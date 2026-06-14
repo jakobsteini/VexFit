@@ -173,6 +173,9 @@ textarea{min-height:88px;line-height:1.6;resize:vertical}
         <div class="chips" id="ovChips"></div>
       </div>
     </div>
+    <a id="profilPreviewBtn" href="#" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:1px solid rgba(232,255,0,0.2);border-radius:3px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);text-decoration:none;margin-bottom:16px;transition:background 0.2s;background:rgba(232,255,0,0.04)">
+      <span>👁</span> So sehe ich für Kunden aus →
+    </a>
   </div>
 
   <!-- ANFRAGEN -->
@@ -282,6 +285,8 @@ function render() {
   const ini = name[0].toUpperCase();
 
   document.getElementById('ovName').textContent = name;
+  const previewBtn = document.getElementById('profilPreviewBtn');
+  if(previewBtn && T.id) previewBtn.href = `profil.html?id=${T.id}`;
   document.getElementById('ovMeta').textContent = T.email;
   document.getElementById('ovAv').textContent = ini;
   document.getElementById('ovPvName').textContent = name;
