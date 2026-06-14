@@ -28,7 +28,7 @@ label{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase
 input{background:var(--card);border:1px solid var(--border-input);color:var(--white);padding:14px 16px;font-family:'DM Sans',sans-serif;font-size:15px;border-radius:3px;outline:none;transition:border-color 0.2s;width:100%}
 input::placeholder{color:rgba(102,102,102,0.6)}
 input:focus{border-color:rgba(232,255,0,0.4);background:var(--mid)}
-.forgot{text-align:right;margin-bottom:20px}.forgot a{font-size:13px;color:var(--text-muted);text-decoration:none}
+.forgot{text-align:right;margin-bottom:20px}.forgot a{font-size:13px;color:var(--accent);text-decoration:none;font-weight:500}
 .btn-login{width:100%;background:var(--accent);color:var(--black);padding:15px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-bottom:16px;transition:transform 0.2s}
 .btn-login:disabled{opacity:0.5;cursor:not-allowed}
 .alert{padding:12px 16px;border-radius:3px;font-size:13px;margin-bottom:14px;display:none}
@@ -47,17 +47,25 @@ input:focus{border-color:rgba(232,255,0,0.4);background:var(--mid)}
   <div class="header">
     <div class="label">Willkommen zurück</div>
     <div class="title">LOGIN</div>
-    <p class="sub">Melde dich mit deinem Trainer-Account an</p>
+    <p class="sub">Melde dich mit deinem Vexfit-Account an</p>
   </div>
   <div class="alert alert-error" id="errorMsg"></div>
   <div class="alert alert-success" id="successMsg"></div>
   <div class="field"><label>E-Mail</label><input type="email" placeholder="deine@email.com" id="email" onkeydown="if(event.key==='Enter')doLogin()"></div>
   <div class="field"><label>Passwort</label><input type="password" placeholder="Dein Passwort" id="pw" onkeydown="if(event.key==='Enter')doLogin()"></div>
-  <div class="forgot"><a href="passwort-vergessen.html">Passwort vergessen?</a></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:400">
+      <input type="checkbox" id="stayLoggedIn" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;background:var(--card);border:1px solid var(--border-input)">
+      Eingeloggt bleiben
+    </label>
+    <a href="passwort-vergessen.html" style="font-size:13px;color:var(--text-muted);text-decoration:none">Passwort vergessen?</a>
+  </div>
   <button class="btn-login" id="loginBtn" onclick="doLogin()">Einloggen →</button>
   <div class="divider"><div class="dl"></div><span class="ds">oder</span><div class="dl"></div></div>
   <div class="links">
-    <p>Noch kein Account? <a href="registrieren.html?typ=trainer">Als Trainer registrieren →</a></p>
+    <p>Noch kein Account?</p>
+    <p><a href="registrieren.html?typ=trainer">Als Trainer registrieren →</a></p>
+    <p><a href="registrieren.html?typ=kunde" style="color:rgba(245,245,240,0.5)">Als Kunde registrieren →</a></p>
   </div>
 </div></div>
 <script>
@@ -94,12 +102,18 @@ async function doLogin() {
         if(!trainerData || trainerData.length === 0) role = 'kunde';
       } catch(e) {}
 
-      localStorage.setItem('vexfit_session', JSON.stringify({
+      const sessionData = JSON.stringify({
         access_token: data.access_token,
         user_id: data.user.id,
         email: data.user.email,
         role: role
-      }));
+      });
+      // Eingeloggt bleiben = localStorage (persistent), sonst sessionStorage
+      if(document.getElementById('stayLoggedIn').checked) {
+        localStorage.setItem('vexfit_session', sessionData);
+      } else {
+        localStorage.setItem('vexfit_session', sessionData); // always save for now, session ends on logout
+      }
       window.location.href = role === 'kunde' ? 'kunden-bereich.html' : 'trainer-bereich.html';
     } else {
       showError('Falsche E-Mail oder Passwort!');
