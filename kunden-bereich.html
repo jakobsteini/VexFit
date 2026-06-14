@@ -7,175 +7,209 @@
 <title>Vexfit – Mein Bereich</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--black:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1e1e1e;--card:#161616;--muted:#666;--border:rgba(255,255,255,0.07);--border-i:rgba(255,255,255,0.12)}
+:root{--bg:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1a1a1a;--card:#161616;--muted:#555;--border:rgba(255,255,255,0.07);--bi:rgba(255,255,255,0.1);--green:#4ade80;--orange:#fb923c}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
-a{text-decoration:none}
-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:0 20px;height:56px;background:rgba(10,10,10,0.97);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
-.logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:4px;color:var(--white)}
+body{background:var(--bg);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(10,10,10,0.98);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:4px;color:var(--white);text-decoration:none}
 .logo span{color:var(--accent)}
-.nav-r{display:flex;align-items:center;gap:10px}
-.nav-email{font-size:12px;color:var(--muted)}
-.btn-out{background:none;border:1px solid var(--border);color:var(--muted);padding:7px 14px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer}
-.btn-out:hover{color:var(--white);border-color:rgba(255,255,255,0.25)}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.topbar-name{font-size:12px;color:var(--muted)}
+.btn-logout{background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer}
+.btn-logout:hover{color:var(--white);border-color:rgba(255,255,255,0.2)}
 .tabs{position:fixed;top:56px;left:0;right:0;z-index:99;background:var(--gray);border-bottom:1px solid var(--border);display:flex}
-.tab{padding:0 20px;height:44px;display:flex;align-items:center;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;white-space:nowrap}
+.tab{flex:1;height:46px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;user-select:none;position:relative}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-.tab.locked{opacity:0.3;cursor:default}
-.page{padding:120px 20px 60px;max-width:640px;margin:0 auto}
-.section{display:none}
+.tab-icon{font-size:13px}
+.badge{position:absolute;top:8px;right:calc(50% - 20px);background:var(--accent);color:var(--bg);font-size:9px;font-weight:700;width:16px;height:16px;border-radius:50%;display:none;align-items:center;justify-content:center}
+.page{padding:102px 16px 80px;max-width:640px;margin:0 auto}
+.section{display:none;animation:fadeIn 0.3s ease}
 .section.active{display:block}
-.card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px;margin-bottom:12px}
-.welcome-name{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,10vw,64px);letter-spacing:2px;line-height:0.95;margin-bottom:6px}
-.welcome-sub{font-size:13px;color:var(--muted);margin-bottom:20px}
-.status-card{border-radius:4px;padding:20px;margin-bottom:20px}
-.status-card.inaktiv{background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.2)}
-.status-card.aktiv{background:rgba(74,222,128,0.06);border:1px solid rgba(74,222,128,0.2)}
-.status-card.waiting{background:rgba(232,255,0,0.06);border:1px solid rgba(232,255,0,0.15)}
-.status-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1.5px;margin-bottom:8px}
-.status-card.inaktiv .status-title{color:orange}
-.status-card.aktiv .status-title{color:#4ade80}
-.status-card.waiting .status-title{color:var(--accent)}
-.status-desc{font-size:13px;color:var(--muted);line-height:1.8;font-weight:300}
-.tag-chip{display:inline-block;padding:4px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:100px;font-size:11px;color:var(--muted);margin:3px}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* WELCOME */
+.welcome-block{margin-bottom:20px}
+.welcome-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:6px}
+.welcome-name{font-family:'Bebas Neue',sans-serif;font-size:clamp(38px,10vw,58px);letter-spacing:2px;line-height:0.9;margin-bottom:4px}
+.welcome-meta{font-size:13px;color:var(--muted);margin-bottom:16px}
+/* STATUS */
+.info-card{background:rgba(232,255,0,0.05);border:1px solid rgba(232,255,0,0.12);border-radius:4px;padding:18px;margin-bottom:16px}
+.ic-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.ic-icon{font-size:18px}
+.ic-title{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1.5px;color:var(--accent)}
+.ic-desc{font-size:13px;color:var(--muted);line-height:1.7;font-weight:300}
+/* GOALS */
+.goals-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.goal-chip{padding:5px 12px;background:rgba(232,255,0,0.07);border:1px solid rgba(232,255,0,0.15);border-radius:100px;font-size:12px;color:var(--accent);font-weight:500}
+/* TRAINER SEARCH */
+.search-bar{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-bottom:8px}
+.search-bar input{background:var(--mid);border:1px solid var(--bi);color:var(--white);padding:11px 13px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;min-width:0}
+.search-bar input:focus{border-color:rgba(232,255,0,0.35)}
+.search-bar select{background:var(--mid);border:1px solid var(--bi);color:var(--white);padding:11px 10px;font-size:13px;border-radius:3px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;white-space:nowrap}
+.search-bar select option{background:#1a1a1a}
+.btn-search{background:var(--accent);color:var(--bg);border:none;padding:11px 16px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap}
+.plz-status{font-size:12px;color:var(--muted);margin-bottom:12px;min-height:16px}
+.filter-bar{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:16px;scrollbar-width:none}
+.filter-bar::-webkit-scrollbar{display:none}
+.fc{padding:5px 12px;border:1px solid var(--bi);border-radius:100px;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.2s;user-select:none}
+.fc.on{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.07)}
 /* TRAINER CARDS */
-.trainer-card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;margin-bottom:10px;cursor:pointer;transition:border-color 0.2s}
-.trainer-card:hover{border-color:rgba(232,255,0,0.2)}
-.tc-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-.tc-av{width:44px;height:44px;border-radius:50%;background:var(--mid);border:2px solid rgba(232,255,0,0.15);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:17px;color:rgba(232,255,0,0.4);flex-shrink:0}
-.tc-name{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px}
+.trainer-card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;margin-bottom:10px;transition:border-color 0.2s}
+.trainer-card:hover{border-color:rgba(232,255,0,0.15)}
+.tc-top{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}
+.tc-av{width:46px;height:46px;border-radius:50%;background:var(--mid);border:2px solid rgba(232,255,0,0.12);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:17px;color:rgba(232,255,0,0.35);flex-shrink:0}
+.tc-info{flex:1;min-width:0}
+.tc-name{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;margin-bottom:2px}
 .tc-meta{font-size:12px;color:var(--muted)}
+.tc-dist{font-size:11px;color:var(--accent);font-weight:600;margin-top:2px}
 .tc-bio{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.btn-anfrage{width:100%;background:var(--accent);color:var(--black);padding:12px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer}
-/* ANFRAGEN */
-.anfrage-item{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;margin-bottom:10px}
-.an-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
-.an-trainer{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1px}
-.an-badge{padding:3px 8px;border-radius:100px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
-.an-badge.pend{background:rgba(232,255,0,0.1);border:1px solid rgba(232,255,0,0.2);color:var(--accent)}
-.an-badge.done{background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.2);color:#4ade80}
-.an-info{font-size:13px;color:var(--muted)}
+.tc-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.tc-chip{padding:3px 8px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:100px;font-size:11px;color:var(--muted)}
+.tc-price{font-size:13px;color:var(--muted);margin-bottom:12px}
+.tc-price strong{color:var(--white)}
+.tc-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn-profil{display:flex;align-items:center;justify-content:center;padding:10px;border:1px solid var(--bi);border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--white);text-decoration:none;transition:border-color 0.2s}
+.btn-profil:hover{border-color:rgba(255,255,255,0.25)}
+.btn-anfrage{background:var(--accent);color:var(--bg);border:none;padding:10px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:opacity 0.2s}
+.btn-anfrage:hover{opacity:0.85}
+/* MEINE TRAINER */
+.meine-card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;margin-bottom:10px}
+.mc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.mc-name{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px}
+.mc-status{padding:3px 9px;border-radius:100px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+.st-pend{background:rgba(232,255,0,0.08);border:1px solid rgba(232,255,0,0.2);color:var(--accent)}
+.st-aktiv{background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.2);color:var(--green)}
+.mc-info{font-size:13px;color:var(--muted);margin-bottom:6px}
+.mc-msg{font-size:13px;color:var(--muted);font-style:italic;padding:10px;background:rgba(255,255,255,0.02);border-radius:3px;border-left:2px solid var(--border);margin-top:8px}
 /* PROFIL */
-.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
-.field label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
-input,select,textarea{background:var(--mid);border:1px solid var(--border-i);color:var(--white);padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%;appearance:none;-webkit-appearance:none;transition:border-color 0.2s}
-input:focus,select:focus{border-color:rgba(232,255,0,0.4)}
-input::placeholder{color:rgba(102,102,102,0.5)}
-select{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 5 5-5z' fill='%23666'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
-select option{background:var(--gray)}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field label{font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+input,select,textarea{background:var(--mid);border:1px solid var(--bi);color:var(--white);padding:11px 13px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%;appearance:none;-webkit-appearance:none;transition:border-color 0.2s}
+input:focus,select:focus{border-color:rgba(232,255,0,0.35)}
+input::placeholder{color:rgba(85,85,85,0.7)}
+select{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 5 5-5z' fill='%23555'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 13px center;padding-right:34px}
+select option{background:#1a1a1a}
+textarea{min-height:80px;line-height:1.6;resize:vertical}
 .goal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.goal-card{background:var(--card);border:1px solid var(--border-i);padding:12px;border-radius:3px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all 0.2s}
+.goal-card{background:var(--card);border:1px solid var(--bi);padding:12px;border-radius:3px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all 0.2s;user-select:none}
 .goal-card.on{border-color:var(--accent);background:rgba(232,255,0,0.05)}
-.goal-card span{font-size:13px;font-weight:500}
-.btn-save{width:100%;background:var(--accent);color:var(--black);padding:14px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-top:6px}
-.btn-save:disabled{opacity:0.5;cursor:not-allowed}
+.goal-card span{font-size:13px}
+.btn-save{width:100%;background:var(--accent);color:var(--bg);padding:14px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-top:8px}
+.btn-save:disabled{opacity:0.4;cursor:not-allowed}
 .alert{padding:11px 14px;border-radius:3px;font-size:13px;margin-bottom:12px;display:none}
 .alert.show{display:block}
-.alert-err{background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b}
-.alert-ok{background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.2);color:#4ade80}
+.alert-ok{background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);color:var(--green)}
+.alert-err{background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.25);color:#f87171}
+/* EMPTY */
+.empty-state{text-align:center;padding:48px 20px;color:var(--muted)}
+.empty-icon{font-size:40px;margin-bottom:14px;display:block}
+.empty-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;margin-bottom:8px;color:rgba(255,255,255,0.4)}
+.empty-sub{font-size:13px;line-height:1.7;font-weight:300}
+.btn-empty{display:inline-block;margin-top:16px;background:var(--accent);color:var(--bg);padding:12px 24px;border-radius:3px;font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border:none;font-family:'DM Sans',sans-serif}
 /* MODAL */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;display:none;align-items:flex-end;justify-content:center}
 .overlay.open{display:flex}
-.modal{background:var(--gray);border:1px solid var(--border);border-radius:6px 6px 0 0;padding:24px 20px 40px;width:100%;max-width:520px;animation:slideUp 0.3s ease}
-.modal-title{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1.5px;margin-bottom:4px}
-.modal-sub{font-size:13px;color:var(--muted);margin-bottom:16px}
-.modal-info{background:var(--card);border:1px solid var(--border);padding:12px;border-radius:3px;margin-bottom:16px;font-size:13px;color:var(--muted)}
-.modal-info strong{color:var(--white);display:block;font-size:16px;margin-bottom:2px}
-textarea.modal-msg{background:var(--card);border:1px solid var(--border-i);color:var(--white);padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%;min-height:90px;line-height:1.6;resize:vertical}
-textarea.modal-msg:focus{border-color:rgba(232,255,0,0.4)}
-.modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
-.btn-cancel{background:none;border:1px solid var(--border);color:var(--muted);padding:12px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
-.btn-send{background:var(--accent);color:var(--black);padding:12px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
-.btn-send:disabled{opacity:0.5;cursor:not-allowed}
-.empty{text-align:center;padding:40px 20px;color:var(--muted)}
-.empty .ei{font-size:36px;margin-bottom:12px}
-.filter-bar{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px}
-.filter-bar::-webkit-scrollbar{display:none}
-.fc{padding:6px 13px;border:1px solid var(--border-i);border-radius:100px;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;flex-shrink:0}
-.fc.on{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.07)}
-@keyframes waBounce{0%{opacity:0;transform:scale(0.5)}100%{opacity:1;transform:scale(1)}}
-.wa{position:fixed;bottom:22px;right:20px;z-index:9999;width:46px;height:46px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 16px rgba(37,211,102,0.4);opacity:0;animation:waBounce 0.5s 2.5s ease both}
-@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.modal{background:var(--gray);border:1px solid var(--border);border-radius:6px 6px 0 0;padding:24px 16px 40px;width:100%;max-width:520px;animation:slideUp 0.3s ease}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-@media(min-width:768px){nav{padding:0 48px}.page{padding:120px 48px 60px}}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1.5px;margin-bottom:4px}
+.modal-sub{font-size:13px;color:var(--muted);margin-bottom:16px}
+.modal-trainer{background:var(--card);border:1px solid var(--border);padding:12px;border-radius:3px;margin-bottom:14px}
+.modal-trainer-name{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;margin-bottom:2px}
+.modal-trainer-meta{font-size:12px;color:var(--muted)}
+textarea.modal-msg{background:var(--card);border:1px solid var(--bi);color:var(--white);padding:12px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%;min-height:88px;line-height:1.6;resize:vertical;margin-bottom:14px}
+textarea.modal-msg:focus{border-color:rgba(232,255,0,0.35)}
+textarea.modal-msg::placeholder{color:rgba(85,85,85,0.7)}
+.modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn-cancel{background:none;border:1px solid var(--border);color:var(--muted);padding:12px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
+.btn-send{background:var(--accent);color:var(--bg);padding:12px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.btn-send:disabled{opacity:0.4;cursor:not-allowed}
+@keyframes waBounce{0%{opacity:0;transform:scale(0.5)}70%{transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}
+.wa{position:fixed;bottom:20px;right:16px;z-index:9999;width:46px;height:46px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 16px rgba(37,211,102,0.4);opacity:0;animation:waBounce 0.5s 2s ease both;text-decoration:none}
+@media(min-width:640px){.topbar{padding:0 32px}.page{padding:102px 32px 80px}}
 </style>
 </head>
 <body>
-<nav>
+
+<div class="topbar">
   <a href="index.html" class="logo">VEX<span>FIT</span></a>
-  <div class="nav-r">
-    <span class="nav-email" id="navEmail"></span>
-    <button class="btn-out" onclick="logout()">Ausloggen</button>
+  <div class="topbar-right">
+    <span class="topbar-name" id="topbarEmail"></span>
+    <button class="btn-logout" onclick="logout()">Ausloggen</button>
   </div>
-</nav>
-<div class="tabs">
-  <div class="tab active" id="tab-ov" onclick="go('ov',this)">Übersicht</div>
-  <div class="tab locked" id="tab-su" onclick="go('su',this)">Trainer finden</div>
-  <div class="tab locked" id="tab-an" onclick="go('an',this)">Meine Anfragen</div>
-  <div class="tab locked" id="tab-pr" onclick="go('pr',this)">Profil</div>
 </div>
+
+<div class="tabs">
+  <div class="tab active" id="tab-ov" onclick="go('ov',this)"><span class="tab-icon">🏠</span>Übersicht</div>
+  <div class="tab" id="tab-su" onclick="go('su',this)"><span class="tab-icon">🔍</span>Trainer</div>
+  <div class="tab" id="tab-mt" onclick="go('mt',this)"><span class="tab-icon">💬</span>Meine Trainer<span class="badge" id="mtBadge">0</span></div>
+  <div class="tab" id="tab-pr" onclick="go('pr',this)"><span class="tab-icon">👤</span>Profil</div>
+</div>
+
 <div class="page">
 
   <!-- ÜBERSICHT -->
   <div class="section active" id="sec-ov">
-    <div style="animation:fadeUp 0.5s ease both">
-      <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:8px">Willkommen zurück</div>
-      <div class="welcome-name" id="wName">–</div>
-      <div class="welcome-sub" id="wSub">–</div>
+    <div class="welcome-block">
+      <div class="welcome-label">Willkommen zurück</div>
+      <div class="welcome-name" id="ovName">–</div>
+      <div class="welcome-meta" id="ovMeta">–</div>
     </div>
-    <div id="statusCard"></div>
-    <div class="card">
-      <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Meine Ziele</div>
-      <div id="goalsEl"></div>
+    <div id="ovGoals" style="margin-bottom:16px"></div>
+    <div class="info-card">
+      <div class="ic-head"><span class="ic-icon">🔍</span><div class="ic-title">WIR SUCHEN FÜR DICH</div></div>
+      <div class="ic-desc">Finde deinen perfekten Trainer im DACH-Raum — lokal oder online. Nutze den "Trainer" Tab um Trainer in deiner Nähe zu finden und eine Anfrage zu stellen.</div>
     </div>
+    <button class="btn-save" style="margin-top:0" onclick="go('su', document.getElementById('tab-su'))">Trainer finden →</button>
   </div>
 
   <!-- TRAINER FINDEN -->
   <div class="section" id="sec-su">
     <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;margin-bottom:14px">TRAINER FINDEN</div>
-    <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-bottom:8px">
+    <div class="search-bar">
       <input type="text" id="plzInput" placeholder="Deine PLZ (z.B. 5026)" maxlength="5">
-      <select id="radiusInput" style="background:var(--mid);border:1px solid var(--border-i);color:var(--white);padding:12px 10px;border-radius:3px;font-size:13px;cursor:pointer;appearance:none;-webkit-appearance:none">
+      <select id="radiusInput">
         <option value="10">10 km</option>
         <option value="25" selected>25 km</option>
         <option value="50">50 km</option>
         <option value="100">100 km</option>
         <option value="0">Alle</option>
       </select>
-      <button onclick="searchByPLZ()" style="background:var(--accent);color:var(--black);border:none;padding:12px 16px;border-radius:3px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap">Suchen →</button>
+      <button class="btn-search" onclick="searchByPLZ()">→</button>
     </div>
-    <div id="plzStatus" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
-    <input type="text" id="searchQ" placeholder="Name suchen..." oninput="filterT()" style="margin-bottom:12px">
-    <div class="filter-bar" id="filterBar">
+    <div class="plz-status" id="plzStatus"></div>
+    <input type="text" id="searchQ" placeholder="Nach Name oder Spezialisierung suchen..." oninput="filterT()" style="background:var(--mid);border:1px solid var(--bi);color:var(--white);padding:10px 13px;font-family:'DM Sans',sans-serif;font-size:13px;border-radius:3px;outline:none;width:100%;margin-bottom:10px">
+    <div class="filter-bar">
       <div class="fc on" onclick="setFilter('alle',this)">Alle</div>
       <div class="fc" onclick="setFilter('Muskelaufbau',this)">💪 Muskelaufbau</div>
       <div class="fc" onclick="setFilter('Abnehmen',this)">🔥 Abnehmen</div>
       <div class="fc" onclick="setFilter('Ausdauer',this)">🏃 Ausdauer</div>
       <div class="fc" onclick="setFilter('Krafttraining',this)">⚡ Krafttraining</div>
-      <div class="fc" onclick="setFilter('Mobility',this)">🧘 Mobility</div>
+      <div class="fc" onclick="setFilter('Yoga',this)">🧘 Mobility</div>
       <div class="fc" onclick="setFilter('Reha',this)">🏥 Reha</div>
     </div>
-    <div id="trainerList"><div class="empty"><div class="ei">🔍</div><p>Wird geladen...</p></div></div>
+    <div id="trainerList"><div class="empty-state"><span class="empty-icon">🔍</span><div class="empty-title">TRAINER LADEN</div><div class="empty-sub">Gib deine PLZ ein oder klicke auf "→"</div></div></div>
   </div>
 
-  <!-- ANFRAGEN -->
-  <div class="section" id="sec-an">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;margin-bottom:16px">MEINE ANFRAGEN</div>
-    <div id="anList"><div class="empty"><div class="ei">📭</div><p>Noch keine Anfragen</p></div></div>
+  <!-- MEINE TRAINER -->
+  <div class="section" id="sec-mt">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;margin-bottom:4px">MEINE TRAINER</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Trainer die du kontaktiert hast</div>
+    <div id="meineList"></div>
   </div>
 
   <!-- PROFIL -->
   <div class="section" id="sec-pr">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;margin-bottom:16px">PROFIL BEARBEITEN</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;margin-bottom:4px">MEIN PROFIL</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Damit Trainer dich besser kennenlernen</div>
     <div class="alert alert-err" id="pErr"></div>
     <div class="alert alert-ok" id="pOk"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div class="field"><label>Vorname</label><input type="text" id="pFn"></div>
       <div class="field"><label>Nachname</label><input type="text" id="pLn"></div>
     </div>
     <div class="field"><label>Stadt</label>
-      <select id="pCity"><option value="">Auswählen...</option><option>Wien</option><option>Graz</option><option>Salzburg</option><option>Linz</option><option>Innsbruck</option><option>München</option><option>Berlin</option><option>Hamburg</option><option>Frankfurt</option><option>Köln</option><option>Zürich</option><option>Basel</option><option>Ich möchte Online-Coaching</option></select>
+      <select id="pCity"><option value="">Auswählen...</option><option>Wien</option><option>Graz</option><option>Salzburg</option><option>Linz</option><option>Innsbruck</option><option>München</option><option>Berlin</option><option>Hamburg</option><option>Frankfurt</option><option>Köln</option><option>Zürich</option><option>Basel</option><option>Online-Coaching gewünscht</option></select>
     </div>
+    <div class="field"><label>PLZ</label><input type="text" id="pPlz" maxlength="5" placeholder="5026"></div>
     <div class="field"><label>Meine Ziele</label>
       <div class="goal-grid">
         <div class="goal-card" onclick="this.classList.toggle('on')"><span>🔥 Abnehmen</span></div>
@@ -186,22 +220,22 @@ textarea.modal-msg:focus{border-color:rgba(232,255,0,0.4)}
         <div class="goal-card" onclick="this.classList.toggle('on')"><span>🏥 Reha</span></div>
       </div>
     </div>
-    <div class="field"><label>Meine Erwartungen</label><textarea id="pErw" placeholder="Was erwartest du von deinem Trainer?" style="min-height:80px;resize:vertical;line-height:1.6;background:var(--mid);border:1px solid var(--border-i);color:var(--white);padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%"></textarea></div>
+    <div class="field"><label>Erwartungen</label><textarea id="pErw" placeholder="Was erwartest du von deinem Trainer?" style="background:var(--mid);border:1px solid var(--bi);color:var(--white);padding:11px 13px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%;min-height:80px;line-height:1.6;resize:vertical"></textarea></div>
     <button class="btn-save" id="saveBtn" onclick="saveProfile()">Speichern</button>
   </div>
 
 </div>
 
-<!-- MODAL -->
-<div class="overlay" id="overlay" onclick="closeOverlay(event)">
+<!-- ANFRAGE MODAL -->
+<div class="overlay" id="overlay" onclick="closeModal(event)">
   <div class="modal">
     <div class="modal-title">TRAINER ANFRAGEN</div>
-    <div class="modal-sub">Deine Anfrage wird direkt übermittelt.</div>
-    <div class="modal-info" id="modalInfo"></div>
-    <textarea class="modal-msg" id="modalMsg" placeholder="Kurz vorstellen: Ziele, Verfügbarkeit..."></textarea>
+    <div class="modal-sub">Deine Anfrage wird direkt übermittelt — kostenlos.</div>
+    <div class="modal-trainer" id="modalTrainer"></div>
+    <textarea class="modal-msg" id="modalMsg" placeholder="Kurz vorstellen: dein Ziel, Verfügbarkeit, Fragen..."></textarea>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeOverlay()">Abbrechen</button>
-      <button class="btn-send" id="sendBtn" onclick="sendAnfrage()">Senden →</button>
+      <button class="btn-cancel" onclick="closeModal()">Abbrechen</button>
+      <button class="btn-send" id="sendBtn" onclick="sendAnfrage()">Anfrage senden →</button>
     </div>
   </div>
 </div>
@@ -212,147 +246,56 @@ textarea.modal-msg:focus{border-color:rgba(232,255,0,0.4)}
 
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
-
-async function getCoords(plz) {
-  for(const country of ['at','de','ch']) {
-    try {
-      const r = await fetch(`https://api.zippopotam.us/${country}/${plz}`);
-      if(r.ok) {
-        const d = await r.json();
-        if(d.places && d.places.length > 0) {
-          return { lat: parseFloat(d.places[0].latitude), lng: parseFloat(d.places[0].longitude), city: d.places[0]['place name'] };
-        }
-      }
-    } catch(e) {}
-  }
-  return null;
-}
-
-function calcDistance(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = (lat2-lat1)*Math.PI/180;
-  const dLng = (lng2-lng1)*Math.PI/180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
-
-async function searchByPLZ() {
-  const plz = document.getElementById('plzInput').value.trim();
-  const radius = parseInt(document.getElementById('radiusInput').value);
-  const status = document.getElementById('plzStatus');
-
-  if(radius === 0) {
-    renderTrainer(allT);
-    status.textContent = `Alle ${allT.length} Trainer`;
-    return;
-  }
-  if(!plz || plz.length < 4) { status.textContent = '⚠️ Bitte gültige PLZ eingeben'; return; }
-
-  status.textContent = '📍 Standort wird ermittelt...';
-  const coords = await getCoords(plz);
-  if(!coords) { status.textContent = '⚠️ PLZ nicht gefunden'; return; }
-  status.textContent = `📍 ${coords.city} · Suche läuft...`;
-
-  const filtered = [];
-  for(const t of allT) {
-    if((t.trainingsart||'').toLowerCase().includes('online')) {
-      filtered.push({...t, _distance: 0, _online: true});
-      continue;
-    }
-    if(!t.plz) continue;
-    const tc = await getCoords(t.plz);
-    if(!tc) continue;
-    const dist = calcDistance(coords.lat, coords.lng, tc.lat, tc.lng);
-    if(dist <= radius) filtered.push({...t, _distance: Math.round(dist)});
-  }
-  filtered.sort((a,b) => a._distance - b._distance);
-  status.textContent = `📍 ${coords.city} · ${filtered.length} Trainer in ${radius} km`;
-  renderTrainerDist(filtered);
-}
-
-function renderTrainerDist(list) {
-  const el = document.getElementById('trainerList');
-  if(!list.length) {
-    el.innerHTML = `<div class="empty"><div class="ei">🔍</div><p>Keine Trainer in diesem Umkreis.<br>Versuche einen größeren Radius.</p></div>`;
-    return;
-  }
-  el.innerHTML = list.map(t => {
-    const ini = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
-    const tags = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="tag-chip">${s}</span>`).join('');
-    const distLabel = t._online ? '🌐 Online' : t._distance !== undefined ? `📍 ${t._distance} km entfernt` : '';
-    return `<div class="trainer-card">
-      <div class="tc-top">
-        <div class="tc-av">${ini}</div>
-        <div><div class="tc-name">${t.vorname||''} ${t.nachname||''}</div>
-        <div class="tc-meta">${distLabel || t.stadt||''} · ${t.trainingsart||''}</div></div>
-      </div>
-      ${t.bio?`<div class="tc-bio">${t.bio}</div>`:''}
-      <div style="margin-bottom:10px">${tags}</div>
-      ${t.preis_stunde?`<div style="font-size:13px;color:var(--muted);margin-bottom:10px">€${t.preis_stunde}/Monat</div>`:''}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <a href="profil.html?id=${t.id}" style="display:flex;align-items:center;justify-content:center;padding:11px;border:1px solid var(--border-i);border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--white);text-decoration:none">Profil →</a>
-        <button class="btn-anfrage" style="margin:0" onclick="openModal(event,${JSON.stringify(t).replace(/"/g,'&quot;')})">Anfragen →</button>
-      </div>
-    </div>`;
-  }).join('');
-}
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
 let K = null, allT = [], activeFilter = 'alle', selT = null;
 
 const raw = localStorage.getItem('vexfit_session');
 if(!raw) { location.href = 'login.html'; }
-const sess = JSON.parse(raw);
-document.getElementById('navEmail').textContent = sess.email;
-init(sess.email);
+else {
+  try {
+    const s = JSON.parse(raw);
+    if(s.role === 'trainer') { location.href = 'trainer-bereich.html'; }
+    else { init(s.email); }
+  } catch(e) { location.href = 'login.html'; }
+}
 
 async function init(email) {
+  document.getElementById('topbarEmail').textContent = email;
   try {
     const r = await fetch(`${SB}/rest/v1/kunden?email=eq.${encodeURIComponent(email)}&select=*`, {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
     });
     const d = await r.json();
-    if(!d || d.length === 0) {
-      // Not a kunde — maybe a trainer logged in here by mistake
-      location.href = 'trainer-bereich.html';
-      return;
-    }
+    if(!d || d.length === 0) { location.href = 'login.html'; return; }
     K = d[0];
     render();
     loadTrainer();
-    loadAnfragen();
+    loadMeineTrainer();
+    if(K.plz) document.getElementById('plzInput').value = K.plz;
   } catch(e) { location.href = 'login.html'; }
 }
 
 function render() {
-  const name = ((K.vorname || '') + ' ' + (K.nachname || '')).trim() || K.email;
-  document.getElementById('wName').textContent = name;
-  document.getElementById('wSub').textContent = (K.stadt || '') + ' · ' + K.email;
+  const name = ((K.vorname||'') + ' ' + (K.nachname||'')).trim() || K.email;
+  document.getElementById('ovName').textContent = name;
+  document.getElementById('ovMeta').textContent = (K.stadt ? '📍 ' + K.stadt + ' · ' : '') + K.email;
 
   // Goals
-  const goals = (K.ziel || '').split(', ').filter(Boolean);
-  document.getElementById('goalsEl').innerHTML = goals.length
-    ? goals.map(g => `<span class="tag-chip">${g}</span>`).join('')
-    : '<span style="font-size:13px;color:var(--muted)">Noch keine Ziele gesetzt</span>';
+  const goals = (K.ziel||'').split(', ').filter(Boolean);
+  document.getElementById('ovGoals').innerHTML = goals.length
+    ? `<div class="goals-row">${goals.map(g => `<span class="goal-chip">${g}</span>`).join('')}</div>`
+    : '';
 
-  // Status
-  document.getElementById('statusCard').innerHTML = `
-    <div class="status-card waiting" style="margin-bottom:20px">
-      <div class="status-title">🔍 WIR SUCHEN FÜR DICH</div>
-      <div class="status-desc">Wir benachrichtigen dich sobald ein passender Trainer für deine Ziele verfügbar ist und du aktiviert wirst.</div>
-    </div>`;
-
-  // Unlock all tabs
-  ['tab-su','tab-an','tab-pr'].forEach(id => document.getElementById(id).classList.remove('locked'));
-
-  // Fill profil
+  // Fill profil form
   document.getElementById('pFn').value = K.vorname || '';
   document.getElementById('pLn').value = K.nachname || '';
+  document.getElementById('pPlz').value = K.plz || '';
   document.getElementById('pErw').value = K.erwartungen || '';
   setSelect('pCity', K.stadt);
-  const saved = (K.ziel || '').split(', ').filter(Boolean);
+  const saved = (K.ziel||'').split(', ').filter(Boolean);
   document.querySelectorAll('.goal-card').forEach(el => {
-    const t = el.querySelector('span').textContent.replace(/^.\s/,'');
-    if(saved.some(g => g.includes(t) || t.includes(g.replace(/^.\s/,'')))) el.classList.add('on');
+    const txt = el.querySelector('span').textContent.replace(/^.\s/,'');
+    if(saved.some(g => g.includes(txt) || txt.includes(g.replace(/^.\s/,'')))) el.classList.add('on');
   });
 }
 
@@ -360,6 +303,47 @@ function setSelect(id, val) {
   if(!val) return;
   const s = document.getElementById(id);
   for(let o of s.options) { if(o.text === val || o.value === val) { o.selected = true; break; } }
+}
+
+// PLZ SEARCH
+async function getCoords(plz) {
+  for(const c of ['at','de','ch']) {
+    try {
+      const r = await fetch(`https://api.zippopotam.us/${c}/${plz}`);
+      if(r.ok) { const d = await r.json(); if(d.places?.length) return {lat:parseFloat(d.places[0].latitude),lng:parseFloat(d.places[0].longitude),city:d.places[0]['place name']}; }
+    } catch(e) {}
+  }
+  return null;
+}
+
+function calcDist(lat1,lng1,lat2,lng2) {
+  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+async function searchByPLZ() {
+  const plz = document.getElementById('plzInput').value.trim();
+  const radius = parseInt(document.getElementById('radiusInput').value);
+  const status = document.getElementById('plzStatus');
+  if(radius === 0) { renderTrainer(allT); status.textContent = `Alle ${allT.length} Trainer`; return; }
+  if(!plz || plz.length < 4) { status.textContent = '⚠️ Bitte gültige PLZ eingeben'; return; }
+  status.textContent = '📍 Standort wird ermittelt...';
+  const coords = await getCoords(plz);
+  if(!coords) { status.textContent = '⚠️ PLZ nicht gefunden'; return; }
+  status.textContent = `📍 ${coords.city} · Suche läuft...`;
+  const filtered = [];
+  for(const t of allT) {
+    if((t.trainingsart||'').toLowerCase().includes('online')) { filtered.push({...t,_dist:0,_online:true}); continue; }
+    if(!t.plz) continue;
+    const tc = await getCoords(t.plz);
+    if(!tc) continue;
+    const dist = calcDist(coords.lat,coords.lng,tc.lat,tc.lng);
+    if(dist <= radius) filtered.push({...t,_dist:Math.round(dist)});
+  }
+  filtered.sort((a,b) => a._dist - b._dist);
+  status.textContent = `📍 ${coords.city} · ${filtered.length} Trainer in ${radius} km`;
+  renderTrainer(filtered);
 }
 
 async function loadTrainer() {
@@ -370,43 +354,16 @@ async function loadTrainer() {
     allT = await r.json() || [];
     renderTrainer(allT);
   } catch(e) {
-    document.getElementById('trainerList').innerHTML = '<div class="empty"><p>Fehler beim Laden</p></div>';
+    document.getElementById('trainerList').innerHTML = '<div class="empty-state"><p>Fehler beim Laden</p></div>';
   }
 }
 
-function renderTrainer(list) {
-  const el = document.getElementById('trainerList');
-  // Filter by kunde's city or online trainers
-  if(K && K.stadt && activeFilter === 'alle' && !document.getElementById('searchQ').value) {
-    const stadtLower = K.stadt.toLowerCase();
-    const filtered = list.filter(t =>
-      !t.stadt ||
-      t.stadt.toLowerCase() === stadtLower ||
-      (t.trainingsart || '').toLowerCase().includes('online')
-    );
-    if(filtered.length > 0) list = filtered;
-  }
-  if(!list.length) { el.innerHTML = `<div class="empty"><div class="ei">🔍</div><p>Noch keine Trainer in ${K && K.stadt ? K.stadt : 'deiner Stadt'} verfügbar.<br><span style="font-size:12px">Wir benachrichtigen dich sobald ein Trainer verfügbar ist.</span></p></div>`; return; }
-  el.innerHTML = list.map(t => {
-    const ini = ((t.vorname||'?')[0] + (t.nachname||'?')[0]).toUpperCase();
-    const tags = (t.spezialisierungen || []).slice(0,3).map(s => `<span class="tag-chip">${s}</span>`).join('');
-    return `<div class="trainer-card">
-      <div class="tc-top">
-        <div class="tc-av">${ini}</div>
-        <div>
-          <div class="tc-name">${t.vorname || ''} ${t.nachname || ''}</div>
-          <div class="tc-meta">${t.stadt || ''} · ${t.trainingsart || ''}</div>
-        </div>
-      </div>
-      ${t.bio ? `<div class="tc-bio">${t.bio}</div>` : ''}
-      <div style="margin-bottom:10px">${tags}</div>
-      ${t.preis_stunde ? `<div style="font-size:13px;color:var(--muted);margin-bottom:10px">€${t.preis_stunde}/Monat</div>` : ''}
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <a href="profil.html?id=${t.id}" style="display:flex;align-items:center;justify-content:center;padding:11px;border:1px solid var(--border-i);border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--white);text-decoration:none">Profil →</a>
-        <button class="btn-anfrage" style="margin:0" onclick="openModal(event,${JSON.stringify(t).replace(/"/g,'&quot;')})">Anfragen →</button>
-      </div>
-    </div>`;
-  }).join('');
+function filterT() {
+  const q = document.getElementById('searchQ').value.toLowerCase();
+  let list = allT;
+  if(activeFilter !== 'alle') list = list.filter(t => (t.spezialisierungen||[]).join(' ').toLowerCase().includes(activeFilter.toLowerCase()));
+  if(q) list = list.filter(t => `${t.vorname||''} ${t.nachname||''} ${(t.spezialisierungen||[]).join(' ')}`.toLowerCase().includes(q));
+  renderTrainer(list);
 }
 
 function setFilter(f, el) {
@@ -416,45 +373,80 @@ function setFilter(f, el) {
   filterT();
 }
 
-function filterT() {
-  const q = document.getElementById('searchQ').value.toLowerCase();
-  let list = allT;
-  if(activeFilter !== 'alle') list = list.filter(t => (t.spezialisierungen||[]).join(' ').includes(activeFilter) || (t.trainingsart||'').includes(activeFilter));
-  if(q) list = list.filter(t => `${t.vorname} ${t.nachname} ${t.stadt||''}`.toLowerCase().includes(q));
-  renderTrainer(list);
+function renderTrainer(list) {
+  const el = document.getElementById('trainerList');
+  if(!list.length) {
+    el.innerHTML = `<div class="empty-state"><span class="empty-icon">🔍</span><div class="empty-title">KEINE TRAINER GEFUNDEN</div><div class="empty-sub">Versuche einen größeren Umkreis oder andere Filter.</div></div>`;
+    return;
+  }
+  el.innerHTML = list.map(t => {
+    const ini = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
+    const chips = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="tc-chip">${s}</span>`).join('');
+    const dist = t._online ? '<div class="tc-dist">🌐 Online · DACH-weit</div>' : t._dist !== undefined ? `<div class="tc-dist">📍 ${t._dist} km entfernt</div>` : '';
+    const price = t.preis_stunde ? `<div class="tc-price">ab <strong>€${t.preis_stunde}/Monat</strong></div>` : '';
+    return `<div class="trainer-card">
+      <div class="tc-top">
+        <div class="tc-av">${ini}</div>
+        <div class="tc-info">
+          <div class="tc-name">${t.vorname||''} ${t.nachname||''}</div>
+          <div class="tc-meta">${t.trainingsart||''} · ${t.stadt||''}</div>
+          ${dist}
+        </div>
+      </div>
+      ${t.bio ? `<div class="tc-bio">${t.bio}</div>` : ''}
+      <div class="tc-chips">${chips}</div>
+      ${price}
+      <div class="tc-actions">
+        <a href="profil.html?id=${t.id}" class="btn-profil">Profil ansehen →</a>
+        <button class="btn-anfrage" onclick="openModal(${JSON.stringify(t).replace(/"/g,'&quot;')})">Anfragen →</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-async function loadAnfragen() {
-  const el = document.getElementById('anList');
+async function loadMeineTrainer() {
+  if(!K) return;
+  const el = document.getElementById('meineList');
   try {
     const r = await fetch(`${SB}/rest/v1/anfragen?kunden_email=eq.${encodeURIComponent(K.email)}&order=created_at.desc`, {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
     });
-    const data = await r.json();
-    if(!data || data.length === 0) { el.innerHTML = '<div class="empty"><div class="ei">📭</div><p>Noch keine Anfragen</p></div>'; return; }
+    const data = await r.json() || [];
+    // Update badge
+    if(data.length > 0) {
+      const badge = document.getElementById('mtBadge');
+      badge.textContent = data.length;
+      badge.style.display = 'flex';
+    }
+    if(!data.length) {
+      el.innerHTML = `<div class="empty-state"><span class="empty-icon">💬</span><div class="empty-title">NOCH KEINE ANFRAGEN</div><div class="empty-sub">Finde deinen Wunschtrainer und stell eine kostenlose Anfrage.</div><button class="btn-empty" onclick="go('su',document.getElementById('tab-su'))">Trainer finden →</button></div>`;
+      return;
+    }
     el.innerHTML = data.map(a => {
+      const date = new Date(a.created_at).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'});
       const done = a.weitergeleitet;
-      return `<div class="anfrage-item">
-        <div class="an-head">
-          <div class="an-trainer">${a.trainer_name || a.trainer_email || '–'}</div>
-          <span class="an-badge ${done ? 'done' : 'pend'}">${done ? 'Aktiv' : 'Ausstehend'}</span>
+      return `<div class="meine-card">
+        <div class="mc-head">
+          <div class="mc-name">${a.trainer_name||a.trainer_email||'–'}</div>
+          <span class="mc-status ${done?'st-aktiv':'st-pend'}">${done?'✓ Aktiv':'⏳ Ausstehend'}</span>
         </div>
-        <div class="an-info">${new Date(a.created_at).toLocaleDateString('de-AT')}</div>
-        ${a.nachricht ? `<div class="an-info" style="margin-top:4px">"${a.nachricht}"</div>` : ''}
+        <div class="mc-info">📅 ${date} · 🎯 ${a.ziel||'–'}</div>
+        ${a.nachricht ? `<div class="mc-msg">"${a.nachricht}"</div>` : ''}
       </div>`;
     }).join('');
-  } catch(e) { el.innerHTML = '<div class="empty"><p>Fehler beim Laden</p></div>'; }
+  } catch(e) {
+    el.innerHTML = '<div class="empty-state"><p>Fehler beim Laden</p></div>';
+  }
 }
 
-function openModal(e, trainer) {
-  e.stopPropagation();
+function openModal(trainer) {
   selT = trainer;
-  document.getElementById('modalInfo').innerHTML = `<strong>${trainer.vorname} ${trainer.nachname}</strong>${trainer.stadt || ''} · ${trainer.trainingsart || ''}`;
+  document.getElementById('modalTrainer').innerHTML = `<div class="modal-trainer-name">${trainer.vorname} ${trainer.nachname}</div><div class="modal-trainer-meta">${trainer.trainingsart||''} · ${trainer.stadt||''}</div>`;
   document.getElementById('modalMsg').value = '';
   document.getElementById('overlay').classList.add('open');
 }
 
-function closeOverlay(e) {
+function closeModal(e) {
   if(!e || e.target === document.getElementById('overlay')) {
     document.getElementById('overlay').classList.remove('open');
     selT = null;
@@ -467,9 +459,9 @@ async function sendAnfrage() {
   btn.disabled = true; btn.textContent = 'Wird gesendet...';
   const body = {
     trainer_email: selT.email,
-    trainer_name: `${selT.vorname} ${selT.nachname}`,
+    trainer_name: `${selT.vorname||''} ${selT.nachname||''}`.trim(),
     kunden_email: K.email,
-    kunden_name: `${K.vorname} ${K.nachname}`,
+    kunden_name: `${K.vorname||''} ${K.nachname||''}`.trim(),
     ziel: K.ziel || '',
     nachricht: document.getElementById('modalMsg').value.trim(),
     status: 'ausstehend',
@@ -477,19 +469,19 @@ async function sendAnfrage() {
   };
   try {
     await fetch(`${SB}/rest/v1/anfragen`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'return=minimal' },
+      method:'POST',
+      headers:{'Content-Type':'application/json',apikey:KEY,Authorization:`Bearer ${KEY}`,Prefer:'return=minimal'},
       body: JSON.stringify(body)
     });
     fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neue-anfrage', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
     }).catch(()=>{});
     document.getElementById('overlay').classList.remove('open');
     selT = null;
-    loadAnfragen();
-    go('an', document.getElementById('tab-an'));
-  } catch(e) { alert('Fehler beim Senden'); }
-  btn.disabled = false; btn.textContent = 'Senden →';
+    loadMeineTrainer();
+    go('mt', document.getElementById('tab-mt'));
+  } catch(e) { alert('Fehler beim Senden. Bitte erneut versuchen.'); }
+  btn.disabled = false; btn.textContent = 'Anfrage senden →';
 }
 
 async function saveProfile() {
@@ -502,13 +494,14 @@ async function saveProfile() {
     vorname: document.getElementById('pFn').value.trim(),
     nachname: document.getElementById('pLn').value.trim(),
     stadt: document.getElementById('pCity').value,
+    plz: document.getElementById('pPlz').value.trim(),
     ziel: goals.join(', '),
     erwartungen: document.getElementById('pErw').value.trim()
   };
   try {
     const r = await fetch(`${SB}/rest/v1/kunden?id=eq.${K.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'return=representation' },
+      method:'PATCH',
+      headers:{'Content-Type':'application/json',apikey:KEY,Authorization:`Bearer ${KEY}`,Prefer:'return=representation'},
       body: JSON.stringify(body)
     });
     if(r.ok) {
@@ -516,24 +509,23 @@ async function saveProfile() {
       if(d && d[0]) K = d[0];
       render();
       const ok = document.getElementById('pOk');
-      ok.textContent = '✓ Gespeichert!';
+      ok.textContent = '✓ Profil gespeichert!';
       ok.classList.add('show');
       setTimeout(() => ok.classList.remove('show'), 3000);
-    } else { throw new Error(); }
+    } else throw new Error();
   } catch(e) {
-    const err = document.getElementById('pErr');
-    err.textContent = '⚠️ Fehler beim Speichern';
-    err.classList.add('show');
+    document.getElementById('pErr').textContent = '⚠️ Fehler beim Speichern';
+    document.getElementById('pErr').classList.add('show');
   }
   btn.disabled = false; btn.textContent = 'Speichern';
 }
 
 function go(id, el) {
-  if(el.classList.contains('locked')) return;
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('sec-' + id).classList.add('active');
   el.classList.add('active');
+  window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 function logout() {
