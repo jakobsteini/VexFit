@@ -193,7 +193,7 @@ footer p{font-size:12px;color:var(--text-muted)}
   <div class="hero-glow"></div>
   <div class="hero-content">
     <div class="hero-badge"><div class="badge-dot"></div>Neu im DACH-Raum</div>
-    <h1>DEIN TRAINER.<em>DEIN ZIEL.</em></h1>
+    <h1>DEIN TRAINER.<em id="heroSub">DEIN ZIEL.</em></h1>
     <p class="hero-sub">Finde in 2 Minuten den perfekten Personal Trainer – lokal oder online. Verifiziert. Direkt buchbar.</p>
     <div class="hero-actions">
       <a href="registrieren.html?typ=kunde" class="btn-primary">Trainer finden →</a>
@@ -288,6 +288,22 @@ if(localStorage.getItem('cookie'))document.getElementById('cookieBanner').style.
 function setCookie(){localStorage.setItem('cookie','set');const b=document.getElementById('cookieBanner');b.style.transform='translateY(100%)';b.style.transition='transform 0.4s';setTimeout(()=>b.style.display='none',400)}
 function openMenu(){document.getElementById('navDrawer').classList.add('open');document.getElementById('navOverlay').classList.add('open');document.body.style.overflow='hidden'}
 function closeMenu(){document.getElementById('navDrawer').classList.remove('open');document.getElementById('navOverlay').classList.remove('open');document.body.style.overflow=''}
+
+// Nur der gelbe Text wechselt — sanft
+const _subs = ['DEIN ZIEL.', 'DEIN ERFOLG.', 'DEINE TRANSFORMATION.', 'DEIN ERGEBNIS.', 'DEINE STÄRKE.', 'DEIN POTENZIAL.'];
+let _si = 0;
+const _subEl = document.getElementById('heroSub');
+if(_subEl) {
+  setInterval(() => {
+    _si = (_si + 1) % _subs.length;
+    _subEl.style.transition = 'opacity 0.5s ease';
+    _subEl.style.opacity = '0';
+    setTimeout(() => {
+      _subEl.textContent = _subs[_si];
+      _subEl.style.opacity = '1';
+    }, 500);
+  }, 2800);
+}
 </script>
 <!-- WhatsApp Button -->
 <style>
