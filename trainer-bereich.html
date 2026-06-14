@@ -115,6 +115,13 @@ textarea{min-height:88px;line-height:1.6;resize:vertical}
 .empty-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;margin-bottom:8px;color:rgba(255,255,255,0.5)}
 .empty-sub{font-size:13px;line-height:1.7;font-weight:300}
 /* WA */
+/* LOADING SCREEN */
+.loading-screen{position:fixed;inset:0;background:var(--bg);z-index:9998;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.loading-logo{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:6px;color:var(--white)}
+.loading-logo span{color:var(--accent)}
+.loading-bar{width:120px;height:2px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden}
+.loading-bar-inner{height:100%;background:var(--accent);border-radius:2px;animation:loadBar 1s ease forwards}
+@keyframes loadBar{from{width:0}to{width:100%}}
 @keyframes waBounce{0%{opacity:0;transform:scale(0.5)}70%{transform:scale(1.05)}100%{opacity:1;transform:scale(1)}}
 .wa{position:fixed;bottom:20px;right:16px;z-index:9999;width:46px;height:46px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 16px rgba(37,211,102,0.4);opacity:0;animation:waBounce 0.5s 2s ease both;text-decoration:none}
 @media(min-width:640px){.topbar{padding:0 32px}.section{padding:24px 32px}.tabs .tab{font-size:12px}}
@@ -122,6 +129,10 @@ textarea{min-height:88px;line-height:1.6;resize:vertical}
 </head>
 <body>
 
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-logo">VEX<span>FIT</span></div>
+  <div class="loading-bar"><div class="loading-bar-inner"></div></div>
+</div>
 <div class="topbar">
   <a href="index.html" class="logo">VEX<span>FIT</span></a>
   <div class="topbar-right">
@@ -241,10 +252,15 @@ else {
     const s = JSON.parse(raw);
     if(s.role === 'kunde') { location.href = 'kunden-bereich.html'; }
     else { init(s.email); }
-  } catch(e) { location.href = 'login.html'; }
+  } catch(e) { hideLoader(); location.href = 'login.html'; }
 }
 
 async function init(email) {
+  // Hide loading screen after data loads
+  const hideLoader = () => {
+    const l = document.getElementById('loadingScreen');
+    if(l) { l.style.opacity = '0'; l.style.transition = 'opacity 0.3s'; setTimeout(() => l.remove(), 300); }
+  };
   document.getElementById('topbarEmail').textContent = email;
   try {
     const r = await fetch(`${SB}/rest/v1/trainers?email=eq.${encodeURIComponent(email)}&select=*`, {
@@ -254,8 +270,9 @@ async function init(email) {
     if(!d || d.length === 0) { location.href = 'login.html'; return; }
     T = d[0];
     render();
+    hideLoader();
     loadAnfragen();
-  } catch(e) { location.href = 'login.html'; }
+  } catch(e) { hideLoader(); location.href = 'login.html'; }
 }
 
 function render() {
