@@ -101,6 +101,10 @@ textarea{min-height:88px;line-height:1.6;resize:vertical}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .field-hint{font-size:11px;color:var(--muted);margin-top:2px}
 .tags-wrap{display:flex;flex-wrap:wrap;gap:6px}
+.av-wrap{position:relative;width:52px;height:52px;flex-shrink:0}
+.av{width:52px;height:52px;border-radius:50%;background:var(--mid);border:2px solid rgba(232,255,0,0.15);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:20px;color:rgba(232,255,0,0.4);object-fit:cover;cursor:pointer;overflow:hidden}
+.av-upload-btn{position:absolute;bottom:-2px;right:-2px;width:20px;height:20px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;border:2px solid var(--bg)}
+#avatarInput{display:none}
 .tag-sel{padding:6px 12px;border:1px solid var(--bi);border-radius:100px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;transition:all 0.2s}
 .tag-sel.on{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.07)}
 .btn-save{width:100%;background:var(--accent);color:var(--bg);padding:14px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-top:8px;transition:opacity 0.2s}
@@ -166,7 +170,11 @@ textarea{min-height:88px;line-height:1.6;resize:vertical}
       <div class="stat-box"><span class="stat-num" id="statKunden">0</span><div class="stat-lbl">Aktive Kunden</div></div>
     </div>
     <div class="profile-preview" id="ovProfile">
-      <div class="av" id="ovAv">–</div>
+      <div class="av-wrap" onclick="document.getElementById('avatarInput').click()">
+        <div class="av" id="ovAv">–</div>
+        <div class="av-upload-btn">✏️</div>
+        <input type="file" id="avatarInput" accept="image/*" onchange="uploadAvatar(this)">
+      </div>
       <div class="pv-info">
         <div class="pv-name" id="ovPvName">–</div>
         <div class="pv-meta" id="ovPvMeta">–</div>
@@ -288,7 +296,16 @@ function render() {
   const previewBtn = document.getElementById('profilPreviewBtn');
   if(previewBtn && T.id) previewBtn.href = `profil.html?id=${T.id}`;
   document.getElementById('ovMeta').textContent = T.email;
-  document.getElementById('ovAv').textContent = ini;
+  const avEl = document.getElementById('ovAv');
+  if(T.avatar_url) {
+    avEl.style.backgroundImage = `url(${T.avatar_url})`;
+    avEl.style.backgroundSize = 'cover';
+    avEl.style.backgroundPosition = 'center';
+    avEl.textContent = '';
+  } else {
+    avEl.style.backgroundImage = '';
+    avEl.textContent = ini;
+  }
   document.getElementById('ovPvName').textContent = name;
   document.getElementById('ovPvMeta').textContent = [T.trainingsart, T.stadt, T.erfahrung].filter(Boolean).join(' · ') || 'Profil noch nicht vollständig';
   const tags = T.spezialisierungen || [];
@@ -360,6 +377,7 @@ async function loadAnfragen() {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
     });
     const data = await r.json() || [];
+    _lastAnzahl = data.length;
     document.getElementById('statAnfragen').textContent = data.length;
     const aktiv = data.filter(a => a.weitergeleitet).length;
     document.getElementById('statKunden').textContent = aktiv;
@@ -454,6 +472,67 @@ function go(id, el) {
   document.getElementById('sec-' + id).classList.add('active');
   el.classList.add('active');
   window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+// Auto-refresh anfragen every 60 seconds
+let _lastAnzahl = 0;
+setInterval(async () => {
+  if(!T) return;
+  try {
+    const r = await fetch(`${SB}/rest/v1/anfragen?trainer_email=eq.${encodeURIComponent(T.email)}&select=id`, {
+      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
+    });
+    const data = await r.json() || [];
+    if(data.length > _lastAnzahl && _lastAnzahl > 0) {
+      // New anfrage arrived — show notification and reload
+      showNotification(`🎉 ${data.length - _lastAnzahl} neue Anfrage${data.length - _lastAnzahl > 1 ? 'n' : ''}!`);
+      loadAnfragen();
+    }
+    _lastAnzahl = data.length;
+  } catch(e) {}
+}, 60000);
+
+function showNotification(msg) {
+  const n = document.createElement('div');
+  n.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--bg);padding:12px 20px;border-radius:100px;font-weight:700;font-size:13px;z-index:9999;animation:fadeUp 0.4s ease both;box-shadow:0 4px 20px rgba(232,255,0,0.3)';
+  n.textContent = msg;
+  document.body.appendChild(n);
+  setTimeout(() => { n.style.opacity='0'; n.style.transition='opacity 0.4s'; setTimeout(()=>n.remove(),400); }, 4000);
+}
+
+async function uploadAvatar(input) {
+  if(!input.files || !input.files[0] || !T) return;
+  const file = input.files[0];
+  if(file.size > 2 * 1024 * 1024) { showNotification('⚠️ Bild max. 2MB'); return; }
+  showNotification('⏳ Wird hochgeladen...');
+  try {
+    const ext = file.name.split('.').pop();
+    const path = `${T.id}.${ext}`;
+    // Upload to Supabase Storage
+    const up = await fetch(`${SB}/storage/v1/object/avatars/${path}`, {
+      method: 'POST',
+      headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': file.type, 'x-upsert': 'true' },
+      body: file
+    });
+    if(!up.ok) throw new Error();
+    const url = `${SB}/storage/v1/object/public/avatars/${path}`;
+    // Save URL to trainer profile
+    await fetch(`${SB}/rest/v1/trainers?id=eq.${T.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type':'application/json', apikey:KEY, Authorization:`Bearer ${KEY}`, Prefer:'return=representation' },
+      body: JSON.stringify({ avatar_url: url })
+    });
+    T.avatar_url = url;
+    // Show image
+    const avEl = document.getElementById('ovAv');
+    avEl.style.backgroundImage = `url(${url})`;
+    avEl.style.backgroundSize = 'cover';
+    avEl.style.backgroundPosition = 'center';
+    avEl.textContent = '';
+    showNotification('✅ Profilbild gespeichert!');
+  } catch(e) {
+    showNotification('⚠️ Fehler beim Hochladen');
+  }
 }
 
 function logout() {

@@ -398,12 +398,13 @@ function renderTrainer(list) {
   }
   el.innerHTML = list.map(t => {
     const ini = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
+    const avStyle = t.avatar_url ? `background-image:url(${t.avatar_url});background-size:cover;background-position:center;font-size:0` : '';
     const chips = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="tc-chip">${s}</span>`).join('');
     const dist = t._online ? '<div class="tc-dist">🌐 Online · DACH-weit</div>' : t._dist !== undefined ? `<div class="tc-dist">📍 ${t._dist} km entfernt</div>` : '';
     const price = t.preis_stunde ? `<div class="tc-price">ab <strong>€${t.preis_stunde}/Monat</strong></div>` : '';
     return `<div class="trainer-card">
       <div class="tc-top">
-        <div class="tc-av">${ini}</div>
+        <div class="tc-av" style="${avStyle}">${avStyle ? '' : ini}</div>
         <div class="tc-info">
           <div class="tc-name">${t.vorname||''} ${t.nachname||''}</div>
           <div class="tc-meta">${t.trainingsart||''} · ${t.stadt||''}</div>
