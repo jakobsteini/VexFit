@@ -255,7 +255,11 @@ function renderTrainer(list) {
   let filtered = list;
   if(activeFilter !== 'alle') filtered = list.filter(t => (t.spezialisierungen||[]).join(' ').toLowerCase().includes(activeFilter.toLowerCase()));
   const el = document.getElementById('trainerList');
-  if(!filtered.length) { el.innerHTML = '<div class="empty-state">Keine Trainer gefunden — anderen Umkreis versuchen</div>'; return; }
+  if(!filtered.length) { el.innerHTML = `<div class="empty-state" style="padding:48px 20px">
+    <div style="font-size:40px;margin-bottom:16px">📍</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;color:rgba(255,255,255,0.3);margin-bottom:12px">NOCH KEINE TRAINER</div>
+    <div style="font-size:14px;color:var(--muted);line-height:1.8;font-weight:300">Wir benachrichtigen dich sobald ein Trainer<br>in deiner Nähe verfügbar ist.</div>
+  </div>`; return; }
   el.innerHTML = filtered.map(t => {
     const ini = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
     const avStyle = t.avatar_url ? `background-image:url(${t.avatar_url});background-size:cover;background-position:center` : '';
