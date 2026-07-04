@@ -56,6 +56,13 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(
 .btn-profil{display:flex;align-items:center;justify-content:center;padding:10px;border:1px solid var(--bi);border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--white);text-decoration:none}
 .btn-anfrage{background:var(--accent);color:var(--bg);border:none;padding:10px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
 .empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+/* ALERT BOX */
+.alert-box{background:var(--card);border:1px solid rgba(232,255,0,0.2);border-radius:4px;padding:20px;margin-top:20px;text-align:left}
+.alert-box-title{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.alert-box-sub{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px}
+.btn-alert{background:var(--accent);color:var(--bg);border:none;width:100%;padding:12px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:opacity 0.2s}
+.btn-alert:disabled{opacity:0.5;cursor:default}
+.btn-alert.active{background:transparent;border:1px solid rgba(232,255,0,0.4);color:var(--accent)}
 /* MODAL */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;display:none;align-items:flex-end;justify-content:center}
 .overlay.open{display:flex}
@@ -154,7 +161,7 @@ textarea.modal-msg::placeholder{color:rgba(85,85,85,0.7)}
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
-let K = null, allT = [], activeFilter = 'alle', selT = null;
+let K = null, allT = [], activeFilter = 'alle', selT = null, lastSearch = null;
 
 // AUTH - no redirect loop
 const raw = localStorage.getItem('vexfit_session');
@@ -223,7 +230,7 @@ async function searchByPLZ() {
   const plz = document.getElementById('plzInput').value.trim();
   const radius = parseInt(document.getElementById('radiusInput').value);
   const status = document.getElementById('plzStatus');
-  if(radius === 0) { if(!allT.length) await loadTrainer(); renderTrainer(allT); status.textContent = `Alle ${allT.length} Trainer`; return; }
+  if(radius === 0) { if(!allT.length) await loadTrainer(); lastSearch = null; renderTrainer(allT); status.textContent = `Alle ${allT.length} Trainer`; return; }
   if(!plz || plz.length < 4) { status.textContent = '⚠️ Bitte gültige PLZ eingeben'; return; }
   if(!allT.length) await loadTrainer();
   status.textContent = '📍 Standort wird ermittelt...';
@@ -241,6 +248,7 @@ async function searchByPLZ() {
   }
   filtered.sort((a,b) => a._dist - b._dist);
   status.textContent = `📍 ${coords.city} · ${filtered.length} Trainer in ${radius} km`;
+  lastSearch = { plz, city: coords.city, radius };
   renderTrainer(filtered);
 }
 
@@ -255,11 +263,21 @@ function renderTrainer(list) {
   let filtered = list;
   if(activeFilter !== 'alle') filtered = list.filter(t => (t.spezialisierungen||[]).join(' ').toLowerCase().includes(activeFilter.toLowerCase()));
   const el = document.getElementById('trainerList');
-  if(!filtered.length) { el.innerHTML = `<div class="empty-state" style="padding:48px 20px">
+  if(!filtered.length) {
+    const where = lastSearch ? `IN ${lastSearch.plz}${lastSearch.city ? ' ' + lastSearch.city.toUpperCase() : ''}` : 'IN DEINER NÄHE';
+    const alertBox = lastSearch ? `
+    <div class="alert-box" id="alertBox">
+      <div class="alert-box-title">🔔 Informiere mich sobald es einen Trainer für mich gibt</div>
+      <div class="alert-box-sub">Sobald sich ein Trainer in ${lastSearch.plz} ${lastSearch.city || ''} registriert, bekommst du automatisch eine E-Mail mit seinen Daten.</div>
+      <button class="btn-alert" id="alertBtn" onclick="activateAlert()">Aktivieren</button>
+    </div>` : '';
+    el.innerHTML = `<div class="empty-state" style="padding:48px 20px 20px">
     <div style="font-size:40px;margin-bottom:16px">📍</div>
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;color:rgba(255,255,255,0.3);margin-bottom:12px">NOCH KEINE TRAINER</div>
-    <div style="font-size:14px;color:var(--muted);line-height:1.8;font-weight:300">Wir benachrichtigen dich sobald ein Trainer<br>in deiner Nähe verfügbar ist.</div>
-  </div>`; return; }
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;color:rgba(255,255,255,0.3);margin-bottom:12px">KEINE TRAINER ${where} GEFUNDEN</div>
+    <div style="font-size:14px;color:var(--muted);line-height:1.8;font-weight:300">Aktuell ist hier noch kein Trainer verfügbar.</div>
+  </div>${alertBox}`;
+    if(lastSearch) checkAlertStatus();
+    return; }
   el.innerHTML = filtered.map(t => {
     const ini = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
     const avStyle = t.avatar_url ? `background-image:url(${t.avatar_url});background-size:cover;background-position:center` : '';
@@ -325,6 +343,50 @@ async function sendAnfrage() {
     desc.textContent = 'Deine Anfrage wurde erfolgreich übermittelt! Der Trainer meldet sich in Kürze bei dir.';
   } catch(e) { alert('Fehler beim Senden'); }
   btn.disabled = false; btn.textContent = 'Senden →';
+}
+
+async function checkAlertStatus() {
+  if(!lastSearch) return;
+  try {
+    const r = await fetch(`${SB}/rest/v1/trainer_alerts?kunden_email=eq.${encodeURIComponent(sess.email)}&plz=eq.${encodeURIComponent(lastSearch.plz)}&aktiv=eq.true&select=id`, {
+      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
+    });
+    const d = await r.json();
+    if(d && d.length > 0) markAlertActive();
+  } catch(e) {}
+}
+
+function markAlertActive() {
+  const btn = document.getElementById('alertBtn');
+  if(!btn) return;
+  btn.textContent = '✓ Aktiviert — du wirst benachrichtigt';
+  btn.classList.add('active');
+  btn.disabled = true;
+}
+
+async function activateAlert() {
+  if(!lastSearch) return;
+  const btn = document.getElementById('alertBtn');
+  btn.disabled = true; btn.textContent = 'Wird aktiviert...';
+  try {
+    const r = await fetch(`${SB}/rest/v1/trainer_alerts`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'resolution=merge-duplicates,return=minimal'},
+      body: JSON.stringify({
+        kunden_email: sess.email,
+        kunden_name: K ? `${K.vorname||''} ${K.nachname||''}`.trim() : '',
+        plz: lastSearch.plz,
+        stadt: lastSearch.city || '',
+        radius: lastSearch.radius || 25,
+        aktiv: true
+      })
+    });
+    if(!r.ok) throw new Error();
+    markAlertActive();
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Aktivieren';
+    alert('Fehler — bitte versuche es erneut.');
+  }
 }
 
 function logout() {
