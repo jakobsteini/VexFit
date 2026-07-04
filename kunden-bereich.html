@@ -99,8 +99,8 @@ textarea.modal-msg::placeholder{color:rgba(85,85,85,0.7)}
   </div>
 </nav>
 
-<!-- WILLKOMMENS-SEITE -->
-<div class="page" id="welcomePage">
+<!-- WILLKOMMENS-SEITE (nach Anfrage-Senden) -->
+<div class="page hidden" id="welcomePage">
   <div class="icon-wrap">🎯</div>
   <div class="title">WILLKOMMEN<br><span>BEI VEXFIT!</span></div>
   <p class="desc" id="welcomeDesc">Sobald ein Trainer in deiner Nähe mit deinen Anforderungen verfügbar ist, wirst du per E-Mail benachrichtigt.</p>
@@ -113,12 +113,12 @@ textarea.modal-msg::placeholder{color:rgba(85,85,85,0.7)}
   <p class="email-note" id="emailNote">Eingeloggt als: –</p>
 </div>
 
-<!-- TRAINER SUCHE -->
-<div class="search-page hidden" id="searchPage">
-  <div class="search-page-title">TRAINER IN DEINER NÄHE</div>
-  <p class="search-page-sub">PLZ eingeben und Umkreis wählen</p>
+<!-- TRAINER SUCHE (Standard-Ansicht nach Login) -->
+<div class="search-page" id="searchPage">
+  <div class="search-page-title">TRAINER SUCHEN</div>
+  <p class="search-page-sub">PLZ ändern oder Umkreis vergrößern, um mehr Trainer zu sehen</p>
   <div class="search-bar">
-    <input type="text" id="plzInput" placeholder="Deine PLZ (z.B. 5026)" maxlength="5">
+    <input type="text" id="plzInput" placeholder="PLZ (z.B. 5026, 1010, 8010)" maxlength="5">
     <select id="radiusInput">
       <option value="10">10 km</option>
       <option value="25" selected>25 km</option>
@@ -173,6 +173,20 @@ if(sess.role === 'trainer') { location.href = 'trainer-bereich.html'; throw new 
 document.getElementById('emailNote').textContent = 'Eingeloggt als: ' + sess.email;
 loadKunde(sess.email);
 
+// Enter-Taste im PLZ-Feld triggert Suche
+document.getElementById('plzInput').addEventListener('keydown', function(e) {
+  if(e.key === 'Enter') { e.preventDefault(); searchByPLZ(); }
+});
+// Auto-Suche wenn 5 Ziffern eingegeben und geändert
+document.getElementById('plzInput').addEventListener('input', function(e) {
+  const v = e.target.value.trim();
+  if(v.length === 5 && /^\d{5}$/.test(v)) searchByPLZ();
+});
+// Radius-Wechsel triggert Suche neu
+document.getElementById('radiusInput').addEventListener('change', function() {
+  if(document.getElementById('plzInput').value.trim().length >= 4) searchByPLZ();
+});
+
 async function loadKunde(email) {
   try {
     const r = await fetch(`${SB}/rest/v1/kunden?email=eq.${encodeURIComponent(email)}&select=*`, {
@@ -184,6 +198,11 @@ async function loadKunde(email) {
       if(K.plz) document.getElementById('plzInput').value = K.plz;
     }
   } catch(e) {}
+  // Direkt Trainer laden und Suche automatisch starten (falls PLZ vorhanden)
+  await loadTrainer();
+  if(document.getElementById('plzInput').value.trim().length >= 4) {
+    searchByPLZ();
+  }
 }
 
 function toggleSearch(e) {
@@ -381,11 +400,29 @@ async function activateAlert() {
         aktiv: true
       })
     });
-    if(!r.ok) throw new Error();
+    if(!r.ok) {
+      const errText = await r.text();
+      console.error('Alert-Aktivierung fehlgeschlagen:', r.status, errText);
+      // Fallback: n8n-Webhook als Backup, falls Supabase-Tabelle noch nicht existiert
+      fetch('https://n8n.srv1551518.hstgr.cloud/webhook/trainer-alert-fallback', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          kunden_email: sess.email, plz: lastSearch.plz,
+          stadt: lastSearch.city || '', radius: lastSearch.radius || 25
+        })
+      }).catch(()=>{});
+      if(r.status === 404 || errText.includes('trainer_alerts')) {
+        alert('Fehler: Die Alert-Tabelle existiert noch nicht in Supabase.\n\nBitte führe das SQL-Script aus dem letzten Schritt aus (im Supabase SQL Editor).');
+      } else if(r.status === 401 || r.status === 403) {
+        alert('Fehler: Berechtigung fehlt. RLS-Policies wurden noch nicht angelegt.\n\nBitte SQL-Script im Supabase SQL Editor ausführen.');
+      } else {
+        alert('Fehler beim Aktivieren (Code ' + r.status + '). Bitte erneut versuchen.');
+      }
+      throw new Error(errText);
+    }
     markAlertActive();
   } catch(e) {
     btn.disabled = false; btn.textContent = 'Aktivieren';
-    alert('Fehler — bitte versuche es erneut.');
   }
 }
 
