@@ -195,8 +195,8 @@ textarea{resize:vertical;min-height:90px;line-height:1.6}
       <div class="step-label">Schritt 3 von 3</div>
       <div class="step-heading">PREISE & ABSCHLUSS</div>
       <div class="field-row">
-        <div class="field"><label>Preis/Monat (€)</label><input type="number" placeholder="z.B. 200" id="t-price" min="0"></div>
-        <div class="field"><label>Online Coaching (€)</label><input type="number" placeholder="z.B. 199" id="t-oprice" min="0"></div>
+        <div class="field"><label>Preis/Stunde (€)</label><input type="number" placeholder="z.B. 60" id="t-price" min="0"></div>
+        <div class="field"><label>Preis/Monat (€) – optional</label><input type="number" placeholder="z.B. 200" id="t-mprice" min="0"></div>
       </div>
       <div class="field"><label>Zertifizierungen</label><input type="text" placeholder="z.B. BSA, NSCA..." id="t-cert"><div class="field-hint">Optional</div></div>
       <div class="field"><label>Calendly Link</label><input type="url" placeholder="https://calendly.com/dein-name" id="t-calendly"><div class="field-hint">Optional – Kunden können direkt Termine buchen</div></div>
@@ -393,7 +393,7 @@ async function submitTrainer() {
     spezialisierungen: tags,
     bio: document.getElementById('t-bio').value.trim(),
     preis_stunde: parseFloat(document.getElementById('t-price').value) || null,
-    preis_online: parseFloat(document.getElementById('t-oprice').value) || null,
+    preis_monat: parseFloat(document.getElementById('t-mprice').value) || null,
     zertifikate: document.getElementById('t-cert').value.trim(),
     calendly: document.getElementById('t-calendly').value.trim(),
     stripe_bezahlt: false,
@@ -411,10 +411,18 @@ async function submitTrainer() {
       showError('t-error', msg.toLowerCase().includes('already') ? 'Diese E-Mail ist bereits registriert!' : 'Registrierung fehlgeschlagen: '+msg);
       btn.disabled=false; btn.textContent='Profil gratis erstellen 🚀'; return;
     }
-    await fetch(SUPABASE_URL+'/rest/v1/trainers', {
+    const insertRes = await fetch(SUPABASE_URL+'/rest/v1/trainers', {
       method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(authData.access_token||SUPABASE_KEY),'Prefer':'return=minimal'},
       body: JSON.stringify({...trainerData, user_id: authData.user?.id})
     });
+    if(!insertRes.ok) {
+      const errText = await insertRes.text();
+      console.error('Trainer-Insert fehlgeschlagen:', insertRes.status, errText);
+      showError('t-error', 'Profil konnte nicht gespeichert werden ('+insertRes.status+'). '+(errText.substring(0,120)||'Bitte erneut versuchen.'));
+      btn.disabled=false; btn.textContent='Profil gratis erstellen 🚀';
+      return;
+    }
+    // E-Mail-Benachrichtigung nur senden, wenn der Insert wirklich geklappt hat
     fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neuer-trainer', {
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(trainerData)
     }).catch(()=>{});
@@ -488,10 +496,16 @@ async function submitClient() {
       showError('c-error',msg.toLowerCase().includes('already')?'Diese E-Mail ist bereits registriert!':'Registrierung fehlgeschlagen: '+msg);
       btn.disabled=false;btn.textContent='Trainer finden →';return;
     }
-    await fetch(SUPABASE_URL+'/rest/v1/kunden',{
+    const insertRes=await fetch(SUPABASE_URL+'/rest/v1/kunden',{
       method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(authData.access_token||SUPABASE_KEY),'Prefer':'return=minimal'},
       body:JSON.stringify({...clientData,user_id:authData.user?.id})
     });
+    if(!insertRes.ok){
+      const errText=await insertRes.text();
+      console.error('Kunden-Insert fehlgeschlagen:',insertRes.status,errText);
+      showError('c-error','Profil konnte nicht gespeichert werden ('+insertRes.status+'). '+(errText.substring(0,120)||'Bitte erneut versuchen.'));
+      btn.disabled=false;btn.textContent='Trainer finden →';return;
+    }
     fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neuer-kunde',{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(clientData)
     }).catch(()=>{});

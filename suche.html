@@ -283,7 +283,7 @@ function renderTrainersWithDistance(trainers) {
   grid.innerHTML = trainers.map((t,i) => {
     const initials = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
     const tags = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="ctag">${s}</span>`).join('');
-    const preis = t.preis_stunde ? `€${t.preis_stunde}<span>/Mo</span>` : '<span>Auf Anfrage</span>';
+    const preis = t.preis_stunde ? `€${t.preis_stunde}<span>/Std</span>` : '<span>Auf Anfrage</span>';
     const distLabel = t._online ? '<span style="color:#e8ff00;font-size:11px">🌐 Online</span>' : t._distance !== undefined ? `<span style="color:#888;font-size:11px">📍 ${t._distance} km</span>` : '';
     return `<div class="tc" onclick="window.location='profil.html?id=${t.id}'">
       <div class="ci" style="background:${bgColors[i%bgColors.length]}">
@@ -335,7 +335,7 @@ function renderTrainers(trainers) {
     const bg = bgColors[i % bgColors.length];
     const isOnline = t.trainingsart === 'Online';
     const tags = (t.spezialisierungen || []).slice(0, 3);
-    const preis = t.preis_stunde ? `€${t.preis_stunde}<span>/Std</span>` : t.preis_online ? `€${t.preis_online}<span>/Mo</span>` : '<span>Auf Anfrage</span>';
+    const preis = t.preis_stunde ? `€${t.preis_stunde}<span>/Std</span>` : t.preis_monat ? `€${t.preis_monat}<span>/Mo</span>` : '<span>Auf Anfrage</span>';
 
     return `
       <div class="tc" onclick="window.location='profil.html?id=${t.id}'">
