@@ -4,576 +4,215 @@
 <meta charset="UTF-8">
 <link rel="icon" type="image/png" href="vexfit-logo.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Vexfit – Trainer Dashboard</title>
+<title>Vexfit – Trainer Bereich</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{
-  --black:#080808;--white:#f4f4ef;--accent:#e8ff00;
-  --gray:#111;--mid:#1a1a1a;--card:#141414;
-  --muted:#555;--muted-l:#888;
-  --border:rgba(255,255,255,0.07);--border-i:rgba(255,255,255,0.13);
-  --green:#4ade80;--orange:#fb923c;--red:#f87171;
-}
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
-a{text-decoration:none;color:inherit}
-nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:rgba(8,8,8,0.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
-.logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:4px;color:var(--white)}
+:root{--bg:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1a1a1a;--card:#161616;--muted:#555;--border:rgba(255,255,255,0.07);--bi:rgba(255,255,255,0.1);--green:#4ade80;--orange:#fb923c}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(10,10,10,0.98);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:4px;color:var(--white);text-decoration:none}
 .logo span{color:var(--accent)}
-.nav-r{display:flex;align-items:center;gap:10px}
-.nav-name{font-size:12px;color:var(--muted-l)}
-.btn-out{background:none;border:1px solid var(--border);color:var(--muted-l);padding:7px 14px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;transition:all .2s}
-.btn-out:hover{color:var(--white);border-color:rgba(255,255,255,.25)}
-.tabs{position:fixed;top:56px;left:0;right:0;z-index:99;background:var(--gray);border-bottom:1px solid var(--border);display:flex;overflow-x:auto}
-.tabs::-webkit-scrollbar{display:none}
-.tab{padding:0 20px;height:44px;display:flex;align-items:center;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap;flex-shrink:0}
-.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-.content{padding:120px 20px 80px;max-width:680px;margin:0 auto}
-.section{display:none}
-.section.active{display:block;animation:fadeUp .35s ease both}
-@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-.card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px;margin-bottom:12px}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:100px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
-.chip-orange{background:rgba(251,146,60,.1);border:1px solid rgba(251,146,60,.25);color:var(--orange)}
-.chip-green{background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:var(--green)}
-.chip-accent{background:rgba(232,255,0,.1);border:1px solid rgba(232,255,0,.2);color:var(--accent)}
-.ov-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:32px 0 24px;margin-bottom:20px}
-.ov-avatar{width:76px;height:76px;border-radius:50%;background:var(--mid);border:2px solid rgba(232,255,0,.2);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:26px;color:rgba(232,255,0,.5);margin-bottom:16px;flex-shrink:0}
-.ov-name{font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,9vw,60px);letter-spacing:2px;line-height:1;margin-bottom:6px}
-.ov-meta{font-size:13px;color:var(--muted-l);font-weight:300;margin-bottom:16px}
-.ov-tags{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:20px}
-.ov-tag{padding:4px 11px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:100px;font-size:11px;color:var(--muted-l)}
-.status-banner{border-radius:4px;padding:18px 20px;margin-bottom:0}
-.status-banner h3{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1.5px;margin-bottom:6px}
-.status-banner p{font-size:13px;font-weight:300;line-height:1.7;margin-bottom:12px}
-.sb-inaktiv{background:rgba(251,146,60,.06);border:1px solid rgba(251,146,60,.2)}
-.sb-inaktiv h3{color:var(--orange)}
-.sb-kostenlos{background:rgba(232,255,0,.05);border:1px solid rgba(232,255,0,.15)}
-.sb-kostenlos h3{color:var(--accent)}
-.sb-aktiv{background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.2)}
-.sb-aktiv h3{color:var(--green)}
+.nav-right{display:flex;align-items:center;gap:12px}
+.nav-profile{display:flex;align-items:center;gap:8px;background:var(--mid);border:1px solid var(--border);padding:7px 14px;border-radius:100px;font-size:12px;color:var(--white);cursor:pointer;text-decoration:none;transition:border-color 0.2s}
+.nav-profile:hover{border-color:rgba(232,255,0,0.3)}
+.nav-profile-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;flex-shrink:0}
+.nav-badge{background:var(--accent);color:var(--bg);font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;display:none;align-items:center;justify-content:center}
+.btn-logout{background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer}
+.btn-logout:hover{color:var(--white)}
+/* WELCOME PAGE */
+.page{padding:100px 20px 60px;max-width:560px;margin:0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center}
+.icon-wrap{width:80px;height:80px;border-radius:50%;background:rgba(232,255,0,0.08);border:2px solid rgba(232,255,0,0.2);display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 28px;animation:popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both}
+.title{font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,8vw,52px);line-height:0.9;letter-spacing:2px;margin-bottom:16px;animation:fadeUp 0.5s 0.2s ease both;opacity:0}
+.title span{color:var(--accent)}
+.desc{font-size:15px;color:var(--muted);line-height:1.8;font-weight:300;margin-bottom:28px;animation:fadeUp 0.5s 0.3s ease both;opacity:0}
+.tags{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:32px;animation:fadeUp 0.5s 0.4s ease both;opacity:0}
+.tag{padding:6px 14px;border:1px solid rgba(232,255,0,0.2);border-radius:100px;font-size:11px;color:var(--accent);font-weight:600;letter-spacing:1px;text-transform:uppercase}
+.tag-gray{border-color:var(--border);color:var(--muted)}
+.btn-primary{background:var(--accent);color:var(--bg);padding:14px 32px;border-radius:3px;font-weight:700;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;display:inline-block;animation:fadeUp 0.5s 0.5s ease both;opacity:0;cursor:pointer;border:none;font-family:'DM Sans',sans-serif}
+.email-note{font-size:12px;color:rgba(85,85,85,0.7);margin-top:16px;animation:fadeUp 0.5s 0.6s ease both;opacity:0}
+/* ANFRAGEN PAGE */
+.anfragen-page{padding:80px 20px 60px;max-width:640px;margin:0 auto}
+.ap-title{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1.5px;margin-bottom:4px}
+.ap-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
 .anfrage-card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;margin-bottom:10px}
-.an-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
-.an-date{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase}
-.an-contact{background:rgba(232,255,0,.05);border:1px solid rgba(232,255,0,.12);padding:14px;border-radius:3px;margin-top:10px}
-.an-contact-label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
-.an-locked{background:rgba(255,255,255,.03);border:1px solid var(--border);padding:14px;border-radius:3px;margin-top:10px}
-.section-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:2px;margin-bottom:18px;color:var(--white)}
-.field{display:flex;flex-direction:column;gap:6px;margin-bottom:13px}
-.field label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
-.field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-input,select,textarea{background:var(--card);border:1px solid var(--border-i);color:var(--white);padding:12px 15px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%;-webkit-appearance:none;transition:border-color .2s}
-input::placeholder,textarea::placeholder{color:rgba(85,85,85,.6)}
-input:focus,select:focus,textarea:focus{border-color:rgba(232,255,0,.45);background:var(--mid)}
-select{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 5 5-5z' fill='%23666'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
-select option{background:var(--gray)}
-textarea{resize:vertical;min-height:100px;line-height:1.6}
-.tags-wrap{display:flex;flex-wrap:wrap;gap:7px}
-.tag{padding:7px 14px;border:1px solid var(--border-i);border-radius:100px;font-size:12px;color:var(--muted-l);cursor:pointer;transition:all .2s;user-select:none}
-.tag.on{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,.07)}
-.divider{height:1px;background:var(--border);margin:20px 0}
-.alert{padding:11px 14px;border-radius:3px;font-size:13px;margin-bottom:14px;display:none}
-.alert.show{display:block}
-.alert-err{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red)}
-.alert-ok{background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);color:var(--green)}
-.btn-save{width:100%;background:var(--accent);color:var(--black);padding:14px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:2px;text-transform:uppercase;cursor:pointer;margin-top:6px;transition:opacity .2s}
-.btn-save:hover{opacity:.88}
-.btn-save:disabled{opacity:.45;cursor:not-allowed}
-.abo-box{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:24px;margin-bottom:12px}
-.abo-price{font-family:'Bebas Neue',sans-serif;font-size:52px;color:var(--accent);letter-spacing:2px;line-height:1;margin:10px 0 4px}
-.abo-note{font-size:12px;color:var(--muted-l);margin-bottom:18px}
-.btn-stripe{display:inline-block;background:var(--accent);color:var(--black);padding:13px 26px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;transition:opacity .2s;border:none;cursor:pointer;text-decoration:none}
-.btn-stripe:hover{opacity:.85}
-.btn-ghost{display:inline-block;background:none;border:1px solid var(--border-i);color:var(--muted-l);padding:13px 26px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;text-decoration:none;transition:all .2s}
-.btn-ghost:hover{color:var(--white);border-color:rgba(255,255,255,.25)}
-@keyframes waBounce{0%{opacity:0;transform:scale(.5)}100%{opacity:1;transform:scale(1)}}
-.wa{position:fixed;bottom:22px;right:20px;z-index:9999;width:46px;height:46px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 16px rgba(37,211,102,.4);opacity:0;animation:waBounce .5s 2s ease both}
-.loader{position:fixed;inset:0;background:var(--black);z-index:999;display:flex;align-items:center;justify-content:center;transition:opacity .3s}
-.loader.hidden{opacity:0;pointer-events:none}
-.spinner{width:30px;height:30px;border:2px solid var(--border-i);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.empty-state{text-align:center;padding:48px 20px;color:var(--muted-l)}
-.empty-icon{font-size:40px;margin-bottom:14px}
-.empty-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;margin-bottom:8px;color:var(--white)}
-.empty-sub{font-size:13px;font-weight:300;line-height:1.7}
-/* === FEATURES: Statistik, Bewertungen, Vorschau, Chat === */
-.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;margin-bottom:14px}
-.stat-box{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:16px}
-.stat-num{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:1px;line-height:1;color:var(--accent)}
-.stat-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted-l);margin-top:6px}
-.rev-box,.rate-box{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;width:100%;margin-bottom:14px;text-align:left}
-.rev-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted-l);padding:5px 0}
-.rev-row strong{color:var(--white);font-size:15px}
-.rev-row .fee{color:var(--accent)}
-.rev-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1.5px;margin-bottom:8px}
-.rate-head{display:flex;align-items:center;gap:12px;margin-bottom:4px}
-.rate-avg{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:1px;line-height:1}
-.stars{color:var(--accent);letter-spacing:1px;font-size:14px}
-.stars .off{color:var(--border-i)}
-.rv-item{border-top:1px solid var(--border);padding-top:10px;margin-top:10px;font-size:13px;color:var(--muted-l)}
-.rv-item .rv-stars{color:var(--accent);font-size:12px;margin-bottom:2px}
-.preview-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted-l);margin-bottom:8px;text-align:left}
-.pv-card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;width:100%;text-align:left;margin-bottom:20px}
-.pv-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-.pv-av{width:44px;height:44px;border-radius:50%;background:var(--mid);border:2px solid rgba(232,255,0,.15);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:17px;color:rgba(232,255,0,.5);flex-shrink:0}
-.pv-name{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px}
-.pv-meta{font-size:12px;color:var(--muted-l)}
-.pv-bio{font-size:13px;color:var(--muted-l);line-height:1.6;margin:8px 0}
-.an-btns{display:flex;gap:8px;margin-top:12px}
-.an-btns button{flex:1;padding:10px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-family:'DM Sans',sans-serif;cursor:pointer;border:1px solid var(--border-i);background:var(--mid);color:var(--white);transition:all .2s}
-.btn-accept{background:var(--accent);color:var(--black);border:none}
-.btn-decline:hover{border-color:var(--red);color:var(--red)}
-.btn-chat:hover{border-color:rgba(232,255,0,.4)}
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:none;align-items:flex-end;justify-content:center}
-.overlay.open{display:flex}
-.modal{background:var(--gray);border:1px solid var(--border);border-radius:6px 6px 0 0;padding:22px 20px 34px;width:100%;max-width:520px;animation:slideUp .3s ease}
-.modal-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1.5px;margin-bottom:2px}
-.modal-sub{font-size:13px;color:var(--muted-l);margin-bottom:12px}
-.chat-body{min-height:200px;max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin:12px 0;padding:4px 2px}
-.chat-empty{text-align:center;color:var(--muted-l);font-size:13px;margin:auto}
-.chat-msg{max-width:78%;padding:9px 13px;border-radius:13px;font-size:14px;line-height:1.45;word-break:break-word}
-.chat-msg.me{align-self:flex-end;background:var(--accent);color:var(--black);border-bottom-right-radius:3px}
-.chat-msg.them{align-self:flex-start;background:var(--card);border:1px solid var(--border);border-bottom-left-radius:3px}
-.chat-time{font-size:9px;opacity:.6;margin-top:3px}
-.chat-input-row{display:flex;gap:8px}
-.chat-input-row input{flex:1}
-.chat-send{background:var(--accent);color:var(--black);border:none;padding:0 18px;border-radius:3px;font-weight:700;font-size:14px;cursor:pointer;flex-shrink:0}
-@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-@media(min-width:640px){nav{padding:0 48px}.content{padding:120px 48px 80px}}
+.anf-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.anf-name{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px}
+.anf-date{font-size:11px;color:var(--muted)}
+.anf-ziel{font-size:13px;color:var(--muted);margin-bottom:10px}
+.contact-box{background:rgba(74,222,128,0.06);border:1px solid rgba(74,222,128,0.2);border-radius:4px;padding:14px;font-size:13px;line-height:1.8}
+.contact-box a{color:var(--accent)}
+.locked-box{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:4px;padding:14px}
+.btn-stripe{display:inline-block;background:var(--accent);color:var(--bg);padding:10px 18px;border-radius:3px;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-decoration:none;margin-top:8px}
+.msg-box{font-size:13px;color:var(--muted);font-style:italic;padding:10px;background:rgba(255,255,255,0.02);border-radius:3px;border-left:2px solid var(--border);margin-top:8px}
+.empty-state{text-align:center;padding:48px 20px;color:var(--muted)}
+.status-bar{background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.2);border-radius:4px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:var(--orange);line-height:1.7}
+.status-bar.aktiv{background:rgba(74,222,128,0.06);border-color:rgba(74,222,128,0.2);color:var(--green)}
+.hidden{display:none}
+@keyframes popIn{from{opacity:0;transform:scale(0.4)}to{opacity:1;transform:scale(1)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes waBounce{0%{opacity:0;transform:scale(0.5)}100%{opacity:1;transform:scale(1)}}
+.wa{position:fixed;bottom:20px;right:16px;z-index:9999;width:46px;height:46px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 16px rgba(37,211,102,0.4);opacity:0;animation:waBounce 0.5s 2s ease both;text-decoration:none}
+@media(min-width:640px){nav{padding:0 32px}}
 </style>
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1034036285801133');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
 </head>
 <body>
-<div class="loader" id="loader"><div class="spinner"></div></div>
+
 <nav>
-  <a href="trainer-bereich.html" class="logo">VEX<span>FIT</span></a>
-  <div class="nav-r">
-    <span class="nav-name" id="navName"></span>
-    <button class="btn-out" onclick="logout()">Ausloggen</button>
+  <a href="index.html" class="logo">VEX<span>FIT</span></a>
+  <div class="nav-right">
+    <a href="#" class="nav-profile" id="navProfileBtn" onclick="toggleAnfragen(event)">
+      <div class="nav-profile-dot"></div>
+      <span>Meine Anfragen</span>
+      <div class="nav-badge" id="navBadge">0</div>
+    </a>
+    <button class="btn-logout" onclick="logout()">Ausloggen</button>
   </div>
 </nav>
-<div class="tabs">
-  <div class="tab active" id="t-ov"  onclick="go('ov',this)">Übersicht</div>
-  <div class="tab"        id="t-an"  onclick="go('an',this)">Anfragen</div>
-  <div class="tab"        id="t-pr"  onclick="go('pr',this)">Profil bearbeiten</div>
-  <div class="tab"        id="t-abo" onclick="go('abo',this)">Mein Abo</div>
-</div>
-<div class="content">
 
-  <!-- ÜBERSICHT -->
-  <div class="section active" id="s-ov">
-    <div class="ov-hero">
-      <div class="ov-avatar" id="ovAvatar">?</div>
-      <div class="ov-name"   id="ovName">–</div>
-      <div class="ov-meta"   id="ovMeta">–</div>
-      <div class="ov-tags"   id="ovTags"></div>
-      <div id="statusBanner" style="width:100%;max-width:460px"></div>
-      <div id="statsWrap" style="width:100%;max-width:460px;margin-top:20px"></div>
-      <div id="rateWrap" style="width:100%;max-width:460px"></div>
-      <div id="revWrap" style="width:100%;max-width:460px"></div>
-      <div id="previewWrap" style="width:100%;max-width:460px"></div>
-    </div>
+<!-- WILLKOMMENS-SEITE -->
+<div class="page" id="welcomePage">
+  <div class="icon-wrap">💪</div>
+  <div class="title">DU BIST<br><span>REGISTRIERT!</span></div>
+  <p class="desc">Wir benachrichtigen dich sobald ein Kunde Interesse an dir findet.<br>Vervollständige dein Profil für mehr Anfragen.</p>
+  <div class="tags" id="statusTags">
+    <span class="tag">✓ Profil gespeichert</span>
+    <span class="tag tag-gray" id="statusTag">⏳ Wird geprüft</span>
   </div>
-
-  <!-- ANFRAGEN -->
-  <div class="section" id="s-an">
-    <div class="section-title">Meine Anfragen</div>
-    <div id="anList"><div class="empty-state"><div class="spinner" style="margin:0 auto 16px"></div><p>Lädt...</p></div></div>
-  </div>
-
-  <!-- PROFIL BEARBEITEN -->
-  <div class="section" id="s-pr">
-    <div class="section-title">Profil bearbeiten</div>
-    <div class="alert alert-err" id="pErr"></div>
-    <div class="alert alert-ok"  id="pOk"></div>
-    <div class="field-row">
-      <div class="field"><label>Vorname</label><input type="text" id="pFn" placeholder="Max"></div>
-      <div class="field"><label>Nachname</label><input type="text" id="pLn" placeholder="Mustermann"></div>
-    </div>
-    <div class="field"><label>Telefon</label><input type="tel" id="pTel" placeholder="+43 660 123 4567"></div>
-    <div class="field"><label>Stadt / Standort</label>
-      <select id="pCity">
-        <option value="">Auswählen...</option>
-        <option>Wien</option><option>Graz</option><option>Salzburg</option><option>Linz</option><option>Innsbruck</option>
-        <option>München</option><option>Berlin</option><option>Hamburg</option><option>Frankfurt</option><option>Köln</option>
-        <option>Zürich</option><option>Basel</option><option>Online (kein fixer Standort)</option>
-      </select>
-    </div>
-    <div class="field"><label>PLZ</label><input type="text" id="pPlz" placeholder="z.B. 5020" maxlength="5"></div>
-    <div class="field"><label>Trainingsart</label>
-      <select id="pType">
-        <option value="">Auswählen...</option>
-        <option>Vor Ort beim Kunden</option><option>Im Fitnessstudio</option><option>Online</option><option>Vor Ort + Online</option>
-      </select>
-    </div>
-    <div class="field"><label>Erfahrung</label>
-      <select id="pExp">
-        <option value="">Auswählen...</option>
-        <option>Unter 1 Jahr</option><option>1–3 Jahre</option><option>3–5 Jahre</option><option>5–10 Jahre</option><option>Mehr als 10 Jahre</option>
-      </select>
-    </div>
-    <div class="field"><label>Spezialisierungen</label>
-      <div class="tags-wrap" id="pTags">
-        <div class="tag" onclick="this.classList.toggle('on')">Muskelaufbau</div>
-        <div class="tag" onclick="this.classList.toggle('on')">Abnehmen</div>
-        <div class="tag" onclick="this.classList.toggle('on')">Krafttraining</div>
-        <div class="tag" onclick="this.classList.toggle('on')">Bodybuilding</div>
-        <div class="tag" onclick="this.classList.toggle('on')">Ausdauer</div>
-        <div class="tag" onclick="this.classList.toggle('on')">Ernährung</div>
-        <div class="tag" onclick="this.classList.toggle('on')">Reha</div>
-        <div class="tag" onclick="this.classList.toggle('on')">HIIT</div>
-        <div class="tag" onclick="this.classList.toggle('on')">Yoga & Mobility</div>
-        <div class="tag" onclick="this.classList.toggle('on')">Functional</div>
-      </div>
-    </div>
-    <div class="field"><label>Über mich</label><textarea id="pBio" placeholder="Erzähl potenziellen Kunden kurz wer du bist..."></textarea></div>
-    <div class="divider"></div>
-    <div class="field-row">
-      <div class="field"><label>Preis/Monat (€)</label><input type="number" id="pPrice" placeholder="z.B. 149" min="0"></div>
-      <div class="field"><label>Online Coaching (€/Mo)</label><input type="number" id="pOPrice" placeholder="z.B. 99" min="0"></div>
-    </div>
-    <div class="field"><label>Zertifizierungen</label><input type="text" id="pCert" placeholder="z.B. BSA, NSCA, UEFA B..."></div>
-    <div class="field">
-      <label>Calendly Link</label>
-      <input type="url" id="pCalendly" placeholder="https://calendly.com/dein-name">
-      <span style="font-size:12px;color:var(--muted-l);margin-top:3px">Kunden können direkt einen Termin buchen · <a href="https://calendly.com" target="_blank" style="color:var(--accent)">Gratis bei Calendly</a></span>
-    </div>
-    <button class="btn-save" id="saveBtn" onclick="saveProfile()">Änderungen speichern</button>
-  </div>
-
-  <!-- MEIN ABO -->
-  <div class="section" id="s-abo">
-    <div class="section-title">Mein Abo</div>
-    <div id="aboContent"></div>
-  </div>
+  <button class="btn-primary" onclick="toggleAnfragen(event)">Meine Anfragen ansehen →</button>
+  <p class="email-note" id="emailNote">Eingeloggt als: –</p>
 </div>
 
-<!-- CHAT-MODAL -->
-<div class="overlay" id="chatOverlay" onclick="if(event.target===this)closeChat()">
-  <div class="modal">
-    <div class="modal-title" id="chatTitle">CHAT</div>
-    <div class="modal-sub">Schreib direkt mit deinem Kunden.</div>
-    <div class="chat-body" id="chatBody"></div>
-    <div class="chat-input-row">
-      <input type="text" id="chatInput" placeholder="Nachricht schreiben..." onkeydown="if(event.key==='Enter')sendChat()">
-      <button class="chat-send" onclick="sendChat()">→</button>
-    </div>
-  </div>
+<!-- ANFRAGEN PAGE -->
+<div class="anfragen-page hidden" id="anfragenPage">
+  <div class="ap-title">MEINE ANFRAGEN</div>
+  <p class="ap-sub">Kunden die dich kontaktiert haben</p>
+  <div id="statusBarEl"></div>
+  <div id="anList"><div class="empty-state">Wird geladen...</div></div>
 </div>
 
-<a href="https://wa.me/436649275737?text=Name%3A%20%0ANachricht%3A%20Hallo%2C%20ich%20habe%20eine%20Frage%20zu%20Vexfit." target="_blank" class="wa">
+<a href="https://wa.me/436649275737" target="_blank" class="wa">
   <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 </a>
 
 <script>
-const SB     = 'https://hbapzwxdehfgnputrfjf.supabase.co';
-const KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
+const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
 const STRIPE = 'https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00';
-const H      = {'apikey':KEY,'Authorization':'Bearer '+KEY,'Content-Type':'application/json'};
-
 let T = null;
-let anfragenData = [], myRatings = { list: [], sum: 0, count: 0 };
-let chatCtx = null, chatPoll = null;
 
-// Auth guard
+// AUTH - no redirect loop
 const raw = localStorage.getItem('vexfit_session');
-if (!raw) { location.href='login.html'; }
+if(!raw) { location.href = 'login.html'; throw new Error(); }
 let sess;
-try { sess=JSON.parse(raw); } catch(e) { localStorage.removeItem('vexfit_session'); location.href='login.html'; }
-if (!sess || !sess.email || sess.role !== 'trainer') { location.href='login.html'; }
+try { sess = JSON.parse(raw); } catch(e) { localStorage.removeItem('vexfit_session'); location.href = 'login.html'; throw new Error(); }
+if(sess.role === 'kunde') { location.href = 'kunden-bereich.html'; throw new Error(); }
 
-loadTrainer();
+document.getElementById('emailNote').textContent = 'Eingeloggt als: ' + sess.email;
+loadTrainer(sess.email);
 
-async function loadTrainer() {
+async function loadTrainer(email) {
   try {
-    const r = await fetch(SB+'/rest/v1/trainers?email=eq.'+encodeURIComponent(sess.email)+'&select=*', {headers:H});
-    const d = await r.json();
-    if (!d || d.length === 0) { logout(); return; }
-    T = d[0];
-    renderDashboard();
-    loadAnfragen();
-    loadRatings();
-  } catch(e) { logout(); }
-  finally { document.getElementById('loader').classList.add('hidden'); }
-}
-
-function renderDashboard() {
-  const fn = T.vorname || '?';
-  const ln = T.nachname || '?';
-  document.getElementById('navName').textContent = fn + ' ' + ln;
-  document.getElementById('ovAvatar').textContent = (fn[0]+ln[0]).toUpperCase();
-  document.getElementById('ovName').textContent = fn + ' ' + ln;
-  const loc = T.trainingsart === 'Online' ? '🌐 Online' : (T.stadt ? '📍 '+T.stadt : '');
-  document.getElementById('ovMeta').textContent = [loc, T.erfahrung].filter(Boolean).join(' · ');
-  document.getElementById('ovTags').innerHTML = (T.spezialisierungen||[]).map(t=>'<span class="ov-tag">'+t+'</span>').join('');
-
-  let html='';
-  if (!T.aktiv) {
-    html='<div class="status-banner sb-inaktiv"><h3>⏳ Profil wird überprüft</h3><p>Wir benachrichtigen dich sobald dein Profil freigeschaltet ist.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="chip chip-orange">⏳ Ausstehend</span><span class="chip" style="border:1px solid var(--border);color:var(--muted-l)">0 € · Kostenlos</span></div></div>';
-  } else if (!T.stripe_bezahlt) {
-    html='<div class="status-banner sb-kostenlos"><h3>🎉 Kostenlose Phase aktiv</h3><p>Dein Profil ist sichtbar. Du zahlst erst wenn du deinen ersten Kunden gewinnst — wir schicken dir dann den Zahlungslink.</p><span class="chip chip-accent">✓ Profil aktiv</span></div>';
-  } else {
-    html='<div class="status-banner sb-aktiv"><h3>✅ Alles aktiv</h3><p>Dein Profil ist sichtbar und dein Abo läuft.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><span class="chip chip-green">✓ Aktiv</span><span class="chip chip-green">✓ Abo bezahlt</span></div></div>';
-  }
-  document.getElementById('statusBanner').innerHTML = html;
-
-  setVal('pFn',T.vorname); setVal('pLn',T.nachname); setVal('pTel',T.telefon);
-  setVal('pBio',T.bio); setVal('pPrice',T.preis_stunde); setVal('pOPrice',T.preis_online);
-  setVal('pCert',T.zertifikate); setVal('pCalendly',T.calendly); setVal('pPlz',T.plz);
-  setSel('pCity',T.stadt); setSel('pType',T.trainingsart); setSel('pExp',T.erfahrung);
-  document.querySelectorAll('#pTags .tag').forEach(el=>{
-    if((T.spezialisierungen||[]).includes(el.textContent.trim())) el.classList.add('on');
-  });
-
-  let aboHTML='';
-  if (!T.stripe_bezahlt) {
-    aboHTML='<div class="abo-box"><div style="font-family:\'Bebas Neue\',sans-serif;font-size:18px;letter-spacing:1.5px;margin-bottom:6px">🎉 Kostenlose Phase</div><p style="font-size:13px;color:var(--muted-l);font-weight:300;line-height:1.7;margin-bottom:10px">Kostenlos bis zum ersten Kunden über Vexfit.</p><div style="display:flex;align-items:flex-end;gap:12px;margin-bottom:4px"><div class="abo-price">0 €</div><div style="font-family:\'Bebas Neue\',sans-serif;font-size:26px;color:rgba(255,255,255,.2);text-decoration:line-through;margin-bottom:12px">49,99 €/Mo</div></div><div class="abo-note">Nach erstem Kunden: 49,99 €/Monat · Monatlich kündbar</div></div><div class="abo-box" style="border-color:rgba(232,255,0,.12)"><div style="font-family:\'Bebas Neue\',sans-serif;font-size:18px;letter-spacing:1.5px;color:var(--muted-l);margin-bottom:6px">Früher aktivieren?</div><p style="font-size:13px;color:var(--muted-l);font-weight:300;line-height:1.7;margin-bottom:16px">Aktiviere jetzt und werde top-platziert in der Suche.</p><a href="'+STRIPE+'" class="btn-stripe" target="_blank">Jetzt für 49,99 €/Mo →</a></div>';
-  } else {
-    aboHTML='<div class="abo-box"><div style="font-family:\'Bebas Neue\',sans-serif;font-size:18px;letter-spacing:1.5px;color:var(--green);margin-bottom:6px">✅ Abo aktiv</div><div class="abo-price">49,99 €</div><div class="abo-note">pro Monat · Automatisch verlängernd</div></div><div class="abo-box"><div style="font-family:\'Bebas Neue\',sans-serif;font-size:18px;letter-spacing:1.5px;color:var(--muted-l);margin-bottom:6px">Kündigen</div><p style="font-size:13px;color:var(--muted-l);font-weight:300;line-height:1.7;margin-bottom:16px">Schreib uns eine E-Mail — wir kümmern uns sofort.</p><a href="mailto:vexfit.info@gmail.com?subject=Vexfit%20Abo%20kündigen&body=E-Mail%3A%20'+T.email+'" class="btn-ghost">Kündigung anfragen →</a></div>';
-  }
-  document.getElementById('aboContent').innerHTML = aboHTML;
-  renderPreview();
-}
-
-async function loadAnfragen() {
-  const el = document.getElementById('anList');
-  try {
-    const r = await fetch(SB+'/rest/v1/anfragen?trainer_email=eq.'+encodeURIComponent(T.email)+'&order=created_at.desc',{headers:H});
-    const data = await r.json();
-    anfragenData = data || [];
-    renderStats();
-    if (!data||data.length===0) {
-      el.innerHTML='<div class="empty-state"><div class="empty-icon">📬</div><div class="empty-title">Noch keine Anfragen</div><p class="empty-sub">Sobald ein Kunde dein Profil kontaktiert erscheint die Anfrage hier.</p></div>';
-      return;
-    }
-    el.innerHTML = data.map(a=>{
-      const paid=T.stripe_bezahlt;
-      const unlocked=paid&&a.weitergeleitet;
-      const date=new Date(a.created_at).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'});
-      const kEmail=a.kunden_email||a.kunde_email||'';
-      const kName=a.kunden_name||a.kunde_name||'–';
-      const status=a.status||'ausstehend';
-      const statusChip = status==='angenommen'
-        ? '<span class="chip chip-green">✓ Angenommen</span>'
-        : status==='abgelehnt'
-          ? '<span class="chip" style="border:1px solid rgba(248,113,113,.3);color:var(--red)">✕ Abgelehnt</span>'
-          : '<span class="chip chip-accent">⏳ Neu</span>';
-      const aEsc = JSON.stringify({id:String(a.id), kunden_email:kEmail, kunden_name:kName}).replace(/"/g,'&quot;');
-      // Aktions-Buttons: Annehmen/Ablehnen nur solange offen; Chat immer
-      let actions = '<div class="an-btns">';
-      if(status==='ausstehend'){
-        actions += '<button class="btn-accept" onclick="acceptAnfrage(\''+String(a.id)+'\')">✓ Annehmen</button>';
-        actions += '<button class="btn-decline" onclick="declineAnfrage(\''+String(a.id)+'\')">✕ Ablehnen</button>';
-      }
-      actions += '<button class="btn-chat" onclick="openChat('+aEsc+')">💬 Chat</button>';
-      actions += '</div>';
-      return '<div class="anfrage-card"><div class="an-header"><div class="an-date">'+date+'</div>'+statusChip+'</div>'+
-        '<div style="font-size:13px;color:var(--muted-l);margin-bottom:6px">🎯 Ziel: <strong style="color:var(--white)">'+(a.ziel||a.kunde_ziel||'–')+'</strong></div>'+
-        (a.nachricht?'<div style="font-size:13px;color:var(--muted-l);font-style:italic;margin-bottom:6px">"'+a.nachricht+'"</div>':'')+
-        (unlocked?'<div class="an-contact"><div class="an-contact-label">✅ Kontaktdaten</div><div style="font-size:13px;color:rgba(244,244,239,.8);line-height:2">👤 '+kName+'<br>📧 <a href="mailto:'+kEmail+'" style="color:var(--accent)">'+kEmail+'</a></div></div>':
-        !paid?'<div class="an-locked"><div style="font-size:13px;color:var(--muted-l);margin-bottom:12px;font-weight:300">Abo aktivieren um Kontaktdaten zu sehen.</div><a href="'+STRIPE+'" target="_blank" class="btn-stripe" style="font-size:11px;padding:10px 20px">💳 Für 49,99 €/Mo freischalten</a></div>':
-        '<div class="an-locked"><div style="font-size:13px;color:var(--muted-l);font-weight:300">Warte auf Freischaltung durch Vexfit...</div></div>')+
-        actions+
-        '</div>';
-    }).join('');
-  } catch(e) { el.innerHTML='<div style="padding:20px;color:var(--muted-l);text-align:center">Fehler beim Laden.</div>'; }
-}
-
-// Anfrage annehmen / ablehnen
-async function setAnfrageStatus(id, status) {
-  try {
-    await fetch(SB+'/rest/v1/anfragen?id=eq.'+encodeURIComponent(id),{
-      method:'PATCH', headers:{...H,'Prefer':'return=minimal'}, body:JSON.stringify({status})
+    const r = await fetch(`${SB}/rest/v1/trainers?email=eq.${encodeURIComponent(email)}&select=*`, {
+      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
     });
-  } catch(e) { alert('Konnte nicht aktualisiert werden'); return false; }
-  return true;
-}
-async function acceptAnfrage(id) {
-  const wasFirst = anfragenData.filter(a=>(a.status||'')==='angenommen').length === 0;
-  if(!await setAnfrageStatus(id,'angenommen')) return;
-  // Optional: bei erstem angenommenen Kunden n8n informieren (z.B. Stripe-Link)
-  if(wasFirst){
-    fetch('https://n8n.srv1551518.hstgr.cloud/webhook/erster-kunde',{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({trainer_email:T.email, trainer_name:(T.vorname||'')+' '+(T.nachname||'')})
-    }).catch(()=>{});
-  }
-  loadAnfragen();
-}
-async function declineAnfrage(id) {
-  if(!await setAnfrageStatus(id,'abgelehnt')) return;
-  loadAnfragen();
+    const d = await r.json();
+    if(d && d.length > 0) {
+      T = d[0];
+      // Update status tag
+      const stag = document.getElementById('statusTag');
+      if(T.aktiv) { stag.textContent = '✓ Profil aktiv'; stag.classList.remove('tag-gray'); }
+      else { stag.textContent = '⏳ Wird geprüft'; }
+    }
+    loadAnfragen(email);
+  } catch(e) {}
 }
 
-// STATISTIK-DASHBOARD
-function renderStats() {
-  const now = new Date();
-  const total = anfragenData.length;
-  const thisMonth = anfragenData.filter(a=>{const d=new Date(a.created_at);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).length;
-  const accepted = anfragenData.filter(a=>(a.status||'')==='angenommen').length;
-  const open = anfragenData.filter(a=>(a.status||'ausstehend')==='ausstehend').length;
-  document.getElementById('statsWrap').innerHTML =
-    '<div class="stat-grid">'+
-    '<div class="stat-box"><div class="stat-num">'+total+'</div><div class="stat-lbl">Anfragen gesamt</div></div>'+
-    '<div class="stat-box"><div class="stat-num">'+thisMonth+'</div><div class="stat-lbl">Diesen Monat</div></div>'+
-    '<div class="stat-box"><div class="stat-num">'+accepted+'</div><div class="stat-lbl">Aktive Kunden</div></div>'+
-    '<div class="stat-box"><div class="stat-num">'+open+'</div><div class="stat-lbl">Offen</div></div>'+
-    '</div>';
-
-  // Umsatz / Gebühr
-  const preis = T.preis_monat || T.preis_stunde || 0;
-  const income = accepted * preis;
-  let fee = 0;
-  if(accepted >= 1) fee = 49.99 + (accepted > 10 ? (accepted-10)*4.99 : 0);
-  const fmt = n => n.toLocaleString('de-AT',{minimumFractionDigits:2,maximumFractionDigits:2});
-  document.getElementById('revWrap').innerHTML =
-    '<div class="rev-box"><div class="rev-title">💶 Umsatz (geschätzt)</div>'+
-    '<div class="rev-row"><span>Dein Einkommen (Kunden)</span><strong>€ '+fmt(income)+'/Mo</strong></div>'+
-    '<div class="rev-row"><span>Deine Vexfit-Gebühr</span><strong class="fee">€ '+fmt(fee)+'/Mo</strong></div>'+
-    '<div class="rev-row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:10px"><span>Netto (ca.)</span><strong>€ '+fmt(income-fee)+'/Mo</strong></div>'+
-    (preis?'':'<div style="font-size:11px;color:var(--muted-l);margin-top:8px">Trag deinen Preis unter „Profil bearbeiten" ein für eine genauere Schätzung.</div>')+
-    '</div>';
-}
-
-// BEWERTUNGEN (empfangen)
-async function loadRatings() {
+async function loadAnfragen(email) {
   try {
-    const r = await fetch(SB+'/rest/v1/bewertungen?trainer_email=eq.'+encodeURIComponent(T.email)+'&order=created_at.desc',{headers:H});
-    const d = await r.json() || [];
-    myRatings = { list: d, sum: d.reduce((s,b)=>s+(b.sterne||0),0), count: d.length };
-  } catch(e) { myRatings = { list: [], sum: 0, count: 0 }; }
-  renderRatings();
-  renderPreview();
+    const r = await fetch(`${SB}/rest/v1/anfragen?trainer_email=eq.${encodeURIComponent(email)}&order=created_at.desc`, {
+      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
+    });
+    const data = await r.json() || [];
+    if(data.length > 0) {
+      const badge = document.getElementById('navBadge');
+      badge.textContent = data.length;
+      badge.style.display = 'flex';
+    }
+    renderAnfragen(data);
+  } catch(e) {}
 }
-function starString(n){let s='';for(let i=1;i<=5;i++)s+=i<=n?'★':'<span class="off">★</span>';return s;}
-function renderRatings() {
-  const el = document.getElementById('rateWrap');
-  if(!myRatings.count){
-    el.innerHTML = '<div class="rate-box"><div class="rate-head"><div class="stars">'+starString(0)+'</div></div><div style="font-size:13px;color:var(--muted-l)">Noch keine Bewertungen. Nach den ersten Trainings bewerten dich deine Kunden hier.</div></div>';
+
+function renderAnfragen(data) {
+  const el = document.getElementById('anList');
+  // Status bar
+  const sb = document.getElementById('statusBarEl');
+  if(T) {
+    if(!T.aktiv) {
+      sb.innerHTML = '<div class="status-bar">⏳ Dein Profil wird noch geprüft. Wir melden uns per E-Mail sobald du aktiviert wirst.</div>';
+    } else if(!T.stripe_bezahlt) {
+      sb.innerHTML = '<div class="status-bar aktiv">✓ Profil aktiv · Kostenlose Phase — sobald du deinen ersten Kunden gewinnst schicken wir dir den Zahlungslink.</div>';
+    } else {
+      sb.innerHTML = '<div class="status-bar aktiv">✅ Profil aktiv · Abo läuft</div>';
+    }
+  }
+  if(!data.length) {
+    el.innerHTML = '<div class="empty-state">📭<br><br>Noch keine Anfragen.<br>Sobald ein Kunde dich kontaktiert erscheint es hier.</div>';
     return;
   }
-  const avg = myRatings.sum/myRatings.count;
-  let html = '<div class="rate-box"><div class="rate-head"><div class="rate-avg">'+avg.toFixed(1)+'</div><div><div class="stars">'+starString(Math.round(avg))+'</div><div style="font-size:12px;color:var(--muted-l);margin-top:2px">'+myRatings.count+' '+(myRatings.count===1?'Bewertung':'Bewertungen')+'</div></div></div>';
-  myRatings.list.slice(0,3).forEach(b=>{
-    html += '<div class="rv-item"><div class="rv-stars">'+starString(b.sterne||0)+'</div>'+(b.text?'<div style="color:rgba(244,244,239,.75);margin:2px 0">"'+escapeHtml(b.text)+'"</div>':'')+'<div style="font-size:11px">— '+escapeHtml(b.kunden_name||'Kunde')+'</div></div>';
-  });
-  html += '</div>';
-  el.innerHTML = html;
+  el.innerHTML = data.map(a => {
+    const date = new Date(a.created_at).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'});
+    let contactHTML = '';
+    if(T && T.stripe_bezahlt && a.weitergeleitet) {
+      contactHTML = `<div class="contact-box"><strong style="font-size:11px;color:var(--green);letter-spacing:1px;text-transform:uppercase">✅ Kontaktdaten freigegeben</strong><br>👤 ${a.kunden_name||'–'}<br>📧 <a href="mailto:${a.kunden_email}">${a.kunden_email||'–'}</a></div>`;
+    } else if(T && !T.stripe_bezahlt) {
+      contactHTML = `<div class="locked-box"><div style="font-size:12px;color:var(--muted);margin-bottom:8px">🔒 Abo aktivieren um Kontaktdaten zu sehen</div><a href="${STRIPE}" target="_blank" class="btn-stripe">Für €49,99/Mo freischalten →</a></div>`;
+    } else {
+      contactHTML = '<div style="font-size:12px;color:var(--muted);margin-top:8px">⏳ Wird von Vexfit freigeschaltet...</div>';
+    }
+    return `<div class="anfrage-card">
+      <div class="anf-head"><div class="anf-name">${a.kunden_name||'Unbekannt'}</div><div class="anf-date">${date}</div></div>
+      <div class="anf-ziel">🎯 ${a.ziel||'–'}</div>
+      ${a.nachricht?`<div class="msg-box">"${a.nachricht}"</div>`:''}
+      ${contactHTML}
+    </div>`;
+  }).join('');
 }
 
-// PROFIL-VORSCHAU (so sehen Kunden dich)
-function renderPreview() {
-  const fn=T.vorname||'', ln=T.nachname||'';
-  const ini=((fn[0]||'?')+(ln[0]||'?')).toUpperCase();
-  const tags=(T.spezialisierungen||[]).slice(0,3).map(s=>'<span class="ov-tag">'+s+'</span>').join('');
-  const price = T.preis_stunde ? '€'+T.preis_stunde+'/Std' : (T.preis_monat ? '€'+T.preis_monat+'/Monat' : '');
-  const ratingLine = myRatings.count ? '<div class="stars" style="margin-bottom:8px">'+starString(Math.round(myRatings.sum/myRatings.count))+' <span style="color:var(--muted-l);font-size:12px">'+(myRatings.sum/myRatings.count).toFixed(1)+' · '+myRatings.count+'</span></div>' : '<div style="font-size:12px;color:var(--muted-l);margin-bottom:8px">Noch keine Bewertungen</div>';
-  document.getElementById('previewWrap').innerHTML =
-    '<div class="preview-lbl">👁 So sehen Kunden dich</div>'+
-    '<div class="pv-card">'+
-    '<div class="pv-top"><div class="pv-av">'+ini+'</div><div><div class="pv-name">'+fn+' '+ln+'</div><div class="pv-meta">'+(T.stadt||'')+' · '+(T.trainingsart||'')+'</div></div></div>'+
-    ratingLine+
-    (T.bio?'<div class="pv-bio">'+escapeHtml(T.bio)+'</div>':'')+
-    (tags?'<div style="margin-bottom:8px">'+tags+'</div>':'')+
-    (price?'<div style="font-size:13px;color:var(--muted-l)">'+price+'</div>':'')+
-    '</div>';
-}
-
-// CHAT (Trainer-Seite)
-function openChat(a){
-  chatCtx = a;
-  document.getElementById('chatTitle').textContent = (a.kunden_name||'CHAT').toUpperCase();
-  document.getElementById('chatInput').value = '';
-  document.getElementById('chatBody').innerHTML = '<div class="chat-empty">Wird geladen...</div>';
-  document.getElementById('chatOverlay').classList.add('open');
-  loadChat();
-  if(chatPoll) clearInterval(chatPoll);
-  chatPoll = setInterval(loadChat, 5000);
-}
-function closeChat(){
-  document.getElementById('chatOverlay').classList.remove('open');
-  if(chatPoll){clearInterval(chatPoll);chatPoll=null;}
-  chatCtx=null;
-}
-async function loadChat(){
-  if(!chatCtx) return;
-  try {
-    const r = await fetch(SB+'/rest/v1/nachrichten?anfrage_id=eq.'+encodeURIComponent(chatCtx.id)+'&order=created_at.asc',{headers:H});
-    const msgs = await r.json() || [];
-    const body = document.getElementById('chatBody');
-    if(!msgs.length){ body.innerHTML='<div class="chat-empty">Noch keine Nachrichten.<br>Schreib die erste!</div>'; return; }
-    const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 40;
-    body.innerHTML = msgs.map(m=>{
-      const mine = m.sender==='trainer';
-      const time = new Date(m.created_at).toLocaleTimeString('de-AT',{hour:'2-digit',minute:'2-digit'});
-      return '<div class="chat-msg '+(mine?'me':'them')+'">'+escapeHtml(m.text)+'<div class="chat-time">'+time+'</div></div>';
-    }).join('');
-    if(atBottom) body.scrollTop = body.scrollHeight;
-  } catch(e){}
-}
-async function sendChat(){
-  if(!chatCtx) return;
-  const input = document.getElementById('chatInput');
-  const text = input.value.trim();
-  if(!text) return;
-  input.value='';
-  try {
-    await fetch(SB+'/rest/v1/nachrichten',{
-      method:'POST', headers:{...H,'Prefer':'return=minimal'},
-      body:JSON.stringify({anfrage_id:String(chatCtx.id), trainer_email:T.email, kunden_email:chatCtx.kunden_email, sender:'trainer', text})
-    });
-    loadChat();
-  } catch(e){ input.value=text; alert('Nachricht konnte nicht gesendet werden'); }
-}
-function escapeHtml(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-
-async function saveProfile() {
-  const btn=document.getElementById('saveBtn');
-  btn.disabled=true; btn.textContent='Speichert...';
-  document.getElementById('pErr').classList.remove('show');
-  document.getElementById('pOk').classList.remove('show');
-  const tags=[...document.querySelectorAll('#pTags .tag.on')].map(el=>el.textContent.trim());
-  const body={
-    vorname:document.getElementById('pFn').value.trim(),
-    nachname:document.getElementById('pLn').value.trim(),
-    telefon:document.getElementById('pTel').value.trim(),
-    stadt:document.getElementById('pCity').value,
-    plz:document.getElementById('pPlz').value.trim(),
-    trainingsart:document.getElementById('pType').value,
-    erfahrung:document.getElementById('pExp').value,
-    spezialisierungen:tags,
-    bio:document.getElementById('pBio').value.trim(),
-    preis_stunde:parseFloat(document.getElementById('pPrice').value)||null,
-    preis_online:parseFloat(document.getElementById('pOPrice').value)||null,
-    zertifikate:document.getElementById('pCert').value.trim(),
-    calendly:document.getElementById('pCalendly').value.trim()
-  };
-  try {
-    const r=await fetch(SB+'/rest/v1/trainers?id=eq.'+T.id,{method:'PATCH',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(body)});
-    if (r.ok) {
-      const d=await r.json();
-      if(d&&d[0]) T=d[0];
-      renderDashboard();
-      const ok=document.getElementById('pOk');
-      ok.textContent='✓ Profil gespeichert!'; ok.classList.add('show');
-      setTimeout(()=>ok.classList.remove('show'),3000);
-    } else { throw new Error(); }
-  } catch(e) {
-    const err=document.getElementById('pErr');
-    err.textContent='⚠️ Fehler beim Speichern.'; err.classList.add('show');
+function toggleAnfragen(e) {
+  if(e) e.preventDefault();
+  const wp = document.getElementById('welcomePage');
+  const ap = document.getElementById('anfragenPage');
+  if(wp.classList.contains('hidden')) {
+    wp.classList.remove('hidden');
+    ap.classList.add('hidden');
+  } else {
+    wp.classList.add('hidden');
+    ap.classList.remove('hidden');
   }
-  btn.disabled=false; btn.textContent='Änderungen speichern';
 }
 
-function go(id,el) {
-  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('s-'+id).classList.add('active');
-  el.classList.add('active');
-  if(id==='an') loadAnfragen();
+function logout() {
+  localStorage.removeItem('vexfit_session');
+  location.href = 'login.html';
 }
-function setVal(id,val){const el=document.getElementById(id);if(el&&val!=null&&val!==undefined)el.value=val;}
-function setSel(id,val){if(!val)return;const s=document.getElementById(id);if(!s)return;for(let o of s.options){if(o.text===val||o.value===val){o.selected=true;break;}}}
-function logout(){localStorage.removeItem('vexfit_session');location.href='login.html';}
 </script>
 </body>
 </html>

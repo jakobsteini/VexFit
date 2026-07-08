@@ -7,301 +7,167 @@
 <title>Vexfit – Mein Bereich</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--black:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1e1e1e;--card:#161616;--muted:#666;--border:rgba(255,255,255,0.07);--border-i:rgba(255,255,255,0.12)}
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
-a{text-decoration:none}
-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:0 20px;height:56px;background:rgba(10,10,10,0.97);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
-.logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:4px;color:var(--white)}
+:root{--bg:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1a1a1a;--card:#161616;--muted:#555;--border:rgba(255,255,255,0.07);--bi:rgba(255,255,255,0.1)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(10,10,10,0.98);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:4px;color:var(--white);text-decoration:none}
 .logo span{color:var(--accent)}
-.nav-r{display:flex;align-items:center;gap:10px}
-.nav-email{font-size:12px;color:var(--muted)}
-.btn-out{background:none;border:1px solid var(--border);color:var(--muted);padding:7px 14px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer}
-.btn-out:hover{color:var(--white);border-color:rgba(255,255,255,0.25)}
-.tabs{position:fixed;top:56px;left:0;right:0;z-index:99;background:var(--gray);border-bottom:1px solid var(--border);display:flex}
-.tab{padding:0 20px;height:44px;display:flex;align-items:center;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;white-space:nowrap}
-.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-.tab.locked{opacity:0.3;cursor:default}
-.page{padding:120px 20px 60px;max-width:640px;margin:0 auto}
-.section{display:none}
-.section.active{display:block}
-.card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px;margin-bottom:12px}
-.welcome-name{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,10vw,64px);letter-spacing:2px;line-height:0.95;margin-bottom:6px}
-.welcome-sub{font-size:13px;color:var(--muted);margin-bottom:20px}
-.status-card{border-radius:4px;padding:20px;margin-bottom:20px}
-.status-card.inaktiv{background:rgba(255,165,0,0.06);border:1px solid rgba(255,165,0,0.2)}
-.status-card.aktiv{background:rgba(74,222,128,0.06);border:1px solid rgba(74,222,128,0.2)}
-.status-card.waiting{background:rgba(232,255,0,0.06);border:1px solid rgba(232,255,0,0.15)}
-.status-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1.5px;margin-bottom:8px}
-.status-card.inaktiv .status-title{color:orange}
-.status-card.aktiv .status-title{color:#4ade80}
-.status-card.waiting .status-title{color:var(--accent)}
-.status-desc{font-size:13px;color:var(--muted);line-height:1.8;font-weight:300}
-.tag-chip{display:inline-block;padding:4px 10px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:100px;font-size:11px;color:var(--muted);margin:3px}
-/* TRAINER CARDS */
-.trainer-card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;margin-bottom:10px;cursor:pointer;transition:border-color 0.2s}
-.trainer-card:hover{border-color:rgba(232,255,0,0.2)}
-.tc-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-.tc-av{width:44px;height:44px;border-radius:50%;background:var(--mid);border:2px solid rgba(232,255,0,0.15);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:17px;color:rgba(232,255,0,0.4);flex-shrink:0}
-.tc-name{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px}
+.nav-right{display:flex;align-items:center;gap:12px}
+.nav-profile{display:flex;align-items:center;gap:8px;background:var(--mid);border:1px solid var(--border);padding:7px 14px;border-radius:100px;font-size:12px;color:var(--white);cursor:pointer;text-decoration:none;transition:border-color 0.2s}
+.nav-profile:hover{border-color:rgba(232,255,0,0.3)}
+.nav-profile-dot{width:8px;height:8px;background:var(--accent);border-radius:50%;flex-shrink:0}
+.btn-logout{background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer}
+.btn-logout:hover{color:var(--white)}
+.page{padding:100px 20px 60px;max-width:560px;margin:0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;text-align:center}
+.icon-wrap{width:80px;height:80px;border-radius:50%;background:rgba(232,255,0,0.08);border:2px solid rgba(232,255,0,0.2);display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 28px;animation:popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both}
+.title{font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,9vw,56px);line-height:0.9;letter-spacing:2px;margin-bottom:16px;animation:fadeUp 0.5s 0.2s ease both;opacity:0}
+.title span{color:var(--accent)}
+.desc{font-size:15px;color:var(--muted);line-height:1.8;font-weight:300;margin-bottom:32px;animation:fadeUp 0.5s 0.3s ease both;opacity:0}
+.tags{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:36px;animation:fadeUp 0.5s 0.4s ease both;opacity:0}
+.tag{padding:6px 14px;border:1px solid rgba(232,255,0,0.2);border-radius:100px;font-size:11px;color:var(--accent);font-weight:600;letter-spacing:1px;text-transform:uppercase}
+.btn-primary{background:var(--accent);color:var(--bg);padding:14px 32px;border-radius:3px;font-weight:700;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;display:inline-block;animation:fadeUp 0.5s 0.5s ease both;opacity:0}
+.email-note{font-size:12px;color:rgba(85,85,85,0.7);margin-top:16px;animation:fadeUp 0.5s 0.6s ease both;opacity:0}
+/* TRAINER SUCHE SEITE */
+.search-page{padding:80px 20px 60px;max-width:640px;margin:0 auto}
+.search-page-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:6px}
+.search-page-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+.search-bar{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-bottom:8px}
+.search-bar input{background:var(--mid);border:1px solid var(--bi);color:var(--white);padding:11px 13px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;min-width:0}
+.search-bar input:focus{border-color:rgba(232,255,0,0.35)}
+.search-bar select{background:var(--mid);border:1px solid var(--bi);color:var(--white);padding:11px 10px;font-size:13px;border-radius:3px;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none}
+.search-bar select option{background:#1a1a1a}
+.btn-search{background:var(--accent);color:var(--bg);border:none;padding:11px 16px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;cursor:pointer}
+.plz-status{font-size:12px;color:var(--muted);margin-bottom:12px;min-height:16px}
+.filter-bar{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;scrollbar-width:none}
+.filter-bar::-webkit-scrollbar{display:none}
+.fc{padding:5px 12px;border:1px solid var(--bi);border-radius:100px;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.2s;user-select:none}
+.fc.on{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.07)}
+.trainer-card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;margin-bottom:10px}
+.tc-top{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px}
+.tc-av{width:44px;height:44px;border-radius:50%;background:var(--mid);border:2px solid rgba(232,255,0,0.12);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:16px;color:rgba(232,255,0,0.35);flex-shrink:0;object-fit:cover;overflow:hidden}
+.tc-name{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1px;margin-bottom:2px}
 .tc-meta{font-size:12px;color:var(--muted)}
-.tc-bio{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.btn-anfrage{width:100%;background:var(--accent);color:var(--black);padding:12px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer}
-/* ANFRAGEN */
-.anfrage-item{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;margin-bottom:10px}
-.an-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
-.an-trainer{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1px}
-.an-badge{padding:3px 8px;border-radius:100px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
-.an-badge.pend{background:rgba(232,255,0,0.1);border:1px solid rgba(232,255,0,0.2);color:var(--accent)}
-.an-badge.done{background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.2);color:#4ade80}
-.an-info{font-size:13px;color:var(--muted)}
-/* PROFIL */
-.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
-.field label{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
-input,select,textarea{background:var(--mid);border:1px solid var(--border-i);color:var(--white);padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%;appearance:none;-webkit-appearance:none;transition:border-color 0.2s}
-input:focus,select:focus{border-color:rgba(232,255,0,0.4)}
-input::placeholder{color:rgba(102,102,102,0.5)}
-select{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 5 5-5z' fill='%23666'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
-select option{background:var(--gray)}
-.goal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.goal-card{background:var(--card);border:1px solid var(--border-i);padding:12px;border-radius:3px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all 0.2s}
-.goal-card.on{border-color:var(--accent);background:rgba(232,255,0,0.05)}
-.goal-card span{font-size:13px;font-weight:500}
-.btn-save{width:100%;background:var(--accent);color:var(--black);padding:14px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-top:6px}
-.btn-save:disabled{opacity:0.5;cursor:not-allowed}
-.alert{padding:11px 14px;border-radius:3px;font-size:13px;margin-bottom:12px;display:none}
-.alert.show{display:block}
-.alert-err{background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b}
-.alert-ok{background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.2);color:#4ade80}
+.tc-dist{font-size:11px;color:var(--accent);font-weight:600;margin-top:2px}
+.tc-bio{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tc-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.tc-chip{padding:3px 8px;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:100px;font-size:11px;color:var(--muted)}
+.tc-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn-profil{display:flex;align-items:center;justify-content:center;padding:10px;border:1px solid var(--bi);border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--white);text-decoration:none}
+.btn-anfrage{background:var(--accent);color:var(--bg);border:none;padding:10px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+/* ALERT BOX */
+.alert-box{background:var(--card);border:1px solid rgba(232,255,0,0.2);border-radius:4px;padding:20px;margin-top:20px;text-align:left}
+.alert-box-title{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.alert-box-sub{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:14px}
+.btn-alert{background:var(--accent);color:var(--bg);border:none;width:100%;padding:12px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:opacity 0.2s}
+.btn-alert:disabled{opacity:0.5;cursor:default}
+.btn-alert.active{background:transparent;border:1px solid rgba(232,255,0,0.4);color:var(--accent)}
 /* MODAL */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:200;display:none;align-items:flex-end;justify-content:center}
 .overlay.open{display:flex}
 .modal{background:var(--gray);border:1px solid var(--border);border-radius:6px 6px 0 0;padding:24px 20px 40px;width:100%;max-width:520px;animation:slideUp 0.3s ease}
-.modal-title{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1.5px;margin-bottom:4px}
-.modal-sub{font-size:13px;color:var(--muted);margin-bottom:16px}
-.modal-info{background:var(--card);border:1px solid var(--border);padding:12px;border-radius:3px;margin-bottom:16px;font-size:13px;color:var(--muted)}
-.modal-info strong{color:var(--white);display:block;font-size:16px;margin-bottom:2px}
-textarea.modal-msg{background:var(--card);border:1px solid var(--border-i);color:var(--white);padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%;min-height:90px;line-height:1.6;resize:vertical}
-textarea.modal-msg:focus{border-color:rgba(232,255,0,0.4)}
-.modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.modal-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;margin-bottom:4px}
+.modal-sub{font-size:13px;color:var(--muted);margin-bottom:14px}
+.modal-info{background:var(--card);border:1px solid var(--border);padding:12px;border-radius:3px;margin-bottom:14px;font-size:13px}
+textarea.modal-msg{background:var(--card);border:1px solid var(--bi);color:var(--white);padding:12px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%;min-height:80px;line-height:1.6;resize:vertical;margin-bottom:12px}
+textarea.modal-msg:focus{border-color:rgba(232,255,0,0.35)}
+textarea.modal-msg::placeholder{color:rgba(85,85,85,0.7)}
+.modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .btn-cancel{background:none;border:1px solid var(--border);color:var(--muted);padding:12px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
-.btn-send{background:var(--accent);color:var(--black);padding:12px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
-.btn-send:disabled{opacity:0.5;cursor:not-allowed}
-.empty{text-align:center;padding:40px 20px;color:var(--muted)}
-.empty .ei{font-size:36px;margin-bottom:12px}
-.filter-bar{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px}
-.filter-bar::-webkit-scrollbar{display:none}
-.fc{padding:6px 13px;border:1px solid var(--border-i);border-radius:100px;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;flex-shrink:0}
-.fc.on{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.07)}
-@keyframes waBounce{0%{opacity:0;transform:scale(0.5)}100%{opacity:1;transform:scale(1)}}
-.wa{position:fixed;bottom:22px;right:20px;z-index:9999;width:46px;height:46px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 16px rgba(37,211,102,0.4);opacity:0;animation:waBounce 0.5s 2.5s ease both}
+.btn-send{background:var(--accent);color:var(--bg);padding:12px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.btn-send:disabled{opacity:0.4;cursor:not-allowed}
+.hidden{display:none}
+@keyframes popIn{from{opacity:0;transform:scale(0.4)}to{opacity:1;transform:scale(1)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-@media(min-width:768px){nav{padding:0 48px}.page{padding:120px 48px 60px}}
-/* === FEATURES: Favoriten, Bewertungen, Vergleich, Chat === */
-.trainer-card{position:relative}
-.fav-btn{position:absolute;top:12px;right:12px;background:none;border:none;font-size:22px;line-height:1;cursor:pointer;color:var(--muted);transition:transform 0.15s,color 0.15s;padding:2px}
-.fav-btn.on{color:#ff5a5a}
-.fav-btn:active{transform:scale(1.35)}
-.tc-profil-btn{display:flex;align-items:center;justify-content:center;padding:11px;border:1px solid var(--border-i);border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--white);text-decoration:none}
-.rating-line{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12px;color:var(--muted)}
-.stars{color:var(--accent);letter-spacing:1px;font-size:13px}
-.stars .off{color:var(--border-i)}
-.cmp-toggle{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);cursor:pointer;margin-bottom:2px;user-select:none}
-.cmp-toggle input{width:auto;margin:0;cursor:pointer;accent-color:var(--accent)}
-.cmp-bar{position:fixed;bottom:0;left:0;right:0;background:var(--gray);border-top:1px solid rgba(232,255,0,0.4);padding:12px 20px;display:none;align-items:center;justify-content:space-between;gap:12px;z-index:150}
-.cmp-bar.show{display:flex}
-.cmp-bar-txt{font-size:13px;color:var(--white)}
-.cmp-bar-btns{display:flex;gap:8px}
-.cmp-clear{background:none;border:1px solid var(--border);color:var(--muted);padding:9px 14px;border-radius:3px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer}
-.cmp-go{background:var(--accent);color:var(--black);border:none;padding:9px 16px;border-radius:3px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-family:'DM Sans',sans-serif;cursor:pointer}
-.cmp-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
-.cmp-table th,.cmp-table td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
-.cmp-table th{color:var(--muted);font-weight:600;font-size:10px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
-.cmp-table td .cn{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:0.5px}
-.star-pick{display:flex;gap:8px;justify-content:center;font-size:38px;margin:10px 0 18px}
-.star-pick span{color:var(--border-i);cursor:pointer;transition:color 0.15s,transform 0.1s}
-.star-pick span.on{color:var(--accent)}
-.star-pick span:active{transform:scale(1.2)}
-.an-actions{display:flex;gap:8px;margin-top:12px}
-.an-btn{flex:1;background:var(--mid);border:1px solid var(--border-i);color:var(--white);padding:9px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;font-family:'DM Sans',sans-serif;cursor:pointer;transition:border-color 0.2s}
-.an-btn:hover{border-color:rgba(232,255,0,0.4)}
-.an-btn.done{opacity:0.5;cursor:default}
-.chat-body{min-height:200px;max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;margin:14px 0;padding:4px 2px}
-.chat-empty{text-align:center;color:var(--muted);font-size:13px;margin:auto}
-.chat-msg{max-width:78%;padding:9px 13px;border-radius:13px;font-size:14px;line-height:1.45;word-break:break-word}
-.chat-msg.me{align-self:flex-end;background:var(--accent);color:var(--black);border-bottom-right-radius:3px}
-.chat-msg.them{align-self:flex-start;background:var(--card);border:1px solid var(--border);border-bottom-left-radius:3px}
-.chat-time{font-size:9px;opacity:0.6;margin-top:3px}
-.chat-input-row{display:flex;gap:8px}
-.chat-input-row input{flex:1}
-.chat-send{background:var(--accent);color:var(--black);border:none;padding:0 18px;border-radius:3px;font-weight:700;font-size:13px;cursor:pointer;flex-shrink:0}
+@keyframes waBounce{0%{opacity:0;transform:scale(0.5)}100%{opacity:1;transform:scale(1)}}
+.wa{position:fixed;bottom:20px;right:16px;z-index:9999;width:46px;height:46px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 16px rgba(37,211,102,0.4);opacity:0;animation:waBounce 0.5s 2s ease both;text-decoration:none}
+@media(min-width:640px){nav{padding:0 32px}}
 </style>
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1034036285801133');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
 </head>
 <body>
+
 <nav>
   <a href="index.html" class="logo">VEX<span>FIT</span></a>
-  <div class="nav-r">
-    <span class="nav-email" id="navEmail"></span>
-    <button class="btn-out" onclick="logout()">Ausloggen</button>
+  <div class="nav-right">
+    <a href="#" class="nav-profile" id="navProfileBtn" onclick="toggleSearch(event)">
+      <div class="nav-profile-dot"></div>
+      <span>Trainer in meiner Nähe</span>
+    </a>
+    <button class="btn-logout" onclick="logout()">Ausloggen</button>
   </div>
 </nav>
-<div class="tabs">
-  <div class="tab active" id="tab-ov" onclick="go('ov',this)">Übersicht</div>
-  <div class="tab locked" id="tab-su" onclick="go('su',this)">Trainer finden</div>
-  <div class="tab locked" id="tab-an" onclick="go('an',this)">Meine Anfragen</div>
-  <div class="tab locked" id="tab-pr" onclick="go('pr',this)">Profil</div>
-</div>
-<div class="page">
 
-  <!-- ÜBERSICHT -->
-  <div class="section active" id="sec-ov">
-    <div style="animation:fadeUp 0.5s ease both">
-      <div style="font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:8px">Willkommen zurück</div>
-      <div class="welcome-name" id="wName">–</div>
-      <div class="welcome-sub" id="wSub">–</div>
-    </div>
-    <div id="statusCard"></div>
-    <div class="card">
-      <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Meine Ziele</div>
-      <div id="goalsEl"></div>
-    </div>
+<!-- WILLKOMMENS-SEITE -->
+<div class="page" id="welcomePage">
+  <div class="icon-wrap">🎯</div>
+  <div class="title">WILLKOMMEN<br><span>BEI VEXFIT!</span></div>
+  <p class="desc" id="welcomeDesc">Sobald ein Trainer in deiner Nähe mit deinen Anforderungen verfügbar ist, wirst du per E-Mail benachrichtigt.</p>
+  <div class="tags">
+    <span class="tag">✓ Registriert</span>
+    <span class="tag">✓ Kostenlos</span>
+    <span class="tag">✓ DACH-Raum</span>
   </div>
-
-  <!-- TRAINER FINDEN -->
-  <div class="section" id="sec-su">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;margin-bottom:14px">TRAINER FINDEN</div>
-    <div style="display:grid;grid-template-columns:1fr auto auto;gap:8px;margin-bottom:8px">
-      <input type="text" id="plzInput" placeholder="Deine PLZ (z.B. 5026)" maxlength="5">
-      <select id="radiusInput" style="background:var(--mid);border:1px solid var(--border-i);color:var(--white);padding:12px 10px;border-radius:3px;font-size:13px;cursor:pointer;appearance:none;-webkit-appearance:none">
-        <option value="10">10 km</option>
-        <option value="25" selected>25 km</option>
-        <option value="50">50 km</option>
-        <option value="100">100 km</option>
-        <option value="0">Alle</option>
-      </select>
-      <button onclick="searchByPLZ()" style="background:var(--accent);color:var(--black);border:none;padding:12px 16px;border-radius:3px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap">Suchen →</button>
-    </div>
-    <div id="plzStatus" style="font-size:12px;color:var(--muted);margin-bottom:10px"></div>
-    <input type="text" id="searchQ" placeholder="Name suchen..." oninput="filterT()" style="margin-bottom:12px">
-    <div class="filter-bar" id="filterBar">
-      <div class="fc on" onclick="setFilter('alle',this)">Alle</div>
-      <div class="fc" onclick="setFilter('fav',this)">♥ Favoriten</div>
-      <div class="fc" onclick="setFilter('Muskelaufbau',this)">💪 Muskelaufbau</div>
-      <div class="fc" onclick="setFilter('Abnehmen',this)">🔥 Abnehmen</div>
-      <div class="fc" onclick="setFilter('Ausdauer',this)">🏃 Ausdauer</div>
-      <div class="fc" onclick="setFilter('Krafttraining',this)">⚡ Krafttraining</div>
-      <div class="fc" onclick="setFilter('Mobility',this)">🧘 Mobility</div>
-      <div class="fc" onclick="setFilter('Reha',this)">🏥 Reha</div>
-    </div>
-    <div id="trainerList"><div class="empty"><div class="ei">🔍</div><p>Wird geladen...</p></div></div>
-  </div>
-
-  <!-- ANFRAGEN -->
-  <div class="section" id="sec-an">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;margin-bottom:16px">MEINE ANFRAGEN</div>
-    <div id="anList"><div class="empty"><div class="ei">📭</div><p>Noch keine Anfragen</p></div></div>
-  </div>
-
-  <!-- PROFIL -->
-  <div class="section" id="sec-pr">
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;margin-bottom:16px">PROFIL BEARBEITEN</div>
-    <div class="alert alert-err" id="pErr"></div>
-    <div class="alert alert-ok" id="pOk"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="field"><label>Vorname</label><input type="text" id="pFn"></div>
-      <div class="field"><label>Nachname</label><input type="text" id="pLn"></div>
-    </div>
-    <div class="field"><label>Stadt</label>
-      <select id="pCity"><option value="">Auswählen...</option><option>Wien</option><option>Graz</option><option>Salzburg</option><option>Linz</option><option>Innsbruck</option><option>München</option><option>Berlin</option><option>Hamburg</option><option>Frankfurt</option><option>Köln</option><option>Zürich</option><option>Basel</option><option>Ich möchte Online-Coaching</option></select>
-    </div>
-    <div class="field"><label>Meine Ziele</label>
-      <div class="goal-grid">
-        <div class="goal-card" onclick="this.classList.toggle('on')"><span>🔥 Abnehmen</span></div>
-        <div class="goal-card" onclick="this.classList.toggle('on')"><span>💪 Muskelaufbau</span></div>
-        <div class="goal-card" onclick="this.classList.toggle('on')"><span>🏃 Ausdauer</span></div>
-        <div class="goal-card" onclick="this.classList.toggle('on')"><span>⚡ Krafttraining</span></div>
-        <div class="goal-card" onclick="this.classList.toggle('on')"><span>🧘 Mobility</span></div>
-        <div class="goal-card" onclick="this.classList.toggle('on')"><span>🏥 Reha</span></div>
-      </div>
-    </div>
-    <div class="field"><label>Meine Erwartungen</label><textarea id="pErw" placeholder="Was erwartest du von deinem Trainer?" style="min-height:80px;resize:vertical;line-height:1.6;background:var(--mid);border:1px solid var(--border-i);color:var(--white);padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%"></textarea></div>
-    <button class="btn-save" id="saveBtn" onclick="saveProfile()">Speichern</button>
-  </div>
-
+  <a href="#" class="btn-primary" onclick="toggleSearch(event)">Trainer in meiner Nähe →</a>
+  <p class="email-note" id="emailNote">Eingeloggt als: –</p>
 </div>
 
-<!-- MODAL -->
-<div class="overlay" id="overlay" onclick="closeOverlay(event)">
+<!-- TRAINER SUCHE -->
+<div class="search-page hidden" id="searchPage">
+  <div class="search-page-title">TRAINER IN DEINER NÄHE</div>
+  <p class="search-page-sub">PLZ eingeben und Umkreis wählen</p>
+  <div class="search-bar">
+    <input type="text" id="plzInput" placeholder="Deine PLZ (z.B. 5026)" maxlength="5">
+    <select id="radiusInput">
+      <option value="10">10 km</option>
+      <option value="25" selected>25 km</option>
+      <option value="50">50 km</option>
+      <option value="100">100 km</option>
+      <option value="0">Alle</option>
+    </select>
+    <button class="btn-search" onclick="searchByPLZ()">→</button>
+  </div>
+  <div class="plz-status" id="plzStatus"></div>
+  <div class="filter-bar">
+    <div class="fc on" onclick="setFilter('alle',this)">Alle</div>
+    <div class="fc" onclick="setFilter('Muskelaufbau',this)">💪 Muskelaufbau</div>
+    <div class="fc" onclick="setFilter('Abnehmen',this)">🔥 Abnehmen</div>
+    <div class="fc" onclick="setFilter('Ausdauer',this)">🏃 Ausdauer</div>
+    <div class="fc" onclick="setFilter('Krafttraining',this)">⚡ Krafttraining</div>
+    <div class="fc" onclick="setFilter('Reha',this)">🏥 Reha</div>
+  </div>
+  <div id="trainerList"><div class="empty-state">PLZ eingeben und auf → klicken</div></div>
+</div>
+
+<!-- ANFRAGE MODAL -->
+<div class="overlay" id="overlay" onclick="closeModal(event)">
   <div class="modal">
-    <!-- FORMULAR -->
-    <div id="modalForm">
-      <div class="modal-title">TRAINER ANFRAGEN</div>
-      <div class="modal-sub">Deine Anfrage wird direkt übermittelt.</div>
-      <div class="modal-info" id="modalInfo"></div>
-      <textarea class="modal-msg" id="modalMsg" placeholder="Kurz vorstellen: Ziele, Verfügbarkeit..."></textarea>
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeOverlay()">Abbrechen</button>
-        <button class="btn-send" id="sendBtn" onclick="sendAnfrage()">Senden →</button>
-      </div>
-    </div>
-    <!-- ERFOLG -->
-    <div id="modalSuccess" style="display:none;text-align:center;padding:8px 4px 4px">
-      <div style="font-size:46px;line-height:1;margin-bottom:16px">🎯</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:10px">TRAINER ANGEFRAGT!</div>
-      <div style="font-size:14px;color:var(--muted);margin-bottom:24px;line-height:1.5">Der Trainer wird sich bald bei dir melden.</div>
-      <button class="btn-send" style="width:100%" onclick="findMoreTrainers()">Weitere Trainer finden →</button>
-    </div>
-  </div>
-</div>
-
-<!-- BEWERTEN-MODAL -->
-<div class="overlay" id="ratingOverlay" onclick="if(event.target===this)closeRating()">
-  <div class="modal">
-    <div class="modal-title">TRAINER BEWERTEN</div>
-    <div class="modal-sub" id="ratingSub">Wie war dein Training?</div>
-    <div class="star-pick" id="starPick">
-      <span onclick="setStars(1)">★</span><span onclick="setStars(2)">★</span><span onclick="setStars(3)">★</span><span onclick="setStars(4)">★</span><span onclick="setStars(5)">★</span>
-    </div>
-    <textarea class="modal-msg" id="ratingText" placeholder="Optional: Was hat dir gefallen?"></textarea>
+    <div class="modal-title">TRAINER ANFRAGEN</div>
+    <div class="modal-sub">Kostenlos — direkt übermittelt</div>
+    <div class="modal-info" id="modalInfo"></div>
+    <textarea class="modal-msg" id="modalMsg" placeholder="Kurz vorstellen: dein Ziel, Verfügbarkeit..."></textarea>
     <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeRating()">Abbrechen</button>
-      <button class="btn-send" id="ratingBtn" onclick="submitRating()">Bewertung senden →</button>
+      <button class="btn-cancel" onclick="closeModal()">Abbrechen</button>
+      <button class="btn-send" id="sendBtn" onclick="sendAnfrage()">Senden →</button>
     </div>
-  </div>
-</div>
-
-<!-- CHAT-MODAL -->
-<div class="overlay" id="chatOverlay" onclick="if(event.target===this)closeChat()">
-  <div class="modal">
-    <div class="modal-title" id="chatTitle">CHAT</div>
-    <div class="modal-sub">Schreib direkt mit deinem Trainer.</div>
-    <div class="chat-body" id="chatBody"></div>
-    <div class="chat-input-row">
-      <input type="text" id="chatInput" placeholder="Nachricht schreiben..." onkeydown="if(event.key==='Enter')sendChat()">
-      <button class="chat-send" onclick="sendChat()">→</button>
-    </div>
-  </div>
-</div>
-
-<!-- VERGLEICH-MODAL -->
-<div class="overlay" id="compareOverlay" onclick="if(event.target===this)closeCompare()">
-  <div class="modal">
-    <div class="modal-title">TRAINER-VERGLEICH</div>
-    <div class="modal-sub">Deine ausgewählten Trainer im direkten Vergleich.</div>
-    <div style="overflow-x:auto" id="compareContent"></div>
-    <div class="modal-btns" style="grid-template-columns:1fr">
-      <button class="btn-cancel" onclick="closeCompare()">Schließen</button>
-    </div>
-  </div>
-</div>
-
-<!-- VERGLEICHS-LEISTE -->
-<div class="cmp-bar" id="cmpBar">
-  <div class="cmp-bar-txt" id="cmpBarTxt">0 Trainer ausgewählt</div>
-  <div class="cmp-bar-btns">
-    <button class="cmp-clear" onclick="clearCompare()">Leeren</button>
-    <button class="cmp-go" onclick="openCompare()">Vergleichen →</button>
   </div>
 </div>
 
@@ -311,142 +177,60 @@ textarea.modal-msg:focus{border-color:rgba(232,255,0,0.4)}
 
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
-
-async function getCoords(plz) {
-  for(const country of ['at','de','ch']) {
-    try {
-      const r = await fetch(`https://api.zippopotam.us/${country}/${plz}`);
-      if(r.ok) {
-        const d = await r.json();
-        if(d.places && d.places.length > 0) {
-          return { lat: parseFloat(d.places[0].latitude), lng: parseFloat(d.places[0].longitude), city: d.places[0]['place name'] };
-        }
-      }
-    } catch(e) {}
-  }
-  return null;
-}
-
-function calcDistance(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = (lat2-lat1)*Math.PI/180;
-  const dLng = (lng2-lng1)*Math.PI/180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
-}
-
-async function searchByPLZ() {
-  const plz = document.getElementById('plzInput').value.trim();
-  const radius = parseInt(document.getElementById('radiusInput').value);
-  const status = document.getElementById('plzStatus');
-
-  if(radius === 0) {
-    renderTrainer(allT);
-    status.textContent = `Alle ${allT.length} Trainer`;
-    return;
-  }
-  if(!plz || plz.length < 4) { status.textContent = '⚠️ Bitte gültige PLZ eingeben'; return; }
-
-  status.textContent = '📍 Standort wird ermittelt...';
-  const coords = await getCoords(plz);
-  if(!coords) { status.textContent = '⚠️ PLZ nicht gefunden'; return; }
-  status.textContent = `📍 ${coords.city} · Suche läuft...`;
-
-  const filtered = [];
-  for(const t of allT) {
-    if((t.trainingsart||'').toLowerCase().includes('online')) {
-      filtered.push({...t, _distance: 0, _online: true});
-      continue;
-    }
-    if(!t.plz) continue;
-    const tc = await getCoords(t.plz);
-    if(!tc) continue;
-    const dist = calcDistance(coords.lat, coords.lng, tc.lat, tc.lng);
-    if(dist <= radius) filtered.push({...t, _distance: Math.round(dist)});
-  }
-  filtered.sort((a,b) => a._distance - b._distance);
-  status.textContent = `📍 ${coords.city} · ${filtered.length} Trainer in ${radius} km`;
-  renderTrainerDist(filtered);
-}
-
-function renderTrainerDist(list) {
-  const el = document.getElementById('trainerList');
-  if(!list.length) {
-    el.innerHTML = `<div class="empty"><div class="ei">🔍</div><p>Keine Trainer in diesem Umkreis.<br>Versuche einen größeren Radius.</p></div>`;
-    return;
-  }
-  el.innerHTML = list.map(t => {
-    const distLabel = t._online ? '🌐 Online' : t._distance !== undefined ? `📍 ${t._distance} km entfernt` : (t.stadt||'');
-    return trainerCardHTML(t, `${distLabel} · ${t.trainingsart||''}`);
-  }).join('');
-}
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
-let K = null, allT = [], activeFilter = 'alle', selT = null;
-let favIds = new Set(), compareList = [], allRatings = {}, ratedAnfragen = new Set();
-let chatCtx = null, chatPoll = null, rateCtx = null, pickStars = 0;
+let K = null, allT = [], activeFilter = 'alle', selT = null, lastSearch = null;
 
+// AUTH - no redirect loop
 const raw = localStorage.getItem('vexfit_session');
-if(!raw) { location.href = 'login.html'; }
-const sess = JSON.parse(raw);
-document.getElementById('navEmail').textContent = sess.email;
-init(sess.email);
+if(!raw) { location.href = 'login.html'; throw new Error('no session'); }
+let sess;
+try { sess = JSON.parse(raw); } catch(e) { localStorage.removeItem('vexfit_session'); location.href = 'login.html'; throw new Error(); }
+if(sess.role === 'trainer') { location.href = 'trainer-bereich.html'; throw new Error(); }
 
-async function init(email) {
+document.getElementById('emailNote').textContent = 'Eingeloggt als: ' + sess.email;
+loadKunde(sess.email);
+
+async function loadKunde(email) {
   try {
     const r = await fetch(`${SB}/rest/v1/kunden?email=eq.${encodeURIComponent(email)}&select=*`, {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
     });
     const d = await r.json();
-    if(!d || d.length === 0) {
-      // Not a kunde — maybe a trainer logged in here by mistake
-      location.href = 'trainer-bereich.html';
-      return;
+    if(d && d.length > 0) {
+      K = d[0];
+      if(K.plz) document.getElementById('plzInput').value = K.plz;
     }
-    K = d[0];
-    render();
-    await Promise.all([loadFavoriten(), loadRatings()]);
-    loadTrainer();
-    loadAnfragen();
-  } catch(e) { location.href = 'login.html'; }
+  } catch(e) {}
 }
 
-function render() {
-  const name = ((K.vorname || '') + ' ' + (K.nachname || '')).trim() || K.email;
-  document.getElementById('wName').textContent = name;
-  document.getElementById('wSub').textContent = (K.stadt || '') + ' · ' + K.email;
-
-  // Goals
-  const goals = (K.ziel || '').split(', ').filter(Boolean);
-  document.getElementById('goalsEl').innerHTML = goals.length
-    ? goals.map(g => `<span class="tag-chip">${g}</span>`).join('')
-    : '<span style="font-size:13px;color:var(--muted)">Noch keine Ziele gesetzt</span>';
-
-  // Status
-  document.getElementById('statusCard').innerHTML = `
-    <div class="status-card waiting" style="margin-bottom:20px">
-      <div class="status-title">🔍 WIR SUCHEN FÜR DICH</div>
-      <div class="status-desc">Wir benachrichtigen dich sobald ein passender Trainer für deine Ziele verfügbar ist und du aktiviert wirst.</div>
-    </div>`;
-
-  // Unlock all tabs
-  ['tab-su','tab-an','tab-pr'].forEach(id => document.getElementById(id).classList.remove('locked'));
-
-  // Fill profil
-  document.getElementById('pFn').value = K.vorname || '';
-  document.getElementById('pLn').value = K.nachname || '';
-  document.getElementById('pErw').value = K.erwartungen || '';
-  setSelect('pCity', K.stadt);
-  const saved = (K.ziel || '').split(', ').filter(Boolean);
-  document.querySelectorAll('.goal-card').forEach(el => {
-    const t = el.querySelector('span').textContent.replace(/^.\s/,'');
-    if(saved.some(g => g.includes(t) || t.includes(g.replace(/^.\s/,'')))) el.classList.add('on');
-  });
+function toggleSearch(e) {
+  e.preventDefault();
+  const wp = document.getElementById('welcomePage');
+  const sp = document.getElementById('searchPage');
+  if(wp.classList.contains('hidden')) {
+    wp.classList.remove('hidden');
+    sp.classList.add('hidden');
+  } else {
+    wp.classList.add('hidden');
+    sp.classList.remove('hidden');
+    if(allT.length === 0) loadTrainer();
+  }
 }
 
-function setSelect(id, val) {
-  if(!val) return;
-  const s = document.getElementById(id);
-  for(let o of s.options) { if(o.text === val || o.value === val) { o.selected = true; break; } }
+async function getCoords(plz) {
+  for(const c of ['at','de','ch']) {
+    try {
+      const r = await fetch(`https://api.zippopotam.us/${c}/${plz}`);
+      if(r.ok) { const d = await r.json(); if(d.places?.length) return {lat:parseFloat(d.places[0].latitude),lng:parseFloat(d.places[0].longitude),city:d.places[0]['place name']}; }
+    } catch(e) {}
+  }
+  return null;
+}
+
+function calcDist(lat1,lng1,lat2,lng2) {
+  const R=6371,dLat=(lat2-lat1)*Math.PI/180,dLng=(lng2-lng1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
 async function loadTrainer() {
@@ -456,432 +240,170 @@ async function loadTrainer() {
     });
     allT = await r.json() || [];
     renderTrainer(allT);
-  } catch(e) {
-    document.getElementById('trainerList').innerHTML = '<div class="empty"><p>Fehler beim Laden</p></div>';
-  }
+  } catch(e) {}
 }
 
-function renderTrainer(list) {
-  const el = document.getElementById('trainerList');
-  // Filter by kunde's city or online trainers
-  if(K && K.stadt && activeFilter === 'alle' && !document.getElementById('searchQ').value) {
-    const stadtLower = K.stadt.toLowerCase();
-    const filtered = list.filter(t =>
-      !t.stadt ||
-      t.stadt.toLowerCase() === stadtLower ||
-      (t.trainingsart || '').toLowerCase().includes('online')
-    );
-    if(filtered.length > 0) list = filtered;
+async function searchByPLZ() {
+  const plz = document.getElementById('plzInput').value.trim();
+  const radius = parseInt(document.getElementById('radiusInput').value);
+  const status = document.getElementById('plzStatus');
+  if(radius === 0) { if(!allT.length) await loadTrainer(); lastSearch = null; renderTrainer(allT); status.textContent = `Alle ${allT.length} Trainer`; return; }
+  if(!plz || plz.length < 4) { status.textContent = '⚠️ Bitte gültige PLZ eingeben'; return; }
+  if(!allT.length) await loadTrainer();
+  status.textContent = '📍 Standort wird ermittelt...';
+  const coords = await getCoords(plz);
+  if(!coords) { status.textContent = '⚠️ PLZ nicht gefunden'; return; }
+  status.textContent = `📍 ${coords.city} · Suche läuft...`;
+  const filtered = [];
+  for(const t of allT) {
+    if((t.trainingsart||'').toLowerCase().includes('online')) { filtered.push({...t,_dist:0,_online:true}); continue; }
+    if(!t.plz) continue;
+    const tc = await getCoords(t.plz);
+    if(!tc) continue;
+    const dist = calcDist(coords.lat,coords.lng,tc.lat,tc.lng);
+    if(dist <= radius) filtered.push({...t,_dist:Math.round(dist)});
   }
-  if(!list.length) { el.innerHTML = `<div class="empty"><div class="ei">🔍</div><p>Noch keine Trainer in ${K && K.stadt ? K.stadt : 'deiner Stadt'} verfügbar.<br><span style="font-size:12px">Wir benachrichtigen dich sobald ein Trainer verfügbar ist.</span></p></div>`; return; }
-  el.innerHTML = list.map(t => trainerCardHTML(t)).join('');
-}
-
-// Gemeinsame Trainer-Karte (Favoriten-Herz, Bewertung, Vergleich)
-function trainerCardHTML(t, metaOverride) {
-  const ini = ((t.vorname||'?')[0] + (t.nachname||'?')[0]).toUpperCase();
-  const tags = (t.spezialisierungen || []).slice(0,3).map(s => `<span class="tag-chip">${s}</span>`).join('');
-  const meta = metaOverride || `${t.stadt || ''} · ${t.trainingsart || ''}`;
-  const isFav = favIds.has(String(t.id));
-  const inCmp = compareList.some(c => String(c.id) === String(t.id));
-  const price = t.preis_stunde ? `€${t.preis_stunde}/Std` : (t.preis_monat ? `€${t.preis_monat}/Monat` : '');
-  const tJSON = JSON.stringify(t).replace(/"/g,'&quot;');
-  return `<div class="trainer-card">
-    <button class="fav-btn ${isFav?'on':''}" title="Zu Favoriten" onclick="toggleFav(event,'${String(t.id)}')">${isFav?'♥':'♡'}</button>
-    <div class="tc-top">
-      <div class="tc-av">${ini}</div>
-      <div>
-        <div class="tc-name">${t.vorname || ''} ${t.nachname || ''}</div>
-        <div class="tc-meta">${meta}</div>
-      </div>
-    </div>
-    <div class="rating-line">${ratingHTML(t.email)}</div>
-    ${t.bio ? `<div class="tc-bio">${t.bio}</div>` : ''}
-    <div style="margin-bottom:10px">${tags}</div>
-    ${price ? `<div style="font-size:13px;color:var(--muted);margin-bottom:10px">${price}</div>` : ''}
-    <label class="cmp-toggle"><input type="checkbox" ${inCmp?'checked':''} onchange="toggleCompare(event,${tJSON})"> Zum Vergleich hinzufügen</label>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
-      <a href="profil.html?id=${t.id}" class="tc-profil-btn">Profil →</a>
-      <button class="btn-anfrage" style="margin:0" onclick="openModal(event,${tJSON})">Anfragen →</button>
-    </div>
-  </div>`;
+  filtered.sort((a,b) => a._dist - b._dist);
+  status.textContent = `📍 ${coords.city} · ${filtered.length} Trainer in ${radius} km`;
+  lastSearch = { plz, city: coords.city, radius };
+  renderTrainer(filtered);
 }
 
 function setFilter(f, el) {
   activeFilter = f;
   document.querySelectorAll('.fc').forEach(c => c.classList.remove('on'));
   el.classList.add('on');
-  filterT();
+  renderTrainer(allT);
 }
 
-function filterT() {
-  const q = document.getElementById('searchQ').value.toLowerCase();
-  let list = allT;
-  if(activeFilter === 'fav') {
-    list = allT.filter(t => favIds.has(String(t.id)));
-    if(q) list = list.filter(t => `${t.vorname} ${t.nachname} ${t.stadt||''}`.toLowerCase().includes(q));
-    const el = document.getElementById('trainerList');
-    if(!list.length) { el.innerHTML = `<div class="empty"><div class="ei">💛</div><p>Noch keine Favoriten.<br><span style="font-size:12px">Tippe auf das Herz bei einem Trainer.</span></p></div>`; return; }
-    el.innerHTML = list.map(t => trainerCardHTML(t)).join('');
-    return;
-  }
-  if(activeFilter !== 'alle') list = list.filter(t => (t.spezialisierungen||[]).join(' ').includes(activeFilter) || (t.trainingsart||'').includes(activeFilter));
-  if(q) list = list.filter(t => `${t.vorname} ${t.nachname} ${t.stadt||''}`.toLowerCase().includes(q));
-  renderTrainer(list);
+function renderTrainer(list) {
+  let filtered = list;
+  if(activeFilter !== 'alle') filtered = list.filter(t => (t.spezialisierungen||[]).join(' ').toLowerCase().includes(activeFilter.toLowerCase()));
+  const el = document.getElementById('trainerList');
+  if(!filtered.length) {
+    const where = lastSearch ? `IN ${lastSearch.plz}${lastSearch.city ? ' ' + lastSearch.city.toUpperCase() : ''}` : 'IN DEINER NÄHE';
+    const alertBox = lastSearch ? `
+    <div class="alert-box" id="alertBox">
+      <div class="alert-box-title">🔔 Informiere mich sobald es einen Trainer für mich gibt</div>
+      <div class="alert-box-sub">Sobald sich ein Trainer in ${lastSearch.plz} ${lastSearch.city || ''} registriert, bekommst du automatisch eine E-Mail mit seinen Daten.</div>
+      <button class="btn-alert" id="alertBtn" onclick="activateAlert()">Aktivieren</button>
+    </div>` : '';
+    el.innerHTML = `<div class="empty-state" style="padding:48px 20px 20px">
+    <div style="font-size:40px;margin-bottom:16px">📍</div>
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;color:rgba(255,255,255,0.3);margin-bottom:12px">KEINE TRAINER ${where} GEFUNDEN</div>
+    <div style="font-size:14px;color:var(--muted);line-height:1.8;font-weight:300">Aktuell ist hier noch kein Trainer verfügbar.</div>
+  </div>${alertBox}`;
+    if(lastSearch) checkAlertStatus();
+    return; }
+  el.innerHTML = filtered.map(t => {
+    const ini = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
+    const avStyle = t.avatar_url ? `background-image:url(${t.avatar_url});background-size:cover;background-position:center` : '';
+    const chips = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="tc-chip">${s}</span>`).join('');
+    const dist = t._online ? '<div class="tc-dist">🌐 Online</div>' : t._dist !== undefined ? `<div class="tc-dist">📍 ${t._dist} km</div>` : '';
+    const price = t.preis_stunde ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">ab €${t.preis_stunde}/Mo</div>` : '';
+    return `<div class="trainer-card">
+      <div class="tc-top">
+        <div class="tc-av" style="${avStyle}">${avStyle?'':ini}</div>
+        <div><div class="tc-name">${t.vorname||''} ${t.nachname||''}</div><div class="tc-meta">${t.trainingsart||''} · ${t.stadt||''}</div>${dist}</div>
+      </div>
+      ${t.bio?`<div class="tc-bio">${t.bio}</div>`:''}
+      <div class="tc-chips">${chips}</div>
+      ${price}
+      <div class="tc-actions">
+        <a href="profil.html?id=${t.id}" class="btn-profil">Profil →</a>
+        <button class="btn-anfrage" onclick="openModal(${JSON.stringify(t).replace(/"/g,'&quot;')})">Anfragen →</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-async function loadAnfragen() {
-  const el = document.getElementById('anList');
-  try {
-    const r = await fetch(`${SB}/rest/v1/anfragen?kunden_email=eq.${encodeURIComponent(K.email)}&order=created_at.desc`, {
-      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
-    });
-    const data = await r.json();
-    if(!data || data.length === 0) { el.innerHTML = '<div class="empty"><div class="ei">📭</div><p>Noch keine Anfragen</p></div>'; return; }
-    el.innerHTML = data.map(a => {
-      const done = a.weitergeleitet;
-      const rated = ratedAnfragen.has(String(a.id));
-      const aEsc = JSON.stringify({id:String(a.id), trainer_email:a.trainer_email||'', trainer_name:a.trainer_name||''}).replace(/"/g,'&quot;');
-      return `<div class="anfrage-item">
-        <div class="an-head">
-          <div class="an-trainer">${a.trainer_name || a.trainer_email || '–'}</div>
-          <span class="an-badge ${done ? 'done' : 'pend'}">${done ? 'Aktiv' : 'Ausstehend'}</span>
-        </div>
-        <div class="an-info">${new Date(a.created_at).toLocaleDateString('de-AT')}</div>
-        ${a.nachricht ? `<div class="an-info" style="margin-top:4px">"${a.nachricht}"</div>` : ''}
-        <div class="an-actions">
-          <button class="an-btn" onclick="openChat(${aEsc})">💬 Chat</button>
-          <button class="an-btn ${rated?'done':''}" ${rated?'disabled':''} onclick="openRating(${aEsc})">${rated?'✓ Bewertet':'⭐ Bewerten'}</button>
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) { el.innerHTML = '<div class="empty"><p>Fehler beim Laden</p></div>'; }
-}
-
-function openModal(e, trainer) {
-  e.stopPropagation();
-  selT = trainer;
-  resetModal();
-  document.getElementById('modalInfo').innerHTML = `<strong>${trainer.vorname} ${trainer.nachname}</strong>${trainer.stadt || ''} · ${trainer.trainingsart || ''}`;
+function openModal(t) {
+  selT = t;
+  document.getElementById('modalInfo').textContent = `${t.vorname} ${t.nachname} · ${t.trainingsart||''} · ${t.stadt||''}`;
   document.getElementById('modalMsg').value = '';
   document.getElementById('overlay').classList.add('open');
 }
 
-function closeOverlay(e) {
+function closeModal(e) {
   if(!e || e.target === document.getElementById('overlay')) {
     document.getElementById('overlay').classList.remove('open');
     selT = null;
-    resetModal();
   }
 }
 
 async function sendAnfrage() {
-  if(!selT || !K) return;
+  if(!selT) return;
   const btn = document.getElementById('sendBtn');
   btn.disabled = true; btn.textContent = 'Wird gesendet...';
   const body = {
     trainer_email: selT.email,
-    trainer_name: `${selT.vorname} ${selT.nachname}`,
-    kunden_email: K.email,
-    kunden_name: `${K.vorname} ${K.nachname}`,
-    ziel: K.ziel || '',
+    trainer_name: `${selT.vorname||''} ${selT.nachname||''}`.trim(),
+    kunden_email: sess.email,
+    kunden_name: K ? `${K.vorname||''} ${K.nachname||''}`.trim() : sess.email,
+    ziel: K ? K.ziel||'' : '',
     nachricht: document.getElementById('modalMsg').value.trim(),
     status: 'ausstehend',
     weitergeleitet: false
   };
   try {
     await fetch(`${SB}/rest/v1/anfragen`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'return=minimal' },
+      method:'POST',
+      headers:{'Content-Type':'application/json',apikey:KEY,Authorization:`Bearer ${KEY}`,Prefer:'return=minimal'},
       body: JSON.stringify(body)
     });
-    fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neue-anfrage', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
-    }).catch(()=>{});
+    fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neue-anfrage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>{});
+    document.getElementById('overlay').classList.remove('open');
     selT = null;
-    loadAnfragen(); // Anfragen-Liste im Hintergrund aktualisieren
-    // Erfolgs-Ansicht im Modal zeigen
-    document.getElementById('modalForm').style.display = 'none';
-    document.getElementById('modalSuccess').style.display = 'block';
+    document.getElementById('welcomePage').classList.remove('hidden');
+    document.getElementById('searchPage').classList.add('hidden');
+    const desc = document.getElementById('welcomeDesc');
+    desc.textContent = 'Deine Anfrage wurde erfolgreich übermittelt! Der Trainer meldet sich in Kürze bei dir.';
   } catch(e) { alert('Fehler beim Senden'); }
   btn.disabled = false; btn.textContent = 'Senden →';
 }
 
-function findMoreTrainers() {
-  document.getElementById('overlay').classList.remove('open');
-  resetModal();
-  go('su', document.getElementById('tab-su'));
-}
-
-function resetModal() {
-  document.getElementById('modalForm').style.display = 'block';
-  document.getElementById('modalSuccess').style.display = 'none';
-}
-
-async function saveProfile() {
-  const btn = document.getElementById('saveBtn');
-  btn.disabled = true; btn.textContent = 'Speichert...';
-  document.getElementById('pErr').classList.remove('show');
-  document.getElementById('pOk').classList.remove('show');
-  const goals = [...document.querySelectorAll('.goal-card.on')].map(el => el.querySelector('span').textContent.trim());
-  const body = {
-    vorname: document.getElementById('pFn').value.trim(),
-    nachname: document.getElementById('pLn').value.trim(),
-    stadt: document.getElementById('pCity').value,
-    ziel: goals.join(', '),
-    erwartungen: document.getElementById('pErw').value.trim()
-  };
+async function checkAlertStatus() {
+  if(!lastSearch) return;
   try {
-    const r = await fetch(`${SB}/rest/v1/kunden?id=eq.${K.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'return=representation' },
-      body: JSON.stringify(body)
-    });
-    if(r.ok) {
-      const d = await r.json();
-      if(d && d[0]) K = d[0];
-      render();
-      const ok = document.getElementById('pOk');
-      ok.textContent = '✓ Gespeichert!';
-      ok.classList.add('show');
-      setTimeout(() => ok.classList.remove('show'), 3000);
-    } else { throw new Error(); }
-  } catch(e) {
-    const err = document.getElementById('pErr');
-    err.textContent = '⚠️ Fehler beim Speichern';
-    err.classList.add('show');
-  }
-  btn.disabled = false; btn.textContent = 'Speichern';
-}
-
-/* ========== FAVORITEN ========== */
-async function loadFavoriten() {
-  try {
-    const r = await fetch(`${SB}/rest/v1/favoriten?kunden_email=eq.${encodeURIComponent(K.email)}&select=trainer_id`, {
+    const r = await fetch(`${SB}/rest/v1/trainer_alerts?kunden_email=eq.${encodeURIComponent(sess.email)}&plz=eq.${encodeURIComponent(lastSearch.plz)}&aktiv=eq.true&select=id`, {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
     });
     const d = await r.json();
-    favIds = new Set((d||[]).map(f => String(f.trainer_id)));
-  } catch(e) { favIds = new Set(); }
-}
-
-async function toggleFav(e, trainerId) {
-  e.stopPropagation();
-  trainerId = String(trainerId);
-  const btn = e.currentTarget;
-  const wasFav = favIds.has(trainerId);
-  // Optimistisches UI-Update
-  if(wasFav) { favIds.delete(trainerId); btn.classList.remove('on'); btn.textContent = '♡'; }
-  else { favIds.add(trainerId); btn.classList.add('on'); btn.textContent = '♥'; }
-  try {
-    if(wasFav) {
-      await fetch(`${SB}/rest/v1/favoriten?kunden_email=eq.${encodeURIComponent(K.email)}&trainer_id=eq.${encodeURIComponent(trainerId)}`, {
-        method: 'DELETE', headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
-      });
-    } else {
-      await fetch(`${SB}/rest/v1/favoriten`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'return=minimal' },
-        body: JSON.stringify({ kunden_email: K.email, trainer_id: trainerId })
-      });
-    }
-  } catch(err) { /* UI bleibt optimistisch */ }
-  if(activeFilter === 'fav') filterT();
-}
-
-/* ========== BEWERTUNGEN ========== */
-async function loadRatings() {
-  try {
-    const r = await fetch(`${SB}/rest/v1/bewertungen?select=trainer_email,sterne,anfrage_id,kunden_email`, {
-      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
-    });
-    const d = await r.json() || [];
-    allRatings = {};
-    ratedAnfragen = new Set();
-    d.forEach(b => {
-      if(b.trainer_email) {
-        const k = b.trainer_email;
-        if(!allRatings[k]) allRatings[k] = { sum: 0, count: 0 };
-        allRatings[k].sum += b.sterne || 0;
-        allRatings[k].count++;
-      }
-      if(b.anfrage_id && b.kunden_email === K.email) ratedAnfragen.add(String(b.anfrage_id));
-    });
-  } catch(e) { allRatings = {}; }
-}
-
-function starString(n) {
-  let s = '';
-  for(let i=1;i<=5;i++) s += i <= n ? '★' : '<span class="off">★</span>';
-  return s;
-}
-
-function ratingHTML(email) {
-  const r = email && allRatings[email];
-  if(!r || !r.count) return `<span class="stars">${starString(0)}</span> <span>Noch keine Bewertungen</span>`;
-  const avg = r.sum / r.count;
-  return `<span class="stars">${starString(Math.round(avg))}</span> <span>${avg.toFixed(1)} · ${r.count} ${r.count===1?'Bewertung':'Bewertungen'}</span>`;
-}
-
-function openRating(a) {
-  rateCtx = a;
-  pickStars = 0;
-  document.getElementById('ratingSub').textContent = `Wie war dein Training mit ${a.trainer_name || a.trainer_email}?`;
-  document.getElementById('ratingText').value = '';
-  renderStarPick();
-  document.getElementById('ratingOverlay').classList.add('open');
-}
-function closeRating() { document.getElementById('ratingOverlay').classList.remove('open'); rateCtx = null; }
-function setStars(n) { pickStars = n; renderStarPick(); }
-function renderStarPick() {
-  const spans = document.querySelectorAll('#starPick span');
-  spans.forEach((s,i) => s.classList.toggle('on', i < pickStars));
-}
-async function submitRating() {
-  if(!rateCtx) return;
-  if(pickStars < 1) { alert('Bitte Sterne auswählen'); return; }
-  const btn = document.getElementById('ratingBtn');
-  btn.disabled = true; btn.textContent = 'Wird gesendet...';
-  const tId = (allT.find(t => t.email === rateCtx.trainer_email) || {}).id;
-  const body = {
-    trainer_id: tId ? String(tId) : null,
-    trainer_email: rateCtx.trainer_email,
-    trainer_name: rateCtx.trainer_name,
-    kunden_email: K.email,
-    kunden_name: `${K.vorname||''} ${K.nachname||''}`.trim(),
-    anfrage_id: String(rateCtx.id),
-    sterne: pickStars,
-    text: document.getElementById('ratingText').value.trim()
-  };
-  try {
-    await fetch(`${SB}/rest/v1/bewertungen`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'return=minimal' },
-      body: JSON.stringify(body)
-    });
-    closeRating();
-    await loadRatings();
-    loadAnfragen();
-    if(document.getElementById('sec-su').classList.contains('active')) filterT();
-  } catch(e) { alert('Fehler beim Senden'); }
-  btn.disabled = false; btn.textContent = 'Bewertung senden →';
-}
-
-/* ========== VERGLEICH ========== */
-function toggleCompare(e, t) {
-  e.stopPropagation();
-  const exists = compareList.some(c => String(c.id) === String(t.id));
-  if(exists) {
-    compareList = compareList.filter(c => String(c.id) !== String(t.id));
-  } else {
-    if(compareList.length >= 3) { e.target.checked = false; alert('Maximal 3 Trainer vergleichen'); return; }
-    compareList.push(t);
-  }
-  updateCmpBar();
-}
-function updateCmpBar() {
-  const bar = document.getElementById('cmpBar');
-  const n = compareList.length;
-  document.getElementById('cmpBarTxt').textContent = `${n} Trainer ausgewählt`;
-  bar.classList.toggle('show', n >= 2);
-}
-function clearCompare() {
-  compareList = [];
-  updateCmpBar();
-  document.querySelectorAll('.cmp-toggle input').forEach(c => c.checked = false);
-}
-function openCompare() {
-  if(compareList.length < 2) return;
-  const rows = [
-    ['Stadt', t => t.stadt || '–'],
-    ['Art', t => t.trainingsart || '–'],
-    ['Preis/Std', t => t.preis_stunde ? `€${t.preis_stunde}` : '–'],
-    ['Preis/Monat', t => t.preis_monat ? `€${t.preis_monat}` : '–'],
-    ['Spezialisierung', t => (t.spezialisierungen||[]).join(', ') || '–'],
-    ['Zertifikate', t => t.zertifikate || '–'],
-    ['Bewertung', t => { const r = allRatings[t.email]; return r && r.count ? `${(r.sum/r.count).toFixed(1)} ★ (${r.count})` : 'Keine'; }]
-  ];
-  let html = '<table class="cmp-table"><thead><tr><th></th>';
-  compareList.forEach(t => html += `<th><span class="cn">${t.vorname||''} ${t.nachname||''}</span></th>`);
-  html += '</tr></thead><tbody>';
-  rows.forEach(([label, fn]) => {
-    html += `<tr><th>${label}</th>`;
-    compareList.forEach(t => html += `<td>${fn(t)}</td>`);
-    html += '</tr>';
-  });
-  html += '</tbody></table>';
-  document.getElementById('compareContent').innerHTML = html;
-  document.getElementById('compareOverlay').classList.add('open');
-}
-function closeCompare() { document.getElementById('compareOverlay').classList.remove('open'); }
-
-/* ========== CHAT ========== */
-function openChat(a) {
-  chatCtx = a;
-  document.getElementById('chatTitle').textContent = (a.trainer_name || 'CHAT').toUpperCase();
-  document.getElementById('chatInput').value = '';
-  document.getElementById('chatBody').innerHTML = '<div class="chat-empty">Wird geladen...</div>';
-  document.getElementById('chatOverlay').classList.add('open');
-  loadChat();
-  if(chatPoll) clearInterval(chatPoll);
-  chatPoll = setInterval(loadChat, 5000);
-}
-function closeChat() {
-  document.getElementById('chatOverlay').classList.remove('open');
-  if(chatPoll) { clearInterval(chatPoll); chatPoll = null; }
-  chatCtx = null;
-}
-async function loadChat() {
-  if(!chatCtx) return;
-  try {
-    const r = await fetch(`${SB}/rest/v1/nachrichten?anfrage_id=eq.${encodeURIComponent(chatCtx.id)}&order=created_at.asc`, {
-      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
-    });
-    const msgs = await r.json() || [];
-    const body = document.getElementById('chatBody');
-    if(!msgs.length) { body.innerHTML = '<div class="chat-empty">Noch keine Nachrichten.<br>Schreib die erste!</div>'; return; }
-    const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 40;
-    body.innerHTML = msgs.map(m => {
-      const mine = m.sender === 'kunde';
-      const time = new Date(m.created_at).toLocaleTimeString('de-AT', {hour:'2-digit',minute:'2-digit'});
-      return `<div class="chat-msg ${mine?'me':'them'}">${escapeHtml(m.text)}<div class="chat-time">${time}</div></div>`;
-    }).join('');
-    if(atBottom) body.scrollTop = body.scrollHeight;
+    if(d && d.length > 0) markAlertActive();
   } catch(e) {}
 }
-async function sendChat() {
-  if(!chatCtx) return;
-  const input = document.getElementById('chatInput');
-  const text = input.value.trim();
-  if(!text) return;
-  input.value = '';
-  const body = {
-    anfrage_id: String(chatCtx.id),
-    trainer_email: chatCtx.trainer_email,
-    kunden_email: K.email,
-    sender: 'kunde',
-    text
-  };
+
+function markAlertActive() {
+  const btn = document.getElementById('alertBtn');
+  if(!btn) return;
+  btn.textContent = '✓ Aktiviert — du wirst benachrichtigt';
+  btn.classList.add('active');
+  btn.disabled = true;
+}
+
+async function activateAlert() {
+  if(!lastSearch) return;
+  const btn = document.getElementById('alertBtn');
+  btn.disabled = true; btn.textContent = 'Wird aktiviert...';
   try {
-    await fetch(`${SB}/rest/v1/nachrichten`, {
+    const r = await fetch(`${SB}/rest/v1/trainer_alerts`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'return=minimal' },
-      body: JSON.stringify(body)
+      headers: {'Content-Type':'application/json', apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'resolution=merge-duplicates,return=minimal'},
+      body: JSON.stringify({
+        kunden_email: sess.email,
+        kunden_name: K ? `${K.vorname||''} ${K.nachname||''}`.trim() : '',
+        plz: lastSearch.plz,
+        stadt: lastSearch.city || '',
+        radius: lastSearch.radius || 25,
+        aktiv: true
+      })
     });
-    loadChat();
-  } catch(e) { input.value = text; alert('Nachricht konnte nicht gesendet werden'); }
-}
-
-function escapeHtml(s) {
-  return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-function go(id, el) {
-  if(el.classList.contains('locked')) return;
-  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('sec-' + id).classList.add('active');
-  el.classList.add('active');
+    if(!r.ok) throw new Error();
+    markAlertActive();
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Aktivieren';
+    alert('Fehler — bitte versuche es erneut.');
+  }
 }
 
 function logout() {

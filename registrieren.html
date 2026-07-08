@@ -103,6 +103,23 @@ textarea{resize:vertical;min-height:90px;line-height:1.6}
 @keyframes popIn{from{opacity:0;transform:scale(0.4)}to{opacity:1;transform:scale(1)}}
 @media(min-width:768px){nav{padding:18px 52px}.page-wrap{padding:90px 20px 60px}}
 </style>
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1034036285801133');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
 </head>
 <body>
 <nav>
@@ -406,17 +423,14 @@ async function submitTrainer() {
       body: JSON.stringify({email, password: pw})
     });
     const authData = await authRes.json();
-    // user_id kann je nach Supabase-Setting an 2 Stellen stehen (siehe Kunden-Flow)
-    const userId = authData.user?.id || authData.id;
-    const hasRealError = !authRes.ok && !userId;
-    if(hasRealError) {
+    if(!authRes.ok) {
       const msg = authData.msg || authData.error_description || authData.error || '';
       showError('t-error', msg.toLowerCase().includes('already') ? 'Diese E-Mail ist bereits registriert!' : 'Registrierung fehlgeschlagen: '+msg);
       btn.disabled=false; btn.textContent='Profil gratis erstellen 🚀'; return;
     }
     const insertRes = await fetch(SUPABASE_URL+'/rest/v1/trainers', {
       method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(authData.access_token||SUPABASE_KEY),'Prefer':'return=minimal'},
-      body: JSON.stringify({...trainerData, user_id: userId})
+      body: JSON.stringify({...trainerData, user_id: authData.user?.id})
     });
     if(!insertRes.ok) {
       const errText = await insertRes.text();
@@ -431,9 +445,11 @@ async function submitTrainer() {
     }).catch(()=>{});
     if(authData.access_token) {
       localStorage.setItem('vexfit_session', JSON.stringify({
-        access_token: authData.access_token, user_id: userId, email, role:'trainer'
+        access_token: authData.access_token, user_id: authData.user?.id, email, role:'trainer'
       }));
     }
+    // Meta Pixel: Trainer-Registrierung tracken
+    if(typeof fbq === 'function') fbq('track', 'CompleteRegistration', {content_name: 'Trainer', value: 0, currency: 'EUR'});
     showSuccess('successTrainer');
   } catch(e) {
     showError('t-error', 'Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
@@ -494,19 +510,14 @@ async function submitClient() {
       body:JSON.stringify({email,password:pw})
     });
     const authData=await authRes.json();
-    // user_id kann je nach Supabase-Setting an 2 Stellen stehen:
-    //  - E-Mail-Bestätigung AUS: authData.user.id (+ access_token)
-    //  - E-Mail-Bestätigung AN : authData.id (kein access_token)
-    const userId=authData.user?.id||authData.id;
-    const hasRealError=!authRes.ok&&!userId;
-    if(hasRealError){
+    if(!authRes.ok){
       const msg=authData.msg||authData.error_description||authData.error||'';
       showError('c-error',msg.toLowerCase().includes('already')?'Diese E-Mail ist bereits registriert!':'Registrierung fehlgeschlagen: '+msg);
       btn.disabled=false;btn.textContent='Trainer finden →';return;
     }
     const insertRes=await fetch(SUPABASE_URL+'/rest/v1/kunden',{
       method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(authData.access_token||SUPABASE_KEY),'Prefer':'return=minimal'},
-      body:JSON.stringify({...clientData,user_id:userId})
+      body:JSON.stringify({...clientData,user_id:authData.user?.id})
     });
     if(!insertRes.ok){
       const errText=await insertRes.text();
@@ -519,9 +530,11 @@ async function submitClient() {
     }).catch(()=>{});
     if(authData.access_token){
       localStorage.setItem('vexfit_session',JSON.stringify({
-        access_token:authData.access_token,user_id:userId,email,role:'kunde'
+        access_token:authData.access_token,user_id:authData.user?.id,email,role:'kunde'
       }));
     }
+    // Meta Pixel: Kunden-Registrierung tracken
+    if(typeof fbq === 'function') fbq('track', 'Lead', {content_name: 'Kunde', value: 0, currency: 'EUR'});
     showSuccess('successClient');
   } catch(e){
     showError('c-error','Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
