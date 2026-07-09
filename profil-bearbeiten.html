@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" href="vexfit-logo.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Vexfit – Profil bearbeiten</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1a1a1a;--card:#161616;--muted:#555;--border:rgba(255,255,255,0.07);--green:#4ade80;--red:#ff6b6b}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(10,10,10,0.98);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:4px;color:var(--white);text-decoration:none}
+.logo span{color:var(--accent)}
+.btn-back{background:none;border:1px solid var(--border);color:var(--muted);padding:7px 14px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;text-decoration:none;transition:color 0.2s,border-color 0.2s}
+.btn-back:hover{color:var(--white);border-color:rgba(255,255,255,0.2)}
+
+.page{padding:80px 20px 60px;max-width:560px;margin:0 auto}
+.page-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,7vw,42px);letter-spacing:2px;line-height:1;margin-bottom:4px}
+.page-title span{color:var(--accent)}
+.page-sub{font-size:13px;color:var(--muted);margin-bottom:28px;line-height:1.6}
+
+.progress-wrap{margin-bottom:28px}
+.progress-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.progress-text{font-size:12px;color:var(--muted)}
+.progress-pct{font-size:13px;font-weight:700;color:var(--accent)}
+.progress-bar{height:4px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:3px;transition:width 0.6s ease}
+
+.section{margin-bottom:24px}
+.section-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1.5px;color:var(--accent);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.section-title .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dot-done{background:var(--green)}
+.dot-missing{background:var(--red)}
+
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;letter-spacing:0.5px;text-transform:uppercase;font-weight:600}
+.field input,.field textarea,.field select{width:100%;background:var(--card);border:1px solid var(--border);color:var(--white);font-family:'DM Sans',sans-serif;font-size:14px;padding:12px 14px;border-radius:4px;outline:none;transition:border-color 0.2s}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:rgba(232,255,0,0.4)}
+.field textarea{resize:vertical;min-height:100px;line-height:1.6}
+.field select{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;cursor:pointer}
+.field select option{background:var(--bg);color:var(--white)}
+.field .hint{font-size:11px;color:rgba(85,85,85,0.7);margin-top:4px}
+
+.chips-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chip{padding:7px 14px;border:1px solid var(--border);border-radius:100px;font-size:12px;color:var(--muted);cursor:pointer;transition:all 0.2s;user-select:none}
+.chip.active{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.08)}
+.chip:hover{border-color:rgba(255,255,255,0.2)}
+
+.btn-row{display:flex;gap:10px;margin-top:32px;flex-wrap:wrap}
+.btn-save{background:var(--accent);color:#000;border:none;padding:14px 28px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:800;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;transition:opacity 0.2s;flex:1;min-width:180px}
+.btn-save:hover{opacity:0.9}
+.btn-save:disabled{opacity:0.4;cursor:not-allowed}
+.btn-cancel{background:none;border:1px solid var(--border);color:var(--muted);padding:14px 20px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:600;font-size:13px;letter-spacing:1px;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center}
+.btn-cancel:hover{color:var(--white);border-color:rgba(255,255,255,0.2)}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--green);color:#000;font-weight:700;font-size:13px;padding:12px 24px;border-radius:4px;z-index:999;opacity:0;transition:all 0.4s ease;pointer-events:none}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.error{background:var(--red);color:#fff}
+
+.loading{display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--muted);font-size:14px}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeUp 0.4s ease both}
+.fade-d1{animation-delay:0.1s}
+.fade-d2{animation-delay:0.2s}
+.fade-d3{animation-delay:0.3s}
+.fade-d4{animation-delay:0.4s}
+
+@keyframes waBounce{0%{opacity:0;transform:scale(0.5)}100%{opacity:1;transform:scale(1)}}
+.wa{position:fixed;bottom:20px;right:16px;z-index:9999;width:46px;height:46px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 16px rgba(37,211,102,0.4);opacity:0;animation:waBounce 0.5s 2s ease both;text-decoration:none}
+
+@media(min-width:640px){nav{padding:0 32px}.page{padding:100px 20px 60px}}
+</style>
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version="2.0";n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,"script","https://connect.facebook.net/en_US/fbevents.js");
+fbq("init","1034036285801133");fbq("track","PageView");
+</script>
+<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"/></noscript>
+<!-- End Meta Pixel Code -->
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo">VEX<span>FIT</span></a>
+  <a href="trainer-bereich.html" class="btn-back">← Zurück</a>
+</nav>
+
+<div class="page" id="mainPage" style="display:none">
+  <div class="page-title fade-in">PROFIL <span>BEARBEITEN</span></div>
+  <p class="page-sub fade-in fade-d1">Vervollständige dein Profil damit Kunden dich finden. Je mehr Infos, desto mehr Anfragen.</p>
+
+  <div class="progress-wrap fade-in fade-d1" id="progressWrap">
+    <div class="progress-label">
+      <span class="progress-text">Profil-Vollständigkeit</span>
+      <span class="progress-pct" id="pctLabel">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <!-- TRAININGSART -->
+  <div class="section fade-in fade-d2">
+    <div class="section-title"><span class="dot dot-missing" id="dotTrainingsart"></span>TRAININGSART</div>
+    <div class="field">
+      <label>Was bietest du an?</label>
+      <select id="fTrainingsart">
+        <option value="">– Bitte wählen –</option>
+        <option value="Personal Training">Personal Training</option>
+        <option value="Gruppen Training">Gruppen Training</option>
+        <option value="Online Coaching">Online Coaching</option>
+        <option value="Ernährungsberatung">Ernährungsberatung</option>
+        <option value="Yoga">Yoga</option>
+        <option value="Pilates">Pilates</option>
+        <option value="Kampfsport">Kampfsport</option>
+        <option value="Rehabilitation">Rehabilitation</option>
+        <option value="Sonstiges">Sonstiges</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- PREIS -->
+  <div class="section fade-in fade-d2">
+    <div class="section-title"><span class="dot dot-missing" id="dotPreis"></span>PREIS PRO STUNDE</div>
+    <div class="field">
+      <label>Dein Stundensatz in €</label>
+      <input type="number" id="fPreis" placeholder="z.B. 60" min="1" max="999">
+      <div class="hint">Wird auf deinem Profil angezeigt. Du kannst ihn jederzeit ändern.</div>
+    </div>
+  </div>
+
+  <!-- BIO -->
+  <div class="section fade-in fade-d3">
+    <div class="section-title"><span class="dot dot-missing" id="dotBio"></span>ÜBER MICH</div>
+    <div class="field">
+      <label>Erzähle potenziellen Kunden über dich</label>
+      <textarea id="fBio" placeholder="Wer bist du? Was motiviert dich? Was können Kunden von dir erwarten?"></textarea>
+      <div class="hint">Mindestens 10 Zeichen. Schreib persönlich — das macht den Unterschied.</div>
+    </div>
+  </div>
+
+  <!-- ERFAHRUNG -->
+  <div class="section fade-in fade-d3">
+    <div class="section-title"><span class="dot dot-missing" id="dotErfahrung"></span>ERFAHRUNG</div>
+    <div class="field">
+      <label>Wie lange trainierst du schon andere?</label>
+      <select id="fErfahrung">
+        <option value="">– Bitte wählen –</option>
+        <option value="Unter 1 Jahr">Unter 1 Jahr</option>
+        <option value="1-2 Jahre">1–2 Jahre</option>
+        <option value="3-5 Jahre">3–5 Jahre</option>
+        <option value="5-10 Jahre">5–10 Jahre</option>
+        <option value="10+ Jahre">10+ Jahre</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- SPEZIALISIERUNGEN -->
+  <div class="section fade-in fade-d4">
+    <div class="section-title"><span class="dot dot-missing" id="dotSpez"></span>SPEZIALISIERUNGEN</div>
+    <div class="field">
+      <label>Wähle alles was zu dir passt</label>
+      <div class="chips-wrap" id="chipWrap"></div>
+      <div class="hint">Mehrfachauswahl möglich. Hilft Kunden dich gezielt zu finden.</div>
+    </div>
+  </div>
+
+  <!-- TELEFON -->
+  <div class="section fade-in fade-d4">
+    <div class="section-title"><span class="dot dot-missing" id="dotTelefon"></span>TELEFON</div>
+    <div class="field">
+      <label>Handynummer für Kundenrückfragen</label>
+      <input type="tel" id="fTelefon" placeholder="+43 660 1234567">
+      <div class="hint">Wird nur an Kunden weitergegeben die dich gebucht haben. Nicht öffentlich sichtbar.</div>
+    </div>
+  </div>
+
+  <div class="btn-row fade-in fade-d4">
+    <button class="btn-save" id="btnSave" onclick="saveProfile()">Profil speichern</button>
+    <a href="trainer-bereich.html" class="btn-cancel">Abbrechen</a>
+  </div>
+</div>
+
+<div class="loading" id="loadingEl">Profil wird geladen...</div>
+
+<div class="toast" id="toast"></div>
+
+<a href="https://wa.me/436649275737" target="_blank" class="wa">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+</a>
+
+<script>
+const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
+
+const SPEZ_OPTIONS = [
+  'Muskelaufbau','Abnehmen','Krafttraining','Ausdauer','HIIT',
+  'Functional Training','Mobility','Bodybuilding','Calisthenics',
+  'Schwangerschaft','Senioren','Rücken & Haltung','Ernährungsplanung',
+  'Wettkampfvorbereitung','Stressabbau','Flexibilität'
+];
+
+let T = null;
+let selectedSpez = [];
+
+// AUTH
+const raw = localStorage.getItem('vexfit_session');
+if(!raw) { location.href = 'login.html'; throw new Error(); }
+let sess;
+try { sess = JSON.parse(raw); } catch(e) { localStorage.removeItem('vexfit_session'); location.href = 'login.html'; throw new Error(); }
+if(sess.role === 'kunde') { location.href = 'kunden-bereich.html'; throw new Error(); }
+
+// INIT
+initChips();
+loadProfile(sess.email);
+
+function initChips() {
+  const wrap = document.getElementById('chipWrap');
+  wrap.innerHTML = SPEZ_OPTIONS.map(s =>
+    `<div class="chip" data-val="${s}" onclick="toggleChip(this)">${s}</div>`
+  ).join('');
+}
+
+function toggleChip(el) {
+  const val = el.dataset.val;
+  if(el.classList.contains('active')) {
+    el.classList.remove('active');
+    selectedSpez = selectedSpez.filter(s => s !== val);
+  } else {
+    el.classList.add('active');
+    selectedSpez.push(val);
+  }
+  updateDots();
+}
+
+async function loadProfile(email) {
+  try {
+    const r = await fetch(`${SB}/rest/v1/trainers?email=eq.${encodeURIComponent(email)}&select=*`, {
+      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
+    });
+    const d = await r.json();
+    if(d && d.length > 0) {
+      T = d[0];
+      fillForm(T);
+    }
+  } catch(e) {
+    showToast('Fehler beim Laden', true);
+  }
+  document.getElementById('loadingEl').style.display = 'none';
+  document.getElementById('mainPage').style.display = 'block';
+}
+
+function fillForm(t) {
+  // Trainingsart
+  if(t.trainingsart) {
+    const sel = document.getElementById('fTrainingsart');
+    for(let o of sel.options) { if(o.value === t.trainingsart) { o.selected = true; break; } }
+  }
+  // Preis
+  if(t.preis_stunde) document.getElementById('fPreis').value = t.preis_stunde;
+  // Bio
+  if(t.bio) document.getElementById('fBio').value = t.bio;
+  // Erfahrung
+  if(t.erfahrung) {
+    const sel = document.getElementById('fErfahrung');
+    for(let o of sel.options) { if(o.value === t.erfahrung) { o.selected = true; break; } }
+  }
+  // Spezialisierungen
+  if(t.spezialisierungen && Array.isArray(t.spezialisierungen)) {
+    selectedSpez = [...t.spezialisierungen];
+    document.querySelectorAll('.chip').forEach(c => {
+      if(selectedSpez.includes(c.dataset.val)) c.classList.add('active');
+    });
+  }
+  // Telefon
+  if(t.telefon) document.getElementById('fTelefon').value = t.telefon;
+
+  updateDots();
+}
+
+function updateDots() {
+  const trainingsart = document.getElementById('fTrainingsart').value;
+  const preis = document.getElementById('fPreis').value;
+  const bio = document.getElementById('fBio').value;
+  const erfahrung = document.getElementById('fErfahrung').value;
+  const telefon = document.getElementById('fTelefon').value;
+
+  const fields = [
+    { dot: 'dotTrainingsart', done: !!trainingsart },
+    { dot: 'dotPreis', done: !!preis && Number(preis) > 0 },
+    { dot: 'dotBio', done: !!bio && bio.length > 10 },
+    { dot: 'dotErfahrung', done: !!erfahrung },
+    { dot: 'dotSpez', done: selectedSpez.length > 0 },
+    { dot: 'dotTelefon', done: !!telefon }
+  ];
+
+  let done = 0;
+  fields.forEach(f => {
+    const el = document.getElementById(f.dot);
+    if(f.done) { el.className = 'dot dot-done'; done++; }
+    else { el.className = 'dot dot-missing'; }
+  });
+
+  const pct = Math.round((done / fields.length) * 100);
+  document.getElementById('pctLabel').textContent = pct + '%';
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+// Live dot updates
+['fTrainingsart','fPreis','fBio','fErfahrung','fTelefon'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateDots);
+  document.getElementById(id).addEventListener('change', updateDots);
+});
+
+async function saveProfile() {
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true;
+  btn.textContent = 'Wird gespeichert...';
+
+  const trainingsart = document.getElementById('fTrainingsart').value;
+  const preis = document.getElementById('fPreis').value;
+  const bio = document.getElementById('fBio').value;
+  const erfahrung = document.getElementById('fErfahrung').value;
+  const telefon = document.getElementById('fTelefon').value.trim();
+
+  // Validation
+  if(!trainingsart && !preis && !bio && !erfahrung && selectedSpez.length === 0 && !telefon) {
+    showToast('Fülle mindestens ein Feld aus', true);
+    btn.disabled = false;
+    btn.textContent = 'Profil speichern';
+    return;
+  }
+
+  const body = {};
+  if(trainingsart) body.trainingsart = trainingsart;
+  if(preis) body.preis_stunde = Number(preis);
+  if(bio) body.bio = bio;
+  if(erfahrung) body.erfahrung = erfahrung;
+  if(selectedSpez.length > 0) body.spezialisierungen = selectedSpez;
+  if(telefon) body.telefon = telefon;
+
+  try {
+    const r = await fetch(`${SB}/rest/v1/trainers?email=eq.${encodeURIComponent(sess.email)}`, {
+      method: 'PATCH',
+      headers: {
+        apikey: KEY,
+        Authorization: `Bearer ${KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if(r.ok) {
+      showToast('✓ Profil gespeichert!');
+      setTimeout(() => { location.href = 'trainer-bereich.html'; }, 1200);
+    } else {
+      const err = await r.text();
+      console.error('Save error:', err);
+      showToast('Fehler beim Speichern', true);
+      btn.disabled = false;
+      btn.textContent = 'Profil speichern';
+    }
+  } catch(e) {
+    console.error(e);
+    showToast('Verbindungsfehler', true);
+    btn.disabled = false;
+    btn.textContent = 'Profil speichern';
+  }
+}
+
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+</script>
+</body>
+</html>
