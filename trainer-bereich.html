@@ -29,6 +29,16 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(
 .tags{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:32px;animation:fadeUp 0.5s 0.4s ease both;opacity:0}
 .tag{padding:6px 14px;border:1px solid rgba(232,255,0,0.2);border-radius:100px;font-size:11px;color:var(--accent);font-weight:600;letter-spacing:1px;text-transform:uppercase}
 .tag-gray{border-color:var(--border);color:var(--muted)}
+.complete-box{background:rgba(232,255,0,0.06);border:1px solid rgba(232,255,0,0.25);border-radius:4px;padding:18px;margin:20px auto 0;max-width:540px}
+.complete-box-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1.5px;color:var(--accent);margin-bottom:8px}
+.complete-box-sub{font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+.complete-items{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.complete-item{padding:5px 12px;border-radius:100px;font-size:11px;letter-spacing:0.5px;font-weight:600}
+.complete-item.missing{background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.25);color:#ff6b6b}
+.complete-item.done{background:rgba(232,255,0,0.08);border:1px solid rgba(232,255,0,0.2);color:var(--accent)}
+.complete-btn{background:var(--accent);color:var(--black);border:none;padding:12px 24px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;text-decoration:none;display:inline-block}
+.complete-progress{height:4px;background:rgba(255,255,255,0.08);border-radius:2px;margin-bottom:12px;overflow:hidden}
+.complete-progress-bar{height:100%;background:var(--accent);border-radius:2px;transition:width 0.5s ease}
 .btn-primary{background:var(--accent);color:var(--bg);padding:14px 32px;border-radius:3px;font-weight:700;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;display:inline-block;animation:fadeUp 0.5s 0.5s ease both;opacity:0;cursor:pointer;border:none;font-family:'DM Sans',sans-serif}
 .email-note{font-size:12px;color:rgba(85,85,85,0.7);margin-top:16px;animation:fadeUp 0.5s 0.6s ease both;opacity:0}
 /* ANFRAGEN PAGE */
@@ -57,20 +67,10 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(
 </style>
 <!-- Meta Pixel Code -->
 <script>
-!function(f,b,e,v,n,t,s)
-{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-n.queue=[];t=b.createElement(e);t.async=!0;
-t.src=v;s=b.getElementsByTagName(e)[0];
-s.parentNode.insertBefore(t,s)}(window, document,'script',
-'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '1034036285801133');
-fbq('track', 'PageView');
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version="2.0";n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,"script","https://connect.facebook.net/en_US/fbevents.js");
+fbq("init","1034036285801133");fbq("track","PageView");
 </script>
-<noscript><img height="1" width="1" style="display:none"
-src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"
-/></noscript>
+<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"/></noscript>
 <!-- End Meta Pixel Code -->
 </head>
 <body>
@@ -99,6 +99,9 @@ src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"
   <button class="btn-primary" onclick="toggleAnfragen(event)">Meine Anfragen ansehen →</button>
   <p class="email-note" id="emailNote">Eingeloggt als: –</p>
 </div>
+
+<!-- PROFIL VERVOLLSTÄNDIGEN -->
+<div id="completeBox" class="complete-box" style="display:none"></div>
 
 <!-- ANFRAGEN PAGE -->
 <div class="anfragen-page hidden" id="anfragenPage">
@@ -140,6 +143,8 @@ async function loadTrainer(email) {
       const stag = document.getElementById('statusTag');
       if(T.aktiv) { stag.textContent = '✓ Profil aktiv'; stag.classList.remove('tag-gray'); }
       else { stag.textContent = '⏳ Wird geprüft'; }
+      // Profil-Vollständigkeit prüfen
+      checkProfileCompletion(T);
     }
     loadAnfragen(email);
   } catch(e) {}
@@ -207,6 +212,34 @@ function toggleAnfragen(e) {
     wp.classList.add('hidden');
     ap.classList.remove('hidden');
   }
+}
+
+function checkProfileCompletion(t) {
+  const fields = [
+    { key: 'trainingsart', label: 'Trainingsart', done: !!t.trainingsart },
+    { key: 'preis_stunde', label: 'Preis/Stunde', done: !!t.preis_stunde },
+    { key: 'bio', label: 'Über mich', done: !!t.bio && t.bio.length > 10 },
+    { key: 'erfahrung', label: 'Erfahrung', done: !!t.erfahrung },
+    { key: 'spezialisierungen', label: 'Spezialisierungen', done: t.spezialisierungen && t.spezialisierungen.length > 0 },
+    { key: 'telefon', label: 'Telefon', done: !!t.telefon }
+  ];
+  const done = fields.filter(f => f.done).length;
+  const total = fields.length;
+  const pct = Math.round((done / total) * 100);
+  if(pct >= 100) return; // Alles vollständig, Box nicht zeigen
+
+  const box = document.getElementById('completeBox');
+  const missing = fields.filter(f => !f.done);
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div class="complete-box-title">📝 Vervollständige dein Profil (${pct}%)</div>
+    <div class="complete-progress"><div class="complete-progress-bar" style="width:${pct}%"></div></div>
+    <div class="complete-box-sub">Je vollständiger dein Profil, desto mehr Anfragen bekommst du. Ergänze die fehlenden Angaben:</div>
+    <div class="complete-items">
+      ${fields.map(f => `<span class="complete-item ${f.done ? 'done' : 'missing'}">${f.done ? '✓' : '✗'} ${f.label}</span>`).join('')}
+    </div>
+    <a href="profil-bearbeiten.html" class="complete-btn" onclick="if(!document.querySelector('[href=\\'profil-bearbeiten.html\\']')){alert('Profil-Bearbeitung kommt bald — kontaktiere uns per WhatsApp!');return false;}">Profil ergänzen →</a>
+  `;
 }
 
 function logout() {

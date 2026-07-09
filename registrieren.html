@@ -10,13 +10,10 @@
 :root{--black:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1e1e1e;--card:#161616;--text-muted:#666;--border:rgba(255,255,255,0.07);--border-input:rgba(255,255,255,0.12)}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100vh}
-.logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;color:var(--white);text-decoration:none}
-.logo span{color:var(--accent)}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;color:var(--white);text-decoration:none}.logo span{color:var(--accent)}
 nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:rgba(10,10,10,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
 .nav-back{color:var(--text-muted);text-decoration:none;font-size:13px}
 .page-wrap{padding:80px 20px 60px;max-width:540px;margin:0 auto}
-
-/* TYPE SELECTOR */
 .type-selector{text-align:center;padding:32px 0;animation:fadeUp 0.5s ease both}
 .page-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px}
 .page-title{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:2px;margin-bottom:8px}
@@ -27,285 +24,128 @@ nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;justify-conten
 .type-icon{font-size:26px;margin-bottom:10px;display:block}
 .type-card h3{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1.5px;margin-bottom:4px}
 .type-card p{font-size:12px;color:var(--text-muted);line-height:1.5}
-.already-account{font-size:13px;color:var(--text-muted);text-align:center}
-.already-account a{color:var(--accent);text-decoration:none;font-weight:600}
-
-/* FORMS */
-.form-container{display:none;animation:fadeUp 0.5s ease both}
-.form-container.active{display:block}
+.already-account{font-size:13px;color:var(--text-muted);text-align:center}.already-account a{color:var(--accent);text-decoration:none;font-weight:600}
+.form-container{display:none;animation:fadeUp 0.5s ease both}.form-container.active{display:block}
 .form-header{text-align:center;margin-bottom:28px;padding-top:8px}
 .form-badge{display:inline-block;padding:4px 14px;border-radius:100px;font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px}
 .badge-trainer{background:rgba(232,255,0,0.1);border:1px solid rgba(232,255,0,0.25);color:var(--accent)}
 .badge-client{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:var(--white)}
 .form-title{font-family:'Bebas Neue',sans-serif;font-size:42px;line-height:0.95;letter-spacing:2px;margin-bottom:6px}
 .form-sub{font-size:13px;color:var(--text-muted)}
-.progress-bar{display:flex;gap:6px;margin-bottom:28px}
-.prog-step{height:3px;flex:1;background:rgba(255,255,255,0.08);border-radius:2px;transition:background 0.4s}
-.prog-step.done{background:var(--accent)}
-.prog-step.active{background:rgba(232,255,0,0.4)}
-.form-step{display:none}
-.form-step.active{display:block;animation:fadeUp 0.4s ease both}
-.step-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px}
-.step-heading{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1.5px;margin-bottom:20px}
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 label{font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)}
-input,select,textarea{background:var(--card);border:1px solid var(--border-input);color:var(--white);padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%;appearance:none;-webkit-appearance:none;transition:border-color 0.2s}
-input::placeholder,textarea::placeholder{color:rgba(102,102,102,0.6)}
-input:focus,select:focus,textarea:focus{border-color:rgba(232,255,0,0.4);background:var(--mid)}
+input,select{background:var(--card);border:1px solid var(--border-input);color:var(--white);padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:14px;border-radius:3px;outline:none;width:100%;appearance:none;-webkit-appearance:none;transition:border-color 0.2s}
+input::placeholder{color:rgba(102,102,102,0.6)}
+input:focus,select:focus{border-color:rgba(232,255,0,0.4);background:var(--mid)}
 select{cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
 select option{background:var(--gray);color:var(--white)}
-textarea{resize:vertical;min-height:90px;line-height:1.6}
-.field-hint{font-size:11px;color:var(--text-muted);margin-top:-4px}
-.tags-wrap{display:flex;flex-wrap:wrap;gap:7px}
-.tag{padding:6px 13px;border:1px solid var(--border-input);border-radius:100px;font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none;transition:all 0.2s}
-.tag.selected{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.08)}
-.goal-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.goal-card{background:var(--card);border:1px solid var(--border-input);padding:12px;border-radius:3px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all 0.2s}
-.goal-card.selected{border-color:var(--accent);background:rgba(232,255,0,0.06)}
-.goal-card span{font-size:13px;font-weight:500}
-.divider{height:1px;background:var(--border);margin:16px 0}
 .checkbox-field{display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-top:12px}
 .custom-cb{width:20px;height:20px;border:1px solid var(--border-input);border-radius:3px;flex-shrink:0;margin-top:2px;transition:all 0.2s;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--black)}
 .checkbox-field input[type="checkbox"]{display:none}
 .checkbox-field input:checked+.custom-cb{background:var(--accent);border-color:var(--accent)}
 .checkbox-field input:checked+.custom-cb::after{content:'✓';font-weight:700}
-.cb-label{font-size:13px;color:var(--text-muted);line-height:1.6}
-.cb-label a{color:var(--accent);text-decoration:none}
-.form-actions{display:flex;gap:10px;margin-top:20px}
-.btn-next{background:var(--accent);color:var(--black);padding:14px 28px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;flex:1;transition:transform 0.2s}
-.btn-next:hover{transform:translateY(-2px)}
-.btn-next:disabled{opacity:0.5;cursor:not-allowed;transform:none}
-.btn-back-s{background:transparent;color:var(--text-muted);border:1px solid var(--border-input);padding:14px 18px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;white-space:nowrap}
-.error-banner{background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:12px 16px;border-radius:3px;font-size:13px;margin-bottom:14px;display:none}
-.error-banner.show{display:block}
+.cb-label{font-size:13px;color:var(--text-muted);line-height:1.6}.cb-label a{color:var(--accent);text-decoration:none}
+.form-actions{margin-top:20px}
+.btn-next{background:var(--accent);color:var(--black);padding:16px 28px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:14px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;width:100%;transition:transform 0.2s}
+.btn-next:hover{transform:translateY(-2px)}.btn-next:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+.btn-back-s{background:transparent;color:var(--text-muted);border:1px solid var(--border-input);padding:10px 20px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
+.error-banner{background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:12px 16px;border-radius:3px;font-size:13px;margin-bottom:14px;display:none}.error-banner.show{display:block}
 .info-box{background:rgba(232,255,0,0.07);border:1px solid rgba(232,255,0,0.2);padding:16px;border-radius:3px;margin-bottom:16px}
 .info-box-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1.5px;color:var(--accent);margin-bottom:6px}
 .info-box p{font-size:12px;color:rgba(245,245,240,0.6);line-height:1.7}
-
-/* SUCCESS SCREEN */
-.success-screen{display:none;text-align:center;padding:60px 0;animation:fadeUp 0.6s ease both}
-.success-screen.active{display:block}
+.trust-row{display:flex;justify-content:center;gap:16px;margin-top:16px;flex-wrap:wrap}
+.trust-item{font-size:11px;color:var(--text-muted);letter-spacing:0.5px}.trust-item span{color:var(--accent)}
+.success-screen{display:none;text-align:center;padding:60px 0;animation:fadeUp 0.6s ease both}.success-screen.active{display:block}
 .success-icon-wrap{width:100px;height:100px;background:rgba(232,255,0,0.08);border:2px solid rgba(232,255,0,0.3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:44px;margin:0 auto 28px;animation:popIn 0.5s 0.2s cubic-bezier(0.34,1.56,0.64,1) both}
-.success-screen h2{font-family:'Bebas Neue',sans-serif;font-size:52px;line-height:0.95;letter-spacing:2px;margin-bottom:14px}
-.success-screen h2 span{color:var(--accent)}
+.success-screen h2{font-family:'Bebas Neue',sans-serif;font-size:52px;line-height:0.95;letter-spacing:2px;margin-bottom:14px}.success-screen h2 span{color:var(--accent)}
 .success-screen p{font-size:15px;color:var(--text-muted);margin-bottom:32px;font-weight:300;line-height:1.8}
 .success-tags{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:32px}
 .success-tag{padding:5px 12px;border:1px solid rgba(232,255,0,0.2);border-radius:100px;font-size:11px;color:rgba(232,255,0,0.7);letter-spacing:1px;text-transform:uppercase;font-weight:600}
-.btn-home{background:var(--accent);color:var(--black);padding:16px 40px;border-radius:3px;font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;display:inline-block;transition:transform 0.2s;box-shadow:0 8px 32px rgba(232,255,0,0.25)}
-.btn-home:hover{transform:translateY(-3px)}
-
-/* WA */
+.btn-home{background:var(--accent);color:var(--black);padding:16px 40px;border-radius:3px;font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;display:inline-block;transition:transform 0.2s;box-shadow:0 8px 32px rgba(232,255,0,0.25)}.btn-home:hover{transform:translateY(-3px)}
 @keyframes waBounce{0%{opacity:0;transform:scale(0.5) translateY(20px)}60%{transform:scale(1.08) translateY(-4px)}100%{opacity:1;transform:scale(1) translateY(0)}}
 .wa-btn{position:fixed;bottom:22px;right:20px;z-index:9999;width:46px;height:46px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 16px rgba(37,211,102,0.45);text-decoration:none;opacity:0;animation:waBounce 0.6s cubic-bezier(0.34,1.56,0.64,1) 2.5s forwards}
-
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes popIn{from{opacity:0;transform:scale(0.4)}to{opacity:1;transform:scale(1)}}
 @media(min-width:768px){nav{padding:18px 52px}.page-wrap{padding:90px 20px 60px}}
 </style>
 <!-- Meta Pixel Code -->
 <script>
-!function(f,b,e,v,n,t,s)
-{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-n.queue=[];t=b.createElement(e);t.async=!0;
-t.src=v;s=b.getElementsByTagName(e)[0];
-s.parentNode.insertBefore(t,s)}(window, document,'script',
-'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '1034036285801133');
-fbq('track', 'PageView');
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init','1034036285801133');fbq('track','PageView');
 </script>
-<noscript><img height="1" width="1" style="display:none"
-src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"
-/></noscript>
+<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"/></noscript>
 <!-- End Meta Pixel Code -->
 </head>
 <body>
-<nav>
-  <a href="index.html" class="logo">VEX<span>FIT</span></a>
-  <a href="index.html" class="nav-back">← Zurück</a>
-</nav>
-
+<nav><a href="index.html" class="logo">VEX<span>FIT</span></a><a href="index.html" class="nav-back">← Zurück</a></nav>
 <div class="page-wrap">
-
-  <!-- TYPE SELECTOR -->
   <div id="typeSelector" class="type-selector">
     <div class="page-label">Registrierung</div>
     <div class="page-title">WER BIST DU?</div>
     <p class="page-sub">Wähle deinen Account-Typ</p>
     <div class="type-cards">
-      <div class="type-card" id="cardTrainer" onclick="selectType('trainer')">
-        <span class="type-icon">💪</span>
-        <h3>ICH BIN TRAINER</h3>
-        <p>Profil erstellen und neue Kunden gewinnen</p>
-      </div>
-      <div class="type-card" id="cardClient" onclick="selectType('client')">
-        <span class="type-icon">🎯</span>
-        <h3>ICH SUCHE TRAINER</h3>
-        <p>Finde deinen perfekten Personal Trainer</p>
-      </div>
+      <div class="type-card" id="cardTrainer" onclick="selectType('trainer')"><span class="type-icon">💪</span><h3>ICH BIN TRAINER</h3><p>Profil erstellen und neue Kunden gewinnen</p></div>
+      <div class="type-card" id="cardClient" onclick="selectType('client')"><span class="type-icon">🎯</span><h3>ICH SUCHE TRAINER</h3><p>Finde deinen perfekten Personal Trainer</p></div>
     </div>
     <div class="already-account">Bereits ein Konto? <a href="login.html">Jetzt anmelden →</a></div>
   </div>
 
-  <!-- TRAINER FORM -->
+  <!-- TRAINER -->
   <div class="form-container" id="formTrainer">
     <div class="form-header">
       <div class="form-badge badge-trainer">💪 Personal Trainer</div>
-      <div class="form-title">PROFIL<br><span style="color:var(--accent)">ERSTELLEN</span></div>
-      <p class="form-sub">3 kurze Schritte · kostenlos bis zum ersten Kunden</p>
+      <div class="form-title">IN 60 SEKUNDEN<br><span style="color:var(--accent)">REGISTRIERT</span></div>
+      <p class="form-sub">Kostenlos bis zum ersten Kunden · kein Haken</p>
     </div>
-    <div class="progress-bar">
-      <div class="prog-step active" id="tp1"></div>
-      <div class="prog-step" id="tp2"></div>
-      <div class="prog-step" id="tp3"></div>
-    </div>
+    <div class="info-box"><div class="info-box-title">🎉 0 € bis Kunde 1</div><p>Erstelle dein Profil gratis. Preise, Bio und Fotos kannst du jederzeit später ergänzen.</p></div>
     <div class="error-banner" id="t-error"></div>
-
-    <!-- Step 1 -->
-    <div class="form-step active" id="tStep1">
-      <div class="step-label">Schritt 1 von 3</div>
-      <div class="step-heading">DEINE DATEN</div>
-      <div class="field-row">
-        <div class="field"><label>Vorname</label><input type="text" placeholder="Max" id="t-fn"></div>
-        <div class="field"><label>Nachname</label><input type="text" placeholder="Mustermann" id="t-ln"></div>
-      </div>
-      <div class="field"><label>E-Mail</label><input type="email" placeholder="max@example.com" id="t-email"></div>
-      <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="t-pw"></div>
-      <div class="field"><label>Telefon</label><input type="tel" placeholder="+43 660 123 4567" id="t-tel"></div>
-      <div class="form-actions">
-        <button class="btn-back-s" onclick="backToSelector()">← Zurück</button>
-        <button class="btn-next" onclick="tNext(1)">Weiter →</button>
-      </div>
+    <div class="field-row">
+      <div class="field"><label>Vorname</label><input type="text" placeholder="Max" id="t-fn"></div>
+      <div class="field"><label>Nachname</label><input type="text" placeholder="Mustermann" id="t-ln"></div>
     </div>
-
-    <!-- Step 2 -->
-    <div class="form-step" id="tStep2">
-      <div class="step-label">Schritt 2 von 3</div>
-      <div class="step-heading">DEIN PROFIL</div>
-      <div class="field">
-        <label>Stadt</label>
-        <select id="t-city"><option value="">Stadt auswählen...</option><option>Wien</option><option>Graz</option><option>Salzburg</option><option>Linz</option><option>Innsbruck</option><option>München</option><option>Berlin</option><option>Hamburg</option><option>Frankfurt</option><option>Köln</option><option>Zürich</option><option>Basel</option><option>Online (kein fixer Standort)</option></select>
-      </div>
-      <div class="field"><label>Postleitzahl</label><input type="text" placeholder="z.B. 5020" id="t-plz" maxlength="5"><div class="field-hint">Für die Umkreissuche deiner Kunden</div></div>
-      <div class="field">
-        <label>Trainingsart</label>
-        <select id="t-type"><option value="">Auswählen...</option><option>Vor Ort beim Kunden</option><option>Im Fitnessstudio</option><option>Online</option><option>Vor Ort + Online</option></select>
-      </div>
-      <div class="field">
-        <label>Erfahrung</label>
-        <select id="t-exp"><option value="">Auswählen...</option><option>Unter 1 Jahr</option><option>1–3 Jahre</option><option>3–5 Jahre</option><option>5–10 Jahre</option><option>Mehr als 10 Jahre</option></select>
-      </div>
-      <div class="field"><label>Spezialisierungen</label>
-        <div class="tags-wrap"><div class="tag" onclick="toggleTag(this)">Muskelaufbau</div><div class="tag" onclick="toggleTag(this)">Abnehmen</div><div class="tag" onclick="toggleTag(this)">Krafttraining</div><div class="tag" onclick="toggleTag(this)">Bodybuilding</div><div class="tag" onclick="toggleTag(this)">Ausdauer</div><div class="tag" onclick="toggleTag(this)">Ernährung</div><div class="tag" onclick="toggleTag(this)">Reha</div><div class="tag" onclick="toggleTag(this)">HIIT</div><div class="tag" onclick="toggleTag(this)">Yoga & Mobility</div><div class="tag" onclick="toggleTag(this)">Functional</div></div>
-      </div>
-      <div class="field"><label>Über mich</label><textarea placeholder="Erzähl potenziellen Kunden kurz wer du bist..." id="t-bio"></textarea></div>
-      <div class="form-actions">
-        <button class="btn-back-s" onclick="tBack(2)">← Zurück</button>
-        <button class="btn-next" onclick="tNext(2)">Weiter →</button>
-      </div>
+    <div class="field"><label>E-Mail</label><input type="email" placeholder="max@example.com" id="t-email"></div>
+    <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="t-pw"></div>
+    <div class="field-row">
+      <div class="field"><label>Stadt</label><select id="t-city"><option value="">Auswählen...</option><option>Wien</option><option>Graz</option><option>Salzburg</option><option>Linz</option><option>Innsbruck</option><option>München</option><option>Berlin</option><option>Hamburg</option><option>Frankfurt</option><option>Köln</option><option>Zürich</option><option>Basel</option><option>Online</option></select></div>
+      <div class="field"><label>PLZ</label><input type="text" placeholder="5020" id="t-plz" maxlength="5"></div>
     </div>
-
-    <!-- Step 3 -->
-    <div class="form-step" id="tStep3">
-      <div class="step-label">Schritt 3 von 3</div>
-      <div class="step-heading">PREISE & ABSCHLUSS</div>
-      <div class="field-row">
-        <div class="field"><label>Preis/Stunde (€)</label><input type="number" placeholder="z.B. 60" id="t-price" min="0"></div>
-        <div class="field"><label>Preis/Monat (€) – optional</label><input type="number" placeholder="z.B. 200" id="t-mprice" min="0"></div>
-      </div>
-      <div class="field"><label>Zertifizierungen</label><input type="text" placeholder="z.B. BSA, NSCA..." id="t-cert"><div class="field-hint">Optional</div></div>
-      <div class="field"><label>Calendly Link</label><input type="url" placeholder="https://calendly.com/dein-name" id="t-calendly"><div class="field-hint">Optional – Kunden können direkt Termine buchen</div></div>
-      <div class="divider"></div>
-      <label class="checkbox-field">
-        <input type="checkbox" id="t-agb">
-        <div class="custom-cb"></div>
-        <span class="cb-label">Ich akzeptiere die <a href="rechtliches.html" target="_blank">AGB</a> und <a href="rechtliches.html#datenschutz" target="_blank">Datenschutzbestimmungen</a></span>
-      </label>
-      <div class="divider"></div>
-      <div class="info-box">
-        <div class="info-box-title">🎉 Kostenlos starten!</div>
-        <p>Dein Profil ist komplett kostenlos bis du deinen ersten Kunden über Vexfit gewinnst.</p>
-      </div>
-      <div class="form-actions">
-        <button class="btn-back-s" onclick="tBack(3)">← Zurück</button>
-        <button class="btn-next" id="t-submit-btn" onclick="submitTrainer()">Profil gratis erstellen 🚀</button>
-      </div>
-    </div>
+    <label class="checkbox-field"><input type="checkbox" id="t-agb"><div class="custom-cb"></div><span class="cb-label">Ich akzeptiere die <a href="rechtliches.html" target="_blank">AGB</a> und <a href="rechtliches.html#datenschutz" target="_blank">Datenschutzbestimmungen</a></span></label>
+    <div class="form-actions"><button class="btn-next" id="t-submit-btn" onclick="submitTrainer()">Profil gratis erstellen 🚀</button></div>
+    <div class="trust-row"><div class="trust-item"><span>✓</span> Kostenlos</div><div class="trust-item"><span>✓</span> Kein Abo</div><div class="trust-item"><span>✓</span> DACH-Region</div></div>
+    <div style="text-align:center;margin-top:16px"><button class="btn-back-s" onclick="backToSelector()">← Zurück</button></div>
   </div>
 
-  <!-- CLIENT FORM -->
+  <!-- KUNDE -->
   <div class="form-container" id="formClient">
     <div class="form-header">
       <div class="form-badge badge-client">🎯 Trainer finden</div>
       <div class="form-title">KOSTENLOS<br><span style="color:var(--accent)">REGISTRIEREN</span></div>
-      <p class="form-sub">2 kurze Schritte · immer gratis</p>
-    </div>
-    <div class="progress-bar">
-      <div class="prog-step active" id="cp1"></div>
-      <div class="prog-step" id="cp2"></div>
+      <p class="form-sub">Finde Trainer in deiner Nähe · immer gratis</p>
     </div>
     <div class="error-banner" id="c-error"></div>
-
-    <!-- Step 1 -->
-    <div class="form-step active" id="cStep1">
-      <div class="step-label">Schritt 1 von 2</div>
-      <div class="step-heading">DEINE DATEN</div>
-      <div class="field-row">
-        <div class="field"><label>Vorname</label><input type="text" placeholder="Anna" id="c-fn"></div>
-        <div class="field"><label>Nachname</label><input type="text" placeholder="Muster" id="c-ln"></div>
-      </div>
-      <div class="field"><label>E-Mail</label><input type="email" placeholder="anna@example.com" id="c-email"></div>
-      <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="c-pw"></div>
-      <div class="field">
-        <label>Stadt</label>
-        <select id="c-city"><option value="">Stadt auswählen...</option><option>Wien</option><option>Graz</option><option>Salzburg</option><option>Linz</option><option>Innsbruck</option><option>München</option><option>Berlin</option><option>Hamburg</option><option>Frankfurt</option><option>Köln</option><option>Zürich</option><option>Basel</option><option>Ich möchte Online-Coaching</option></select>
-      </div>
-      <div class="field"><label>Postleitzahl</label><input type="text" placeholder="z.B. 5026" id="c-plz" maxlength="5"><div class="field-hint">Für Trainer in deiner Nähe</div></div>
-      <div class="form-actions">
-        <button class="btn-back-s" onclick="backToSelector()">← Zurück</button>
-        <button class="btn-next" onclick="cNext()">Weiter →</button>
-      </div>
+    <div class="field-row">
+      <div class="field"><label>Vorname</label><input type="text" placeholder="Anna" id="c-fn"></div>
+      <div class="field"><label>Nachname</label><input type="text" placeholder="Muster" id="c-ln"></div>
     </div>
-
-    <!-- Step 2 -->
-    <div class="form-step" id="cStep2">
-      <div class="step-label">Schritt 2 von 2</div>
-      <div class="step-heading">DEIN ZIEL</div>
-      <div class="field">
-        <label>Was möchtest du erreichen?</label>
-        <div class="goal-grid">
-          <div class="goal-card" onclick="toggleGoal(this)"><span>🔥 Abnehmen</span></div>
-          <div class="goal-card" onclick="toggleGoal(this)"><span>💪 Muskelaufbau</span></div>
-          <div class="goal-card" onclick="toggleGoal(this)"><span>🏃 Ausdauer</span></div>
-          <div class="goal-card" onclick="toggleGoal(this)"><span>⚡ Krafttraining</span></div>
-          <div class="goal-card" onclick="toggleGoal(this)"><span>🧘 Mobility</span></div>
-          <div class="goal-card" onclick="toggleGoal(this)"><span>🏥 Reha</span></div>
-        </div>
-      </div>
-      <div class="field"><label>Meine Erwartungen</label><textarea id="c-erwartungen" placeholder="Was erwartest du von deinem Trainer?"></textarea><div class="field-hint">Optional</div></div>
-      <label class="checkbox-field">
-        <input type="checkbox" id="c-agb">
-        <div class="custom-cb"></div>
-        <span class="cb-label">Ich akzeptiere die <a href="rechtliches.html#agb" target="_blank">AGB & Datenschutz</a></span>
-      </label>
-      <div class="form-actions">
-        <button class="btn-back-s" onclick="cBack()">← Zurück</button>
-        <button class="btn-next" id="c-submit-btn" onclick="submitClient()">Trainer finden →</button>
-      </div>
+    <div class="field"><label>E-Mail</label><input type="email" placeholder="anna@example.com" id="c-email"></div>
+    <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="c-pw"></div>
+    <div class="field-row">
+      <div class="field"><label>Stadt</label><select id="c-city"><option value="">Auswählen...</option><option>Wien</option><option>Graz</option><option>Salzburg</option><option>Linz</option><option>Innsbruck</option><option>München</option><option>Berlin</option><option>Hamburg</option><option>Frankfurt</option><option>Köln</option><option>Zürich</option><option>Basel</option><option>Online</option></select></div>
+      <div class="field"><label>PLZ</label><input type="text" placeholder="5026" id="c-plz" maxlength="5"></div>
     </div>
+    <label class="checkbox-field"><input type="checkbox" id="c-agb"><div class="custom-cb"></div><span class="cb-label">Ich akzeptiere die <a href="rechtliches.html#agb" target="_blank">AGB & Datenschutz</a></span></label>
+    <div class="form-actions"><button class="btn-next" id="c-submit-btn" onclick="submitClient()">Trainer finden →</button></div>
+    <div class="trust-row"><div class="trust-item"><span>✓</span> 100% kostenlos</div><div class="trust-item"><span>✓</span> Kein Abo</div><div class="trust-item"><span>✓</span> Sofort loslegen</div></div>
+    <div style="text-align:center;margin-top:16px"><button class="btn-back-s" onclick="backToSelector()">← Zurück</button></div>
   </div>
 
   <!-- SUCCESS TRAINER -->
   <div class="success-screen" id="successTrainer">
     <div class="success-icon-wrap">✅</div>
-    <h2>DU WIRST BALD<br><span>AKTIVIERT!</span></h2>
-    <p>Unser Team meldet sich bei dir.<br>Sobald du eine Kundenanfrage bekommst,<br>schicken wir dir eine automatische E-Mail zur Aktivierung.</p>
-    <div class="success-tags">
-      <span class="success-tag">✓ Profil gespeichert</span>
-      <span class="success-tag">✓ Kostenlos gestartet</span>
-    </div>
+    <h2>PROFIL<br><span>ERSTELLT!</span></h2>
+    <p>Dein Trainerprofil ist angelegt.<br>Du kannst jetzt Preise, Bio und Fotos ergänzen.</p>
+    <div class="success-tags"><span class="success-tag">✓ Profil gespeichert</span><span class="success-tag">✓ Kostenlos gestartet</span></div>
     <a href="trainer-bereich.html" class="btn-home">Zum Trainer-Bereich →</a>
   </div>
 
@@ -313,14 +153,10 @@ src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"
   <div class="success-screen" id="successClient">
     <div class="success-icon-wrap">🎯</div>
     <h2>WILLKOMMEN<br><span>BEI VEXFIT!</span></h2>
-    <p>Deine Registrierung war erfolgreich!<br>Wir finden jetzt den passenden Trainer für dich.</p>
-    <div class="success-tags">
-      <span class="success-tag">✓ Konto erstellt</span>
-      <span class="success-tag">✓ Kostenlos</span>
-    </div>
-    <a href="kunden-bereich.html" class="btn-home">Zum Dashboard →</a>
+    <p>Deine Registrierung war erfolgreich!<br>Finde jetzt Trainer in deiner Nähe.</p>
+    <div class="success-tags"><span class="success-tag">✓ Konto erstellt</span><span class="success-tag">✓ Kostenlos</span></div>
+    <a href="kunden-bereich.html" class="btn-home">Trainer suchen →</a>
   </div>
-
 </div>
 
 <a href="https://wa.me/436649275737?text=Name%3A%20%0ANachricht%3A%20Hi%20ich%20habe%20eine%20Frage%20zu%20Vexfit%2C" target="_blank" class="wa-btn">
@@ -328,224 +164,61 @@ src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"
 </a>
 
 <script>
-const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
+const SUPABASE_URL='https://hbapzwxdehfgnputrfjf.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
 
-// Auto-detect type from URL
-const urlType = new URLSearchParams(window.location.search).get('typ');
-if(urlType === 'trainer') selectType('trainer');
-else if(urlType === 'kunde' || urlType === 'client') selectType('client');
+const urlType=new URLSearchParams(window.location.search).get('typ');
+if(urlType==='trainer')selectType('trainer');
+else if(urlType==='kunde'||urlType==='client')selectType('client');
 
-function selectType(type) {
-  document.getElementById('typeSelector').style.display = 'none';
-  if(type === 'trainer') {
-    document.getElementById('cardTrainer').classList.add('active');
-    document.getElementById('formTrainer').classList.add('active');
-  } else {
-    document.getElementById('cardClient').classList.add('active');
-    document.getElementById('formClient').classList.add('active');
-  }
-}
+function selectType(t){document.getElementById('typeSelector').style.display='none';if(t==='trainer'){document.getElementById('cardTrainer').classList.add('active');document.getElementById('formTrainer').classList.add('active')}else{document.getElementById('cardClient').classList.add('active');document.getElementById('formClient').classList.add('active')}}
+function backToSelector(){document.getElementById('typeSelector').style.display='block';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active')}
+function showSuccess(id){document.getElementById('typeSelector').style.display='none';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active');document.getElementById(id).classList.add('active');window.scrollTo({top:0,behavior:'smooth'})}
 
-function backToSelector() {
-  document.getElementById('typeSelector').style.display = 'block';
-  document.getElementById('formTrainer').classList.remove('active');
-  document.getElementById('formClient').classList.remove('active');
-}
-
-function showSuccess(id) {
-  document.getElementById('typeSelector').style.display = 'none';
-  document.getElementById('formTrainer').classList.remove('active');
-  document.getElementById('formClient').classList.remove('active');
-  document.getElementById(id).classList.add('active');
-  window.scrollTo({top: 0, behavior: 'smooth'});
-}
-
-// TRAINER STEPS
-function tNext(s) {
+async function submitTrainer(){
   hideError('t-error');
-  if(s === 1) {
-    const fn = document.getElementById('t-fn').value.trim();
-    const ln = document.getElementById('t-ln').value.trim();
-    const email = document.getElementById('t-email').value.trim();
-    const pw = document.getElementById('t-pw').value;
-    if(!fn || !ln || !email || !pw) { showError('t-error', 'Bitte alle Felder ausfüllen!'); return; }
-    if(pw.length < 8) { showError('t-error', 'Passwort muss mind. 8 Zeichen haben!'); return; }
-  }
-  document.getElementById('tStep'+s).classList.remove('active');
-  document.getElementById('tStep'+(s+1)).classList.add('active');
-  document.getElementById('tp'+s).classList.remove('active');
-  document.getElementById('tp'+s).classList.add('done');
-  document.getElementById('tp'+(s+1)).classList.add('active');
-  window.scrollTo({top:0, behavior:'smooth'});
-}
-
-function tBack(s) {
-  document.getElementById('tStep'+s).classList.remove('active');
-  document.getElementById('tStep'+(s-1)).classList.add('active');
-  document.getElementById('tp'+(s-1)).classList.remove('done');
-  document.getElementById('tp'+(s-1)).classList.add('active');
-  document.getElementById('tp'+s).classList.remove('active');
-  window.scrollTo({top:0, behavior:'smooth'});
-}
-
-async function submitTrainer() {
-  hideError('t-error');
-  if(!document.getElementById('t-agb').checked) { showError('t-error', 'Bitte AGB akzeptieren!'); return; }
-  const btn = document.getElementById('t-submit-btn');
-  btn.disabled = true; btn.textContent = 'Wird gespeichert...';
-
-  const email = document.getElementById('t-email').value.trim();
-  const pw = document.getElementById('t-pw').value;
-  const tags = [...document.querySelectorAll('#formTrainer .tag.selected')].map(t => t.textContent);
-  const trainerData = {
-    vorname: document.getElementById('t-fn').value.trim(),
-    nachname: document.getElementById('t-ln').value.trim(),
-    email: email,
-    telefon: document.getElementById('t-tel').value.trim(),
-    stadt: document.getElementById('t-city').value,
-    plz: document.getElementById('t-plz').value.trim(),
-    trainingsart: document.getElementById('t-type').value,
-    erfahrung: document.getElementById('t-exp').value,
-    spezialisierungen: tags,
-    bio: document.getElementById('t-bio').value.trim(),
-    preis_stunde: parseFloat(document.getElementById('t-price').value) || null,
-    preis_monat: parseFloat(document.getElementById('t-mprice').value) || null,
-    zertifikate: document.getElementById('t-cert').value.trim(),
-    calendly: document.getElementById('t-calendly').value.trim(),
-    stripe_bezahlt: false,
-    aktiv: false
-  };
-
-  try {
-    const authRes = await fetch(SUPABASE_URL+'/auth/v1/signup', {
-      method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},
-      body: JSON.stringify({email, password: pw})
-    });
-    const authData = await authRes.json();
-    if(!authRes.ok) {
-      const msg = authData.msg || authData.error_description || authData.error || '';
-      showError('t-error', msg.toLowerCase().includes('already') ? 'Diese E-Mail ist bereits registriert!' : 'Registrierung fehlgeschlagen: '+msg);
-      btn.disabled=false; btn.textContent='Profil gratis erstellen 🚀'; return;
-    }
-    const insertRes = await fetch(SUPABASE_URL+'/rest/v1/trainers', {
-      method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(authData.access_token||SUPABASE_KEY),'Prefer':'return=minimal'},
-      body: JSON.stringify({...trainerData, user_id: authData.user?.id})
-    });
-    if(!insertRes.ok) {
-      const errText = await insertRes.text();
-      console.error('Trainer-Insert fehlgeschlagen:', insertRes.status, errText);
-      showError('t-error', 'Profil konnte nicht gespeichert werden ('+insertRes.status+'). '+(errText.substring(0,120)||'Bitte erneut versuchen.'));
-      btn.disabled=false; btn.textContent='Profil gratis erstellen 🚀';
-      return;
-    }
-    // E-Mail-Benachrichtigung nur senden, wenn der Insert wirklich geklappt hat
-    fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neuer-trainer', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(trainerData)
-    }).catch(()=>{});
-    if(authData.access_token) {
-      localStorage.setItem('vexfit_session', JSON.stringify({
-        access_token: authData.access_token, user_id: authData.user?.id, email, role:'trainer'
-      }));
-    }
-    // Meta Pixel: Trainer-Registrierung tracken
-    if(typeof fbq === 'function') fbq('track', 'CompleteRegistration', {content_name: 'Trainer', value: 0, currency: 'EUR'});
+  const fn=document.getElementById('t-fn').value.trim(),ln=document.getElementById('t-ln').value.trim(),email=document.getElementById('t-email').value.trim(),pw=document.getElementById('t-pw').value,city=document.getElementById('t-city').value,plz=document.getElementById('t-plz').value.trim();
+  if(!fn||!ln||!email||!pw||!city){showError('t-error','Bitte alle Felder ausfüllen!');return}
+  if(pw.length<8){showError('t-error','Passwort muss mind. 8 Zeichen haben!');return}
+  if(!document.getElementById('t-agb').checked){showError('t-error','Bitte AGB akzeptieren!');return}
+  const btn=document.getElementById('t-submit-btn');btn.disabled=true;btn.textContent='Wird gespeichert...';
+  const td={vorname:fn,nachname:ln,email,telefon:'',stadt:city,plz,trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
+  try{
+    const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
+    const ad=await ar.json();
+    if(!ar.ok){const m=ad.msg||ad.error_description||ad.error||'';showError('t-error',m.toLowerCase().includes('already')?'Diese E-Mail ist bereits registriert!':'Registrierung fehlgeschlagen: '+m);btn.disabled=false;btn.textContent='Profil gratis erstellen 🚀';return}
+    const ir=await fetch(SUPABASE_URL+'/rest/v1/trainers',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(ad.access_token||SUPABASE_KEY),'Prefer':'return=minimal'},body:JSON.stringify({...td,user_id:ad.user?.id})});
+    if(!ir.ok){const e=await ir.text();console.error('Insert fail:',ir.status,e);showError('t-error','Profil konnte nicht gespeichert werden. Bitte erneut versuchen.');btn.disabled=false;btn.textContent='Profil gratis erstellen 🚀';return}
+    fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neuer-trainer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(td)}).catch(()=>{});
+    if(ad.access_token)localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,user_id:ad.user?.id,email,role:'trainer'}));
+    if(typeof fbq==='function')fbq('track','CompleteRegistration',{content_name:'Trainer',value:0,currency:'EUR'});
     showSuccess('successTrainer');
-  } catch(e) {
-    showError('t-error', 'Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
-    btn.disabled=false; btn.textContent='Profil gratis erstellen 🚀';
-  }
+  }catch(e){showError('t-error','Verbindungsfehler. Bitte prüfe deine Internetverbindung.');btn.disabled=false;btn.textContent='Profil gratis erstellen 🚀';}
 }
 
-// CLIENT STEPS
-function cNext() {
+async function submitClient(){
   hideError('c-error');
-  const fn=document.getElementById('c-fn').value.trim();
-  const ln=document.getElementById('c-ln').value.trim();
-  const email=document.getElementById('c-email').value.trim();
-  const pw=document.getElementById('c-pw').value;
-  const city=document.getElementById('c-city').value;
-  if(!fn||!ln||!email||!pw||!city){showError('c-error','Bitte alle Felder ausfüllen!');return;}
-  if(pw.length<8){showError('c-error','Passwort muss mind. 8 Zeichen haben!');return;}
-  document.getElementById('cStep1').classList.remove('active');
-  document.getElementById('cStep2').classList.add('active');
-  document.getElementById('cp1').classList.remove('active');
-  document.getElementById('cp1').classList.add('done');
-  document.getElementById('cp2').classList.add('active');
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-
-function cBack() {
-  document.getElementById('cStep2').classList.remove('active');
-  document.getElementById('cStep1').classList.add('active');
-  document.getElementById('cp2').classList.remove('active');
-  document.getElementById('cp1').classList.remove('done');
-  document.getElementById('cp1').classList.add('active');
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-
-async function submitClient() {
-  hideError('c-error');
-  if(!document.getElementById('c-agb').checked){showError('c-error','Bitte AGB akzeptieren!');return;}
-  const goals=[...document.querySelectorAll('#formClient .goal-card.selected')].map(g=>g.querySelector('span').textContent.trim());
-  if(goals.length===0){showError('c-error','Bitte wähle mindestens ein Ziel!');return;}
-  const btn=document.getElementById('c-submit-btn');
-  btn.disabled=true; btn.textContent='Wird gespeichert...';
-
-  const email=document.getElementById('c-email').value.trim();
-  const pw=document.getElementById('c-pw').value;
-  const clientData={
-    vorname:document.getElementById('c-fn').value.trim(),
-    nachname:document.getElementById('c-ln').value.trim(),
-    email,
-    stadt:document.getElementById('c-city').value,
-    plz:document.getElementById('c-plz').value.trim(),
-    ziel:goals.join(', '),
-    erwartungen:document.getElementById('c-erwartungen').value.trim()
-  };
-
-  try {
-    const authRes=await fetch(SUPABASE_URL+'/auth/v1/signup',{
-      method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},
-      body:JSON.stringify({email,password:pw})
-    });
-    const authData=await authRes.json();
-    if(!authRes.ok){
-      const msg=authData.msg||authData.error_description||authData.error||'';
-      showError('c-error',msg.toLowerCase().includes('already')?'Diese E-Mail ist bereits registriert!':'Registrierung fehlgeschlagen: '+msg);
-      btn.disabled=false;btn.textContent='Trainer finden →';return;
-    }
-    const insertRes=await fetch(SUPABASE_URL+'/rest/v1/kunden',{
-      method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(authData.access_token||SUPABASE_KEY),'Prefer':'return=minimal'},
-      body:JSON.stringify({...clientData,user_id:authData.user?.id})
-    });
-    if(!insertRes.ok){
-      const errText=await insertRes.text();
-      console.error('Kunden-Insert fehlgeschlagen:',insertRes.status,errText);
-      showError('c-error','Profil konnte nicht gespeichert werden ('+insertRes.status+'). '+(errText.substring(0,120)||'Bitte erneut versuchen.'));
-      btn.disabled=false;btn.textContent='Trainer finden →';return;
-    }
-    fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neuer-kunde',{
-      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(clientData)
-    }).catch(()=>{});
-    if(authData.access_token){
-      localStorage.setItem('vexfit_session',JSON.stringify({
-        access_token:authData.access_token,user_id:authData.user?.id,email,role:'kunde'
-      }));
-    }
-    // Meta Pixel: Kunden-Registrierung tracken
-    if(typeof fbq === 'function') fbq('track', 'Lead', {content_name: 'Kunde', value: 0, currency: 'EUR'});
+  const fn=document.getElementById('c-fn').value.trim(),ln=document.getElementById('c-ln').value.trim(),email=document.getElementById('c-email').value.trim(),pw=document.getElementById('c-pw').value,city=document.getElementById('c-city').value,plz=document.getElementById('c-plz').value.trim();
+  if(!fn||!ln||!email||!pw||!city){showError('c-error','Bitte alle Felder ausfüllen!');return}
+  if(pw.length<8){showError('c-error','Passwort muss mind. 8 Zeichen haben!');return}
+  if(!document.getElementById('c-agb').checked){showError('c-error','Bitte AGB akzeptieren!');return}
+  const btn=document.getElementById('c-submit-btn');btn.disabled=true;btn.textContent='Wird gespeichert...';
+  const cd={vorname:fn,nachname:ln,email,stadt:city,plz,ziel:'',erwartungen:''};
+  try{
+    const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
+    const ad=await ar.json();
+    if(!ar.ok){const m=ad.msg||ad.error_description||ad.error||'';showError('c-error',m.toLowerCase().includes('already')?'Diese E-Mail ist bereits registriert!':'Registrierung fehlgeschlagen: '+m);btn.disabled=false;btn.textContent='Trainer finden →';return}
+    const ir=await fetch(SUPABASE_URL+'/rest/v1/kunden',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(ad.access_token||SUPABASE_KEY),'Prefer':'return=minimal'},body:JSON.stringify({...cd,user_id:ad.user?.id})});
+    if(!ir.ok){const e=await ir.text();console.error('Insert fail:',ir.status,e);showError('c-error','Profil konnte nicht gespeichert werden. Bitte erneut versuchen.');btn.disabled=false;btn.textContent='Trainer finden →';return}
+    fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neuer-kunde',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cd)}).catch(()=>{});
+    if(ad.access_token)localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,user_id:ad.user?.id,email,role:'kunde'}));
+    if(typeof fbq==='function')fbq('track','Lead',{content_name:'Kunde',value:0,currency:'EUR'});
     showSuccess('successClient');
-  } catch(e){
-    showError('c-error','Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
-    btn.disabled=false;btn.textContent='Trainer finden →';
-  }
+  }catch(e){showError('c-error','Verbindungsfehler. Bitte prüfe deine Internetverbindung.');btn.disabled=false;btn.textContent='Trainer finden →';}
 }
 
-function showError(id,msg){const el=document.getElementById(id);el.textContent='⚠️ '+msg;el.classList.add('show');}
-function hideError(id){document.getElementById(id).classList.remove('show');}
-function toggleTag(el){el.classList.toggle('selected');}
-function toggleGoal(el){el.classList.toggle('selected');}
+function showError(id,msg){const el=document.getElementById(id);el.textContent='⚠️ '+msg;el.classList.add('show')}
+function hideError(id){document.getElementById(id).classList.remove('show')}
 </script>
 </body>
 </html>
