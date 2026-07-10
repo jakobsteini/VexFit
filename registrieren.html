@@ -68,6 +68,11 @@ select option{background:var(--gray);color:var(--white)}
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes popIn{from{opacity:0;transform:scale(0.4)}to{opacity:1;transform:scale(1)}}
 @media(min-width:768px){nav{padding:18px 52px}.page-wrap{padding:90px 20px 60px}}
+.iab-banner{display:none;position:fixed;top:0;left:0;right:0;z-index:2000;background:#e8ff00;color:#0a0a0a;padding:10px 16px;font-size:12px;font-weight:600;text-align:center;line-height:1.5}
+.iab-banner.show{display:block}
+.iab-banner b{text-decoration:underline}
+.iab-banner + nav{top:38px}
+body.iab-active{padding-top:38px}
 </style>
 <!-- Meta Pixel Code -->
 <script>
@@ -78,6 +83,7 @@ fbq('init','1034036285801133');fbq('track','PageView');
 <!-- End Meta Pixel Code -->
 </head>
 <body>
+<div class="iab-banner" id="iabBanner">📱 Für ein reibungsloses Erlebnis: Tippe oben rechts auf <b>⋯</b> und wähle <b>„Im Browser öffnen"</b></div>
 <nav><a href="index.html" class="logo">VEX<span>FIT</span></a><a href="index.html" class="nav-back">← Zurück</a></nav>
 <div class="page-wrap">
   <div id="typeSelector" class="type-selector">
@@ -105,7 +111,6 @@ fbq('init','1034036285801133');fbq('track','PageView');
       <div class="field"><label>Nachname</label><input type="text" placeholder="Mustermann" id="t-ln"></div>
     </div>
     <div class="field"><label>E-Mail</label><input type="email" placeholder="max@example.com" id="t-email"></div>
-    <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="t-pw"></div>
     <div class="field-row">
       <div class="field"><label>Stadt</label><select id="t-city"><option value="">Auswählen...</option><option>Wien</option><option>Graz</option><option>Salzburg</option><option>Linz</option><option>Innsbruck</option><option>München</option><option>Berlin</option><option>Hamburg</option><option>Frankfurt</option><option>Köln</option><option>Zürich</option><option>Basel</option><option>Online</option></select></div>
       <div class="field"><label>PLZ</label><input type="text" placeholder="5020" id="t-plz" maxlength="5"></div>
@@ -129,7 +134,6 @@ fbq('init','1034036285801133');fbq('track','PageView');
       <div class="field"><label>Nachname</label><input type="text" placeholder="Muster" id="c-ln"></div>
     </div>
     <div class="field"><label>E-Mail</label><input type="email" placeholder="anna@example.com" id="c-email"></div>
-    <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="c-pw"></div>
     <div class="field-row">
       <div class="field"><label>Stadt</label><select id="c-city"><option value="">Auswählen...</option><option>Wien</option><option>Graz</option><option>Salzburg</option><option>Linz</option><option>Innsbruck</option><option>München</option><option>Berlin</option><option>Hamburg</option><option>Frankfurt</option><option>Köln</option><option>Zürich</option><option>Basel</option><option>Online</option></select></div>
       <div class="field"><label>PLZ</label><input type="text" placeholder="5026" id="c-plz" maxlength="5"></div>
@@ -167,6 +171,16 @@ fbq('init','1034036285801133');fbq('track','PageView');
 const SUPABASE_URL='https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
 
+// In-App-Browser erkennen (Facebook/Instagram) und Hinweis-Banner zeigen
+(function(){
+  const ua = navigator.userAgent || '';
+  const isInApp = /FBAN|FBAV|Instagram/i.test(ua);
+  if(isInApp){
+    document.getElementById('iabBanner').classList.add('show');
+    document.body.classList.add('iab-active');
+  }
+})();
+
 const urlType=new URLSearchParams(window.location.search).get('typ');
 if(urlType==='trainer')selectType('trainer');
 else if(urlType==='kunde'||urlType==='client')selectType('client');
@@ -175,11 +189,12 @@ function selectType(t){document.getElementById('typeSelector').style.display='no
 function backToSelector(){document.getElementById('typeSelector').style.display='block';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active')}
 function showSuccess(id){document.getElementById('typeSelector').style.display='none';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active');document.getElementById(id).classList.add('active');window.scrollTo({top:0,behavior:'smooth'})}
 
+function genPw(){return 'Vx'+Math.random().toString(36).slice(-8)+Math.floor(Math.random()*100)+'!';}
+
 async function submitTrainer(){
   hideError('t-error');
-  const fn=document.getElementById('t-fn').value.trim(),ln=document.getElementById('t-ln').value.trim(),email=document.getElementById('t-email').value.trim(),pw=document.getElementById('t-pw').value,city=document.getElementById('t-city').value,plz=document.getElementById('t-plz').value.trim();
-  if(!fn||!ln||!email||!pw||!city){showError('t-error','Bitte alle Felder ausfüllen!');return}
-  if(pw.length<8){showError('t-error','Passwort muss mind. 8 Zeichen haben!');return}
+  const fn=document.getElementById('t-fn').value.trim(),ln=document.getElementById('t-ln').value.trim(),email=document.getElementById('t-email').value.trim(),pw=genPw(),city=document.getElementById('t-city').value,plz=document.getElementById('t-plz').value.trim();
+  if(!fn||!ln||!email||!city){showError('t-error','Bitte alle Felder ausfüllen!');return}
   if(!document.getElementById('t-agb').checked){showError('t-error','Bitte AGB akzeptieren!');return}
   const btn=document.getElementById('t-submit-btn');btn.disabled=true;btn.textContent='Wird gespeichert...';
   const td={vorname:fn,nachname:ln,email,telefon:'',stadt:city,plz,trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
@@ -190,7 +205,7 @@ async function submitTrainer(){
     const ir=await fetch(SUPABASE_URL+'/rest/v1/trainers',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(ad.access_token||SUPABASE_KEY),'Prefer':'return=minimal'},body:JSON.stringify({...td,user_id:ad.user?.id})});
     if(!ir.ok){const e=await ir.text();console.error('Insert fail:',ir.status,e);showError('t-error','Profil konnte nicht gespeichert werden. Bitte erneut versuchen.');btn.disabled=false;btn.textContent='Profil gratis erstellen 🚀';return}
     fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neuer-trainer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(td)}).catch(()=>{});
-    if(ad.access_token)localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,user_id:ad.user?.id,email,role:'trainer'}));
+    if(ad.access_token){try{localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,user_id:ad.user?.id,email,role:'trainer'}));}catch(e){console.warn('localStorage blockiert:',e);}}
     if(typeof fbq==='function')fbq('track','CompleteRegistration',{content_name:'Trainer',value:0,currency:'EUR'});
     showSuccess('successTrainer');
   }catch(e){showError('t-error','Verbindungsfehler. Bitte prüfe deine Internetverbindung.');btn.disabled=false;btn.textContent='Profil gratis erstellen 🚀';}
@@ -198,9 +213,8 @@ async function submitTrainer(){
 
 async function submitClient(){
   hideError('c-error');
-  const fn=document.getElementById('c-fn').value.trim(),ln=document.getElementById('c-ln').value.trim(),email=document.getElementById('c-email').value.trim(),pw=document.getElementById('c-pw').value,city=document.getElementById('c-city').value,plz=document.getElementById('c-plz').value.trim();
-  if(!fn||!ln||!email||!pw||!city){showError('c-error','Bitte alle Felder ausfüllen!');return}
-  if(pw.length<8){showError('c-error','Passwort muss mind. 8 Zeichen haben!');return}
+  const fn=document.getElementById('c-fn').value.trim(),ln=document.getElementById('c-ln').value.trim(),email=document.getElementById('c-email').value.trim(),pw=genPw(),city=document.getElementById('c-city').value,plz=document.getElementById('c-plz').value.trim();
+  if(!fn||!ln||!email||!city){showError('c-error','Bitte alle Felder ausfüllen!');return}
   if(!document.getElementById('c-agb').checked){showError('c-error','Bitte AGB akzeptieren!');return}
   const btn=document.getElementById('c-submit-btn');btn.disabled=true;btn.textContent='Wird gespeichert...';
   const cd={vorname:fn,nachname:ln,email,stadt:city,plz,ziel:'',erwartungen:''};
@@ -211,7 +225,7 @@ async function submitClient(){
     const ir=await fetch(SUPABASE_URL+'/rest/v1/kunden',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+(ad.access_token||SUPABASE_KEY),'Prefer':'return=minimal'},body:JSON.stringify({...cd,user_id:ad.user?.id})});
     if(!ir.ok){const e=await ir.text();console.error('Insert fail:',ir.status,e);showError('c-error','Profil konnte nicht gespeichert werden. Bitte erneut versuchen.');btn.disabled=false;btn.textContent='Trainer finden →';return}
     fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neuer-kunde',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cd)}).catch(()=>{});
-    if(ad.access_token)localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,user_id:ad.user?.id,email,role:'kunde'}));
+    if(ad.access_token){try{localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,user_id:ad.user?.id,email,role:'kunde'}));}catch(e){console.warn('localStorage blockiert:',e);}}
     if(typeof fbq==='function')fbq('track','Lead',{content_name:'Kunde',value:0,currency:'EUR'});
     showSuccess('successClient');
   }catch(e){showError('c-error','Verbindungsfehler. Bitte prüfe deine Internetverbindung.');btn.disabled=false;btn.textContent='Trainer finden →';}
