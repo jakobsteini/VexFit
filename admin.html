@@ -83,6 +83,11 @@ src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"
 </head>
 <body>
 
+<!-- Hinweis: Admin-Panel deaktiviert, Vollzugriffs-Schluessel entfernt -->
+<div id="adminDisabledNotice" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.45);border-left:4px solid #ff6b6b;color:#ff6b6b;padding:18px 24px;margin:0;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;line-height:1.5;text-align:center;transition:background 0.2s">
+  ⚠️ Admin-Panel vorübergehend deaktiviert. Zugriff wird mit dem neuen Supabase-Projekt neu eingerichtet.
+</div>
+
 <!-- LOGIN -->
 <div class="login-wrap" id="loginWrap">
   <div class="login-box">
@@ -175,7 +180,6 @@ src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"
 <script>
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
-const SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODg0NzQ3NCwiZXhwIjoyMDk0NDIzNDc0fQ.YpuPpog_Kr180-yWBTSmQ_tx2_aqW0FjGcWqVdmqKUU';
 // ⚠️ ÄNDERE DIESES PASSWORT!
 const ADMIN_PASSWORD = 'steini';
 
@@ -379,62 +383,30 @@ async function loadData() {
   }
 }
 
+// Die folgenden Funktionen brauchten den entfernten Vollzugriffs-Schluessel.
+// Sie tun bewusst nichts und weisen auf den Hinweis oben hin.
+function adminDeaktiviertHinweis() {
+  const el = document.getElementById('adminDisabledNotice');
+  if(!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  el.style.background = 'rgba(255,80,80,0.3)';
+  setTimeout(() => { el.style.background = 'rgba(255,80,80,0.12)'; }, 1200);
+}
+
 async function banTrainer(userId, tableId, name) {
-  if(!confirm(`Trainer "${name}" sperren? Login wird sofort deaktiviert.`)) return;
-  if(userId && userId !== 'null' && userId !== 'undefined') {
-    await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${SERVICE_KEY}` },
-      body: JSON.stringify({ ban_duration: '876000h' })
-    });
-  }
-  alert(`✅ ${name} wurde gesperrt.`);
-  loadData();
+  adminDeaktiviertHinweis();
 }
 
 async function banKunde(userId, tableId, name) {
-  if(!confirm(`Kunde "${name}" sperren? Login wird sofort deaktiviert.`)) return;
-  if(userId && userId !== 'null' && userId !== 'undefined') {
-    await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${SERVICE_KEY}` },
-      body: JSON.stringify({ ban_duration: '876000h' })
-    });
-  }
-  alert(`✅ ${name} wurde gesperrt.`);
-  loadData();
+  adminDeaktiviertHinweis();
 }
 
 async function deleteTrainer(userId, tableId, name) {
-  if(!confirm(`Trainer "${name}" komplett löschen? Auch der Login wird entfernt!`)) return;
-  await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${tableId}`, {
-    method: 'DELETE',
-    headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${SERVICE_KEY}` }
-  });
-  if(userId && userId !== 'null' && userId !== 'undefined') {
-    await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
-      method: 'DELETE',
-      headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${SERVICE_KEY}` }
-    });
-  }
-  alert(`✅ ${name} wurde komplett gelöscht.`);
-  loadData();
+  adminDeaktiviertHinweis();
 }
 
 async function deleteKunde(userId, tableId, name) {
-  if(!confirm(`Kunde "${name}" komplett löschen? Auch der Login wird entfernt!`)) return;
-  await fetch(`${SUPABASE_URL}/rest/v1/kunden?id=eq.${tableId}`, {
-    method: 'DELETE',
-    headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${SERVICE_KEY}` }
-  });
-  if(userId && userId !== 'null' && userId !== 'undefined') {
-    await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
-      method: 'DELETE',
-      headers: { 'apikey': SERVICE_KEY, 'Authorization': `Bearer ${SERVICE_KEY}` }
-    });
-  }
-  alert(`✅ ${name} wurde komplett gelöscht.`);
-  loadData();
+  adminDeaktiviertHinweis();
 }
 
 async function activateTrainer(id) {
