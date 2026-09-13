@@ -112,6 +112,11 @@ fbq('init','1034036285801133');fbq('track','PageView');
     </div>
     <div class="field"><label>E-Mail</label><input type="email" placeholder="max@example.com" id="t-email"></div>
     <div class="field-row">
+      <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="t-pw" autocomplete="new-password"></div>
+      <div class="field"><label>Passwort wiederholen</label><input type="password" placeholder="Nochmal eingeben" id="t-pw2" autocomplete="new-password"></div>
+    </div>
+    <div class="error-banner" id="t-pw-error"></div>
+    <div class="field-row">
       <div class="field"><label>Stadt</label><select id="t-city"><option value="">Auswählen...</option><option>Wien</option><option>Graz</option><option>Salzburg</option><option>Linz</option><option>Innsbruck</option><option>München</option><option>Berlin</option><option>Hamburg</option><option>Frankfurt</option><option>Köln</option><option>Zürich</option><option>Basel</option><option>Online</option></select></div>
       <div class="field"><label>PLZ</label><input type="text" placeholder="5020" id="t-plz" maxlength="5"></div>
     </div>
@@ -134,6 +139,11 @@ fbq('init','1034036285801133');fbq('track','PageView');
       <div class="field"><label>Nachname</label><input type="text" placeholder="Muster" id="c-ln"></div>
     </div>
     <div class="field"><label>E-Mail</label><input type="email" placeholder="anna@example.com" id="c-email"></div>
+    <div class="field-row">
+      <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="c-pw" autocomplete="new-password"></div>
+      <div class="field"><label>Passwort wiederholen</label><input type="password" placeholder="Nochmal eingeben" id="c-pw2" autocomplete="new-password"></div>
+    </div>
+    <div class="error-banner" id="c-pw-error"></div>
     <div class="field-row">
       <div class="field"><label>Stadt</label><select id="c-city"><option value="">Auswählen...</option><option>Wien</option><option>Graz</option><option>Salzburg</option><option>Linz</option><option>Innsbruck</option><option>München</option><option>Berlin</option><option>Hamburg</option><option>Frankfurt</option><option>Köln</option><option>Zürich</option><option>Basel</option><option>Online</option></select></div>
       <div class="field"><label>PLZ</label><input type="text" placeholder="5026" id="c-plz" maxlength="5"></div>
@@ -189,12 +199,23 @@ function selectType(t){document.getElementById('typeSelector').style.display='no
 function backToSelector(){document.getElementById('typeSelector').style.display='block';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active')}
 function showSuccess(id){document.getElementById('typeSelector').style.display='none';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active');document.getElementById(id).classList.add('active');window.scrollTo({top:0,behavior:'smooth'})}
 
-function genPw(){return 'Vx'+Math.random().toString(36).slice(-8)+Math.floor(Math.random()*100)+'!';}
+// Prueft die beiden Passwortfelder. Gibt das Passwort zurueck oder null bei Verstoss.
+function pruefePasswort(kuerzel){
+  hideError(kuerzel+'-pw-error');
+  const pw=document.getElementById(kuerzel+'-pw').value;
+  const pw2=document.getElementById(kuerzel+'-pw2').value;
+  if(!pw||!pw2){showError(kuerzel+'-pw-error','Bitte wähle ein Passwort und wiederhole es.');return null}
+  if(pw.length<8){showError(kuerzel+'-pw-error','Dein Passwort muss mindestens 8 Zeichen haben.');return null}
+  if(pw!==pw2){showError(kuerzel+'-pw-error','Die beiden Passwörter stimmen nicht überein.');return null}
+  return pw;
+}
 
 async function submitTrainer(){
   hideError('t-error');
-  const fn=document.getElementById('t-fn').value.trim(),ln=document.getElementById('t-ln').value.trim(),email=document.getElementById('t-email').value.trim(),pw=genPw(),city=document.getElementById('t-city').value,plz=document.getElementById('t-plz').value.trim();
+  const fn=document.getElementById('t-fn').value.trim(),ln=document.getElementById('t-ln').value.trim(),email=document.getElementById('t-email').value.trim(),city=document.getElementById('t-city').value,plz=document.getElementById('t-plz').value.trim();
   if(!fn||!ln||!email||!city){showError('t-error','Bitte alle Felder ausfüllen!');return}
+  const pw=pruefePasswort('t');
+  if(pw===null)return;
   if(!document.getElementById('t-agb').checked){showError('t-error','Bitte AGB akzeptieren!');return}
   const btn=document.getElementById('t-submit-btn');btn.disabled=true;btn.textContent='Wird gespeichert...';
   const td={vorname:fn,nachname:ln,email,telefon:'',stadt:city,plz,trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
@@ -213,8 +234,10 @@ async function submitTrainer(){
 
 async function submitClient(){
   hideError('c-error');
-  const fn=document.getElementById('c-fn').value.trim(),ln=document.getElementById('c-ln').value.trim(),email=document.getElementById('c-email').value.trim(),pw=genPw(),city=document.getElementById('c-city').value,plz=document.getElementById('c-plz').value.trim();
+  const fn=document.getElementById('c-fn').value.trim(),ln=document.getElementById('c-ln').value.trim(),email=document.getElementById('c-email').value.trim(),city=document.getElementById('c-city').value,plz=document.getElementById('c-plz').value.trim();
   if(!fn||!ln||!email||!city){showError('c-error','Bitte alle Felder ausfüllen!');return}
+  const pw=pruefePasswort('c');
+  if(pw===null)return;
   if(!document.getElementById('c-agb').checked){showError('c-error','Bitte AGB akzeptieren!');return}
   const btn=document.getElementById('c-submit-btn');btn.disabled=true;btn.textContent='Wird gespeichert...';
   const cd={vorname:fn,nachname:ln,email,stadt:city,plz,ziel:'',erwartungen:''};
