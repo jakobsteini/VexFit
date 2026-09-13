@@ -320,7 +320,8 @@ async function sendContact() {
     } catch(e) { console.log('Webhook failed silently'); }
 
     // 1. Save to Supabase anfragen table
-    await fetch(`${SUPABASE_URL}/rest/v1/anfragen`, {
+    // Spaltennamen muessen exakt der Tabelle entsprechen, sonst geht die Anfrage verloren.
+    const anfrageRes = await fetch(`${SUPABASE_URL}/rest/v1/anfragen`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -329,16 +330,19 @@ async function sendContact() {
         'Prefer': 'return=minimal'
       },
       body: JSON.stringify({
-        trainer_id: trainerData ? trainerData.id : null,
         trainer_name: trainerData ? trainerData.vorname + ' ' + trainerData.nachname : '–',
         trainer_email: trainerData ? trainerData.email : '–',
-        kunde_name: name,
-        kunde_email: email,
-        kunde_ziel: goal || '–',
-        kunde_nachricht: message,
+        kunden_name: name,
+        kunden_email: email,
+        ziel: goal || '–',
+        nachricht: message,
         weitergeleitet: false
       })
     });
+    if(!anfrageRes.ok) {
+      console.error('Anfrage speichern fehlgeschlagen:', anfrageRes.status, await anfrageRes.text());
+      throw new Error('Anfrage konnte nicht gespeichert werden');
+    }
 
     // 2. Send to Formspree (notify Jakob)
     const res = await fetch(FORMSPREE, {
@@ -366,8 +370,9 @@ async function sendContact() {
       throw new Error('Send failed');
     }
   } catch(e) {
+    console.error('sendContact:', e);
     const err = document.getElementById('contactError');
-    err.textContent = '⚠️ Fehler beim Senden. Bitte versuche es erneut.';
+    err.textContent = '⚠️ Deine Anfrage konnte nicht gesendet werden. Bitte versuche es erneut oder schreib uns per WhatsApp.';
     err.classList.add('show');
     btn.disabled = false;
     btn.textContent = 'Nachricht senden →';
