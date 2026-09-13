@@ -354,11 +354,15 @@ async function sendAnfrage() {
     weitergeleitet: false
   };
   try {
-    await fetch(`${SB}/rest/v1/anfragen`, {
+    const r = await fetch(`${SB}/rest/v1/anfragen`, {
       method:'POST',
       headers:{'Content-Type':'application/json',apikey:KEY,Authorization:`Bearer ${KEY}`,Prefer:'return=minimal'},
       body: JSON.stringify(body)
     });
+    if(!r.ok) {
+      console.error('Anfrage speichern fehlgeschlagen:', r.status, await r.text());
+      throw new Error('Anfrage konnte nicht gespeichert werden');
+    }
     fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neue-anfrage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>{});
     document.getElementById('overlay').classList.remove('open');
     selT = null;
@@ -366,7 +370,10 @@ async function sendAnfrage() {
     document.getElementById('searchPage').classList.add('hidden');
     const desc = document.getElementById('welcomeDesc');
     desc.textContent = 'Deine Anfrage wurde erfolgreich übermittelt! Der Trainer meldet sich in Kürze bei dir.';
-  } catch(e) { alert('Fehler beim Senden'); }
+  } catch(e) {
+    console.error('sendAnfrage:', e);
+    alert('Deine Anfrage konnte nicht gesendet werden. Bitte versuche es erneut.');
+  }
   btn.disabled = false; btn.textContent = 'Senden →';
 }
 
@@ -376,9 +383,10 @@ async function checkAlertStatus() {
     const r = await fetch(`${SB}/rest/v1/trainer_alerts?kunden_email=eq.${encodeURIComponent(sess.email)}&plz=eq.${encodeURIComponent(lastSearch.plz)}&aktiv=eq.true&select=id`, {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
     });
+    if(!r.ok) throw new Error('Alert-Status laden fehlgeschlagen: ' + r.status);
     const d = await r.json();
-    if(d && d.length > 0) markAlertActive();
-  } catch(e) {}
+    if(Array.isArray(d) && d.length > 0) markAlertActive();
+  } catch(e) { console.error('checkAlertStatus:', e); }
 }
 
 function markAlertActive() {

@@ -440,7 +440,7 @@ async function submitNotify() {
   if(!email) { alert('Bitte E-Mail eingeben!'); return; }
   const stadt = document.getElementById('searchInput')?.value || '';
   try {
-    await fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neuer-kunde', {
+    const r = await fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neuer-kunde', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
@@ -449,7 +449,12 @@ async function submitNotify() {
         ziel: 'Benachrichtigung gewünscht', budget: ''
       })
     });
-  } catch(e) {}
+    if(!r.ok) throw new Error('Benachrichtigung fehlgeschlagen: ' + r.status);
+  } catch(e) {
+    console.error('submitNotify:', e);
+    alert('Deine Anmeldung konnte nicht gespeichert werden. Bitte versuche es erneut.');
+    return;
+  }
   document.getElementById('notifyForm').style.display = 'none';
   document.getElementById('notifySuccess').style.display = 'block';
 }
