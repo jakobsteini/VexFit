@@ -94,9 +94,14 @@ let recoveryToken = null;
 
 // Supabase haengt den Wiederherstellungs-Token als Fragment an die Adresse.
 (function liesToken(){
-  const f = new URLSearchParams((location.hash || '').replace(/^#/, ''));
-  const fehler = f.get('error_description') || f.get('error');
-  const token = f.get('access_token');
+  // Supabase legt den Token ueblicherweise ins Fragment hinter dem Rautezeichen.
+  // Zur Sicherheit werden auch die Abfrageparameter hinter dem Fragezeichen gelesen.
+  const ausFragment = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+  const ausAbfrage  = new URLSearchParams(location.search || '');
+  const hole = name => ausFragment.get(name) || ausAbfrage.get(name);
+
+  const fehler = hole('error_description') || hole('error');
+  const token = hole('access_token');
 
   if(fehler){
     zeigeTokenFehler('Dieser Link ist nicht mehr gültig. Fordere einen neuen Reset-Link an.');
@@ -108,7 +113,7 @@ let recoveryToken = null;
   }
   recoveryToken = token;
   // Token aus der Adresszeile nehmen, damit er nicht im Verlauf stehen bleibt.
-  try { history.replaceState(null, '', location.pathname + location.search); } catch(e) {}
+  try { history.replaceState(null, '', location.pathname); } catch(e) {}
   document.getElementById('formSection').style.display = 'block';
 })();
 

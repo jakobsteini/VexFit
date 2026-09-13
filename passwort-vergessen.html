@@ -82,10 +82,14 @@ async function submit() {
   const btn = document.getElementById('resetBtn');
   btn.disabled = true; btn.textContent = 'Wird gesendet...';
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+    // Das Rueckkehrziel MUSS als Abfrageparameter redirect_to an der Adresse haengen.
+    // Im JSON-Rumpf wird es ignoriert, dann faellt Supabase auf die Site URL zurueck.
+    // Absolute Adresse, und sie muss in Supabase unter Redirect URLs eingetragen sein.
+    const ZIEL = 'https://vexfit.app/passwort-neu.html';
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(ZIEL)}`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'apikey': SUPABASE_KEY},
-      body: JSON.stringify({email, redirectTo: 'https://vexfit.app/passwort-neu.html'})
+      body: JSON.stringify({email})
     });
     // Absichtlich immer dieselbe Rueckmeldung, egal wie die Antwort ausfaellt:
     // sonst koennte man ablesen, welche Adressen registriert sind.
