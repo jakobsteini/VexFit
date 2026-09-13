@@ -392,5 +392,61 @@ function showToast(msg, isError) {
   setTimeout(() => { t.className = 'toast'; }, 3000);
 }
 </script>
+<!-- Zustimmung fuer Marketing. Gleicher Aufbau und gleiche Gestaltung auf allen Seiten. -->
+<style>
+.cookie-banner{position:fixed;bottom:0;left:0;right:0;z-index:10000;background:#141414;border-top:1px solid rgba(255,255,255,0.07);padding:16px 20px;display:none;flex-direction:column;gap:12px;animation:vxSlideUp 0.5s ease both;font-family:'DM Sans',sans-serif}
+.cookie-banner.show{display:flex}
+.cookie-text{font-size:13px;color:#666;line-height:1.6}
+.cookie-text a{color:#e8ff00;text-decoration:none}
+.cookie-actions{display:flex;gap:10px}
+.btn-cookie-ok{flex:1;background:#e8ff00;color:#0a0a0a;padding:12px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;text-transform:uppercase;cursor:pointer}
+.btn-cookie-no{flex:1;background:transparent;color:#666;padding:12px;border:1px solid rgba(255,255,255,0.07);border-radius:3px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer}
+@keyframes vxSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+</style>
+<div class="cookie-banner" id="cookieBanner">
+  <div class="cookie-text">&#127850; Wir verwenden Cookies. <a href="rechtliches.html">Datenschutz</a></div>
+  <div class="cookie-actions">
+    <button class="btn-cookie-no" onclick="vexfitAblehnen()">Nur n&ouml;tige</button>
+    <button class="btn-cookie-ok" onclick="vexfitZustimmen()">Akzeptieren &#10003;</button>
+  </div>
+</div>
+<script>
+// Drei Zustaende in vexfit_consent: kein Wert = noch nicht gefragt, "abgelehnt", "zugestimmt".
+// Nur bei "noch nicht gefragt" erscheint der Banner.
+function vexfitWhatsappZeigen(an){
+  // Solange der Banner offen ist, wuerde der schwebende Knopf den Akzeptieren-Knopf verdecken.
+  var k = document.querySelectorAll('.wa-btn, .wa');
+  for(var i=0;i<k.length;i++) k[i].style.display = an ? '' : 'none';
+}
+function vexfitBannerZeigen(){
+  var b = document.getElementById('cookieBanner');
+  if(!b) return;
+  b.classList.add('show');
+  vexfitWhatsappZeigen(false);
+}
+function vexfitBannerSchliessen(){
+  var b = document.getElementById('cookieBanner');
+  if(b){
+    b.style.transition = 'transform 0.4s';
+    b.style.transform = 'translateY(100%)';
+    setTimeout(function(){ b.classList.remove('show'); }, 400);
+  }
+  vexfitWhatsappZeigen(true);
+}
+function vexfitZustimmen(){
+  try { localStorage.setItem('vexfit_consent','zugestimmt'); } catch(e) {}
+  if(typeof vexfitPixelLaden === 'function') vexfitPixelLaden();
+  vexfitBannerSchliessen();
+}
+function vexfitAblehnen(){
+  try { localStorage.setItem('vexfit_consent','abgelehnt'); } catch(e) {}
+  vexfitBannerSchliessen();
+}
+(function(){
+  var stand = null;
+  try { stand = localStorage.getItem('vexfit_consent'); } catch(e) {}
+  if(stand !== 'zugestimmt' && stand !== 'abgelehnt') vexfitBannerZeigen();
+})();
+</script>
 </body>
 </html>
