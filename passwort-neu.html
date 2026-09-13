@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <link rel="icon" type="image/png" href="vexfit-logo.png">
-<title>Vexfit – Passwort vergessen</title>
+<title>Vexfit – Neues Passwort</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--black:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--card:#161616;--text-muted:#666;--border:rgba(255,255,255,0.07);--border-input:rgba(255,255,255,0.12)}
@@ -56,61 +56,121 @@ src="https://www.facebook.com/tr?id=1034036285801133&ev=PageView&noscript=1"
 <body>
 <nav><a href="index.html" class="logo">VEX<span>FIT</span></a><a href="login.html" class="nav-back">← Login</a></nav>
 <div class="wrap"><div class="box">
-  <div id="formSection">
-    <div class="label">Passwort vergessen?</div>
-    <div class="title">ZURÜCKSETZEN</div>
-    <p class="sub">Gib deine E-Mail ein. Wir schicken dir einen Reset-Link direkt von Supabase.</p>
+
+  <!-- Formular: nur sichtbar, wenn ein gueltiger Token im Link steckt -->
+  <div id="formSection" style="display:none">
+    <div class="label">Fast geschafft</div>
+    <div class="title">NEUES PASSWORT</div>
+    <p class="sub">Wähle ein neues Passwort für dein Vexfit-Konto.</p>
     <div class="alert alert-error" id="errMsg"></div>
-    <div class="field"><label>E-Mail</label><input type="email" placeholder="deine@email.com" id="reset-email" onkeydown="if(event.key==='Enter')submit()"></div>
-    <button class="btn" id="resetBtn" onclick="submit()">Reset-Link senden →</button>
-    <div class="back-link">Passwort erinnerst du dich? <a href="login.html">Login</a></div>
+    <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="pw" autocomplete="new-password"></div>
+    <div class="field"><label>Passwort wiederholen</label><input type="password" placeholder="Nochmal eingeben" id="pw2" autocomplete="new-password" onkeydown="if(event.key==='Enter')setzePasswort()"></div>
+    <button class="btn" id="saveBtn" onclick="setzePasswort()">Passwort speichern →</button>
+    <div class="back-link">Doch wieder eingefallen? <a href="login.html">Login</a></div>
   </div>
+
+  <!-- Kein oder abgelaufener Token -->
+  <div id="tokenSection" style="display:none">
+    <div class="label">Link ungültig</div>
+    <div class="title">LINK ABGELAUFEN</div>
+    <p class="sub" id="tokenHinweis">Dieser Link ist nicht mehr gültig. Fordere einen neuen Reset-Link an.</p>
+    <div class="back-link"><a href="passwort-vergessen.html">Neuen Reset-Link anfordern →</a></div>
+  </div>
+
+  <!-- Erfolg -->
   <div class="success" id="successSection">
-    <div class="success-icon">📬</div>
-    <h3>E-MAIL<br><span>GESENDET!</span></h3>
-    <p>Wir haben dir einen Reset-Link geschickt. Bitte prüfe deinen Posteingang – auch Spam!</p>
-    <a href="login.html">Zurück zum Login</a>
+    <div class="success-icon">✅</div>
+    <h3>PASSWORT<br><span>GEÄNDERT!</span></h3>
+    <p>Du wirst gleich zum Login weitergeleitet.</p>
+    <a href="login.html">Zum Login</a>
   </div>
+
 </div></div>
 <script>
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
 
-async function submit() {
-  const email = document.getElementById('reset-email').value.trim();
-  if(!email) { showErr('Bitte E-Mail eingeben!'); return; }
-  const btn = document.getElementById('resetBtn');
-  btn.disabled = true; btn.textContent = 'Wird gesendet...';
+let recoveryToken = null;
+
+// Supabase haengt den Wiederherstellungs-Token als Fragment an die Adresse.
+(function liesToken(){
+  const f = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+  const fehler = f.get('error_description') || f.get('error');
+  const token = f.get('access_token');
+
+  if(fehler){
+    zeigeTokenFehler('Dieser Link ist nicht mehr gültig. Fordere einen neuen Reset-Link an.');
+    return;
+  }
+  if(!token){
+    zeigeTokenFehler('Dieser Link enthält keinen gültigen Zugang. Fordere einen neuen Reset-Link an.');
+    return;
+  }
+  recoveryToken = token;
+  // Token aus der Adresszeile nehmen, damit er nicht im Verlauf stehen bleibt.
+  try { history.replaceState(null, '', location.pathname + location.search); } catch(e) {}
+  document.getElementById('formSection').style.display = 'block';
+})();
+
+function zeigeTokenFehler(text){
+  document.getElementById('tokenHinweis').textContent = text;
+  document.getElementById('tokenSection').style.display = 'block';
+}
+
+function zeigeFehler(text){
+  const e = document.getElementById('errMsg');
+  e.textContent = '⚠️ ' + text;
+  e.classList.add('show');
+}
+
+async function setzePasswort(){
+  const e = document.getElementById('errMsg');
+  e.classList.remove('show');
+
+  const pw = document.getElementById('pw').value;
+  const pw2 = document.getElementById('pw2').value;
+  if(!pw || !pw2){ zeigeFehler('Bitte wähle ein Passwort und wiederhole es.'); return; }
+  if(pw.length < 8){ zeigeFehler('Dein Passwort muss mindestens 8 Zeichen haben.'); return; }
+  if(pw !== pw2){ zeigeFehler('Die beiden Passwörter stimmen nicht überein.'); return; }
+  if(!recoveryToken){ zeigeFehler('Der Link ist nicht mehr gültig. Bitte fordere einen neuen an.'); return; }
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'Wird gespeichert...';
+
   try {
-    const r = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json', 'apikey': SUPABASE_KEY},
-      body: JSON.stringify({email, redirectTo: 'https://vexfit.app/passwort-neu.html'})
+    const r = await fetch(SUPABASE_URL + '/auth/v1/user', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + recoveryToken
+      },
+      body: JSON.stringify({ password: pw })
     });
-    // Absichtlich immer dieselbe Rueckmeldung, egal wie die Antwort ausfaellt:
-    // sonst koennte man ablesen, welche Adressen registriert sind.
-    // Ein technischer Fehler landet nur in der Konsole.
-    if(!r.ok) console.error('Reset fehlgeschlagen:', r.status, await r.text());
+
+    if(!r.ok){
+      const d = await r.json().catch(() => ({}));
+      const m = (d.msg || d.error_description || d.message || '').toLowerCase();
+      if(r.status === 401 || r.status === 403 || m.includes('expired')){
+        zeigeFehler('Der Link ist abgelaufen. Bitte fordere unter "Passwort vergessen" einen neuen an.');
+      } else if(m.includes('should be different') || m.includes('same as the old')){
+        zeigeFehler('Bitte wähle ein anderes Passwort als dein bisheriges.');
+      } else if(m.includes('at least') || m.includes('password')){
+        zeigeFehler('Das Passwort erfüllt nicht die Anforderungen. Bitte wähle ein längeres.');
+      } else {
+        zeigeFehler('Das Passwort konnte nicht gespeichert werden. Bitte versuche es erneut.');
+      }
+      btn.disabled = false; btn.textContent = 'Passwort speichern →';
+      return;
+    }
+
     document.getElementById('formSection').style.display = 'none';
     document.getElementById('successSection').style.display = 'block';
-  } catch(e) {
-    console.error('Reset:', e);
-    document.getElementById('formSection').style.display = 'none';
-    document.getElementById('successSection').style.display = 'block';
+    setTimeout(() => { location.href = 'login.html'; }, 2000);
+  } catch(err){
+    zeigeFehler('Keine Verbindung. Dein Passwort wurde nicht geändert.');
+    btn.disabled = false; btn.textContent = 'Passwort speichern →';
   }
 }
-function showErr(msg) { const e = document.getElementById('errMsg'); e.textContent = '⚠️ ' + msg; e.classList.add('show'); }
 </script>
-<!-- WhatsApp Button -->
-<style>
-@keyframes waBounce{0%{opacity:0;transform:scale(0.5) translateY(20px)}60%{transform:scale(1.08) translateY(-4px)}80%{transform:scale(0.96) translateY(2px)}100%{opacity:1;transform:scale(1) translateY(0)}}
-.wa-btn{position:fixed;bottom:22px;right:20px;z-index:9999;width:46px;height:46px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 16px rgba(37,211,102,0.45);text-decoration:none;opacity:0;animation:waBounce 0.6s cubic-bezier(0.34,1.56,0.64,1) 2.5s forwards;transition:transform 0.2s,box-shadow 0.2s}
-.wa-btn:hover{transform:scale(1.1);box-shadow:0 5px 24px rgba(37,211,102,0.6)}
-</style>
-<a href="https://wa.me/436649275737?text=Name%3A%20%0ANachricht%3A%20Hi%20ich%20habe%20eine%20Frage%20zu%20Vexfit%2C" 
-   target="_blank" class="wa-btn" aria-label="WhatsApp Kontakt">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-  </svg>
-</a>
 </body></html>
