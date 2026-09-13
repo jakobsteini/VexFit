@@ -511,24 +511,26 @@ async function saveProfile() {
     if(r.ok) {
       showToast('✓ Profil gespeichert!');
       updateDots();
+      if(T) Object.assign(T, body);
 
-      // If now complete → switch to Anfragen after short delay
-      if(profileComplete) {
-        setTimeout(() => {
-          showPage('anfragen');
-          document.getElementById('navProfilDot').style.display = 'none';
-        }, 1000);
-      }
+      // Bestaetigung kurz stehen lassen, dann zu den Anfragen wechseln.
+      setTimeout(() => {
+        showPage('anfragen');
+        if(profileComplete) document.getElementById('navProfilDot').style.display = 'none';
+      }, 1200);
 
       btn.disabled = false;
       btn.textContent = 'Profil speichern';
     } else {
-      showToast('Fehler beim Speichern', true);
+      const fehler = await r.text();
+      console.error('Speichern fehlgeschlagen:', r.status, fehler);
+      showToast('Speichern fehlgeschlagen. Bitte versuche es erneut.', true);
       btn.disabled = false;
       btn.textContent = 'Profil speichern';
     }
   } catch(e) {
-    showToast('Verbindungsfehler', true);
+    console.error('Speichern:', e);
+    showToast('Keine Verbindung. Dein Profil wurde nicht gespeichert.', true);
     btn.disabled = false;
     btn.textContent = 'Profil speichern';
   }
