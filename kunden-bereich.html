@@ -195,12 +195,13 @@ async function loadKunde(email) {
     const r = await fetch(`${SB}/rest/v1/kunden?email=eq.${encodeURIComponent(email)}&select=*`, {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
     });
+    if(!r.ok) throw new Error('Kundendaten laden fehlgeschlagen: ' + r.status);
     const d = await r.json();
-    if(d && d.length > 0) {
+    if(Array.isArray(d) && d.length > 0) {
       K = d[0];
       if(K.plz) document.getElementById('plzInput').value = K.plz;
     }
-  } catch(e) {}
+  } catch(e) { console.error(e); }
 }
 
 function toggleSearch(e) {
@@ -238,9 +239,16 @@ async function loadTrainer() {
     const r = await fetch(`${SB}/rest/v1/trainers?aktiv=eq.true&select=*&order=created_at.desc`, {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
     });
-    allT = await r.json() || [];
+    if(!r.ok) throw new Error('Trainer laden fehlgeschlagen: ' + r.status);
+    const daten = await r.json();
+    if(!Array.isArray(daten)) throw new Error('Unerwartete Antwort beim Trainer laden');
+    allT = daten;
     renderTrainer(allT);
-  } catch(e) {}
+  } catch(e) {
+    console.error(e);
+    const g = document.getElementById('trainerList');
+    if(g) g.innerHTML = '<div class="empty-state" style="padding:48px 20px 20px">⚠️<br><br>Die Trainerliste konnte nicht geladen werden.<br>Bitte lade die Seite neu.</div>';
+  }
 }
 
 async function searchByPLZ() {

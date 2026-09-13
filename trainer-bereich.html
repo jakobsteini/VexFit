@@ -299,8 +299,13 @@ async function loadTrainer(email) {
     const r = await fetch(`${SB}/rest/v1/trainers?email=eq.${encodeURIComponent(email)}&select=*`, {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
     });
+    if(!r.ok) throw new Error('Profil laden fehlgeschlagen: ' + r.status);
     const d = await r.json();
-    if(d && d.length > 0) {
+    if(!Array.isArray(d)) throw new Error('Unerwartete Antwort beim Profil laden');
+    if(d.length === 0) {
+      showToast('Zu dieser E-Mail wurde kein Trainerprofil gefunden.', true);
+    }
+    if(d.length > 0) {
       T = d[0];
       fillForm(T);
       updateDots();
@@ -313,7 +318,10 @@ async function loadTrainer(email) {
       }
     }
     loadAnfragen(email);
-  } catch(e) { console.error(e); }
+  } catch(e) {
+    console.error(e);
+    showToast('Dein Profil konnte nicht geladen werden. Bitte Seite neu laden.', true);
+  }
 }
 
 function fillForm(t) {
@@ -409,14 +417,21 @@ async function loadAnfragen(email) {
     const r = await fetch(`${SB}/rest/v1/anfragen?trainer_email=eq.${encodeURIComponent(email)}&order=created_at.desc`, {
       headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
     });
-    const data = await r.json() || [];
+    if(!r.ok) throw new Error('Anfragen laden fehlgeschlagen: ' + r.status);
+    const data = await r.json();
+    if(!Array.isArray(data)) throw new Error('Unerwartete Antwort beim Anfragen laden');
     if(data.length > 0) {
       const badge = document.getElementById('navBadge');
       badge.textContent = data.length;
       badge.style.display = 'flex';
     }
     renderAnfragen(data);
-  } catch(e) {}
+  } catch(e) {
+    console.error(e);
+    const el = document.getElementById('anList');
+    if(el) el.innerHTML = '<div class="empty-state">⚠️<br><br>Deine Anfragen konnten nicht geladen werden.<br>Bitte lade die Seite neu.</div>';
+    showToast('Anfragen konnten nicht geladen werden.', true);
+  }
 }
 
 function renderAnfragen(data) {

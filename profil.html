@@ -231,12 +231,17 @@ async function loadProfile() {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=*`, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
     });
+    if(!res.ok) throw new Error('Profil laden fehlgeschlagen: ' + res.status);
     const data = await res.json();
-    if(!data || data.length === 0) { window.location.href = 'suche.html'; return; }
+    if(!Array.isArray(data)) throw new Error('Unerwartete Antwort beim Profil laden');
+    // Kein Treffer heisst: Profil gibt es nicht oder es ist nicht freigeschaltet.
+    if(data.length === 0) { window.location.href = 'suche.html'; return; }
     trainerData = data[0];
     renderProfile(trainerData);
   } catch(e) {
-    window.location.href = 'suche.html';
+    console.error(e);
+    const lp = document.getElementById('loadingProfile');
+    if(lp) lp.innerHTML = '<div style="text-align:center;padding:40px 20px">⚠️<br><br>Dieses Profil konnte gerade nicht geladen werden.<br>Bitte lade die Seite neu.<br><br><a href="suche.html" style="color:var(--accent)">Zurück zur Suche</a></div>';
   }
 }
 
