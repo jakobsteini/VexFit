@@ -494,8 +494,11 @@ Jakob von Vexfit`);
   window.open(`mailto:${email}?subject=${subject}&body=${body}`);
 }
 </script>
+<div class="cookie-widerruf"><a href="#" onclick="return vexfitEinstellungenOeffnen()">Cookie-Einstellungen</a></div>
 <!-- Zustimmung fuer Marketing. Gleicher Aufbau und gleiche Gestaltung auf allen Seiten. -->
 <style>
+.cookie-widerruf{text-align:center;padding:20px;font-size:13px}
+.cookie-widerruf a{color:#666;text-decoration:none}
 .cookie-banner{position:fixed;bottom:0;left:0;right:0;z-index:10000;background:#141414;border-top:1px solid rgba(255,255,255,0.07);padding:16px 20px;display:none;flex-direction:column;gap:12px;animation:vxSlideUp 0.5s ease both;font-family:'DM Sans',sans-serif}
 .cookie-banner.show{display:flex}
 .cookie-text{font-size:13px;color:#666;line-height:1.6}
@@ -534,6 +537,14 @@ function vexfitBannerSchliessen(){
     setTimeout(function(){ b.classList.remove('show'); }, 400);
   }
   vexfitWhatsappZeigen(true);
+}
+function vexfitEinstellungenOeffnen(){
+  // Setzt auf "noch nicht gefragt" zurueck und zeigt den Banner erneut.
+  try { localStorage.removeItem('vexfit_consent'); } catch(e) {}
+  var b = document.getElementById('cookieBanner');
+  if(b){ b.style.transition = ''; b.style.transform = ''; }
+  vexfitBannerZeigen();
+  return false;
 }
 function vexfitZustimmen(){
   try { localStorage.setItem('vexfit_consent','zugestimmt'); } catch(e) {}

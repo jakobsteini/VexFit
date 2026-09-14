@@ -287,6 +287,7 @@ try {
     <a href="rechtliches.html#datenschutz">Datenschutz</a>
     <a href="rechtliches.html#agb">AGB</a>
     <a href="mailto:vexfit.info@gmail.com">Kontakt</a>
+      <a href="#" onclick="return vexfitEinstellungenOeffnen()">Cookie-Einstellungen</a>
   </div>
 </footer>
 <script>
@@ -364,6 +365,14 @@ function vexfitBannerSchliessen(){
     setTimeout(function(){ b.classList.remove('show'); }, 400);
   }
   vexfitWhatsappZeigen(true);
+}
+function vexfitEinstellungenOeffnen(){
+  // Setzt auf "noch nicht gefragt" zurueck und zeigt den Banner erneut.
+  try { localStorage.removeItem('vexfit_consent'); } catch(e) {}
+  var b = document.getElementById('cookieBanner');
+  if(b){ b.style.transition = ''; b.style.transform = ''; }
+  vexfitBannerZeigen();
+  return false;
 }
 function vexfitZustimmen(){
   try { localStorage.setItem('vexfit_consent','zugestimmt'); } catch(e) {}

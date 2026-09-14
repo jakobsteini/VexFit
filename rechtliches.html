@@ -54,7 +54,8 @@ try {
 </div>
 <footer>
   <a href="index.html" class="footer-logo">VEX<span>FIT</span></a>
-  <div class="fl"><a href="rechtliches.html">Impressum</a><a href="rechtliches.html#datenschutz">Datenschutz</a><a href="rechtliches.html#agb">AGB</a></div>
+  <div class="fl"><a href="rechtliches.html">Impressum</a><a href="rechtliches.html#datenschutz">Datenschutz</a><a href="rechtliches.html#agb">AGB</a>
+      <a href="#" onclick="return vexfitEinstellungenOeffnen()">Cookie-Einstellungen</a></div>
   <p>© 2026 Vexfit</p>
 </footer>
 <script>function showTab(id,btn){document.querySelectorAll('.ls').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById(id).classList.add('active');btn.classList.add('active');window.scrollTo({top:0,behavior:'smooth'})}const hash=window.location.hash.replace('#','');if(hash){const btn=document.querySelector('.tab-btn[onclick*="'+hash+'"]');if(btn)showTab(hash,btn)}</script>
@@ -110,6 +111,14 @@ function vexfitBannerSchliessen(){
     setTimeout(function(){ b.classList.remove('show'); }, 400);
   }
   vexfitWhatsappZeigen(true);
+}
+function vexfitEinstellungenOeffnen(){
+  // Setzt auf "noch nicht gefragt" zurueck und zeigt den Banner erneut.
+  try { localStorage.removeItem('vexfit_consent'); } catch(e) {}
+  var b = document.getElementById('cookieBanner');
+  if(b){ b.style.transition = ''; b.style.transform = ''; }
+  vexfitBannerZeigen();
+  return false;
 }
 function vexfitZustimmen(){
   try { localStorage.setItem('vexfit_consent','zugestimmt'); } catch(e) {}
