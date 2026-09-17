@@ -285,6 +285,26 @@ if(!raw) { location.href = 'login.html'; throw new Error(); }
 let sess;
 try { sess = JSON.parse(raw); } catch(e) { localStorage.removeItem('vexfit_session'); location.href = 'login.html'; throw new Error(); }
 if(sess.role === 'kunde') { location.href = 'kunden-bereich.html'; throw new Error(); }
+if(!sess.access_token) { localStorage.removeItem('vexfit_session'); alert('Bitte melde dich erneut an.'); location.href = 'login.html'; throw new Error(); }
+
+// ──── ZUGANG ────
+// Abfragen im angemeldeten Bereich gehen mit dem Zugangs-Token des Nutzers.
+// Der oeffentliche Schluessel bleibt im apikey-Kopf, so erwartet es Supabase.
+function authKopf(weitere) {
+  const k = { apikey: KEY, Authorization: 'Bearer ' + sess.access_token };
+  if(weitere) for(const n in weitere) k[n] = weitere[n];
+  return k;
+}
+// Ohne gueltiges Token ist der Bereich nicht benutzbar: abmelden und zurueck zur Anmeldung.
+function sitzungAbgelaufen() {
+  try { localStorage.removeItem('vexfit_session'); } catch(e) {}
+  alert('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
+  location.href = 'login.html';
+}
+function istAbgemeldet(r) {
+  if(r.status === 401 || r.status === 403) { sitzungAbgelaufen(); return true; }
+  return false;
+}
 
 // ──── INIT ────
 initChips();
@@ -312,8 +332,9 @@ function toggleChip(el) {
 async function loadTrainer(email) {
   try {
     const r = await fetch(`${SB}/rest/v1/trainers?email=eq.${encodeURIComponent(email)}&select=*`, {
-      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
+      headers: authKopf()
     });
+    if(istAbgemeldet(r)) return;
     if(!r.ok) throw new Error('Profil laden fehlgeschlagen: ' + r.status);
     const d = await r.json();
     if(!Array.isArray(d)) throw new Error('Unerwartete Antwort beim Profil laden');
@@ -514,14 +535,10 @@ async function saveProfile() {
   try {
     const r = await fetch(`${SB}/rest/v1/trainers?email=eq.${encodeURIComponent(sess.email)}`, {
       method: 'PATCH',
-      headers: {
-        apikey: KEY,
-        Authorization: `Bearer ${KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal'
-      },
+      headers: authKopf({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
       body: JSON.stringify(body)
     });
+    if(istAbgemeldet(r)) return;
 
     if(r.ok) {
       showToast('✓ Profil gespeichert!');
