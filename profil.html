@@ -234,7 +234,7 @@ async function loadProfile() {
   if(!id) { window.location.href = 'suche.html'; return; }
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=*`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv`, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
     });
     if(!res.ok) throw new Error('Profil laden fehlgeschlagen: ' + res.status);
@@ -320,7 +320,7 @@ async function sendContact() {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          trainer_email: trainerData ? trainerData.email : '',
+          trainer_id: trainerData ? trainerData.id : '',
           trainer_name: trainerData ? trainerData.vorname + ' ' + trainerData.nachname : '',
           kunde_name: name,
           kunde_email: email,
@@ -341,8 +341,8 @@ async function sendContact() {
         'Prefer': 'return=minimal'
       },
       body: JSON.stringify({
+        trainer_id: trainerData ? trainerData.id : null,
         trainer_name: trainerData ? trainerData.vorname + ' ' + trainerData.nachname : '–',
-        trainer_email: trainerData ? trainerData.email : '–',
         kunden_name: name,
         kunden_email: email,
         ziel: goal || '–',
@@ -362,7 +362,7 @@ async function sendContact() {
       body: JSON.stringify({
         _subject: `🔔 NEUE ANFRAGE: ${name} → ${trainerData ? trainerData.vorname + ' ' + trainerData.nachname : 'Trainer'}`,
         '👤 TRAINER Name': trainerData ? trainerData.vorname + ' ' + trainerData.nachname : '–',
-        '📧 TRAINER Email': trainerData ? trainerData.email : '–',
+        '🆔 TRAINER Kennung': trainerData ? trainerData.id : '–',
         '🙋 KUNDE Name': name,
         '📩 KUNDE Email': email,
         '🎯 KUNDE Ziel': goal || '–',

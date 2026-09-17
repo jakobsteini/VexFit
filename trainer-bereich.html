@@ -353,7 +353,13 @@ async function loadTrainer(email) {
         document.getElementById('navProfilDot').style.display = 'none';
       }
     }
-    loadAnfragen(email);
+    // Die Anfrage traegt die Kennung des Trainers, nicht mehr seine E-Mail.
+    if(T && T.id) {
+      loadAnfragen(T.id);
+    } else {
+      const el = document.getElementById('anList');
+      if(el) el.innerHTML = '<div class="empty-state">📭<br><br>Noch keine Anfragen.<br>Sobald ein Kunde dich kontaktiert erscheint es hier.</div>';
+    }
   } catch(e) {
     console.error(e);
     showToast('Dein Profil konnte nicht geladen werden. Bitte Seite neu laden.', true);
@@ -448,11 +454,12 @@ function showPage(page, e) {
 }
 
 // ──── ANFRAGEN ────
-async function loadAnfragen(email) {
+async function loadAnfragen(trainerId) {
   try {
-    const r = await fetch(`${SB}/rest/v1/anfragen?trainer_email=eq.${encodeURIComponent(email)}&order=created_at.desc`, {
-      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
+    const r = await fetch(`${SB}/rest/v1/anfragen?trainer_id=eq.${encodeURIComponent(trainerId)}&order=created_at.desc`, {
+      headers: authKopf()
     });
+    if(istAbgemeldet(r)) return;
     if(!r.ok) throw new Error('Anfragen laden fehlgeschlagen: ' + r.status);
     const data = await r.json();
     if(!Array.isArray(data)) throw new Error('Unerwartete Antwort beim Anfragen laden');

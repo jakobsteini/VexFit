@@ -262,7 +262,7 @@ function calcDist(lat1,lng1,lat2,lng2) {
 
 async function loadTrainer() {
   try {
-    const r = await fetch(`${SB}/rest/v1/trainers?aktiv=eq.true&select=*&order=created_at.desc`, {
+    const r = await fetch(`${SB}/rest/v1/trainers?aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv&order=created_at.desc`, {
       headers: authKopf()
     });
     if(istAbgemeldet(r)) return;
@@ -371,7 +371,7 @@ async function sendAnfrage() {
   const btn = document.getElementById('sendBtn');
   btn.disabled = true; btn.textContent = 'Wird gesendet...';
   const body = {
-    trainer_email: selT.email,
+    trainer_id: selT.id,
     trainer_name: `${selT.vorname||''} ${selT.nachname||''}`.trim(),
     kunden_email: sess.email,
     kunden_name: K ? `${K.vorname||''} ${K.nachname||''}`.trim() : sess.email,
@@ -383,9 +383,10 @@ async function sendAnfrage() {
   try {
     const r = await fetch(`${SB}/rest/v1/anfragen`, {
       method:'POST',
-      headers:{'Content-Type':'application/json',apikey:KEY,Authorization:`Bearer ${KEY}`,Prefer:'return=minimal'},
+      headers: authKopf({'Content-Type':'application/json', Prefer:'return=minimal'}),
       body: JSON.stringify(body)
     });
+    if(istAbgemeldet(r)) return;
     if(!r.ok) {
       console.error('Anfrage speichern fehlgeschlagen:', r.status, await r.text());
       throw new Error('Anfrage konnte nicht gespeichert werden');

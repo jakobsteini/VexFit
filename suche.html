@@ -326,7 +326,7 @@ function renderTrainersWithDistance(trainers) {
 async function loadTrainers() {
   document.getElementById('loading').classList.add('show');
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=*&order=created_at.desc`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv&order=created_at.desc`, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
     });
     if(!res.ok) throw new Error('Trainer laden fehlgeschlagen: ' + res.status);

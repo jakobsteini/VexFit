@@ -1,6 +1,12 @@
 -- ============================================================================
 -- Vexfit - Zugriffsregeln fuer alle sechs Tabellen
--- Erzeugt am 14.09.2026. NICHT eingespielt.
+-- Erzeugt am 14.09.2026, angepasst am 17.09.2026. NICHT eingespielt.
+--
+-- Nachtrag 17.09.2026: Die Anfrage speichert jetzt die Kennung des Trainers
+-- statt seiner E-Mail-Adresse. Deshalb steht in der Leseregel fuer anfragen
+-- trainer_id statt trainer_email, und das Schreibrecht gilt fuer trainer_id.
+-- Voraussetzung ist die Migration 2026-09-17-anfragen-trainer-id.sql, die
+-- diese Spalte anlegt. Sie gehoert ZUERST eingespielt.
 --
 -- ACHTUNG, vor dem Einspielen lesen:
 -- Diese Regeln setzen voraus, dass angemeldete Bereiche ihre Abfragen mit dem
@@ -108,7 +114,7 @@ REVOKE ALL ON public.anfragen FROM anon;
 
 -- Erlaubt dem nicht angemeldeten Besucher ausschliesslich, eine Anfrage
 -- abzuschicken, damit die Kontaktaufnahme weiter funktioniert.
-GRANT INSERT (trainer_email, trainer_name, kunden_email, kunden_name, ziel,
+GRANT INSERT (trainer_id, trainer_name, kunden_email, kunden_name, ziel,
               nachricht, status, weitergeleitet)
   ON public.anfragen TO anon;
 
@@ -121,13 +127,13 @@ CREATE POLICY "anfragen_anlegen"
   ON public.anfragen FOR INSERT TO anon, authenticated
   WITH CHECK (true);
 
--- Zeigt eine Anfrage nur den beiden Beteiligten, also dem angeschriebenen
--- Trainer und dem anfragenden Kunden. Verglichen wird die E-Mail aus dem
--- Zugangs-Token, weil die Tabelle keine user_id hat.
+-- Zeigt eine Anfrage nur den beiden Beteiligten. Der Trainer wird ueber die
+-- Kennung in trainer_id gefunden, die auf seine eigene Zeile zeigt; der Kunde
+-- ueber die E-Mail aus seinem Zugangs-Token.
 CREATE POLICY "anfragen_nur_beteiligte_lesen"
   ON public.anfragen FOR SELECT TO authenticated
-  USING (trainer_email = (auth.jwt() ->> 'email')
-      OR kunden_email  = (auth.jwt() ->> 'email'));
+  USING (kunden_email = (auth.jwt() ->> 'email')
+      OR trainer_id IN (SELECT t.id FROM public.trainers t WHERE t.user_id = auth.uid()));
 
 
 -- ================== nachrichten, favoriten, bewertungen =====================
