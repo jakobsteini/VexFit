@@ -3,7 +3,10 @@
 # exclude nimmt Pfade von der Veroeffentlichung aus: sie bleiben im Repo,
 # werden aber nicht auf vexfit.app ausgeliefert.
 #
-# entwuerfe/ enthaelt Entwuerfe mit erfundenen Namen und E-Mail-Adressen,
-# die nicht oeffentlich abrufbar sein sollen.
+# entwuerfe/         Entwuerfe mit erfundenen Namen und E-Mail-Adressen.
+# migrations/        SQL-Dateien, die den Aufbau der Datenbank beschreiben.
+# supabase-setup.sql dasselbe fuer die Ersteinrichtung.
 exclude:
   - entwuerfe
+  - migrations
+  - supabase-setup.sql
