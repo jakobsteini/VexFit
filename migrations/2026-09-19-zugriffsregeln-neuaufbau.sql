@@ -26,44 +26,37 @@
 -- TEIL 1 - ALTE REGELN ENTFERNEN
 -- ############################################################################
 --
--- ACHTUNG, DIESE DATEI IST NOCH NICHT VOLLSTAENDIG.
+-- Dieser Block entfernt JEDE im Schema public vorhandene Regel, ohne dass ihr
+-- Name bekannt sein muss: Postgres laeuft ueber pg_policies und loescht, was
+-- es dort findet. Das ist noetig, weil in Postgres eine einzige erlaubende
+-- Regel genuegt, um Daten offenzulegen - bliebe auch nur eine alte Regel
+-- stehen, waeren Teil 2 und Teil 3 wirkungslos und die Daten weiter offen.
 --
--- Hier gehoeren die 17 vorhandenen Regeln einzeln und namentlich hin. Ihre
--- Namen liegen in pg_policies und waren aus dieser Sitzung heraus nicht
--- lesbar: es gibt auf diesem Rechner weder psql noch das Supabase-CLI, und
--- ueber die REST-Schnittstelle ist pg_catalog grundsaetzlich nicht erreichbar.
--- Namen zu raten ist ausgeschlossen - ein falscher Name in DROP POLICY IF
--- EXISTS laeuft ohne Fehler durch und liesse die betreffende Regel stehen.
--- Genau dann waere alles Folgende wirkungslos und die Datenbank weiter offen,
--- ohne dass es jemand merkt.
+-- Der Block raeumt bewusst auch die Regeln mit weg, die Teil 3 gleich danach
+-- neu setzt. Beim ersten Einspielen gibt es sie noch nicht, bei einem zweiten
+-- Durchlauf schon - so bleibt die Datei wiederholbar.
 --
--- SO KOMMEN DIE NAMEN HER - diese Abfrage im SQL-Editor ausfuehren:
---
---   SELECT tablename, policyname, cmd, roles, qual, with_check
---     FROM pg_policies
---    WHERE schemaname = 'public'
---    ORDER BY tablename, policyname;
---
--- Dann fuer jede der 17 Zeilen eine Zeile nach diesem Muster hier eintragen,
--- mit einem Kommentar darueber, was die Regel erlaubt hat:
---
---   -- Liess jeden ohne Anmeldung alle Kundenzeilen lesen.
---   DROP POLICY IF EXISTS "<policyname>" ON public.<tablename>;
---
--- Der Waechter darunter verhindert bis dahin, dass die Datei versehentlich
--- halb wirkt. Sobald alle 17 Zeilen eingetragen sind, den Waechter loeschen.
+-- ZUM ZEITPUNKT DER MESSUNG (19.09.2026) bestanden 17 Regeln, verteilt auf:
+--   anfragen      2
+--   bewertungen   2
+--   favoriten     3
+--   kunden        4
+--   nachrichten   2
+--   trainers      4
+-- Das ist reine Dokumentation des Vorzustands. Der Block arbeitet unabhaengig
+-- davon: er entfernt, was er vorfindet, auch wenn es inzwischen mehr oder
+-- weniger Regeln sind.
 
-DO $waechter$
+DO $$
+DECLARE r record;
 BEGIN
-  RAISE EXCEPTION
-    'ABBRUCH: Teil 1 ist noch leer. Ohne das Entfernen der 17 alten Regeln '
-    'waere diese Migration wirkungslos, weil in Postgres eine einzige '
-    'erlaubende Regel genuegt. Erst die Namen aus pg_policies eintragen '
-    '(Abfrage steht im Kommentar darueber), dann diesen Block loeschen.';
-END
-$waechter$;
-
--- >>> Die 17 DROP-POLICY-Zeilen kommen hierher. <<<
+  FOR r IN SELECT schemaname, tablename, policyname
+             FROM pg_policies WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I',
+                   r.policyname, r.schemaname, r.tablename);
+  END LOOP;
+END $$;
 
 
 -- ############################################################################
