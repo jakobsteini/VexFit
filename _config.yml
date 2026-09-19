@@ -1,0 +1,9 @@
+# Einstellungen fuer GitHub Pages (Jekyll).
+#
+# exclude nimmt Pfade von der Veroeffentlichung aus: sie bleiben im Repo,
+# werden aber nicht auf vexfit.app ausgeliefert.
+#
+# entwuerfe/ enthaelt Entwuerfe mit erfundenen Namen und E-Mail-Adressen,
+# die nicht oeffentlich abrufbar sein sollen.
+exclude:
+  - entwuerfe
