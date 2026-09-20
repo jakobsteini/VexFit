@@ -471,7 +471,7 @@ async function checkAlertStatus() {
   if(!lastSearch) return;
   try {
     const r = await fetch(`${SB}/rest/v1/trainer_alerts?kunden_email=eq.${encodeURIComponent(sess.email)}&plz=eq.${encodeURIComponent(lastSearch.plz)}&aktiv=eq.true&select=id`, {
-      headers: { apikey: KEY, Authorization: `Bearer ${KEY}` }
+      headers: authKopf()
     });
     if(!r.ok) throw new Error('Alert-Status laden fehlgeschlagen: ' + r.status);
     const d = await r.json();
@@ -494,7 +494,7 @@ async function activateAlert() {
   try {
     const r = await fetch(`${SB}/rest/v1/trainer_alerts`, {
       method: 'POST',
-      headers: {'Content-Type':'application/json', apikey: KEY, Authorization: `Bearer ${KEY}`, Prefer: 'resolution=merge-duplicates,return=minimal'},
+      headers: authKopf({'Content-Type':'application/json', Prefer: 'resolution=merge-duplicates,return=minimal'}),
       body: JSON.stringify({
         kunden_email: sess.email,
         kunden_name: K ? `${K.vorname||''} ${K.nachname||''}`.trim() : '',
