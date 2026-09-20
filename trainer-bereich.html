@@ -91,6 +91,14 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(
 .ap-title{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1.5px;margin-bottom:4px}
 .ap-sub{font-size:13px;color:var(--muted);margin-bottom:20px}
 
+/* Uebersicht oben: drei Zahlen im Stil der vorhandenen Karten */
+.ub-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.ub-box{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:14px 8px;text-align:center}
+.ub-num{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--accent);letter-spacing:1px;display:block;line-height:1}
+.ub-label{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:4px}
+.ub-hinweis{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:18px}
+.ub-hinweis a{color:var(--accent);text-decoration:none}
+
 /* Mini-Banner in Anfragen */
 .mini-banner{background:rgba(232,255,0,0.06);border:1px solid rgba(232,255,0,0.2);border-radius:4px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;transition:border-color 0.2s}
 .mini-banner:hover{border-color:rgba(232,255,0,0.5)}
@@ -296,6 +304,15 @@ try {
 <div class="page-wrap hidden" id="anfragenPage">
   <div class="ap-title">MEINE ANFRAGEN</div>
   <p class="ap-sub">Kunden die dich kontaktiert haben</p>
+
+  <!-- Uebersicht: Zahlen aus den geladenen Anfragen und der vorhandenen
+       Vollstaendigkeits-Berechnung des Profilformulars -->
+  <div class="ub-grid fade fd1">
+    <div class="ub-box"><span class="ub-num" id="ubOffen">–</span><div class="ub-label">Offene Anfragen</div></div>
+    <div class="ub-box"><span class="ub-num" id="ubAngenommen">–</span><div class="ub-label">Angenommen</div></div>
+    <div class="ub-box"><span class="ub-num" id="ubProfil">–</span><div class="ub-label">Profil</div></div>
+  </div>
+  <div class="ub-hinweis hidden" id="ubHinweis"></div>
 
   <!-- Mini-Banner: nur sichtbar wenn Profil unvollständig -->
   <div class="mini-banner hidden" id="miniBanner" onclick="showPage('profil')">
@@ -536,12 +553,12 @@ async function uploadAvatar() {
 
 function updateDots() {
   const checks = [
-    { id: 'dotTrainingsart', ok: !!document.getElementById('fTrainingsart').value },
-    { id: 'dotPreis', ok: Number(document.getElementById('fPreis').value) > 0 },
-    { id: 'dotBio', ok: document.getElementById('fBio').value.length > 10 },
-    { id: 'dotErfahrung', ok: !!document.getElementById('fErfahrung').value },
-    { id: 'dotSpez', ok: selectedSpez.length > 0 },
-    { id: 'dotTelefon', ok: !!document.getElementById('fTelefon').value.trim() }
+    { id: 'dotTrainingsart', name: 'Trainingsart', ok: !!document.getElementById('fTrainingsart').value },
+    { id: 'dotPreis', name: 'Preis pro Stunde', ok: Number(document.getElementById('fPreis').value) > 0 },
+    { id: 'dotBio', name: 'Über mich', ok: document.getElementById('fBio').value.length > 10 },
+    { id: 'dotErfahrung', name: 'Erfahrung', ok: !!document.getElementById('fErfahrung').value },
+    { id: 'dotSpez', name: 'Spezialisierungen', ok: selectedSpez.length > 0 },
+    { id: 'dotTelefon', name: 'Telefon', ok: !!document.getElementById('fTelefon').value.trim() }
   ];
   let done = 0;
   checks.forEach(c => {
@@ -552,6 +569,20 @@ function updateDots() {
   const pct = Math.round((done / checks.length) * 100);
   document.getElementById('pctLabel').textContent = pct + '%';
   document.getElementById('progressFill').style.width = pct + '%';
+
+  // Uebersicht oben im Anfragen-Bereich: dieselbe Zahl, dieselben Felder.
+  const ubProfil = document.getElementById('ubProfil');
+  if(ubProfil) ubProfil.textContent = pct + '%';
+  const hinweis = document.getElementById('ubHinweis');
+  if(hinweis) {
+    const fehlt = checks.filter(c => !c.ok).map(c => c.name);
+    if(fehlt.length > 0) {
+      hinweis.innerHTML = `Es fehlt noch: ${fehlt.join(', ')}. <a href="#" onclick="showPage('profil',event)">Zum Profilformular →</a>`;
+      hinweis.classList.remove('hidden');
+    } else {
+      hinweis.classList.add('hidden');
+    }
+  }
 
   profileComplete = (pct >= 100);
 
@@ -635,7 +666,19 @@ async function loadAnfragen(trainerId) {
   }
 }
 
+// Zaehlt offene und angenommene Anfragen fuer die Uebersicht oben. Fehlt die
+// Zustands-Spalte noch, bleiben die Striche stehen.
+function renderUebersichtZahlen(data) {
+  const offenEl = document.getElementById('ubOffen');
+  const angEl = document.getElementById('ubAngenommen');
+  if(!offenEl || !angEl) return;
+  if(data.length > 0 && !('status' in data[0])) return;
+  offenEl.textContent = data.filter(a => anfrageZustand(a) === 'offen').length;
+  angEl.textContent = data.filter(a => anfrageZustand(a) === 'angenommen').length;
+}
+
 function renderAnfragen(data) {
+  renderUebersichtZahlen(data);
   const el = document.getElementById('anList');
   const sb = document.getElementById('statusBarEl');
   if(T) {
