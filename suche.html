@@ -222,6 +222,13 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 let allTrainers = [];
 let activeFilter = 'alle';
 
+// Als Profilbild gilt nur eine Adresse aus dem eigenen Bilder-Behaelter;
+// alles andere (leer, fremde Adresse) faellt auf die Initialen zurueck.
+const AVATAR_PREFIX = SUPABASE_URL + '/storage/v1/object/public/avatars/';
+function avatarAdresse(u) {
+  return (typeof u === 'string' && u.indexOf(AVATAR_PREFIX) === 0) ? u : null;
+}
+
 // BG colors for avatars
 const bgColors = [
   'linear-gradient(135deg,#1a1a1a,#2a2a2a)',
@@ -318,9 +325,11 @@ function renderTrainersWithDistance(trainers) {
     const tags = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="ctag">${s}</span>`).join('');
     const preis = t.preis_stunde ? `€${t.preis_stunde}<span>/Std</span>` : '<span>Auf Anfrage</span>';
     const distLabel = t._online ? '<span style="color:#e8ff00;font-size:11px">🌐 Online</span>' : t._distance !== undefined ? `<span style="color:#888;font-size:11px">📍 ${t._distance} km</span>` : '';
+    const bild = avatarAdresse(t.avatar_url);
+    const ciStyle = bild ? `background-image:url('${bild}');background-size:cover;background-position:center` : `background:${bgColors[i%bgColors.length]}`;
     return `<div class="tc" onclick="window.location='profil.html?id=${t.id}'">
-      <div class="ci" style="background:${bgColors[i%bgColors.length]}">
-        <div class="cav">${initials}</div>
+      <div class="ci" style="${ciStyle}">
+        ${bild ? '' : `<div class="cav">${initials}</div>`}
         <div class="cbadge ${t._online?'online':''}">Verifiziert ✓</div>
       </div>
       <div class="cb">
@@ -375,11 +384,13 @@ function renderTrainers(trainers) {
     const isOnline = t.trainingsart === 'Online';
     const tags = (t.spezialisierungen || []).slice(0, 3);
     const preis = t.preis_stunde ? `€${t.preis_stunde}<span>/Std</span>` : t.preis_monat ? `€${t.preis_monat}<span>/Mo</span>` : '<span>Auf Anfrage</span>';
+    const bild = avatarAdresse(t.avatar_url);
+    const ciStyle = bild ? `background-image:url('${bild}');background-size:cover;background-position:center` : `background:${bg}`;
 
     return `
       <div class="tc" onclick="window.location='profil.html?id=${t.id}'">
-        <div class="ci" style="background:${bg}">
-          <div class="cav">${initials}</div>
+        <div class="ci" style="${ciStyle}">
+          ${bild ? '' : `<div class="cav">${initials}</div>`}
           <div class="cbadge ${isOnline ? 'online' : ''}">
             ${isOnline ? 'Online' : 'Verifiziert ✓'}
           </div>

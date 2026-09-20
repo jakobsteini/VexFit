@@ -195,6 +195,13 @@ const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
 let K = null, allT = [], activeFilter = 'alle', selT = null, lastSearch = null;
 
+// Als Profilbild gilt nur eine Adresse aus dem eigenen Bilder-Behaelter;
+// alles andere (leer, fremde Adresse) faellt auf die Initialen zurueck.
+const AVATAR_PREFIX = SB + '/storage/v1/object/public/avatars/';
+function avatarAdresse(u) {
+  return (typeof u === 'string' && u.indexOf(AVATAR_PREFIX) === 0) ? u : null;
+}
+
 // AUTH - no redirect loop
 const raw = localStorage.getItem('vexfit_session');
 if(!raw) { location.href = 'login.html'; throw new Error('no session'); }
@@ -342,7 +349,8 @@ function renderTrainer(list) {
     return; }
   el.innerHTML = filtered.map(t => {
     const ini = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
-    const avStyle = t.avatar_url ? `background-image:url(${t.avatar_url});background-size:cover;background-position:center` : '';
+    const bild = avatarAdresse(t.avatar_url);
+    const avStyle = bild ? `background-image:url('${bild}');background-size:cover;background-position:center` : '';
     const chips = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="tc-chip">${s}</span>`).join('');
     const dist = t._online ? '<div class="tc-dist">🌐 Online</div>' : t._dist !== undefined ? `<div class="tc-dist">📍 ${t._dist} km</div>` : '';
     const price = t.preis_stunde ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">ab €${t.preis_stunde}/Mo</div>` : '';

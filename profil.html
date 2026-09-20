@@ -238,6 +238,13 @@ const FORMSPREE = 'https://formspree.io/f/xaqvodqb';
 
 let trainerData = null;
 
+// Als Profilbild gilt nur eine Adresse aus dem eigenen Bilder-Behaelter;
+// alles andere (leer, fremde Adresse) faellt auf die Initialen zurueck.
+const AVATAR_PREFIX = SUPABASE_URL + '/storage/v1/object/public/avatars/';
+function avatarAdresse(u) {
+  return (typeof u === 'string' && u.indexOf(AVATAR_PREFIX) === 0) ? u : null;
+}
+
 async function loadProfile() {
   const urlParams = new URLSearchParams(window.location.search);
   const id = urlParams.get('id');
@@ -264,7 +271,17 @@ async function loadProfile() {
 function renderProfile(t) {
   document.title = `Vexfit – ${t.vorname} ${t.nachname}`;
   const initials = (t.vorname[0] + t.nachname[0]).toUpperCase();
-  document.getElementById('pAvatar').textContent = initials;
+  const avatarEl = document.getElementById('pAvatar');
+  const bild = avatarAdresse(t.avatar_url);
+  if(bild) {
+    avatarEl.style.backgroundImage = `url('${bild}')`;
+    avatarEl.style.backgroundSize = 'cover';
+    avatarEl.style.backgroundPosition = 'center';
+    avatarEl.textContent = '';
+  } else {
+    avatarEl.style.backgroundImage = '';
+    avatarEl.textContent = initials;
+  }
   document.getElementById('pName').textContent = t.vorname + ' ' + t.nachname;
   const isOnline = t.trainingsart === 'Online';
   document.getElementById('pLocation').textContent = isOnline ? '🌐 Online · DACH-weit' : '📍 ' + t.stadt + ' · ' + t.trainingsart;

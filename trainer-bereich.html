@@ -78,6 +78,15 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(
 .skip-link{display:block;text-align:center;margin-top:16px;font-size:13px;color:var(--muted);cursor:pointer;text-decoration:none;padding:10px;transition:color 0.2s}
 .skip-link:hover{color:var(--white)}
 
+/* Profilbild: gleiche Kreisflaeche wie auf dem oeffentlichen Profil */
+.avatar-row{display:flex;align-items:center;gap:14px}
+.avatar-preview{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#1a1a1a,#2a2a2a);background-size:cover;background-position:center;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:24px;color:rgba(232,255,0,0.4);border:2px solid rgba(232,255,0,0.2);flex-shrink:0;overflow:hidden}
+.avatar-btns{display:flex;flex-direction:column;gap:8px}
+.btn-avatar{background:var(--card);border:1px solid var(--border);color:var(--white);padding:9px 16px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;transition:border-color 0.2s}
+.btn-avatar:hover{border-color:rgba(232,255,0,0.3)}
+.btn-avatar-upload{background:var(--accent);color:#000;border:1px solid var(--accent);font-weight:800;letter-spacing:1px;text-transform:uppercase}
+.btn-avatar:disabled{opacity:0.4;cursor:not-allowed}
+
 /* ═══ ANFRAGEN ═══ */
 .ap-title{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1.5px;margin-bottom:4px}
 .ap-sub{font-size:13px;color:var(--muted);margin-bottom:20px}
@@ -176,6 +185,23 @@ try {
       <span class="progress-pct" id="pctLabel">0%</span>
     </div>
     <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <!-- Profilbild: zaehlt bewusst NICHT in die Vollstaendigkeit, deshalb ohne Punkt -->
+  <div class="section fade fd2">
+    <div class="section-head">PROFILBILD</div>
+    <div class="field">
+      <label>Dein Foto</label>
+      <div class="avatar-row">
+        <div class="avatar-preview" id="avatarPreview"></div>
+        <div class="avatar-btns">
+          <button type="button" class="btn-avatar" onclick="document.getElementById('fAvatar').click()">Bild auswählen</button>
+          <button type="button" class="btn-avatar btn-avatar-upload hidden" id="btnAvatarUpload" onclick="uploadAvatar()">Hochladen</button>
+        </div>
+      </div>
+      <input type="file" id="fAvatar" accept="image/jpeg,image/png,image/webp" class="hidden">
+      <div class="hint">JPG, PNG oder WebP, höchstens 5 MB. Sichtbar in der Suche und auf deinem Profil.</div>
+    </div>
   </div>
 
   <!-- Trainingsart -->
@@ -362,6 +388,7 @@ async function loadTrainer(email) {
     if(d.length > 0) {
       T = d[0];
       fillForm(T);
+      zeigeAvatar();
       updateDots();
 
       // If profile already complete → go straight to Anfragen
@@ -402,6 +429,101 @@ function fillForm(t) {
     });
   }
   if(t.telefon) document.getElementById('fTelefon').value = t.telefon;
+}
+
+// ──── PROFILBILD ────
+// Als Profilbild gilt nur eine Adresse aus dem eigenen Bilder-Behaelter;
+// alles andere (leer, fremde Adresse) faellt auf die Initialen zurueck.
+const AVATAR_PREFIX = SB + '/storage/v1/object/public/avatars/';
+function avatarAdresse(u) {
+  return (typeof u === 'string' && u.indexOf(AVATAR_PREFIX) === 0) ? u : null;
+}
+let avatarDatei = null;
+
+function zeigeAvatar(vorschauUrl) {
+  const el = document.getElementById('avatarPreview');
+  if(!el) return;
+  const bild = vorschauUrl || (T && avatarAdresse(T.avatar_url));
+  if(bild) {
+    el.style.backgroundImage = `url('${bild}')`;
+    el.textContent = '';
+  } else {
+    el.style.backgroundImage = '';
+    el.textContent = T ? ((T.vorname||'?')[0] + (T.nachname||'?')[0]).toUpperCase() : '';
+  }
+}
+
+document.getElementById('fAvatar').addEventListener('change', function() {
+  const f = this.files && this.files[0];
+  const btn = document.getElementById('btnAvatarUpload');
+  avatarDatei = null;
+  btn.classList.add('hidden');
+  if(!f) { zeigeAvatar(); return; }
+  const erlaubt = ['image/jpeg', 'image/png', 'image/webp'];
+  if(!erlaubt.includes(f.type)) {
+    showToast('Dieses Format geht nicht. Bitte wähle ein Bild als JPG, PNG oder WebP.', true);
+    this.value = '';
+    zeigeAvatar();
+    return;
+  }
+  if(f.size > 5 * 1024 * 1024) {
+    showToast('Das Bild ist zu groß. Erlaubt sind höchstens 5 MB.', true);
+    this.value = '';
+    zeigeAvatar();
+    return;
+  }
+  avatarDatei = f;
+  zeigeAvatar(URL.createObjectURL(f));
+  btn.classList.remove('hidden');
+});
+
+async function uploadAvatar() {
+  if(!avatarDatei) return;
+  // Der Ablagepfad braucht die Nutzer-Kennung; alte Sitzungen haben sie noch nicht.
+  if(!sess.user_id) {
+    showToast('Bitte melde dich einmal neu an, dann klappt der Bild-Upload.', true);
+    return;
+  }
+  const btn = document.getElementById('btnAvatarUpload');
+  btn.disabled = true;
+  btn.textContent = 'Wird hochgeladen...';
+  const endung = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[avatarDatei.type];
+  const pfad = sess.user_id + '/avatar.' + endung;
+  try {
+    const up = await fetch(SB + '/storage/v1/object/avatars/' + pfad, {
+      method: 'POST',
+      headers: authKopf({ 'Content-Type': avatarDatei.type, 'x-upsert': 'true' }),
+      body: avatarDatei
+    });
+    if(istAbgemeldet(up)) return;
+    if(!up.ok) {
+      console.error('Bild hochladen fehlgeschlagen:', up.status, await up.text());
+      throw new Error('upload');
+    }
+    // ?v= sorgt dafuer, dass der Browser nach einem Wechsel nicht das alte Bild zeigt.
+    const url = AVATAR_PREFIX + pfad + '?v=' + Date.now();
+    const r = await fetch(`${SB}/rest/v1/trainers?email=eq.${encodeURIComponent(sess.email)}`, {
+      method: 'PATCH',
+      headers: authKopf({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify({ avatar_url: url })
+    });
+    if(istAbgemeldet(r)) return;
+    if(!r.ok) {
+      console.error('Bildadresse speichern fehlgeschlagen:', r.status, await r.text());
+      throw new Error('save');
+    }
+    if(T) T.avatar_url = url;
+    avatarDatei = null;
+    document.getElementById('fAvatar').value = '';
+    btn.classList.add('hidden');
+    zeigeAvatar();
+    showToast('✓ Profilbild gespeichert!');
+  } catch(e) {
+    console.error('uploadAvatar:', e);
+    showToast('Das Bild konnte nicht gespeichert werden. Bitte versuche es erneut.', true);
+  }
+  btn.disabled = false;
+  btn.textContent = 'Hochladen';
 }
 
 function updateDots() {
