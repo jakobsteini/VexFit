@@ -98,20 +98,14 @@ try {
 </head>
 <body>
 
-<!-- Hinweis: Admin-Panel deaktiviert, Vollzugriffs-Schluessel entfernt -->
-<div id="adminDisabledNotice" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.45);border-left:4px solid #ff6b6b;color:#ff6b6b;padding:18px 24px;margin:0;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;line-height:1.5;text-align:center;transition:background 0.2s">
-  ⚠️ Admin-Panel vorübergehend deaktiviert. Zugriff wird mit dem neuen Supabase-Projekt neu eingerichtet.
-</div>
-
-<!-- LOGIN -->
-<div class="login-wrap" id="loginWrap">
+<!-- KEIN ZUGRIFF -->
+<!-- Erscheint nur, wenn jemand angemeldet ist, aber nicht das Admin-Konto. -->
+<div class="login-wrap" id="keinZugriffWrap" style="display:none">
   <div class="login-box">
     <a href="index.html" class="logo">VEX<span>FIT</span></a>
-    <div class="login-title">ADMIN LOGIN</div>
-    <p class="login-sub">Nur für Vexfit Administratoren</p>
-    <div class="login-field"><label>Passwort</label><input type="password" id="adminPw" placeholder="Admin Passwort" onkeydown="if(event.key==='Enter')checkLogin()"></div>
-    <button class="login-btn" onclick="checkLogin()">Einloggen →</button>
-    <div class="login-error" id="loginError">Falsches Passwort!</div>
+    <div class="login-title">KEIN ZUGRIFF</div>
+    <p class="login-sub">Dieses Konto hat keinen Zugriff auf den Admin-Bereich.</p>
+    <a href="index.html" class="login-btn" style="display:block;text-decoration:none">Zur Startseite →</a>
   </div>
 </div>
 
@@ -195,18 +189,42 @@ try {
 <script>
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
-// ⚠️ ÄNDERE DIESES PASSWORT!
-const ADMIN_PASSWORD = 'steini';
+// Kennung des einzigen Kontos mit Admin-Zugriff. Die Datenbankregeln aus
+// migrations/2026-09-20-admin-vollzugriff.sql pruefen dieselbe Kennung -
+// diese Zeile steuert nur die Anzeige, der Schutz liegt in der Datenbank.
+const ADMIN_USER_ID = 'ee744b01-0a70-4da5-a19b-6c905c8479b5';
 
-function checkLogin() {
-  const pw = document.getElementById('adminPw').value;
-  if(pw === ADMIN_PASSWORD) {
-    document.getElementById('loginWrap').style.display = 'none';
-    document.getElementById('dashboardWrap').style.display = 'block';
-    loadData();
-  } else {
-    document.getElementById('loginError').style.display = 'block';
-  }
+// ──── AUTH ────
+// Ohne Anmeldung zurueck zur Anmeldeseite; angemeldet, aber nicht das
+// Admin-Konto: Hinweis zeigen und keine Daten laden.
+const raw = localStorage.getItem('vexfit_session');
+if(!raw) { location.href = 'login.html'; throw new Error(); }
+let sess;
+try { sess = JSON.parse(raw); } catch(e) { localStorage.removeItem('vexfit_session'); location.href = 'login.html'; throw new Error(); }
+if(!sess.access_token) { localStorage.removeItem('vexfit_session'); location.href = 'login.html'; throw new Error(); }
+if(sess.user_id !== ADMIN_USER_ID) {
+  document.getElementById('keinZugriffWrap').style.display = 'flex';
+  throw new Error();
+}
+document.getElementById('dashboardWrap').style.display = 'block';
+loadData();
+
+// Alle Aufrufe gehen mit dem Zugangs-Token des Nutzers; der oeffentliche
+// Schluessel bleibt nur im apikey-Kopf, so erwartet es Supabase.
+function authKopf(weitere) {
+  const k = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + sess.access_token };
+  if(weitere) for(const n in weitere) k[n] = weitere[n];
+  return k;
+}
+// Ohne gueltiges Token ist der Bereich nicht benutzbar: abmelden und zurueck.
+function sitzungAbgelaufen() {
+  try { localStorage.removeItem('vexfit_session'); } catch(e) {}
+  alert('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
+  location.href = 'login.html';
+}
+function istAbgemeldet(r) {
+  if(r.status === 401 || r.status === 403) { sitzungAbgelaufen(); return true; }
+  return false;
 }
 
 function sendDailyReport() {
@@ -316,9 +334,8 @@ Stripe Link: https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00
 }
 
 function logout() {
-  document.getElementById('loginWrap').style.display = 'flex';
-  document.getElementById('dashboardWrap').style.display = 'none';
-  document.getElementById('adminPw').value = '';
+  try { localStorage.removeItem('vexfit_session'); } catch(e) {}
+  location.href = 'login.html';
 }
 
 function showTab(tab, btn) {
@@ -332,15 +349,19 @@ async function loadData() {
  try {
   // Load trainers
   const trRes = await fetch(`${SUPABASE_URL}/rest/v1/trainers?select=*&order=created_at.desc`, {
-    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    headers: authKopf()
   });
+  if(istAbgemeldet(trRes)) return;
+  if(!trRes.ok) throw new Error('Trainer laden fehlgeschlagen: ' + trRes.status);
   const trainers = await trRes.json();
   window.allTrainers = trainers;
 
   // Load kunden
   const kuRes = await fetch(`${SUPABASE_URL}/rest/v1/kunden?select=*&order=created_at.desc`, {
-    headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    headers: authKopf()
   });
+  if(istAbgemeldet(kuRes)) return;
+  if(!kuRes.ok) throw new Error('Kunden laden fehlgeschlagen: ' + kuRes.status);
   const kunden = await kuRes.json();
   window.allKunden = kunden;
   
@@ -372,8 +393,8 @@ async function loadData() {
         <td><span class="badge ${t.aktiv ? 'badge-active' : 'badge-unpaid'}">${t.aktiv ? 'Aktiv' : 'Inaktiv'}</span></td>
         <td style="display:flex;flex-direction:column;gap:5px;padding:8px 16px">
           ${!t.aktiv ? `<button class="btn-activate" onclick="activateTrainer('${t.id}')">👁️ Profil freigeben</button>` : `<span style="color:#4ade80;font-size:11px;font-weight:600">✅ Aktiv</span>`}
-          <button onclick="banTrainer('${t.user_id}', '${t.id}', '${t.vorname} ${t.nachname}')" style="background:rgba(255,165,0,0.12);border:1px solid rgba(255,165,0,0.3);color:#ffaa00;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🚫 Sperren</button>
-          <button onclick="deleteTrainer('${t.user_id}', '${t.id}', '${t.vorname} ${t.nachname}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
+          ${t.aktiv ? `<button onclick="banTrainer('${t.id}', '${t.vorname} ${t.nachname}')" style="background:rgba(255,165,0,0.12);border:1px solid rgba(255,165,0,0.3);color:#ffaa00;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🚫 Sperren</button>` : ''}
+          <button onclick="deleteTrainer('${t.id}', '${t.vorname} ${t.nachname}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
         </td>
         <td>${t.created_at ? new Date(t.created_at).toLocaleDateString('de-AT') : '–'}</td>
       </tr>`).join('');
@@ -391,8 +412,7 @@ async function loadData() {
         <td>${k.stadt || '–'}</td>
         <td>${k.ziel || '–'}</td>
         <td>
-          <button onclick="banKunde('${k.user_id}', '${k.id}', '${k.vorname} ${k.nachname}')" style="background:rgba(255,165,0,0.12);border:1px solid rgba(255,165,0,0.3);color:#ffaa00;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🚫 Sperren</button>
-          <button onclick="deleteKunde('${k.user_id}', '${k.id}', '${k.vorname} ${k.nachname}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
+          <button onclick="deleteKunde('${k.id}', '${k.vorname} ${k.nachname}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
         </td>
         <td>${k.created_at ? new Date(k.created_at).toLocaleDateString('de-AT') : '–'}</td>
       </tr>`).join('');
@@ -406,51 +426,72 @@ async function loadData() {
  }
 }
 
-// Die folgenden Funktionen brauchten den entfernten Vollzugriffs-Schluessel.
-// Sie tun bewusst nichts und weisen auf den Hinweis oben hin.
-function adminDeaktiviertHinweis() {
-  const el = document.getElementById('adminDisabledNotice');
-  if(!el) return;
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  el.style.background = 'rgba(255,80,80,0.3)';
-  setTimeout(() => { el.style.background = 'rgba(255,80,80,0.12)'; }, 1200);
+// ──── AKTIONEN ────
+// Setzt trainers.aktiv fuer eine Zeile; liefert wahr bei Erfolg. Supabase
+// meldet auch dann Erfolg, wenn die Regeln null Zeilen zulassen - deshalb
+// wird die geaenderte Zeile zurueckverlangt und gezaehlt.
+async function setzeTrainerAktiv(id, neu) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: authKopf({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
+      body: JSON.stringify({ aktiv: neu })
+    });
+    if(istAbgemeldet(res)) return false;
+    if(!res.ok) return false;
+    const zeilen = await res.json();
+    return Array.isArray(zeilen) && zeilen.length > 0;
+  } catch(e) {
+    console.error('setzeTrainerAktiv:', e);
+    return false;
+  }
 }
 
-async function banTrainer(userId, tableId, name) {
-  adminDeaktiviertHinweis();
+// Loescht eine Zeile; liefert wahr, wenn tatsaechlich eine Zeile entfernt
+// wurde. Gleiche Kontrolle wie oben: die geloeschte Zeile wird zurueckverlangt.
+async function loescheZeile(tabelle, id) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${tabelle}?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: authKopf({ 'Prefer': 'return=representation' })
+    });
+    if(istAbgemeldet(res)) return false;
+    if(!res.ok) return false;
+    const zeilen = await res.json();
+    return Array.isArray(zeilen) && zeilen.length > 0;
+  } catch(e) {
+    console.error('loescheZeile:', e);
+    return false;
+  }
 }
 
-async function banKunde(userId, tableId, name) {
-  adminDeaktiviertHinweis();
+async function banTrainer(id, name) {
+  const ok = await setzeTrainerAktiv(id, false);
+  if(!ok) { alert(`${name} konnte nicht gesperrt werden. Die Anzeige wurde nicht veraendert. Bitte versuche es erneut.`); return; }
+  loadData();
 }
 
-async function deleteTrainer(userId, tableId, name) {
-  adminDeaktiviertHinweis();
+async function deleteTrainer(id, name) {
+  if(!confirm(`${name} wirklich entfernen? Die Zeile wird aus der Trainerliste geloescht, das Anmeldekonto bleibt bestehen.`)) return;
+  const ok = await loescheZeile('trainers', id);
+  if(!ok) { alert(`${name} konnte nicht entfernt werden. Die Anzeige wurde nicht veraendert. Bitte versuche es erneut.`); return; }
+  loadData();
 }
 
-async function deleteKunde(userId, tableId, name) {
-  adminDeaktiviertHinweis();
+async function deleteKunde(id, name) {
+  if(!confirm(`${name} wirklich entfernen? Die Zeile wird aus der Kundenliste geloescht, das Anmeldekonto bleibt bestehen.`)) return;
+  const ok = await loescheZeile('kunden', id);
+  if(!ok) { alert(`${name} konnte nicht entfernt werden. Die Anzeige wurde nicht veraendert. Bitte versuche es erneut.`); return; }
+  loadData();
 }
 
 async function activateTrainer(id) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`
-    },
-    body: JSON.stringify({ aktiv: true, stripe_bezahlt: false })
-  });
-  if(res.ok) {
-    // Get trainer data for email
-    const trRes = await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&select=*`, {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-    });
-    const trainers = await trRes.json();
-    const t = trainers[0];
+  const ok = await setzeTrainerAktiv(id, true);
+  if(!ok) { alert('Der Trainer konnte nicht freigegeben werden. Die Anzeige wurde nicht veraendert. Bitte versuche es erneut.'); return; }
 
-    // Open email to Jakob with Stripe link
+  // Open email to Jakob with Stripe link
+  const t = (window.allTrainers || []).find(x => x.id === id);
+  if(t) {
     const subject = encodeURIComponent(`✅ Trainer aktiviert: ${t.vorname} ${t.nachname} – Stripe Link schicken?`);
     const body = encodeURIComponent(`Hi Jakob,
 
@@ -467,20 +508,14 @@ Sobald der Trainer seinen ersten Kunden hat:
 Admin: https://vexfit.app/admin.html`);
 
     window.open(`mailto:vexfit.info@gmail.com?subject=${subject}&body=${body}`);
-    loadData();
-  } else {
-    alert('❌ Fehler! Bitte SQL Policy in Supabase hinzufügen.');
   }
+  loadData();
 }
 
 async function markAsPaid(id, email, name) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}`, {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': SUPABASE_KEY,
-      'Authorization': `Bearer ${SUPABASE_KEY}`
-    },
+    headers: authKopf({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ stripe_bezahlt: true })
   });
   if(res.ok) {
