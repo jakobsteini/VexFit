@@ -107,6 +107,14 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(
 .locked-box{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:4px;padding:14px}
 .btn-stripe{display:inline-block;background:var(--accent);color:var(--bg);padding:10px 18px;border-radius:3px;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-decoration:none;margin-top:8px}
 .msg-box{font-size:13px;color:var(--muted);font-style:italic;padding:10px;background:rgba(255,255,255,0.02);border-radius:3px;border-left:2px solid var(--border);margin-top:8px}
+.anf-status{display:inline-block;padding:4px 10px;border-radius:100px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:10px}
+.anf-status.offen{background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.3);color:var(--orange)}
+.anf-status.angenommen{background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.3);color:var(--green)}
+.anf-status.abgelehnt{background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.3);color:var(--red)}
+.anf-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.btn-annehmen{background:var(--accent);color:var(--bg);border:none;padding:10px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.btn-ablehnen{background:none;border:1px solid var(--border);color:var(--muted);padding:10px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.btn-annehmen:disabled,.btn-ablehnen:disabled{opacity:0.4;cursor:not-allowed}
 .empty-state{text-align:center;padding:48px 20px;color:var(--muted)}
 .status-bar{background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.2);border-radius:4px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:var(--orange);line-height:1.7}
 .status-bar.aktiv{background:rgba(74,222,128,0.06);border-color:rgba(74,222,128,0.2);color:var(--green)}
@@ -594,6 +602,15 @@ function showPage(page, e) {
 }
 
 // ──── ANFRAGEN ────
+let anfragenDaten = [];
+
+// Zustand einer Anfrage: alles ausser angenommen/abgelehnt gilt als offen
+// (Altbestand traegt 'ausstehend' oder gar keinen Wert).
+function anfrageZustand(a) {
+  const s = a && a.status;
+  return (s === 'angenommen' || s === 'abgelehnt') ? s : 'offen';
+}
+
 async function loadAnfragen(trainerId) {
   try {
     const r = await fetch(`${SB}/rest/v1/anfragen?trainer_id=eq.${encodeURIComponent(trainerId)}&order=created_at.desc`, {
@@ -608,6 +625,7 @@ async function loadAnfragen(trainerId) {
       badge.textContent = data.length;
       badge.style.display = 'flex';
     }
+    anfragenDaten = data;
     renderAnfragen(data);
   } catch(e) {
     console.error(e);
@@ -633,6 +651,9 @@ function renderAnfragen(data) {
     el.innerHTML = '<div class="empty-state">📭<br><br>Noch keine Anfragen.<br>Sobald ein Kunde dich kontaktiert erscheint es hier.</div>';
     return;
   }
+  // Fehlt die Zustands-Spalte noch (Migration nicht eingespielt), bleibt die
+  // Karte wie bisher: keine Kennzeichnung, keine Knoepfe.
+  const statusVorhanden = data.length > 0 && ('status' in data[0]);
   el.innerHTML = data.map(a => {
     const date = new Date(a.created_at).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'});
     let contactHTML = '';
@@ -643,13 +664,61 @@ function renderAnfragen(data) {
     } else {
       contactHTML = '<div style="font-size:12px;color:var(--muted);margin-top:8px">⏳ Wird von Vexfit freigeschaltet...</div>';
     }
+    let statusHTML = '';
+    if(statusVorhanden) {
+      const z = anfrageZustand(a);
+      if(z === 'angenommen') {
+        statusHTML = '<div class="anf-status angenommen">✓ Angenommen</div>';
+      } else if(z === 'abgelehnt') {
+        statusHTML = '<div class="anf-status abgelehnt">Abgelehnt</div>';
+      } else {
+        statusHTML = `<div class="anf-status offen">Neu</div>
+        <div class="anf-actions">
+          <button class="btn-annehmen" onclick="beantworteAnfrage('${a.id}','angenommen',this)">Annehmen</button>
+          <button class="btn-ablehnen" onclick="beantworteAnfrage('${a.id}','abgelehnt',this)">Ablehnen</button>
+        </div>`;
+      }
+    }
     return `<div class="anfrage-card">
       <div class="anf-head"><div class="anf-name">${a.kunden_name||'Unbekannt'}</div><div class="anf-date">${date}</div></div>
       <div class="anf-ziel">🎯 ${a.ziel||'–'}</div>
       ${a.nachricht?`<div class="msg-box">"${a.nachricht}"</div>`:''}
       ${contactHTML}
+      ${statusHTML}
     </div>`;
   }).join('');
+}
+
+// Speichert Annehmen/Ablehnen. Erst wenn die Datenbank die geaenderte Zeile
+// bestaetigt, wird die Karte umgestellt - kein Erfolg ohne bestaetigten Erfolg.
+async function beantworteAnfrage(id, neuerStatus, el) {
+  const karte = el && el.closest('.anfrage-card');
+  const knoepfe = karte ? karte.querySelectorAll('.anf-actions button') : [];
+  knoepfe.forEach(b => b.disabled = true);
+  try {
+    const r = await fetch(`${SB}/rest/v1/anfragen?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: authKopf({ 'Content-Type': 'application/json', Prefer: 'return=representation' }),
+      body: JSON.stringify({ status: neuerStatus })
+    });
+    if(istAbgemeldet(r)) return;
+    let gespeichert = false;
+    if(r.ok) {
+      const d = await r.json().catch(() => null);
+      gespeichert = Array.isArray(d) && d.length > 0 && d[0].status === neuerStatus;
+    } else {
+      console.error('Anfrage-Zustand speichern fehlgeschlagen:', r.status, await r.text());
+    }
+    if(!gespeichert) throw new Error('nicht gespeichert');
+    const a = anfragenDaten.find(x => String(x.id) === String(id));
+    if(a) a.status = neuerStatus;
+    renderAnfragen(anfragenDaten);
+    showToast(neuerStatus === 'angenommen' ? '✓ Anfrage angenommen' : 'Anfrage abgelehnt');
+  } catch(e) {
+    console.error('beantworteAnfrage:', e);
+    showToast('Der Zustand konnte nicht gespeichert werden. Bitte versuche es erneut.', true);
+    knoepfe.forEach(b => b.disabled = false);
+  }
 }
 
 // ──── SAVE ────

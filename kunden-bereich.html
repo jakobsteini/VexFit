@@ -66,6 +66,16 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(
 .btn-profil{display:flex;align-items:center;justify-content:center;padding:10px;border:1px solid var(--bi);border-radius:3px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--white);text-decoration:none}
 .btn-anfrage{background:var(--accent);color:var(--bg);border:none;padding:10px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
 .empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+/* MEINE ANFRAGEN auf der Willkommensseite */
+.meine-anfragen{width:100%;max-width:520px;margin-top:44px;text-align:left;animation:fadeUp 0.5s 0.7s ease both;opacity:0}
+.ma-title{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1px;margin-bottom:10px}
+.ma-row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ma-name{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1px}
+.ma-date{font-size:11px;color:var(--muted)}
+.ma-status{display:inline-block;padding:4px 10px;border-radius:100px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:8px}
+.ma-status.offen{background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.3);color:#fb923c}
+.ma-status.angenommen{background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.3);color:#4ade80}
+.ma-status.abgelehnt{background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.3);color:#ff6b6b}
 /* ALERT BOX */
 .alert-box{background:var(--card);border:1px solid rgba(232,255,0,0.2);border-radius:4px;padding:20px;margin-top:20px;text-align:left}
 .alert-box-title{font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
@@ -143,6 +153,13 @@ try {
   </div>
   <a href="#" class="btn-primary" onclick="toggleSearch(event)">Trainer in meiner Nähe →</a>
   <p class="email-note" id="emailNote">Eingeloggt als: –</p>
+
+  <!-- Eigene Anfragen mit Bearbeitungsstand; bleibt ausgeblendet, solange es
+       keine gibt oder sie nicht geladen werden koennen -->
+  <div class="meine-anfragen hidden" id="meineAnfragen">
+    <div class="ma-title">MEINE ANFRAGEN</div>
+    <div id="maList"></div>
+  </div>
 </div>
 
 <!-- TRAINER SUCHE -->
@@ -231,6 +248,32 @@ function istAbgemeldet(r) {
 
 document.getElementById('emailNote').textContent = 'Eingeloggt als: ' + sess.email;
 loadKunde(sess.email);
+ladeMeineAnfragen();
+
+// Zeigt die eigenen Anfragen mit Bearbeitungsstand. Schlaegt das Laden fehl
+// oder gibt es noch keine, bleibt der Abschnitt einfach ausgeblendet.
+async function ladeMeineAnfragen() {
+  try {
+    const r = await fetch(`${SB}/rest/v1/anfragen?kunden_email=eq.${encodeURIComponent(sess.email)}&select=id,trainer_name,status,created_at&order=created_at.desc`, {
+      headers: authKopf()
+    });
+    if(!r.ok) return;
+    const d = await r.json();
+    if(!Array.isArray(d) || d.length === 0) return;
+    document.getElementById('maList').innerHTML = d.map(a => {
+      const datum = a.created_at ? new Date(a.created_at).toLocaleDateString('de-AT',{day:'2-digit',month:'2-digit',year:'numeric'}) : '';
+      // Alles ausser angenommen/abgelehnt gilt als offen (Altbestand traegt
+      // 'ausstehend' oder gar keinen Wert).
+      const z = (a.status === 'angenommen' || a.status === 'abgelehnt') ? a.status : 'offen';
+      const text = z === 'angenommen' ? 'Angenommen' : z === 'abgelehnt' ? 'Abgelehnt' : 'Wartet auf Antwort';
+      return `<div class="trainer-card">
+        <div class="ma-row"><div class="ma-name">${a.trainer_name || 'Trainer'}</div><div class="ma-date">${datum}</div></div>
+        <div class="ma-status ${z}">${text}</div>
+      </div>`;
+    }).join('');
+    document.getElementById('meineAnfragen').classList.remove('hidden');
+  } catch(e) { console.error('ladeMeineAnfragen:', e); }
+}
 
 async function loadKunde(email) {
   try {
@@ -416,6 +459,7 @@ async function sendAnfrage() {
     document.getElementById('searchPage').classList.add('hidden');
     const desc = document.getElementById('welcomeDesc');
     desc.textContent = 'Deine Anfrage wurde erfolgreich übermittelt! Der Trainer meldet sich in Kürze bei dir.';
+    ladeMeineAnfragen();
   } catch(e) {
     console.error('sendAnfrage:', e);
     alert('Deine Anfrage konnte nicht gesendet werden. Bitte versuche es erneut.');
