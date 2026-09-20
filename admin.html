@@ -329,6 +329,7 @@ function showTab(tab, btn) {
 }
 
 async function loadData() {
+ try {
   // Load trainers
   const trRes = await fetch(`${SUPABASE_URL}/rest/v1/trainers?select=*&order=created_at.desc`, {
     headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
@@ -396,6 +397,13 @@ async function loadData() {
         <td>${k.created_at ? new Date(k.created_at).toLocaleDateString('de-AT') : '–'}</td>
       </tr>`).join('');
   }
+ } catch(e) {
+  console.error('loadData:', e);
+  const tb = document.getElementById('trainers-tbody');
+  if(tb) tb.innerHTML = '<tr><td colspan="10" class="loading-text">⚠️ Daten konnten nicht geladen werden.<br><button onclick="loadData()" style="margin-top:12px;background:var(--accent);color:#0a0a0a;border:none;padding:8px 18px;border-radius:3px;font-weight:700;cursor:pointer">Erneut versuchen</button></td></tr>';
+  const kb = document.getElementById('kunden-tbody');
+  if(kb) kb.innerHTML = '<tr><td colspan="6" class="loading-text">⚠️ Daten konnten nicht geladen werden. Bitte erneut versuchen.</td></tr>';
+ }
 }
 
 // Die folgenden Funktionen brauchten den entfernten Vollzugriffs-Schluessel.
