@@ -20,6 +20,46 @@ Gebaut am 26.09.2026 aus der Sicherung des Workflows, Verhalten unverändert.
 Gibt es **keine** aktiven Alerts, passiert gar nichts — auch kein Markieren. Das
 ist so aus dem Workflow übernommen.
 
+## Absicherung (26.09.2026, vor dem ersten Einsatz)
+
+Zwei Dinge weichen bewusst vom Workflow ab:
+
+**Maskieren.** Jeder Wert aus `trainers` und `trainer_alerts` läuft durch
+`maskieren()` in `kern.ts`, bevor er im Mail-HTML landet — `&`, `<`, `>`, `"`
+und `'` werden ersetzt. Der Workflow hat Freitexte roh eingesetzt; ein Trainer
+konnte damit eigenes HTML in die Mail einer Kundin schreiben. Wortlaut und
+Aussehen der Mail sind unverändert. Die Adresse im `href` muss mit `https://`
+beginnen (`sichereAdresse()`), sonst entfällt der Knopf ganz. Der Betreff wird
+von Zeilenumbrüchen befreit (`betreffSaeubern()`), damit sich keine zweite
+Mail-Kopfzeile einschleusen lässt.
+
+**Probelauf.** Ein Aufruf mit `?probelauf` rechnet Auswahl und Zuordnung
+vollständig durch, verschickt aber **nichts** und markiert **nichts**:
+
+```bash
+curl -s -X POST "https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/trainer-alert?probelauf=1" -H "Authorization: Bearer <TRAINER_ALERT_KEY>"
+```
+
+Antwort:
+
+```jsonc
+{
+  "probelauf": true,
+  "trainer_gelesen": 3,
+  "alerts_gelesen": 5,
+  "mails_wuerden_gesendet": 2,
+  "mails": [{ "trainer_id": "…", "alert_id": "…", "entfernung_km": 12.4 }]
+}
+```
+
+Keine Adressen, keine Namen — nur Zahlen, Kennungen und die Entfernung.
+`entfernung_km` ist `null`, wenn der Treffer über die **gleiche PLZ** zustande
+kam; dann rechnet der Ablauf keine Entfernung aus, so schon im Workflow.
+
+Es genügt, dass der Parameter **da ist** — der Wert spielt keine Rolle. Ein
+Vertipper (`?probelauf=ja`) führt damit zum Trockenlauf und nicht zu einem
+echten Versand. Der Zeitplan hängt keinen Parameter an und läuft unverändert.
+
 ## Aufbau
 
 | Datei                 | Inhalt                                                |

@@ -6,6 +6,11 @@
 // Diese Datei enthaelt NUR die Verdrahtung nach aussen: Datenbank, PLZ-Dienst,
 // SMTP. Die gesamte Logik steht in kern.ts und wird dort ohne Netz geprueft.
 //
+// Probelauf: ein Aufruf mit `?probelauf` an derselben Adresse rechnet Auswahl
+// und Zuordnung durch, verschickt aber nichts und markiert nichts. Die Antwort
+// nennt nur Zahlen, Trainer- und Alert-Kennungen sowie die Entfernung — keine
+// Adressen, keine Namen. Gedacht fuer den ersten Blick vor dem Scharfschalten.
+//
 // Angestossen wird sie vom Zeitplan in
 // supabase/migrations/20260926_193000_trainer_alert_zeitplan.sql
 // (pg_cron + pg_net, alle 15 Minuten) mit dem Schluessel aus Supabase Vault.

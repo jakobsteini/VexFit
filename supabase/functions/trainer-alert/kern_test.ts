@@ -17,11 +17,16 @@ import {
   type Anschluesse,
   bearbeiten,
   benoetigtePlz,
+  betreffSaeubern,
   entfernung,
+  istProbelauf,
   type Koordinate,
   mailBetreff,
   mailHtml,
+  maskieren,
+  profilAdresse,
   schluesselGueltig,
+  sichereAdresse,
   type Trainer,
   TRAINER_SPALTEN,
   zuordnen,
@@ -68,16 +73,15 @@ function bau(opt: {
   return { anschluesse, auf };
 }
 
-function anfrage(schluessel?: string | null): Request {
+function anfrage(schluessel?: string | null, abfrage = ""): Request {
   const kopf = new Headers();
   if (schluessel !== null && schluessel !== undefined) {
     kopf.set("Authorization", schluessel);
   }
-  return new Request("https://x.functions.supabase.co/trainer-alert", {
-    method: "POST",
-    headers: kopf,
-    body: "{}",
-  });
+  return new Request(
+    `https://x.functions.supabase.co/trainer-alert${abfrage}`,
+    { method: "POST", headers: kopf, body: "{}" },
+  );
 }
 
 const T_WIEN: Trainer = {
@@ -422,4 +426,303 @@ Deno.test("ohne neue Trainer wird nichts gelesen, gesendet oder markiert", async
   assertEquals(antwort.status, 200);
   assertEquals(auf.gesendet, []);
   assertEquals(auf.markiert, []);
+});
+
+// ---------------------------------------------------------------------------
+// Maskieren (Absicherung vom 26.09.2026)
+// ---------------------------------------------------------------------------
+Deno.test("maskieren ersetzt genau die fuenf Sonderzeichen", () => {
+  assertEquals(maskieren(`&<>"'`), "&amp;&lt;&gt;&quot;&#39;");
+  assertEquals(maskieren("harmloser Text"), "harmloser Text");
+  assertEquals(maskieren(null), "");
+  assertEquals(maskieren(undefined), "");
+  assertEquals(maskieren(60), "60");
+  // Erst maskieren, dann nichts doppelt: das & des Ersatzes bleibt stehen.
+  assertEquals(maskieren("a & b"), "a &amp; b");
+});
+
+Deno.test("Trainername mit Skript, Verweis, Anfuehrungszeichen und & wird nur maskiert eingesetzt", () => {
+  const boes: Trainer = {
+    ...T_WIEN,
+    vorname: '<script>alert("weg")</script>',
+    nachname: `<a href="https://beispiel.invalid">klick</a> & 'so'`,
+    bio: "<img src=x onerror=alert(1)>",
+    stadt: "Wien<br>Zweitzeile",
+    plz: '1010"><b>',
+    trainingsart: "Studio & Freiluft",
+    preis_stunde: '60"><script>',
+    spezialisierungen: ["<b>Kraft</b>", "A & B"],
+  };
+  // Der Alert hat dieselbe (absichtlich verunstaltete) PLZ, damit der Treffer
+  // ueber die gleiche PLZ zustande kommt und kein PLZ-Dienst noetig ist.
+  const alert: Alert = { ...A_WIEN, plz: boes.plz as string };
+  const html = mailHtml(zuordnen([boes], [alert], new Map()).mails[0]);
+
+  // Kein einziges rohes Steuerzeichen aus den Daten darf durchkommen.
+  assert(!html.includes("<script>"), "<script> steht roh im HTML");
+  assert(!html.includes("</script>"), "</script> steht roh im HTML");
+  assert(!html.includes("<img"), "<img steht roh im HTML");
+  // `onerror=` darf als TEXT vorkommen (die spitzen Klammern sind maskiert),
+  // aber in keinem echten Tag. Deshalb jedes Tag einzeln ansehen.
+  const tags = html.match(/<[^>]*>/g) ?? [];
+  for (const tag of tags) {
+    for (
+      const boese of [
+        "onerror",
+        "onmouseover",
+        "onload",
+        "script",
+        "javascript:",
+      ]
+    ) {
+      assert(
+        !tag.toLowerCase().includes(boese),
+        `Tag mit ${boese}: ${tag.slice(0, 60)}`,
+      );
+    }
+  }
+  assert(!html.includes("<br>"), "<br> steht roh im HTML");
+  assert(!html.includes("<b>"), "<b> steht roh im HTML");
+  assert(
+    !html.includes('<a href="https://beispiel.invalid"'),
+    "fremder Verweis steht roh im HTML",
+  );
+
+  // Stattdessen maskiert und damit als Text sichtbar.
+  assertStringIncludes(
+    html,
+    "&lt;script&gt;alert(&quot;weg&quot;)&lt;/script&gt;",
+  );
+  assertStringIncludes(
+    html,
+    "&lt;a href=&quot;https://beispiel.invalid&quot;&gt;klick&lt;/a&gt; &amp; &#39;so&#39;",
+  );
+  assertStringIncludes(html, "&lt;img src=x onerror=alert(1)&gt;");
+  assertStringIncludes(html, "Wien&lt;br&gt;Zweitzeile");
+  assertStringIncludes(html, "Studio &amp; Freiluft");
+  assertStringIncludes(html, "&lt;b&gt;Kraft&lt;/b&gt; · A &amp; B");
+
+  // Genau ein <a> bleibt: der eigene Knopf.
+  assertEquals(html.match(/<a\s/g)?.length, 1);
+});
+
+Deno.test("Kundenname wird ebenfalls maskiert", () => {
+  const html = mailHtml(
+    zuordnen([T_WIEN], [{ ...A_WIEN, kunden_name: "<b>Eva</b>" }], new Map())
+      .mails[0],
+  );
+  assertStringIncludes(html, "Hallo &lt;b&gt;Eva&lt;/b&gt;! 👋");
+  assert(!html.includes("<b>Eva</b>"));
+});
+
+Deno.test("href: nur https:// wird uebernommen, javascript: und http:// fallen weg", () => {
+  assertEquals(
+    sichereAdresse("https://vexfit.app/profil.html?id=1"),
+    "https://vexfit.app/profil.html?id=1",
+  );
+  assertEquals(sichereAdresse("HTTPS://vexfit.app/x"), "HTTPS://vexfit.app/x");
+  assertEquals(sichereAdresse("http://vexfit.app/x"), null);
+  assertEquals(sichereAdresse("javascript:alert(1)"), null);
+  assertEquals(sichereAdresse("JavaScript:alert(1)"), null);
+  assertEquals(sichereAdresse("data:text/html,<script>"), null);
+  assertEquals(sichereAdresse("//vexfit.app/x"), null);
+  assertEquals(sichereAdresse(""), null);
+  assertEquals(sichereAdresse("https://vexfit.app/\nSet-Cookie: x"), null);
+});
+
+Deno.test("die Profiladresse bleibt https und kodiert die Kennung", () => {
+  assertEquals(
+    profilAdresse("t-wien"),
+    "https://vexfit.app/profil.html?id=t-wien",
+  );
+  assertEquals(
+    profilAdresse('x" onmouseover="alert(1)'),
+    "https://vexfit.app/profil.html?id=x%22%20onmouseover%3D%22alert(1)",
+  );
+  const html = mailHtml(
+    zuordnen(
+      [{ ...T_WIEN, id: 'x" onmouseover="alert(1)' }],
+      [A_WIEN],
+      new Map(),
+    ).mails[0],
+  );
+  assert(
+    !html.includes('onmouseover="alert(1)"'),
+    "Attribut wurde eingeschleust",
+  );
+  assertStringIncludes(
+    html,
+    'href="https://vexfit.app/profil.html?id=x%22%20onmouseover%3D%22alert(1)"',
+  );
+});
+
+Deno.test("ohne zulaessige Adresse entfaellt der Knopf ganz", () => {
+  // profilAdresse liefert immer https; hier wird die Weiche selbst geprueft.
+  assertEquals(sichereAdresse("ftp://vexfit.app"), null);
+  const html = mailHtml(zuordnen([T_WIEN], [A_WIEN], new Map()).mails[0]);
+  assertStringIncludes(html, "JETZT ANFRAGEN");
+  assertEquals(html.match(/href=/g)?.length, 1);
+});
+
+Deno.test("Betreff: Zeilenumbrueche im Namen kommen nicht in die Kopfzeile", () => {
+  const boes = {
+    ...T_WIEN,
+    vorname: "Eva\r\nBcc: fremd@beispiel.invalid",
+    nachname: "M\nX",
+  };
+  const betreff = mailBetreff(zuordnen([boes], [A_WIEN], new Map()).mails[0]);
+  assert(!betreff.includes("\n"), "Betreff enthaelt noch \\n");
+  assert(!betreff.includes("\r"), "Betreff enthaelt noch \\r");
+  assertEquals(
+    betreff,
+    "🎉 Neuer Trainer in deiner Nähe: Eva Bcc: fremd@beispiel.invalid M X",
+  );
+  // Der normale Fall bleibt Zeichen fuer Zeichen derselbe wie vorher.
+  assertEquals(
+    mailBetreff(zuordnen([T_WIEN], [A_WIEN], new Map()).mails[0]),
+    "🎉 Neuer Trainer in deiner Nähe: Testvorname Testnachname",
+  );
+});
+
+Deno.test("betreffSaeubern fasst Steuerzeichen zu einem Leerzeichen zusammen", () => {
+  assertEquals(betreffSaeubern("a\r\n\r\nb"), "a b");
+  assertEquals(betreffSaeubern("a\tb"), "a b");
+  assertEquals(betreffSaeubern("  a  b  "), "a b");
+  assertEquals(betreffSaeubern("ohne Umbruch"), "ohne Umbruch");
+});
+
+// ---------------------------------------------------------------------------
+// Probelauf
+// ---------------------------------------------------------------------------
+Deno.test("istProbelauf erkennt den Parameter, egal mit welchem Wert", () => {
+  const u = "https://x.functions.supabase.co/trainer-alert";
+  assertEquals(istProbelauf(`${u}?probelauf=1`), true);
+  assertEquals(istProbelauf(`${u}?probelauf=`), true);
+  assertEquals(istProbelauf(`${u}?probelauf=ja`), true);
+  assertEquals(istProbelauf(`${u}?a=1&probelauf=1`), true);
+  assertEquals(istProbelauf(u), false);
+  assertEquals(istProbelauf(`${u}?anderes=1`), false);
+  assertEquals(istProbelauf("keine Adresse"), false);
+});
+
+Deno.test("Probelauf: kein SMTP-Aufruf, kein Schreiben auf trainers", async () => {
+  const { anschluesse, auf } = bau({
+    trainer: [T_WIEN, { ...T_WIEN, id: "t-ohne", plz: "5020" }],
+    alerts: [A_WIEN],
+    koordinaten: {
+      "1010": { lat: 48.2083, lng: 16.3731 },
+      "5020": { lat: 47.8095, lng: 13.0550 },
+    },
+  });
+  const antwort = await bearbeiten(
+    anfrage(`Bearer ${SCHLUESSEL}`, "?probelauf=1"),
+    SCHLUESSEL,
+    anschluesse,
+  );
+  assertEquals(antwort.status, 200);
+  assertEquals(auf.gesendet, [], "es wurde versendet");
+  assertEquals(auf.markiert, [], "es wurde markiert");
+
+  const d = await antwort.json();
+  assertEquals(d.probelauf, true);
+  assertEquals(d.trainer_gelesen, 2);
+  assertEquals(d.alerts_gelesen, 1);
+  assertEquals(d.mails_wuerden_gesendet, 1);
+  assertEquals(d.mails.length, 1);
+  assertEquals(d.mails[0].trainer_id, "t-wien");
+  assertEquals(d.mails[0].alert_id, "a-wien");
+  assertEquals(d.mails[0].entfernung_km, null); // gleiche PLZ
+});
+
+Deno.test("Probelauf: Antwort enthaelt keine Adresse und keinen Namen", async () => {
+  const { anschluesse } = bau({
+    trainer: [T_WIEN],
+    alerts: [A_WIEN, {
+      ...A_WIEN,
+      id: "a-nah",
+      kunden_email: "zweite@beispiel.at",
+      plz: "1200",
+    }],
+    koordinaten: {
+      "1010": { lat: 48.2083, lng: 16.3731 },
+      "1200": { lat: 48.2400, lng: 16.3800 },
+    },
+  });
+  const antwort = await bearbeiten(
+    anfrage(`Bearer ${SCHLUESSEL}`, "?probelauf=1"),
+    SCHLUESSEL,
+    anschluesse,
+  );
+  const roh = JSON.stringify(await antwort.json());
+  assert(!roh.includes("@"), `Adresse in der Antwort: ${roh}`);
+  for (
+    const wort of [
+      "Testvorname",
+      "Testnachname",
+      "Testkundin",
+      "kundin",
+      "zweite",
+      "Wien",
+    ]
+  ) {
+    assert(!roh.includes(wort), `"${wort}" steht in der Antwort: ${roh}`);
+  }
+  // Die Entfernung des zweiten Treffers ist eine Zahl in km.
+  const d = JSON.parse(roh);
+  assertEquals(d.mails.length, 2);
+  const mitKm = d.mails.find((m: { entfernung_km: number | null }) =>
+    m.entfernung_km !== null
+  );
+  assert(
+    mitKm && mitKm.entfernung_km > 0 && mitKm.entfernung_km < 25,
+    `km war ${mitKm?.entfernung_km}`,
+  );
+});
+
+Deno.test("Probelauf ohne neue Trainer antwortet mit Nullen", async () => {
+  const { anschluesse, auf } = bau({ trainer: [], alerts: [A_WIEN] });
+  const antwort = await bearbeiten(
+    anfrage(`Bearer ${SCHLUESSEL}`, "?probelauf=1"),
+    SCHLUESSEL,
+    anschluesse,
+  );
+  const d = await antwort.json();
+  assertEquals(antwort.status, 200);
+  assertEquals(d, {
+    probelauf: true,
+    trainer_gelesen: 0,
+    alerts_gelesen: 0,
+    mails_wuerden_gesendet: 0,
+    mails: [],
+  });
+  assertEquals(auf.gesendet, []);
+  assertEquals(auf.markiert, []);
+});
+
+Deno.test("Probelauf braucht trotzdem einen gueltigen Schluessel", async () => {
+  const { anschluesse, auf } = bau({ trainer: [T_WIEN], alerts: [A_WIEN] });
+  const antwort = await bearbeiten(
+    anfrage("Bearer FALSCH", "?probelauf=1"),
+    SCHLUESSEL,
+    anschluesse,
+  );
+  assertEquals(antwort.status, 401);
+  assertEquals(auf.gesendet, []);
+  assertEquals(auf.markiert, []);
+});
+
+Deno.test("ohne probelauf-Parameter wird weiterhin versendet und markiert", async () => {
+  const { anschluesse, auf } = bau({ trainer: [T_WIEN], alerts: [A_WIEN] });
+  const antwort = await bearbeiten(
+    anfrage(`Bearer ${SCHLUESSEL}`),
+    SCHLUESSEL,
+    anschluesse,
+  );
+  assertEquals(antwort.status, 200);
+  assertEquals(auf.gesendet.length, 1);
+  assertEquals(auf.markiert, ["t-wien"]);
+  const d = await antwort.json();
+  assertEquals(d.probelauf, undefined);
+  assertEquals(d.mails_gesendet, 1);
+  assertEquals(d.markiert, 1);
 });
