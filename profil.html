@@ -343,7 +343,7 @@ async function sendContact() {
   try {
     // 0. Notify n8n webhook
     try {
-      await fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neue-anfrage', {
+      await fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neue-anfrage', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({

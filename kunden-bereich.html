@@ -452,7 +452,7 @@ async function sendAnfrage() {
       console.error('Anfrage speichern fehlgeschlagen:', r.status, await r.text());
       throw new Error('Anfrage konnte nicht gespeichert werden');
     }
-    fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neue-anfrage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>{});
+    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neue-anfrage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(()=>{});
     document.getElementById('overlay').classList.remove('open');
     selT = null;
     document.getElementById('welcomePage').classList.remove('hidden');

@@ -467,7 +467,7 @@ async function submitNotify() {
   if(!email) { alert('Bitte E-Mail eingeben!'); return; }
   const stadt = document.getElementById('searchInput')?.value || '';
   try {
-    const r = await fetch('https://n8n.srv1551518.hstgr.cloud/webhook/neuer-kunde', {
+    const r = await fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-kunde', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
