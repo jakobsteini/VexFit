@@ -251,50 +251,12 @@ export function hatEmpfaenger(mail: Pick<Alertmail, "kunden_email">): boolean {
 // Maskieren — alles, was aus der Datenbank kommt, geht nur maskiert ins HTML
 // ============================================================================
 
-/**
- * Die EINE Maskier-Funktion. Jeder Wert aus `trainers` oder `trainer_alerts`
- * laeuft hier durch, bevor er im Mail-HTML landet.
- *
- * Der n8n-Workflow hat Freitexte roh eingesetzt. Ein Trainer konnte damit
- * eigenes HTML in die Mail einer Kundin schreiben. Wortlaut und Aussehen der
- * Mail bleiben unveraendert — nur die fuenf Sonderzeichen werden ersetzt.
- */
-export function maskieren(wert: unknown): string {
-  return String(wert ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-/**
- * Adresse fuer ein `href`. Zugelassen ist nur, was mit `https://` beginnt —
- * `javascript:`, `data:` und auch einfaches `http://` fallen heraus und werden
- * mit `null` beantwortet; der Aufrufer laesst den Knopf dann ganz weg.
- */
-export function sichereAdresse(adresse: string): string | null {
-  const roh = String(adresse ?? "").trim();
-  if (!roh.toLowerCase().startsWith("https://")) return null;
-  // Steuerzeichen haetten im Attribut nichts zu suchen. Der Linter warnt bei
-  // Steuerzeichen im Muster — hier sind sie genau der Zweck.
-  // deno-lint-ignore no-control-regex
-  if (/[\u0000-\u001f\u007f]/.test(roh)) return null;
-  return roh;
-}
-
-/**
- * Betreffzeile saeubern: Zeilenumbrueche und andere Steuerzeichen werden zu
- * einem Leerzeichen. Sonst koennte ein Trainername eine zweite Mail-Kopfzeile
- * einschleusen (Header Injection).
- */
-export function betreffSaeubern(betreff: string): string {
-  return String(betreff ?? "")
-    // deno-lint-ignore no-control-regex -- Steuerzeichen sind hier der Zweck
-    .replace(/[\r\n\u0000-\u001f\u007f\u2028\u2029]+/g, " ")
-    .replace(/ {2,}/g, " ")
-    .trim();
-}
+// Maskieren, Betreff saeubern und die href-Pruefung stehen seit dem
+// 26.09.2026 in ../_shared/text.ts — dieselbe Fassung benutzt auch
+// vexfit-automation. Hier nur weitergereicht, damit alle bisherigen Aufrufer
+// und Pruefungen unveraendert `from "./kern.ts"` importieren koennen.
+import { betreffSaeubern, maskieren, sichereAdresse } from "../_shared/text.ts";
+export { betreffSaeubern, maskieren, sichereAdresse };
 
 /** Adresse der Profilseite eines Trainers — die einzige Adresse in der Mail. */
 export function profilAdresse(trainerId: string): string | null {

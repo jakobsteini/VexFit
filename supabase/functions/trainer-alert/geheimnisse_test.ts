@@ -156,6 +156,14 @@ Deno.test("die neuen Dateien des Bausteins enthalten keine Zugangsdaten", () => 
     "supabase/functions/trainer-alert/geheimnisse_test.ts",
     "supabase/migrations/20260926193000_trainer_alert_zeitplan.sql",
     "supabase/migrations/20260926193100_trainer_alert_zeitplan_entfernen.sql",
+    // 26.09.2026 dazugekommen (Ersatz fuer "Komplette Automation v4")
+    "supabase/functions/_shared/text.ts",
+    "supabase/functions/vexfit-automation/index.ts",
+    "supabase/functions/vexfit-automation/kern.ts",
+    "supabase/functions/vexfit-automation/kern_test.ts",
+    "supabase/migrations/20260926210000_stripe_events_verarbeitet.sql",
+    "supabase/migrations/20260926210100_stripe_events_verarbeitet_entfernen.sql",
+    "werkzeuge/stripe-endpunkt-anlegen.sh",
   ];
   const funde: string[] = [];
   for (const datei of neu) {
@@ -175,6 +183,13 @@ Deno.test("die neuen Dateien des Bausteins enthalten keine Zugangsdaten", () => 
       const _ of inhalt.match(/GMAIL_PASSWORT\s*[:=]\s*["'][^"']+["']/g) ?? []
     ) {
       funde.push(`${datei}: GMAIL_PASSWORT mit Wert`);
+    }
+    for (
+      const _ of inhalt.match(
+        /(STRIPE_WEBHOOK_SECRET|STRIPE_API_KEY|ADMIN_PASSWORT_HINWEIS)\s*[:=]\s*["'][^"']{6,}["']/g,
+      ) ?? []
+    ) {
+      funde.push(`${datei}: Secret mit Wert`);
     }
     for (const _ of inhalt.match(/\beyJ[A-Za-z0-9_-]{8,}\./g) ?? []) {
       funde.push(`${datei}: JWT-artige Zeichenfolge`);
