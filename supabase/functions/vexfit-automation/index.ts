@@ -121,13 +121,17 @@ const anschluesse: Anschluesse = {
     return zeilen[0] ?? null;
   },
 
-  // Node "Offene Anfrage holen"
-  async offeneAnfrage(trainerId: string): Promise<Anfrage | null> {
+  // Node "Offene Anfrage holen", erweitert um E2: die AELTESTE Anfrage.
+  // Die Zeitspalte ist belegt: kunden-bereich.html:257 liest sie mit
+  // (`select=id,trainer_name,status,created_at`), trainer-bereich.html:647
+  // sortiert danach (`order=created_at.desc`).
+  async aeltesteOffeneAnfrage(trainerId: string): Promise<Anfrage | null> {
     const zeilen = await lesen<Anfrage>(
       `anfragen?trainer_id=eq.${
         encodeURIComponent(trainerId)
       }&weitergeleitet=eq.false` +
-        `&select=id,kunden_name,kunden_email,ziel,nachricht`,
+        `&select=id,kunden_name,kunden_email,ziel,nachricht,created_at` +
+        `&order=created_at.asc&limit=1`,
     );
     return zeilen[0] ?? null;
   },
@@ -140,12 +144,11 @@ const anschluesse: Anschluesse = {
     });
   },
 
-  // Node "Anfrage als weitergeleitet markieren"
-  anfragenWeitergeleitetMarkieren(trainerId: string): Promise<void> {
+  // Node "Anfrage als weitergeleitet markieren", erweitert um E2: genau
+  // DIESE eine Zeile, nicht mehr alle offenen Anfragen des Trainers.
+  anfrageWeitergeleitetMarkieren(anfrageId: string): Promise<void> {
     return schreiben(
-      `anfragen?trainer_id=eq.${
-        encodeURIComponent(trainerId)
-      }&weitergeleitet=eq.false`,
+      `anfragen?id=eq.${encodeURIComponent(anfrageId)}`,
       { weitergeleitet: true },
     );
   },

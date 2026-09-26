@@ -6,16 +6,46 @@ Verhalten unverändert.
 
 ## Die vier Auslöser
 
-| Pfad             | Auslöser                             | Was passiert                                                                                                                                                                                                                                                      |
-| ---------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/neuer-trainer` | `registrieren.html`                  | Mail an `vexfit.info@gmail.com`: „🆕 Neuer Trainer: …" mit Name, E-Mail, Stadt, Trainingsart und Link auf `admin.html`. Kein Datenbankzugriff.                                                                                                                    |
-| `/neuer-kunde`   | `registrieren.html`, `suche.html`    | Mail an `vexfit.info@gmail.com`: „🎯 Neuer Kunde: …" mit Name, E-Mail, Stadt, Ziel und Link auf das Supabase-Dashboard. Kein Datenbankzugriff.                                                                                                                    |
-| `/neue-anfrage`  | `profil.html`, `kunden-bereich.html` | Trainer über `body.trainer_id` in `trainers` nachschlagen. Ist `stripe_bezahlt === true` → Mail „Jetzt freischalten!" mit dem 9,99-Link, sonst → Mail „Abo aktivieren!" mit dem 49,99-Link. Empfänger ist `trainers.email`. Kein Schreibzugriff.                  |
-| `/stripe`        | Stripe, `checkout.session.completed` | Trainer über `customer_details.email` finden → offene Anfrage holen (`anfragen`, `weitergeleitet = false`) → `trainers.stripe_bezahlt` und `aktiv` auf `true` → Kundendaten an den Trainer mailen → `anfragen.weitergeleitet` auf `true` → Zahlungsmail an Jakob. |
+| Pfad             | Auslöser                             | Was passiert                                                                                                                                                                                                                                                           |
+| ---------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/neuer-trainer` | `registrieren.html`                  | Mail an `vexfit.info@gmail.com`: „🆕 Neuer Trainer: …" mit Name, E-Mail, Stadt, Trainingsart und Link auf `admin.html`. Kein Datenbankzugriff.                                                                                                                         |
+| `/neuer-kunde`   | `registrieren.html`, `suche.html`    | Mail an `vexfit.info@gmail.com`: „🎯 Neuer Kunde: …" mit Name, E-Mail, Stadt, Ziel und Link auf das Supabase-Dashboard. Kein Datenbankzugriff.                                                                                                                         |
+| `/neue-anfrage`  | `profil.html`, `kunden-bereich.html` | Trainer über `body.trainer_id` in `trainers` nachschlagen. Ist `stripe_bezahlt === true` → Mail „Jetzt freischalten!" mit dem 9,99-Link, sonst → Mail „Abo aktivieren!" mit dem 49,99-Link. Empfänger ist `trainers.email`. Kein Schreibzugriff.                       |
+| `/stripe`        | Stripe, `checkout.session.completed` | Trainer über `customer_details.email` finden → `trainers.stripe_bezahlt` und `aktiv` auf `true` → älteste offene Anfrage holen → Kundendaten an den Trainer mailen und genau diese Anfrage auf `weitergeleitet = true` → Zahlungsmail an Jakob. Siehe E1 und E2 unten. |
 
-**Wichtig und 1:1 übernommen:** findet der Stripe-Pfad **keine offene Anfrage**,
-passiert gar nichts — auch das Markieren als bezahlt bleibt aus. In n8n lief der
-Zweig hinter einem leeren „Offene Anfrage holen" ebenfalls nicht weiter.
+## Drei Korrekturen vom 26.09.2026
+
+Nach dem ersten Bau hat Jakob drei Dinge entschieden bzw. gemeldet. Sie sind die
+einzigen Stellen, an denen die Function bewusst vom Workflow abweicht.
+
+**Kundendaten kommen aus dem Webhook-Rumpf, beide Schreibweisen.** Die zwei
+Aufrufer schicken unterschiedliche Feldnamen:
+
+| Aufrufer                      | Feldnamen                                     |
+| ----------------------------- | --------------------------------------------- |
+| `kunden-bereich.html:435-441` | `kunden_name`, `ziel`, `nachricht`            |
+| `profil.html:350-355`         | `kunde_name`, `kunde_ziel`, `kunde_nachricht` |
+
+Der Workflow las nur die erste Schreibweise — Anfragen über `profil.html` kamen
+mit drei leeren Zeilen an. `kundenAngaben()` in `kern.ts` liest jetzt beide.
+Nicht aus der Tabelle `anfragen`, weil `profil.html` den Webhook in Schritt 0
+ruft und die Zeile erst in Schritt 1 anlegt (`profil.html:344-378`) — zum
+Zeitpunkt des Aufrufs gibt es sie noch nicht.
+
+**E1 — jede Zahlung wird verbucht.** `checkout.session.completed` setzt
+`trainers.stripe_bezahlt` und `trainers.aktiv` auf `true`, auch ohne offene
+Anfrage. Dann geht **keine** Kundendaten-Mail hinaus; die Zahlungsmail an Jakob
+geht trotzdem und trägt statt „✅ Kunden-Daten weitergeleitet" die Zeile „⚠️
+keine offene Anfrage". Vorher blieb eine solche Zahlung folgenlos, weil in n8n
+der Zweig hinter einem leeren „Offene Anfrage holen" nicht weiterlief.
+
+**E2 — genau eine Anfrage je Zahlung.** Hat ein Trainer mehrere offene Anfragen,
+wird pro Zahlung die **älteste** freigeschaltet: gemailt und als
+`weitergeleitet` markiert wird nur sie, die übrigen bleiben offen. Sortiert wird
+über `anfragen.created_at` aufsteigend — die Spalte ist belegt in
+`kunden-bereich.html:257` (`select=…,created_at`) und `trainer-bereich.html:647`
+(`order=created_at.desc`). Vorher traf das Markieren alle offenen Anfragen des
+Trainers auf einmal.
 
 ## Aufbau
 

@@ -76,11 +76,13 @@ export interface Trainer {
 }
 
 export interface Anfrage {
-  id?: string;
+  /** Pflicht: seit E2 wird genau DIESE Zeile als weitergeleitet markiert. */
+  id: string;
   kunden_name?: string | null;
   kunden_email?: string | null;
   ziel?: string | null;
   nachricht?: string | null;
+  created_at?: string | null;
 }
 
 export interface Mail {
@@ -104,9 +106,11 @@ export interface StripeEreignis {
 export interface Anschluesse {
   trainerNachId(id: string): Promise<Trainer | null>;
   trainerNachEmail(email: string): Promise<Trainer | null>;
-  offeneAnfrage(trainerId: string): Promise<Anfrage | null>;
+  /** Die AELTESTE offene Anfrage des Trainers (E2), oder null. */
+  aeltesteOffeneAnfrage(trainerId: string): Promise<Anfrage | null>;
   trainerBezahltMarkieren(email: string): Promise<void>;
-  anfragenWeitergeleitetMarkieren(trainerId: string): Promise<void>;
+  /** Genau EINE Anfrage als weitergeleitet markieren (E2). */
+  anfrageWeitergeleitetMarkieren(anfrageId: string): Promise<void>;
   mailSenden(mail: Mail): Promise<void>;
   /** Signatur pruefen. Gibt null zurueck, wenn sie nicht stimmt. */
   stripeEreignis(
@@ -171,6 +175,33 @@ export function eingabePruefen(
   return { ok: true };
 }
 
+/**
+ * Kundenname, Ziel und Nachricht aus dem Webhook-Rumpf.
+ *
+ * Die beiden ausgelieferten Aufrufer schicken UNTERSCHIEDLICHE Namen:
+ *   kunden-bereich.html:435-441  kunden_name, ziel, nachricht
+ *   profil.html:350-355          kunde_name, kunde_ziel, kunde_nachricht
+ * Der n8n-Workflow las nur die erste Schreibweise, deshalb kamen die drei
+ * Zeilen bei Anfragen ueber profil.html leer an. Hier werden beide gelesen.
+ *
+ * Warum nicht aus der Tabelle `anfragen`? profil.html ruft den Webhook in
+ * Schritt 0 auf und legt die Zeile erst in Schritt 1 an (profil.html:344-378)
+ * — zum Zeitpunkt des Aufrufs gibt es die Zeile also noch gar nicht.
+ * kunden-bereich.html macht es umgekehrt (Zeile 445 anlegen, Zeile 455 rufen).
+ * Der Rumpf ist die einzige Quelle, die in beiden Faellen da ist.
+ */
+export function kundenAngaben(
+  body: Record<string, unknown>,
+): { name: unknown; ziel: unknown; nachricht: unknown } {
+  const erste = (a: unknown, b: unknown) =>
+    a === undefined || a === null || a === "" ? b : a;
+  return {
+    name: erste(body.kunden_name, body.kunde_name),
+    ziel: erste(body.ziel, body.kunde_ziel),
+    nachricht: erste(body.nachricht, body.kunde_nachricht),
+  };
+}
+
 /** Wert so einsetzen, wie n8n es tat: fehlt er, steht dort nichts. */
 function w(wert: unknown): string {
   return wert === null || wert === undefined ? "" : String(wert);
@@ -227,6 +258,7 @@ export function mailErsteAnfrage(
   trainer: Trainer,
   body: Record<string, unknown>,
 ): Mail {
+  const kunde = kundenAngaben(body);
   return {
     an: w(trainer.email),
     betreff: betreffSaeubern(
@@ -236,9 +268,9 @@ export function mailErsteAnfrage(
       "\n" +
       "du hast deine erste Kunden-Anfrage erhalten! 🚀\n" +
       "\n" +
-      `👤 Kunde: ${w(body.kunden_name)}\n` +
-      `🎯 Ziel: ${w(body.ziel)}\n` +
-      `💬 Nachricht: ${w(body.nachricht)}\n` +
+      `👤 Kunde: ${w(kunde.name)}\n` +
+      `🎯 Ziel: ${w(kunde.ziel)}\n` +
+      `💬 Nachricht: ${w(kunde.nachricht)}\n` +
       "\n" +
       "Um die Kontaktdaten zu erhalten aktiviere dein Abo:\n" +
       "\n" +
@@ -257,6 +289,7 @@ export function mailWeitereAnfrage(
   trainer: Trainer,
   body: Record<string, unknown>,
 ): Mail {
+  const kunde = kundenAngaben(body);
   return {
     an: w(trainer.email),
     betreff: betreffSaeubern(
@@ -266,9 +299,9 @@ export function mailWeitereAnfrage(
       "\n" +
       "du hast eine neue Kunden-Anfrage! 🚀\n" +
       "\n" +
-      `👤 Kunde: ${w(body.kunden_name)}\n` +
-      `🎯 Ziel: ${w(body.ziel)}\n` +
-      `💬 Nachricht: ${w(body.nachricht)}\n` +
+      `👤 Kunde: ${w(kunde.name)}\n` +
+      `🎯 Ziel: ${w(kunde.ziel)}\n` +
+      `💬 Nachricht: ${w(kunde.nachricht)}\n` +
       "\n" +
       "Einmalig freischalten für €9,99:\n" +
       "\n" +
@@ -314,10 +347,16 @@ export function mailZahlungAnJakob(
   trainer: Trainer,
   zahlerEmail: string,
   betragCent: number | null | undefined,
+  anfrageWeitergeleitet: boolean,
 ): Mail {
   const betrag = betragCent === null || betragCent === undefined
     ? ""
     : String(betragCent / 100);
+  // E1 (Jakob, 26.09.2026): eine Zahlung ohne offene Anfrage wird trotzdem
+  // verbucht. Dann stimmt die zweite Haken-Zeile des Workflows nicht mehr.
+  const zweiteZeile = anfrageWeitergeleitet
+    ? "✅ Kunden-Daten weitergeleitet"
+    : "⚠️ keine offene Anfrage";
   return {
     an: BETREIBER,
     betreff: betreffSaeubern(`💰 Zahlung: ${zahlerEmail}`),
@@ -328,7 +367,7 @@ export function mailZahlungAnJakob(
       `💶 Betrag: ${betrag}€\n` +
       "\n" +
       "✅ Als bezahlt markiert\n" +
-      "✅ Kunden-Daten weitergeleitet\n" +
+      zweiteZeile + "\n" +
       "\n" +
       "→ Admin: https://vexfit.app/admin.html",
   };
@@ -515,14 +554,24 @@ async function neueAnfrage(
 }
 
 /**
- * Stripe-Pfad. Reihenfolge wie im Workflow:
- * Trainer finden → offene Anfrage holen → Trainer als bezahlt markieren →
- * Kundendaten an den Trainer + Anfrage als weitergeleitet markieren →
+ * Stripe-Pfad.
+ *
+ * Reihenfolge wie im Workflow: Trainer finden → Trainer als bezahlt markieren
+ * → Kundendaten an den Trainer + Anfrage als weitergeleitet markieren →
  * Zahlungsmail an Jakob.
  *
- * Wichtig und 1:1 uebernommen: findet "Offene Anfrage holen" nichts, laeuft in
- * n8n der ganze Rest des Zweiges nicht — dann wird auch NICHT als bezahlt
- * markiert. Eine Zahlung ohne offene Anfrage bleibt also folgenlos.
+ * Zwei Entscheidungen von Jakob vom 26.09.2026 weichen bewusst vom Workflow ab:
+ *
+ * E1  Jede erfolgreiche Zahlung setzt `stripe_bezahlt` und `aktiv` auf true —
+ *     auch ohne offene Anfrage. Frueher lief der Zweig hinter einem leeren
+ *     "Offene Anfrage holen" gar nicht weiter, die Zahlung blieb folgenlos.
+ *     Ohne offene Anfrage geht KEINE Kundendaten-Mail hinaus; die Zahlungsmail
+ *     an Jakob geht trotzdem, mit dem Vermerk "keine offene Anfrage".
+ *
+ * E2  Bei mehreren offenen Anfragen wird pro Zahlung genau EINE freigeschaltet:
+ *     die aelteste (`anfragen.created_at` aufsteigend). Nur sie wird gemailt
+ *     und nur sie wird markiert; die uebrigen bleiben offen. Frueher traf das
+ *     Markieren alle offenen Anfragen des Trainers auf einmal.
  */
 async function stripe(r: Request, a: Anschluesse): Promise<Response> {
   const rumpf = await r.text();
@@ -553,31 +602,42 @@ async function stripe(r: Request, a: Anschluesse): Promise<Response> {
     return antwort(200, { ok: true, uebersprungen: "kein Trainer" });
   }
 
-  const anfrage = await a.offeneAnfrage(trainer.id);
-  if (!anfrage) {
-    await a.ereignisVermerken(ereignis.id, ereignis.type);
-    a.melden?.("keine offene Anfrage — wie im Workflow passiert nichts weiter");
-    return antwort(200, { ok: true, uebersprungen: "keine offene Anfrage" });
-  }
-
+  // E1: die Zahlung wird in jedem Fall verbucht.
   await a.trainerBezahltMarkieren(zahlerEmail);
-  const mailsGesendet = await sendeWennAdresseTaugt(
+
+  // E2: genau die aelteste offene Anfrage.
+  const anfrage = await a.aeltesteOffeneAnfrage(trainer.id);
+
+  let mails = 0;
+  if (anfrage) {
+    const ging = await sendeWennAdresseTaugt(
       a,
       mailKundenDaten(trainer, anfrage, zahlerEmail),
-    )
-    ? 1
-    : 0;
-  await a.anfragenWeitergeleitetMarkieren(trainer.id);
-  const jakobGesendet = await sendeWennAdresseTaugt(
+    );
+    if (ging) mails++;
+    await a.anfrageWeitergeleitetMarkieren(anfrage.id);
+  } else {
+    a.melden?.(
+      "Zahlung ohne offene Anfrage — verbucht, aber nichts weitergeleitet",
+    );
+  }
+
+  const anJakob = await sendeWennAdresseTaugt(
     a,
-    mailZahlungAnJakob(trainer, zahlerEmail, sitzung.amount_total),
+    mailZahlungAnJakob(
+      trainer,
+      zahlerEmail,
+      sitzung.amount_total,
+      Boolean(anfrage),
+    ),
   );
+  if (anJakob) mails++;
 
   await a.ereignisVermerken(ereignis.id, ereignis.type);
   return antwort(200, {
     ok: true,
-    mails: mailsGesendet + (jakobGesendet ? 1 : 0),
+    mails,
     trainer_markiert: true,
-    anfrage_weitergeleitet: true,
+    anfrage_weitergeleitet: Boolean(anfrage),
   });
 }

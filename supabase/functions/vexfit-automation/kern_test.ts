@@ -19,6 +19,7 @@ import {
   BETREIBER,
   eingabePruefen,
   ERLAUBTE_HERKUNFT,
+  kundenAngaben,
   LINK_ERSTE,
   LINK_WEITERE,
   type Mail,
@@ -35,7 +36,7 @@ const TEST_GEHEIMNIS = "whsec_nur_fuer_den_test_ohne_echten_wert";
 interface Aufzeichnung {
   mails: Mail[];
   bezahltMarkiert: string[];
-  weitergeleitetMarkiert: string[];
+  weitergeleitetMarkiert: string[]; // jetzt Anfrage-Kennungen (E2)
   vermerkt: string[];
 }
 
@@ -53,11 +54,14 @@ const A_STANDARD: Anfrage = {
   kunden_email: "kundin@beispiel.at",
   ziel: "Abnehmen",
   nachricht: "Ich moechte starten.",
+  created_at: "2026-09-20T10:00:00Z",
 };
 
 function bau(opt: {
   trainer?: Trainer | null;
   anfrage?: Anfrage | null;
+  /** Mehrere offene Anfragen — die Datenbank wird hier nachgebaut (E2). */
+  offene?: Anfrage[];
   schonVerarbeitet?: Set<string>;
   adminHinweis?: string;
   smtpFehler?: boolean;
@@ -69,6 +73,8 @@ function bau(opt: {
     vermerkt: [],
   };
   const schon = opt.schonVerarbeitet ?? new Set<string>();
+  /** Schon weitergeleitete Anfragen — die Sperre der Datenbank nachgebaut. */
+  const erledigt = new Set<string>();
   const stripeClient = new Stripe("sk_test_nicht_benutzt", {
     httpClient: Stripe.createFetchHttpClient(),
   });
@@ -79,14 +85,27 @@ function bau(opt: {
       Promise.resolve(opt.trainer === undefined ? T_STANDARD : opt.trainer),
     trainerNachEmail: () =>
       Promise.resolve(opt.trainer === undefined ? T_STANDARD : opt.trainer),
-    offeneAnfrage: () =>
-      Promise.resolve(opt.anfrage === undefined ? A_STANDARD : opt.anfrage),
+    // Bildet die Abfrage nach: offen, nach created_at aufsteigend, erste Zeile.
+    aeltesteOffeneAnfrage: () => {
+      if (opt.offene) {
+        const offen = opt.offene
+          .filter((x) => !erledigt.has(x.id))
+          .sort((x, y) =>
+            String(x.created_at).localeCompare(String(y.created_at))
+          );
+        return Promise.resolve(offen[0] ?? null);
+      }
+      const einzeln = opt.anfrage === undefined ? A_STANDARD : opt.anfrage;
+      if (einzeln && erledigt.has(einzeln.id)) return Promise.resolve(null);
+      return Promise.resolve(einzeln);
+    },
     trainerBezahltMarkieren: (email) => {
       auf.bezahltMarkiert.push(email);
       return Promise.resolve();
     },
-    anfragenWeitergeleitetMarkieren: (id) => {
-      auf.weitergeleitetMarkiert.push(id);
+    anfrageWeitergeleitetMarkieren: (anfrageId) => {
+      auf.weitergeleitetMarkiert.push(anfrageId);
+      erledigt.add(anfrageId);
       return Promise.resolve();
     },
     mailSenden: (m) => {
@@ -381,27 +400,54 @@ Deno.test("/neue-anfrage: ohne trainer_id → 400, unbekannte Kennung → 200 oh
   assertEquals(leer.auf.mails, []);
 });
 
-Deno.test("/neue-anfrage: die Feldnamen von profil.html kommen im Text leer an (wie im Workflow)", async () => {
-  // profil.html schickt kunde_name/kunde_ziel/kunde_nachricht, der Workflow
-  // liest kunden_name/ziel/nachricht. Das ist unveraendert uebernommen.
+Deno.test("/neue-anfrage: die Feldnamen von profil.html kommen jetzt gefuellt an", async () => {
+  // profil.html:350-355 schickt kunde_name / kunde_ziel / kunde_nachricht,
+  // kunden-bereich.html:435-441 schickt kunden_name / ziel / nachricht.
+  // Seit dem 26.09.2026 liest die Function beide Schreibweisen.
   const { anschluesse, auf } = bau();
   await bearbeiten(
     anfrage("neue-anfrage", {
       trainer_id: "t-1",
       trainer_name: "Testvorname Testnachname",
-      kunde_name: "Eva",
+      kunde_name: "Eva Muster",
       kunde_email: "eva@beispiel.at",
       kunde_ziel: "Abnehmen",
-      kunde_nachricht: "Hallo!",
+      kunde_nachricht: "Ich moechte starten.",
     }, VOM_BROWSER),
     anschluesse,
   );
-  assertStringIncludes(auf.mails[0].text, "👤 Kunde: \n");
-  assertStringIncludes(auf.mails[0].text, "🎯 Ziel: \n");
-  assert(
-    !auf.mails[0].text.includes("Eva"),
-    "Wert aus einem anderen Feldnamen wurde eingesetzt",
+  const text = auf.mails[0].text;
+  assertStringIncludes(text, "👤 Kunde: Eva Muster");
+  assertStringIncludes(text, "🎯 Ziel: Abnehmen");
+  assertStringIncludes(text, "💬 Nachricht: Ich moechte starten.");
+});
+
+Deno.test("/neue-anfrage: die Feldnamen von kunden-bereich.html gehen weiter", async () => {
+  const { anschluesse, auf } = bau();
+  await bearbeiten(
+    anfrage("neue-anfrage", {
+      trainer_id: "t-1",
+      kunden_name: "Eva Muster",
+      kunden_email: "eva@beispiel.at",
+      ziel: "Abnehmen",
+      nachricht: "Ich moechte starten.",
+    }, VOM_BROWSER),
+    anschluesse,
   );
+  const text = auf.mails[0].text;
+  assertStringIncludes(text, "👤 Kunde: Eva Muster");
+  assertStringIncludes(text, "🎯 Ziel: Abnehmen");
+  assertStringIncludes(text, "💬 Nachricht: Ich moechte starten.");
+});
+
+Deno.test("/neue-anfrage: kundenAngaben nimmt die erste gefuellte Schreibweise", () => {
+  assertEquals(kundenAngaben({ kunden_name: "A", kunde_name: "B" }).name, "A");
+  assertEquals(kundenAngaben({ kunde_name: "B" }).name, "B");
+  assertEquals(kundenAngaben({ kunden_name: "", kunde_name: "B" }).name, "B");
+  assertEquals(kundenAngaben({ ziel: "Z", kunde_ziel: "Y" }).ziel, "Z");
+  assertEquals(kundenAngaben({ kunde_ziel: "Y" }).ziel, "Y");
+  assertEquals(kundenAngaben({ kunde_nachricht: "N" }).nachricht, "N");
+  assertEquals(kundenAngaben({}).name, undefined);
 });
 
 // ===========================================================================
@@ -585,7 +631,7 @@ Deno.test("Stripe: gueltige Signatur → markieren, weiterleiten, zwei Mails wie
   assertEquals(a.status, 200);
 
   assertEquals(auf.bezahltMarkiert, ["trainer@beispiel.at"]);
-  assertEquals(auf.weitergeleitetMarkiert, ["t-1"]);
+  assertEquals(auf.weitergeleitetMarkiert, ["a-1"]); // E2: die Anfrage, nicht der Trainer
   assertEquals(auf.vermerkt, ["evt_1"]);
   assertEquals(auf.mails.length, 2);
 
@@ -697,21 +743,131 @@ Deno.test("Stripe: kein Trainer zur Zahleradresse → nichts markiert, Ereignis 
   assertEquals(auf.vermerkt, ["evt_ohne_trainer"]);
 });
 
-Deno.test("Stripe: keine offene Anfrage → gar nichts, auch nicht als bezahlt markiert (wie im Workflow)", async () => {
+Deno.test("E1 — Zahlung ohne offene Anfrage: verbucht, keine Trainer-Mail, Vermerk an Jakob", async () => {
   const { anschluesse, auf } = bau({ anfrage: null });
   const a = await bearbeiten(
     await stripeAnfrage(zahlung("evt_ohne_anfrage")),
     anschluesse,
   );
   assertEquals(a.status, 200);
-  assertEquals((await a.json()).uebersprungen, "keine offene Anfrage");
-  assertEquals(auf.mails, []);
-  assertEquals(
-    auf.bezahltMarkiert,
-    [],
-    "im Workflow laeuft der Zweig hier nicht weiter",
-  );
+  const d = await a.json();
+  assertEquals(d.trainer_markiert, true);
+  assertEquals(d.anfrage_weitergeleitet, false);
+
+  // verbucht wird trotzdem
+  assertEquals(auf.bezahltMarkiert, ["trainer@beispiel.at"]);
   assertEquals(auf.weitergeleitetMarkiert, []);
+
+  // genau eine Mail, und zwar die an Jakob
+  assertEquals(auf.mails.length, 1);
+  assertEquals(auf.mails[0].an, "vexfit.info@gmail.com");
+  assertEquals(auf.mails[0].betreff, "💰 Zahlung: trainer@beispiel.at");
+  assertStringIncludes(auf.mails[0].text, "✅ Als bezahlt markiert");
+  assertStringIncludes(auf.mails[0].text, "⚠️ keine offene Anfrage");
+  assert(
+    !auf.mails[0].text.includes("✅ Kunden-Daten weitergeleitet"),
+    "die Haken-Zeile behauptet eine Weiterleitung, die es nicht gab",
+  );
+  assertEquals(auf.vermerkt, ["evt_ohne_anfrage"]);
+});
+
+Deno.test("E1 — mit offener Anfrage steht die urspruengliche Haken-Zeile in der Mail", async () => {
+  const { anschluesse, auf } = bau();
+  await bearbeiten(
+    await stripeAnfrage(zahlung("evt_mit_anfrage")),
+    anschluesse,
+  );
+  assertStringIncludes(auf.mails[1].text, "✅ Kunden-Daten weitergeleitet");
+  assert(!auf.mails[1].text.includes("keine offene Anfrage"));
+});
+
+// --------------------------------------------------------------------------
+// E2 — genau eine Anfrage je Zahlung, die aelteste
+// --------------------------------------------------------------------------
+const DREI_OFFENE: Anfrage[] = [
+  {
+    id: "a-mitte",
+    kunden_name: "Kundin Mitte",
+    kunden_email: "mitte@beispiel.at",
+    ziel: "Mitte",
+    nachricht: "zweite",
+    created_at: "2026-09-20T12:00:00Z",
+  },
+  {
+    id: "a-alt",
+    kunden_name: "Kundin Alt",
+    kunden_email: "alt@beispiel.at",
+    ziel: "Alt",
+    nachricht: "erste",
+    created_at: "2026-09-19T08:00:00Z",
+  },
+  {
+    id: "a-neu",
+    kunden_name: "Kundin Neu",
+    kunden_email: "neu@beispiel.at",
+    ziel: "Neu",
+    nachricht: "dritte",
+    created_at: "2026-09-21T09:00:00Z",
+  },
+];
+
+Deno.test("E2 — drei offene Anfragen: nur die aelteste wird gemailt und markiert", async () => {
+  const { anschluesse, auf } = bau({ offene: DREI_OFFENE });
+  const a = await bearbeiten(
+    await stripeAnfrage(zahlung("evt_e2_1")),
+    anschluesse,
+  );
+  assertEquals(a.status, 200);
+
+  assertEquals(
+    auf.weitergeleitetMarkiert,
+    ["a-alt"],
+    "es wurde die falsche Anfrage markiert",
+  );
+  assertEquals(auf.mails.length, 2);
+  const anTrainer = auf.mails[0];
+  assertStringIncludes(anTrainer.text, "👤 Name: Kundin Alt");
+  assertStringIncludes(anTrainer.text, "📧 Email: alt@beispiel.at");
+  assert(
+    !anTrainer.text.includes("Kundin Mitte"),
+    "eine zweite Anfrage steht in der Mail",
+  );
+  assert(
+    !anTrainer.text.includes("Kundin Neu"),
+    "eine dritte Anfrage steht in der Mail",
+  );
+});
+
+Deno.test("E2 — zweite Zahlung: die naechstaeltere wird freigeschaltet, die juengste bleibt offen", async () => {
+  const { anschluesse, auf } = bau({ offene: DREI_OFFENE });
+  await bearbeiten(await stripeAnfrage(zahlung("evt_e2_a")), anschluesse);
+  await bearbeiten(await stripeAnfrage(zahlung("evt_e2_b")), anschluesse);
+
+  assertEquals(auf.weitergeleitetMarkiert, ["a-alt", "a-mitte"]);
+  assertEquals(auf.mails.length, 4); // je Zahlung eine an den Trainer und eine an Jakob
+  assertStringIncludes(auf.mails[0].text, "👤 Name: Kundin Alt");
+  assertStringIncludes(auf.mails[2].text, "👤 Name: Kundin Mitte");
+
+  // Die juengste ist weiterhin offen und kaeme bei der naechsten Zahlung dran.
+  await bearbeiten(await stripeAnfrage(zahlung("evt_e2_c")), anschluesse);
+  assertEquals(auf.weitergeleitetMarkiert, ["a-alt", "a-mitte", "a-neu"]);
+});
+
+Deno.test("E2 — vierte Zahlung ohne offene Anfrage: verbucht, Vermerk, nichts markiert", async () => {
+  const { anschluesse, auf } = bau({ offene: DREI_OFFENE });
+  for (const kennung of ["evt_v1", "evt_v2", "evt_v3", "evt_v4"]) {
+    await bearbeiten(await stripeAnfrage(zahlung(kennung)), anschluesse);
+  }
+  assertEquals(auf.weitergeleitetMarkiert, ["a-alt", "a-mitte", "a-neu"]);
+  assertEquals(
+    auf.bezahltMarkiert.length,
+    4,
+    "jede Zahlung wird verbucht (E1)",
+  );
+  assertStringIncludes(
+    auf.mails[auf.mails.length - 1].text,
+    "⚠️ keine offene Anfrage",
+  );
 });
 
 Deno.test("Stripe: Betrag wird wie im Workflow durch 100 geteilt", async () => {
