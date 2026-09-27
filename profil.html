@@ -377,7 +377,7 @@ async function sendContact() {
       })
     });
     if(!anfrageRes.ok) {
-      console.error('Anfrage speichern fehlgeschlagen:', anfrageRes.status, await anfrageRes.text());
+      console.error('Anfrage speichern fehlgeschlagen:', anfrageRes.status);
       throw new Error('Anfrage konnte nicht gespeichert werden');
     }
 

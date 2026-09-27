@@ -522,7 +522,7 @@ async function uploadAvatar() {
     });
     if(istAbgemeldet(up)) return;
     if(!up.ok) {
-      console.error('Bild hochladen fehlgeschlagen:', up.status, await up.text());
+      console.error('Bild hochladen fehlgeschlagen:', up.status);
       throw new Error('upload');
     }
     // ?v= sorgt dafuer, dass der Browser nach einem Wechsel nicht das alte Bild zeigt.
@@ -534,7 +534,7 @@ async function uploadAvatar() {
     });
     if(istAbgemeldet(r)) return;
     if(!r.ok) {
-      console.error('Bildadresse speichern fehlgeschlagen:', r.status, await r.text());
+      console.error('Bildadresse speichern fehlgeschlagen:', r.status);
       throw new Error('save');
     }
     if(T) T.avatar_url = url;
@@ -750,7 +750,7 @@ async function beantworteAnfrage(id, neuerStatus, el) {
       const d = await r.json().catch(() => null);
       gespeichert = Array.isArray(d) && d.length > 0 && d[0].status === neuerStatus;
     } else {
-      console.error('Anfrage-Zustand speichern fehlgeschlagen:', r.status, await r.text());
+      console.error('Anfrage-Zustand speichern fehlgeschlagen:', r.status);
     }
     if(!gespeichert) throw new Error('nicht gespeichert');
     const a = anfragenDaten.find(x => String(x.id) === String(id));
@@ -813,8 +813,7 @@ async function saveProfile() {
       btn.disabled = false;
       btn.textContent = 'Profil speichern';
     } else {
-      const fehler = await r.text();
-      console.error('Speichern fehlgeschlagen:', r.status, fehler);
+      console.error('Speichern fehlgeschlagen:', r.status);
       showToast('Speichern fehlgeschlagen. Bitte versuche es erneut.', true);
       btn.disabled = false;
       btn.textContent = 'Profil speichern';

@@ -500,8 +500,7 @@ async function saveProfile() {
       showToast('✓ Profil gespeichert!');
       setTimeout(() => { location.href = 'trainer-bereich.html'; }, 1200);
     } else {
-      const err = await r.text();
-      console.error('Save error:', err);
+      console.error('Save error:', r.status);
       showToast('Fehler beim Speichern', true);
       btn.disabled = false;
       btn.textContent = 'Profil speichern';

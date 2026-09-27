@@ -109,7 +109,7 @@ async function submit() {
     // Absichtlich immer dieselbe Rueckmeldung, egal wie die Antwort ausfaellt:
     // sonst koennte man ablesen, welche Adressen registriert sind.
     // Ein technischer Fehler landet nur in der Konsole.
-    if(!r.ok) console.error('Reset fehlgeschlagen:', r.status, await r.text());
+    if(!r.ok) console.error('Reset fehlgeschlagen:', r.status);
     document.getElementById('formSection').style.display = 'none';
     document.getElementById('successSection').style.display = 'block';
   } catch(e) {
