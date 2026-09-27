@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /admin.html
+Disallow: /entwuerfe/
+Disallow: /migrations/
+Disallow: /supabase-setup.sql
+
+Sitemap: https://vexfit.app/sitemap.xml
