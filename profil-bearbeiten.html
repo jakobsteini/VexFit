@@ -150,7 +150,7 @@ try {
     <div class="section-title"><span class="dot dot-missing" id="dotPreis"></span>PREIS PRO STUNDE</div>
     <div class="field">
       <label>Dein Stundensatz in €</label>
-      <input type="number" id="fPreis" placeholder="z.B. 60" min="1" max="999">
+      <input type="number" id="fPreis" placeholder="z.B. 60" min="1" max="999" inputmode="numeric">
       <div class="hint">Wird auf deinem Profil angezeigt. Du kannst ihn jederzeit ändern.</div>
     </div>
   </div>
@@ -196,7 +196,7 @@ try {
     <div class="section-title"><span class="dot dot-missing" id="dotTelefon"></span>TELEFON</div>
     <div class="field">
       <label>Handynummer für Kundenrückfragen</label>
-      <input type="tel" id="fTelefon" placeholder="+43 660 1234567">
+      <input type="tel" id="fTelefon" placeholder="+43 660 1234567" autocomplete="tel">
       <div class="hint">Wird nur an Kunden weitergegeben die dich gebucht haben. Nicht öffentlich sichtbar.</div>
     </div>
   </div>
@@ -206,7 +206,7 @@ try {
     <div class="section-title"><span class="dot dot-missing" id="dotStandort"></span>STANDORT</div>
     <div class="field">
       <label>Postleitzahl</label>
-      <input type="text" id="fPlz" placeholder="5020" maxlength="5" oninput="plzGeaendert()">
+      <input type="text" id="fPlz" placeholder="5020" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="plzGeaendert()">
       <div class="hint" id="plzStatus" style="display:none"></div>
       <div class="hint">Dein Ort wird aus der Postleitzahl ermittelt und auf deinem Profil angezeigt.</div>
     </div>

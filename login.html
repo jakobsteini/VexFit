@@ -83,8 +83,8 @@ try {
   </div>
   <div class="alert alert-error" id="errorMsg"></div>
   <div class="alert alert-success" id="successMsg"></div>
-  <div class="field"><label>E-Mail</label><input type="email" placeholder="deine@email.com" id="email" onkeydown="if(event.key==='Enter')doLogin()"></div>
-  <div class="field"><label>Passwort</label><input type="password" placeholder="Dein Passwort" id="pw" onkeydown="if(event.key==='Enter')doLogin()"></div>
+  <div class="field"><label>E-Mail</label><input type="email" placeholder="deine@email.com" id="email" autocomplete="email" onkeydown="if(event.key==='Enter')doLogin()"></div>
+  <div class="field"><label>Passwort</label><input type="password" placeholder="Dein Passwort" id="pw" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:400">
       <input type="checkbox" id="stayLoggedIn" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;background:var(--card);border:1px solid var(--border-input)">

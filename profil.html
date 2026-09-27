@@ -203,8 +203,8 @@ try {
           <div class="contact-title">TRAINER ANFRAGEN</div>
           <p class="contact-sub">Sende eine Anfrage – wir vermitteln den Kontakt für dich</p>
           <div class="alert-error" id="contactError"></div>
-          <div class="field"><label>Dein Name</label><input type="text" placeholder="Anna Muster" id="c-name"></div>
-          <div class="field"><label>Deine E-Mail</label><input type="email" placeholder="anna@example.com" id="c-email"></div>
+          <div class="field"><label>Dein Name</label><input type="text" placeholder="Anna Muster" id="c-name" autocomplete="name"></div>
+          <div class="field"><label>Deine E-Mail</label><input type="email" placeholder="anna@example.com" id="c-email" autocomplete="email"></div>
           <div class="field"><label>Dein Ziel</label><input type="text" placeholder="z.B. Abnehmen, Muskelaufbau..." id="c-goal"></div>
           <div class="field"><label>Nachricht</label><textarea placeholder="Erzähl dem Trainer kurz was du suchst..." id="c-message"></textarea></div>
           <button class="btn-send" id="sendBtn" onclick="sendContact()">Nachricht senden →</button>

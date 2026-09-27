@@ -76,7 +76,7 @@ try {
     <div class="title">ZURÜCKSETZEN</div>
     <p class="sub">Gib deine E-Mail ein. Wir schicken dir einen Reset-Link direkt von Supabase.</p>
     <div class="alert alert-error" id="errMsg"></div>
-    <div class="field"><label>E-Mail</label><input type="email" placeholder="deine@email.com" id="reset-email" onkeydown="if(event.key==='Enter')submit()"></div>
+    <div class="field"><label>E-Mail</label><input type="email" placeholder="deine@email.com" id="reset-email" autocomplete="email" onkeydown="if(event.key==='Enter')submit()"></div>
     <button class="btn" id="resetBtn" onclick="submit()">Reset-Link senden →</button>
     <div class="back-link">Passwort erinnerst du dich? <a href="login.html">Login</a></div>
   </div>

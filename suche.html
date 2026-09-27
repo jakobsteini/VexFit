@@ -147,7 +147,7 @@ try {
   <div class="sh-label">Trainer finden</div>
   <div class="sh-title">FINDE DEINEN<br>PERFEKTEN TRAINER</div>
   <div class="search-bar">
-    <input class="s-input" type="text" placeholder="Deine PLZ (z.B. 5026)" id="plzInput" maxlength="5">
+    <input class="s-input" type="text" placeholder="Deine PLZ (z.B. 5026)" id="plzInput" maxlength="5" inputmode="numeric" autocomplete="postal-code">
     <select class="s-input" id="radiusInput" style="max-width:130px;cursor:pointer">
       <option value="10">10 km</option>
       <option value="25" selected>25 km</option>
@@ -189,7 +189,7 @@ try {
         <div class="notify-label">🔔 Benachrichtigung</div>
         <div class="notify-title">Benachrichtige mich!</div>
         <p class="notify-sub">Gib deine E-Mail ein – wir melden uns sobald Trainer in deiner Stadt verfügbar sind.</p>
-        <div class="notify-field"><label>Deine E-Mail</label><input type="email" placeholder="deine@email.com" id="notif-email"></div>
+        <div class="notify-field"><label>Deine E-Mail</label><input type="email" placeholder="deine@email.com" id="notif-email" autocomplete="email"></div>
         <button class="notify-btn" onclick="submitNotify()">🔔 Jetzt benachrichtigen</button>
       </div>
       <div id="notifySuccess" style="display:none;text-align:center;padding:16px 0">

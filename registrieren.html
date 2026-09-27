@@ -132,16 +132,16 @@ try {
     <div class="info-box"><div class="info-box-title">🎉 0 € bis Kunde 1</div><p>Erstelle dein Profil gratis. Preise, Bio und Fotos kannst du jederzeit später ergänzen.</p></div>
     <div class="error-banner" id="t-error"></div>
     <div class="field-row">
-      <div class="field"><label>Vorname</label><input type="text" placeholder="Max" id="t-fn"></div>
-      <div class="field"><label>Nachname</label><input type="text" placeholder="Mustermann" id="t-ln"></div>
+      <div class="field"><label>Vorname</label><input type="text" placeholder="Max" id="t-fn" autocomplete="given-name"></div>
+      <div class="field"><label>Nachname</label><input type="text" placeholder="Mustermann" id="t-ln" autocomplete="family-name"></div>
     </div>
-    <div class="field"><label>E-Mail</label><input type="email" placeholder="max@example.com" id="t-email"></div>
+    <div class="field"><label>E-Mail</label><input type="email" placeholder="max@example.com" id="t-email" autocomplete="email"></div>
     <div class="field-row">
       <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="t-pw" autocomplete="new-password"></div>
       <div class="field"><label>Passwort wiederholen</label><input type="password" placeholder="Nochmal eingeben" id="t-pw2" autocomplete="new-password"></div>
     </div>
     <div class="error-banner" id="t-pw-error"></div>
-    <div class="field"><label>PLZ</label><input type="text" placeholder="5020" id="t-plz" maxlength="5" oninput="plzGeaendert('t')"></div>
+    <div class="field"><label>PLZ</label><input type="text" placeholder="5020" id="t-plz" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="plzGeaendert('t')"></div>
     <div id="t-plz-status" style="display:none;font-size:12px;color:var(--text-muted);margin:-6px 0 12px"></div>
     <label class="checkbox-field"><input type="checkbox" id="t-agb"><div class="custom-cb"></div><span class="cb-label">Ich akzeptiere die <a href="rechtliches.html" target="_blank">AGB</a> und <a href="rechtliches.html#datenschutz" target="_blank">Datenschutzbestimmungen</a></span></label>
     <div class="form-actions"><button class="btn-next" id="t-submit-btn" onclick="submitTrainer()">Profil gratis erstellen 🚀</button></div>
@@ -158,16 +158,16 @@ try {
     </div>
     <div class="error-banner" id="c-error"></div>
     <div class="field-row">
-      <div class="field"><label>Vorname</label><input type="text" placeholder="Anna" id="c-fn"></div>
-      <div class="field"><label>Nachname</label><input type="text" placeholder="Muster" id="c-ln"></div>
+      <div class="field"><label>Vorname</label><input type="text" placeholder="Anna" id="c-fn" autocomplete="given-name"></div>
+      <div class="field"><label>Nachname</label><input type="text" placeholder="Muster" id="c-ln" autocomplete="family-name"></div>
     </div>
-    <div class="field"><label>E-Mail</label><input type="email" placeholder="anna@example.com" id="c-email"></div>
+    <div class="field"><label>E-Mail</label><input type="email" placeholder="anna@example.com" id="c-email" autocomplete="email"></div>
     <div class="field-row">
       <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="c-pw" autocomplete="new-password"></div>
       <div class="field"><label>Passwort wiederholen</label><input type="password" placeholder="Nochmal eingeben" id="c-pw2" autocomplete="new-password"></div>
     </div>
     <div class="error-banner" id="c-pw-error"></div>
-    <div class="field"><label>PLZ</label><input type="text" placeholder="5026" id="c-plz" maxlength="5" oninput="plzGeaendert('c')"></div>
+    <div class="field"><label>PLZ</label><input type="text" placeholder="5026" id="c-plz" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="plzGeaendert('c')"></div>
     <div id="c-plz-status" style="display:none;font-size:12px;color:var(--text-muted);margin:-6px 0 12px"></div>
     <label class="checkbox-field"><input type="checkbox" id="c-agb"><div class="custom-cb"></div><span class="cb-label">Ich akzeptiere die <a href="rechtliches.html#agb" target="_blank">AGB & Datenschutz</a></span></label>
     <div class="form-actions"><button class="btn-next" id="c-submit-btn" onclick="submitClient()">Trainer finden →</button></div>
