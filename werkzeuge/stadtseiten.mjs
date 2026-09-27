@@ -337,11 +337,17 @@ function vexfitAblehnen(){
 }
 
 // ──── sitemap.xml ────
-function sitemapXml() {
+// Neben den Seiten des Repos steht fuer jeden freigeschalteten Trainer die
+// Adresse seines oeffentlichen Profils in der sitemap. Die Datei wird bei
+// jedem Lauf komplett neu geschrieben - Profile von Trainern, die nicht mehr
+// freigeschaltet sind, fallen dadurch automatisch wieder heraus.
+function sitemapXml(trainer) {
   const seiten = readdirSync(REPO)
     .filter(f => f.endsWith('.html') && !SITEMAP_AUSSCHLUSS.has(f))
     .sort();
-  const eintraege = seiten.map(f => `  <url><loc>${BASIS}/${f}</loc></url>`).join('\n');
+  const profile = (trainer || []).map(t => `profil.html?id=${t.id}`).sort();
+  const eintraege = [...seiten, ...profile]
+    .map(f => `  <url><loc>${BASIS}/${f}</loc></url>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${eintraege}\n</urlset>\n`;
 }
 
@@ -426,7 +432,7 @@ async function main() {
   }
 
   // sitemap.xml und Fussbereichs-Links pflegen.
-  writeFileSync(join(REPO, 'sitemap.xml'), sitemapXml());
+  writeFileSync(join(REPO, 'sitemap.xml'), sitemapXml(trainer));
   const staedte = erreicht.map(([stadt]) => stadt);
   const fussGeaendert = ['index.html', 'suche.html']
     .filter(d => fussblockEinsetzen(d, fussblock(staedte)));
