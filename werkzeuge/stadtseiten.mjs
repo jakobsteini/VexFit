@@ -37,9 +37,25 @@ const SPALTEN = 'id,created_at,vorname,nachname,stadt,plz,trainingsart,erfahrung
 // Wie in suche.html: als Profilbild gilt nur eine Adresse aus dem eigenen Behaelter.
 const AVATAR_PREFIX = SUPABASE_URL + '/storage/v1/object/public/avatars/';
 
-// Seiten, die nicht in die sitemap gehoeren: admin.html ist in robots.txt
-// ausgeschlossen, 404.html ist die Fehlerseite von GitHub Pages.
-const SITEMAP_AUSSCHLUSS = new Set(['admin.html', '404.html']);
+// 404.html ist die Fehlerseite von GitHub Pages und gehoert nie in die sitemap.
+const SITEMAP_AUSSCHLUSS = new Set(['404.html']);
+
+// Ob eine Seite in die sitemap gehoert, wird aus der Datei selbst gelesen,
+// nicht aus einer festen Liste. Draussen bleibt, was
+//   1. Suchmaschinen per noindex ausschliesst,
+//   2. ohne Anmeldung sofort auf login.html weiterleitet (angemeldeter
+//      Bereich), oder
+//   3. dem Anmelden oder dem Zuruecksetzen des Passworts dient (Aufrufe der
+//      Endpunkte auth/v1/token, /recover oder /user; die Registrierung nutzt
+//      nur auth/v1/signup und bleibt bewusst drin).
+function seiteFuerSitemap(datei) {
+  if (SITEMAP_AUSSCHLUSS.has(datei)) return false;
+  const quelle = readFileSync(join(REPO, datei), 'utf8');
+  if (/name="robots"[^>]*noindex/.test(quelle)) return false;
+  if (/location\.href\s*=\s*'login\.html'/.test(quelle)) return false;
+  if (/auth\/v1\/(token|recover|user)\b/.test(quelle)) return false;
+  return true;
+}
 
 export function slug(stadt) {
   return stadt.toLowerCase()
@@ -343,7 +359,7 @@ function vexfitAblehnen(){
 // freigeschaltet sind, fallen dadurch automatisch wieder heraus.
 function sitemapXml(trainer) {
   const seiten = readdirSync(REPO)
-    .filter(f => f.endsWith('.html') && !SITEMAP_AUSSCHLUSS.has(f))
+    .filter(f => f.endsWith('.html') && seiteFuerSitemap(f))
     .sort();
   const profile = (trainer || []).map(t => `profil.html?id=${t.id}`).sort();
   const eintraege = [...seiten, ...profile]
