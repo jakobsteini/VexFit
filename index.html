@@ -53,23 +53,18 @@ h1 em{font-style:normal;color:var(--accent);display:block}
 .btn-primary{background:var(--accent);color:var(--black);padding:16px 28px;border-radius:3px;font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;text-decoration:none;display:block;text-align:center;transition:transform 0.2s,box-shadow 0.2s;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;width:100%}
 .btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 36px rgba(232,255,0,0.25)}
 .btn-secondary{color:var(--white);padding:15px 28px;border:1px solid rgba(255,255,255,0.15);border-radius:3px;font-weight:500;font-size:13px;text-decoration:none;display:block;text-align:center;background:transparent;cursor:pointer;font-family:'DM Sans',sans-serif;width:100%}
-.hero-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:40px;opacity:0;animation:fadeUp 0.6s 0.5s ease forwards}
+.hero-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-top:40px;opacity:0;animation:fadeUp 0.6s 0.5s ease forwards}
 .stat{background:var(--card);padding:16px 12px;text-align:center}
 .stat-num{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:2px;display:block;line-height:1}
 .stat-label{font-size:9px;color:var(--text-muted);letter-spacing:1px;text-transform:uppercase;margin-top:4px}
 .ticker-wrap{overflow:hidden;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
 .ticker-row{display:flex;white-space:nowrap;padding:12px 0}
-.ticker-row:first-child{border-bottom:1px solid rgba(0,0,0,0.1)}
 .ticker-row.row-accent{background:var(--accent)}
-.ticker-row.row-dark{background:var(--gray)}
 .ticker-inner{display:inline-flex;animation:tickerLeft 20s linear infinite}
-.ticker-inner-rev{display:inline-flex;animation:tickerRight 24s linear infinite}
 .ticker-item{display:inline-flex;align-items:center;gap:12px;padding:0 14px;font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:2px}
 .row-accent .ticker-item{color:var(--black)}
-.row-dark .ticker-item{color:rgba(255,255,255,0.3)}
 .ticker-dot{width:4px;height:4px;border-radius:50%;flex-shrink:0}
 .row-accent .ticker-dot{background:rgba(0,0,0,0.25)}
-.row-dark .ticker-dot{background:rgba(232,255,0,0.35)}
 .section{padding:64px 20px}
 .section-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px}
 .section-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,9vw,56px);line-height:0.95;letter-spacing:2px;margin-bottom:40px}
@@ -143,7 +138,6 @@ footer p{font-size:12px;color:var(--text-muted)}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
 @keyframes glowPulse{0%,100%{opacity:1}50%{opacity:0.6}}
 @keyframes tickerLeft{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-@keyframes tickerRight{from{transform:translateX(-50%)}to{transform:translateX(0)}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 </style>
 <!-- Meta Pixel Code -->
@@ -205,13 +199,11 @@ try {
     <div class="hero-stats">
       <div class="stat"><span class="stat-num">0€</span><div class="stat-label">Für Kunden</div></div>
       <div class="stat"><span class="stat-num">DACH</span><div class="stat-label">Verfügbar</div></div>
-      <div class="stat"><span class="stat-num">100%</span><div class="stat-label">Verifiziert</div></div>
     </div>
   </div>
 </section>
 <div class="ticker-wrap">
   <div class="ticker-row row-accent"><div class="ticker-inner"><div class="ticker-item"><span>PERSONAL TRAINING</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>ONLINE COACHING</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>MUSKELAUFBAU</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>ERNÄHRUNG</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>KRAFTTRAINING</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>BODYBUILDING</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>ABNEHMEN</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>PERSONAL TRAINING</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>ONLINE COACHING</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>MUSKELAUFBAU</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>ERNÄHRUNG</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>KRAFTTRAINING</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>BODYBUILDING</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>ABNEHMEN</span><div class="ticker-dot"></div></div></div></div>
-  <div class="ticker-row row-dark"><div class="ticker-inner-rev"><div class="ticker-item"><span>WIEN</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>MÜNCHEN</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>BERLIN</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>ZÜRICH</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>HAMBURG</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>SALZBURG</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>FRANKFURT</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>GRAZ</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>WIEN</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>MÜNCHEN</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>BERLIN</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>ZÜRICH</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>HAMBURG</span><div class="ticker-dot"></div></div><div class="ticker-item"><span>SALZBURG</span><div class="ticker-dot"></div></div></div></div>
 </div>
 <section class="section" id="how">
   <div class="section-label reveal">So funktioniert's</div>
