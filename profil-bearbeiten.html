@@ -201,6 +201,17 @@ try {
     </div>
   </div>
 
+  <!-- STANDORT -->
+  <div class="section fade-in fade-d4">
+    <div class="section-title"><span class="dot dot-missing" id="dotStandort"></span>STANDORT</div>
+    <div class="field">
+      <label>Postleitzahl</label>
+      <input type="text" id="fPlz" placeholder="5020" maxlength="5" oninput="plzGeaendert()">
+      <div class="hint" id="plzStatus" style="display:none"></div>
+      <div class="hint">Dein Ort wird aus der Postleitzahl ermittelt und auf deinem Profil angezeigt.</div>
+    </div>
+  </div>
+
   <div class="btn-row fade-in fade-d4">
     <button class="btn-save" id="btnSave" onclick="saveProfile()">Profil speichern</button>
     <a href="trainer-bereich.html" class="btn-cancel">Abbrechen</a>
@@ -322,6 +333,12 @@ function fillForm(t) {
   }
   // Telefon
   if(t.telefon) document.getElementById('fTelefon').value = t.telefon;
+  // Stadt und Postleitzahl: gespeicherten Stand anzeigen
+  if(t.plz) document.getElementById('fPlz').value = t.plz;
+  if(t.plz && t.stadt) {
+    plzStand = { plz: String(t.plz), stadt: t.stadt };
+    plzStatusZeigen(t.stadt, false);
+  }
 
   updateDots();
 }
@@ -339,7 +356,8 @@ function updateDots() {
     { dot: 'dotBio', done: !!bio && bio.length > 10 },
     { dot: 'dotErfahrung', done: !!erfahrung },
     { dot: 'dotSpez', done: selectedSpez.length > 0 },
-    { dot: 'dotTelefon', done: !!telefon }
+    { dot: 'dotTelefon', done: !!telefon },
+    { dot: 'dotStandort', done: !!document.getElementById('fPlz').value.trim() }
   ];
 
   let done = 0;
@@ -360,8 +378,90 @@ function updateDots() {
   document.getElementById(id).addEventListener('change', updateDots);
 });
 
+// ──── PLZ -> STADT ────
+// Die Stadt wird nicht getippt, sondern aus der Postleitzahl ermittelt -
+// derselbe Weg wie in registrieren.html und der Umkreissuche (suche.html):
+// api.zippopotam.us, Laender at, de und ch in dieser Reihenfolge.
+let plzStand = { plz: '', stadt: null };
+let plzTimer = null;
+let plzLauf = 0;
+
+// Liefert {stadt} bei Treffer, {netzfehler:true} wenn der Dienst nicht
+// erreichbar war, sonst null (Postleitzahl in keinem der drei Laender bekannt).
+async function ortZuPlz(plz) {
+  let netzfehler = false;
+  for(const land of ['at','de','ch']) {
+    try {
+      const r = await fetch(`https://api.zippopotam.us/${land}/${plz}`);
+      if(r.ok) {
+        const d = await r.json();
+        if(d.places && d.places.length > 0) return { stadt: d.places[0]['place name'] };
+      }
+    } catch(e) { netzfehler = true; }
+  }
+  return netzfehler ? { netzfehler: true } : null;
+}
+
+function plzStatusZeigen(html, fehler) {
+  const el = document.getElementById('plzStatus');
+  if(!html) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.color = fehler ? 'var(--red)' : 'var(--muted)';
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
+function plzGeaendert() {
+  plzLauf++;
+  plzStand = { plz: '', stadt: null };
+  plzStatusZeigen('');
+  document.getElementById('btnSave').disabled = false;
+  if(plzTimer) clearTimeout(plzTimer);
+  const wert = document.getElementById('fPlz').value.trim();
+  updateDots();
+  if(!/^\d{4,5}$/.test(wert)) return;
+  plzTimer = setTimeout(() => { plzPruefen(); }, 600);
+}
+
+// Ermittelt die Stadt zum Feldinhalt und zeigt sie unter dem Feld an.
+// Gibt die Stadt zurueck oder null. Waehrend der Ermittlung ist der
+// Speichern-Knopf gesperrt.
+async function plzPruefen() {
+  const wert = document.getElementById('fPlz').value.trim();
+  if(!/^\d{4,5}$/.test(wert)) { plzStatusZeigen('Bitte gib eine gültige Postleitzahl ein (4 oder 5 Ziffern).', true); return null; }
+  if(plzStand.plz === wert && plzStand.stadt) return plzStand.stadt;
+  const lauf = ++plzLauf;
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true;
+  plzStatusZeigen('Postleitzahl wird geprüft...');
+  const erg = await ortZuPlz(wert);
+  if(lauf !== plzLauf) return null; // inzwischen wurde weiter getippt
+  btn.disabled = false;
+  if(erg && erg.stadt) {
+    plzStand = { plz: wert, stadt: erg.stadt };
+    plzStatusZeigen(erg.stadt);
+    return erg.stadt;
+  }
+  plzStand = { plz: '', stadt: null };
+  if(erg && erg.netzfehler) {
+    plzStatusZeigen('Der Ort konnte gerade nicht ermittelt werden. <a href="#" style="color:var(--accent)" onclick="plzPruefen();return false">Erneut versuchen</a>', true);
+  } else {
+    plzStatusZeigen('Zu dieser Postleitzahl wurde kein Ort gefunden. Bitte prüfe deine Eingabe.', true);
+  }
+  return null;
+}
+
 async function saveProfile() {
   const btn = document.getElementById('btnSave');
+
+  // Ort zuerst ermitteln; plzPruefen sperrt den Knopf waehrend der Pruefung.
+  // Ohne ermittelten Ort wird nicht gespeichert - der Grund steht am Feld.
+  const plzWert = document.getElementById('fPlz').value.trim();
+  let stadtNeu = null;
+  if(plzWert) {
+    stadtNeu = await plzPruefen();
+    if(!stadtNeu) { showToast('Die Stadt konnte nicht aus der PLZ ermittelt werden', true); return; }
+  }
+
   btn.disabled = true;
   btn.textContent = 'Wird gespeichert...';
 
@@ -372,7 +472,7 @@ async function saveProfile() {
   const telefon = document.getElementById('fTelefon').value.trim();
 
   // Validation
-  if(!trainingsart && !preis && !bio && !erfahrung && selectedSpez.length === 0 && !telefon) {
+  if(!trainingsart && !preis && !bio && !erfahrung && selectedSpez.length === 0 && !telefon && !plzWert) {
     showToast('Fülle mindestens ein Feld aus', true);
     btn.disabled = false;
     btn.textContent = 'Profil speichern';
@@ -386,6 +486,7 @@ async function saveProfile() {
   if(erfahrung) body.erfahrung = erfahrung;
   if(selectedSpez.length > 0) body.spezialisierungen = selectedSpez;
   if(telefon) body.telefon = telefon;
+  if(plzWert && stadtNeu) { body.plz = plzWert; body.stadt = stadtNeu; }
 
   try {
     const r = await fetch(`${SB}/rest/v1/trainers?email=eq.${encodeURIComponent(sess.email)}`, {
