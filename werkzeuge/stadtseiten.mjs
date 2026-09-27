@@ -154,6 +154,8 @@ export function stadtseiteHtml(stadt, trainer) {
 <head>
 <meta charset="UTF-8">
 <link rel="icon" type="image/png" href="vexfit-logo.png">
+<link rel="apple-touch-icon" href="vexfit-logo.png">
+<link rel="manifest" href="manifest.json">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${titel}</title>
 <meta name="description" content="${beschreibung}">

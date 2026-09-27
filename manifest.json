@@ -1,0 +1,14 @@
+{
+  "name": "Vexfit",
+  "short_name": "Vexfit",
+  "start_url": "/",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "vexfit-logo.png",
+      "sizes": "500x500",
+      "type": "image/png"
+    }
+  ]
+}
