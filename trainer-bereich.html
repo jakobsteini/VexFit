@@ -433,6 +433,9 @@ async function loadTrainer(email) {
   } catch(e) {
     console.error(e);
     showToast('Dein Profil konnte nicht geladen werden. Bitte Seite neu laden.', true);
+    // Sonst bliebe im Anfragen-Bereich dauerhaft "Wird geladen..." stehen.
+    const el = document.getElementById('anList');
+    if(el) el.innerHTML = '<div class="empty-state">⚠️<br><br>Dein Profil konnte nicht geladen werden.<br>Bitte lade die Seite neu.</div>';
   }
 }
 
