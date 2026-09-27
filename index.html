@@ -166,7 +166,7 @@ try {
 <body>
 <div class="nav-overlay" id="navOverlay" onclick="closeMenu()"></div>
 <div class="nav-drawer" id="navDrawer">
-  <button class="nav-close" onclick="closeMenu()">✕</button>
+  <button class="nav-close" onclick="closeMenu()" aria-label="Menü schließen">✕</button>
   <a href="#how" onclick="closeMenu()">So funktioniert's</a>
   <a href="#fuer-trainer" onclick="closeMenu()">Für Trainer</a>
   <a href="#fuer-kunden" onclick="closeMenu()">Für Kunden</a>
@@ -182,7 +182,7 @@ try {
       <li><a href="login.html">Login</a></li>
     </ul>
     <a href="registrieren.html?typ=kunde" class="nav-cta">Starten</a>
-    <button class="nav-hamburger" onclick="openMenu()"><span></span><span></span><span></span></button>
+    <button class="nav-hamburger" onclick="openMenu()" aria-label="Menü öffnen"><span></span><span></span><span></span></button>
   </div>
 </nav>
 <section class="hero">
