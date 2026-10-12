@@ -1,5 +1,15 @@
 #!/usr/bin/env node
 // ============================================================================
+// ████ STILLGELEGT SEIT 12.10.2026 ████
+//
+// Trainer sind nur noch nach Anmeldung sichtbar (Geschaeftsmodell).
+// Oeffentliche Stadtseiten wuerden Suchmaschinen etwas zeigen, was Besucher
+// ohne Anmeldung nicht sehen duerfen. Deshalb erzeugt dieses Werkzeug KEINE
+// Stadtseiten mehr; ein Lauf loescht vorhandene Stadtseiten und schreibt die
+// sitemap.xml ohne Trainerprofile neu. Der Schalter STILLGELEGT steht weiter
+// unten; der alte Erzeugungs-Code bleibt absichtlich erhalten, falls die
+// Entscheidung eines Tages zurueckgenommen wird.
+// ============================================================================
 // Vexfit - Stadtseiten erzeugen (SEO)
 //
 // Liest alle freigeschalteten Trainer (aktiv=true) mit dem oeffentlichen
@@ -26,6 +36,11 @@ import { dirname, join, basename } from 'node:path';
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASIS = 'https://vexfit.app';
 const SCHWELLE = 3;
+
+// ████ ABSCHALTUNG ████ Trainer sind nur nach Anmeldung sichtbar; oeffentliche
+// Stadtseiten wuerden Suchmaschinen etwas zeigen, was Besucher nicht sehen
+// duerfen. Solange das gilt, bleibt dieser Schalter auf true.
+const STILLGELEGT = true;
 
 // Oeffentlicher (anon) Schluessel - steht in jeder Seite des Repos, kein Geheimnis.
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
@@ -395,6 +410,19 @@ function fussblockEinsetzen(datei, block) {
 
 // ──── Hauptlauf ────
 async function main() {
+  if (STILLGELEGT) {
+    console.log('STILLGELEGT: Trainer sind nur nach Anmeldung sichtbar - es werden');
+    console.log('keine Stadtseiten erzeugt. Vorhandene werden geloescht, die');
+    console.log('sitemap.xml wird ohne Trainerprofile neu geschrieben.');
+    const geloescht = [];
+    for (const f of readdirSync(REPO)) {
+      if (/^personal-trainer-.+\.html$/.test(f)) { unlinkSync(join(REPO, f)); geloescht.push(f); }
+    }
+    writeFileSync(join(REPO, 'sitemap.xml'), sitemapXml([]));
+    console.log(`Geloescht (${geloescht.length}): ${geloescht.join(', ') || 'keine'}`);
+    console.log('sitemap.xml neu geschrieben.');
+    return;
+  }
   const antwort = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=${SPALTEN}&order=created_at.desc`, {
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
   });

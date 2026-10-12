@@ -1,5 +1,7 @@
 User-agent: *
 Disallow: /admin.html
+Disallow: /suche.html
+Disallow: /profil.html
 Disallow: /entwuerfe/
 Disallow: /migrations/
 Disallow: /supabase-setup.sql
