@@ -254,6 +254,30 @@ const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
 const FORMSPREE = 'https://formspree.io/f/xaqvodqb';
 
+// ──── ZUGANG ────
+// Das Lesen des Trainerprofils geht mit dem Zugangs-Token des angemeldeten
+// Nutzers (vexfit_session); der oeffentliche Schluessel bleibt nur im
+// apikey-Kopf, so erwartet es Supabase. Muster wie in kunden-bereich.html.
+// Die Anmeldepruefung oben hat sichergestellt, dass ein Token vorliegt.
+let sess = null;
+try { sess = JSON.parse(localStorage.getItem('vexfit_session') || 'null'); } catch(e) {}
+function authKopf(weitere) {
+  const k = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + (sess && sess.access_token) };
+  if(weitere) for(const n in weitere) k[n] = weitere[n];
+  return k;
+}
+// Antwortet die Datenbank mit 401/403, ist das Token abgelaufen: abmelden und
+// mit verstaendlicher Meldung zurueck zur Anmeldung.
+function sitzungAbgelaufen() {
+  try { localStorage.removeItem('vexfit_session'); } catch(e) {}
+  alert('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
+  location.href = 'login.html';
+}
+function istAbgemeldet(r) {
+  if(r.status === 401 || r.status === 403) { sitzungAbgelaufen(); return true; }
+  return false;
+}
+
 let trainerData = null;
 
 // Als Profilbild gilt nur eine Adresse aus dem eigenen Bilder-Behaelter;
@@ -270,8 +294,9 @@ async function loadProfile() {
 
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv`, {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      headers: authKopf()
     });
+    if(istAbgemeldet(res)) return;
     if(!res.ok) throw new Error('Profil laden fehlgeschlagen: ' + res.status);
     const data = await res.json();
     if(!Array.isArray(data)) throw new Error('Unerwartete Antwort beim Profil laden');
