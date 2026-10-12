@@ -220,7 +220,19 @@ else if(urlType==='kunde'||urlType==='client')selectType('client');
 
 function selectType(t){document.getElementById('typeSelector').style.display='none';if(t==='trainer'){document.getElementById('cardTrainer').classList.add('active');document.getElementById('formTrainer').classList.add('active')}else{document.getElementById('cardClient').classList.add('active');document.getElementById('formClient').classList.add('active')}}
 function backToSelector(){document.getElementById('typeSelector').style.display='block';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active')}
-function showSuccess(id){document.getElementById('typeSelector').style.display='none';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active');document.getElementById(id).classList.add('active');window.scrollTo({top:0,behavior:'smooth'})}
+function showSuccess(id){document.getElementById('typeSelector').style.display='none';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active');document.getElementById(id).classList.add('active');window.scrollTo({top:0,behavior:'smooth'});zielKnopfSetzen(id)}
+
+// Hat das Zugangs-Gate (suche.html/profil.html) eine gewuenschte Adresse
+// gemerkt, fuehrt der Erfolgs-Knopf dorthin zurueck. Zugelassen sind nur
+// eigene Seitennamen, keine fremden Adressen.
+function zielKnopfSetzen(id){
+  let ziel = null;
+  try { ziel = sessionStorage.getItem('vexfit_ziel'); } catch(e) {}
+  if(!ziel || !/^[a-z0-9-]+\.html(\?[A-Za-z0-9=&_.-]*)?$/.test(ziel)) return;
+  const knopf = document.querySelector('#' + id + ' .btn-home');
+  if(knopf) knopf.href = ziel;
+  try { sessionStorage.removeItem('vexfit_ziel'); } catch(e) {}
+}
 
 // Prueft die beiden Passwortfelder. Gibt das Passwort zurueck oder null bei Verstoss.
 function pruefePasswort(kuerzel){

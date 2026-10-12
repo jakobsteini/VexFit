@@ -220,6 +220,21 @@ try {
 </footer>
 
 <script>
+// ──── ZUGANG ────
+// Trainer sind nur nach Anmeldung sichtbar (Geschaeftsmodell). Ohne Sitzung
+// geht es zur Kundenregistrierung, BEVOR irgendeine Trainerabfrage laeuft;
+// die gewuenschte Adresse wird gemerkt, damit die Registrierung hierher
+// zurueckfuehren kann. Eine Beschraenkung auf eine bestimmte Rolle legt der
+// Code nirgends fest - deshalb kommt jede angemeldete Person durch.
+(function(){
+  let sess = null;
+  try { sess = JSON.parse(localStorage.getItem('vexfit_session') || 'null'); } catch(e) {}
+  if(sess && sess.access_token) return;
+  try { sessionStorage.setItem('vexfit_ziel', location.pathname.split('/').pop() + location.search); } catch(e) {}
+  location.replace('registrieren.html?typ=kunde');
+  throw new Error('nicht angemeldet');
+})();
+
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
 
