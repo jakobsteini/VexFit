@@ -106,10 +106,25 @@ try {
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
 
+// Gemerktes Ziel aus dem Zugangs-Gate (vexfit_ziel) sicher aufloesen.
+// Erlaubt sind ausschliesslich die beiden Seiten, die ueberhaupt ein Ziel
+// merken: suche.html und profil.html - beide stehen jeder angemeldeten Rolle
+// offen. Das sind relative Adressen ohne Schema und ohne Host, liegen also
+// immer innerhalb von vexfit.app; eine praeparierte fremde Adresse (mit http:,
+// // oder fremdem Host) oder eine rollengebundene Seite faellt durch das Muster
+// und wird verworfen. Das Ziel wird dabei entfernt, damit es nur einmal greift.
+function gemerktesZiel() {
+  let ziel = null;
+  try { ziel = sessionStorage.getItem('vexfit_ziel'); } catch(e) {}
+  try { sessionStorage.removeItem('vexfit_ziel'); } catch(e) {}
+  if(ziel && /^(suche|profil)\.html(\?[A-Za-z0-9=&_.\-]*)?$/.test(ziel)) return ziel;
+  return null;
+}
+
 const _existingSession = localStorage.getItem('vexfit_session');
 if(_existingSession) {
   const _s = JSON.parse(_existingSession);
-  window.location.href = _s.role === 'kunde' ? 'kunden-bereich.html' : 'trainer-bereich.html';
+  window.location.href = gemerktesZiel() || (_s.role === 'kunde' ? 'kunden-bereich.html' : 'trainer-bereich.html');
 }
 
 async function doLogin() {
@@ -160,7 +175,7 @@ async function doLogin() {
       } else {
         localStorage.setItem('vexfit_session', sessionData); // always save for now, session ends on logout
       }
-      window.location.href = role === 'kunde' ? 'kunden-bereich.html' : 'trainer-bereich.html';
+      window.location.href = gemerktesZiel() || (role === 'kunde' ? 'kunden-bereich.html' : 'trainer-bereich.html');
     } else {
       showError('Falsche E-Mail oder Passwort!');
       btn.disabled = false; btn.textContent = 'Einloggen →';

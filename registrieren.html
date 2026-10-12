@@ -223,12 +223,15 @@ function backToSelector(){document.getElementById('typeSelector').style.display=
 function showSuccess(id){document.getElementById('typeSelector').style.display='none';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active');document.getElementById(id).classList.add('active');window.scrollTo({top:0,behavior:'smooth'});zielKnopfSetzen(id)}
 
 // Hat das Zugangs-Gate (suche.html/profil.html) eine gewuenschte Adresse
-// gemerkt, fuehrt der Erfolgs-Knopf dorthin zurueck. Zugelassen sind nur
-// eigene Seitennamen, keine fremden Adressen.
+// gemerkt, fuehrt der Erfolgs-Knopf dorthin zurueck. Zugelassen sind
+// ausschliesslich suche.html und profil.html - beide stehen jeder Rolle offen.
+// Das sind relative Adressen ohne Schema und ohne Host, liegen also immer
+// innerhalb von vexfit.app; eine praeparierte fremde Adresse oder eine
+// rollengebundene Seite faellt durch das Muster und wird verworfen.
 function zielKnopfSetzen(id){
   let ziel = null;
   try { ziel = sessionStorage.getItem('vexfit_ziel'); } catch(e) {}
-  if(!ziel || !/^[a-z0-9-]+\.html(\?[A-Za-z0-9=&_.-]*)?$/.test(ziel)) return;
+  if(!ziel || !/^(suche|profil)\.html(\?[A-Za-z0-9=&_.\-]*)?$/.test(ziel)) return;
   const knopf = document.querySelector('#' + id + ' .btn-home');
   if(knopf) knopf.href = ziel;
   try { sessionStorage.removeItem('vexfit_ziel'); } catch(e) {}
