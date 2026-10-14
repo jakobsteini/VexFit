@@ -53,7 +53,13 @@ nav{background:var(--gray);border-bottom:1px solid var(--border);padding:16px 24
 .stat-sub{font-size:12px;color:var(--text-muted);margin-top:4px}
 
 /* TABS */
-.tabs{display:flex;gap:3px;margin-bottom:20px}
+.tabs{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:20px}
+.section-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--white);margin:12px 0 14px}
+.badge-fwd{background:rgba(74,222,128,0.15);color:#4ade80}
+.badge-nofwd{background:rgba(255,255,255,0.06);color:var(--text-muted)}
+.badge-offen{background:rgba(232,255,0,0.12);color:var(--accent)}
+.badge-ang{background:rgba(74,222,128,0.15);color:#4ade80}
+.badge-abg{background:rgba(255,80,80,0.12);color:#ff6b6b}
 .tab{padding:10px 20px;background:var(--card);border:none;color:var(--text-muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all 0.2s}
 .tab.active{background:var(--accent);color:var(--black)}
 
@@ -136,9 +142,21 @@ try {
       <div class="stat-card"><div class="stat-label">Monatsumsatz</div><div class="stat-value" id="s-umsatz">–</div><div class="stat-sub">Aktuell</div></div>
     </div>
 
+    <div class="section-title">Plattform-Zustand</div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">Anfragen gesamt</div><div class="stat-value" id="s-anfragen-total">–</div><div class="stat-sub" id="s-anfragen-7tage">Letzte 7 Tage: –</div></div>
+      <div class="stat-card"><div class="stat-label">Offen</div><div class="stat-value" id="s-anfragen-offen">–</div><div class="stat-sub">Noch nicht beantwortet</div></div>
+      <div class="stat-card"><div class="stat-label">Angenommen</div><div class="stat-value" id="s-anfragen-ang">–</div><div class="stat-sub">Vom Trainer</div></div>
+      <div class="stat-card"><div class="stat-label">Abgelehnt</div><div class="stat-value" id="s-anfragen-abg">–</div><div class="stat-sub">Vom Trainer</div></div>
+    </div>
+
     <div class="tabs">
       <button class="tab active" onclick="showTab('trainers', this)">Trainer</button>
       <button class="tab" onclick="showTab('kunden', this)">Kunden</button>
+      <button class="tab" onclick="showTab('anfragen', this)">Anfragen</button>
+      <button class="tab" onclick="showTab('ohneanfrage', this)">Trainer o. Anfrage</button>
+      <button class="tab" onclick="showTab('unvollstaendig', this)">Profil unvollständig</button>
+      <button class="tab" onclick="showTab('zahlungen', this)">Zahlungen</button>
     </div>
 
     <!-- TRAINERS TAB -->
@@ -182,6 +200,82 @@ try {
           </thead>
           <tbody id="kunden-tbody">
             <tr><td colspan="6" class="loading-text">Lade Kunden...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ANFRAGEN TAB -->
+    <div class="tab-content" id="tab-anfragen">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Trainer</th>
+              <th>Kunde</th>
+              <th>Zustand</th>
+              <th>Weitergeleitet</th>
+            </tr>
+          </thead>
+          <tbody id="anfragen-tbody">
+            <tr><td colspan="5" class="loading-text">Lade Anfragen...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TRAINER OHNE ANFRAGE TAB -->
+    <div class="tab-content" id="tab-ohneanfrage">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>E-Mail</th>
+              <th>Stadt</th>
+              <th>Registriert</th>
+            </tr>
+          </thead>
+          <tbody id="ohneanfrage-tbody">
+            <tr><td colspan="4" class="loading-text">Lade Trainer...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PROFIL UNVOLLSTAENDIG TAB -->
+    <div class="tab-content" id="tab-unvollstaendig">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>E-Mail</th>
+              <th>Es fehlt</th>
+              <th>Registriert</th>
+            </tr>
+          </thead>
+          <tbody id="unvollstaendig-tbody">
+            <tr><td colspan="4" class="loading-text">Lade Trainer...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ZAHLUNGEN TAB -->
+    <div class="tab-content" id="tab-zahlungen">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Verarbeitet am</th>
+              <th>Typ</th>
+              <th>Ereignis-Kennung</th>
+            </tr>
+          </thead>
+          <tbody id="zahlungen-tbody">
+            <tr><td colspan="3" class="loading-text">Lade Zahlungsereignisse...</td></tr>
           </tbody>
         </table>
       </div>
@@ -367,7 +461,12 @@ async function loadData() {
   if(!kuRes.ok) throw new Error('Kunden laden fehlgeschlagen: ' + kuRes.status);
   const kunden = await kuRes.json();
   window.allKunden = kunden;
-  
+
+  // Plattform-Zustand nachladen (ausschliesslich lesend). Laeuft unabhaengig;
+  // ein Fehler in einem Abschnitt zeigt dort einen Hinweis, bricht aber die
+  // Trainer- und Kundenliste nicht ab.
+  loadPlattform();
+
   // Update last refresh time
   document.getElementById('lastUpdate').textContent = 'Zuletzt aktualisiert: ' + new Date().toLocaleTimeString('de-AT');
 
@@ -427,6 +526,201 @@ async function loadData() {
   const kb = document.getElementById('kunden-tbody');
   if(kb) kb.innerHTML = '<tr><td colspan="6" class="loading-text">⚠️ Daten konnten nicht geladen werden. Bitte erneut versuchen.</td></tr>';
  }
+}
+
+// ──── PLATTFORM-ZUSTAND (nur lesend) ────
+
+// Zustand einer Anfrage - identisch zur Berechnung im Trainerbereich
+// (trainer-bereich.html: anfrageZustand): alles ausser angenommen/abgelehnt
+// gilt als offen.
+function anfrageZustand(a) {
+  const s = a && a.status;
+  return (s === 'angenommen' || s === 'abgelehnt') ? s : 'offen';
+}
+
+// Profilvollstaendigkeit - dieselben sechs Felder wie die Anzeige im
+// Trainerbereich (trainer-bereich.html: updateDots). Das Profilbild zaehlt
+// dort bewusst NICHT mit. Keine eigene Gewichtung.
+function fehlendeProfilfelder(t) {
+  const fehlt = [];
+  if(!t.trainingsart) fehlt.push('Trainingsart');
+  if(!(Number(t.preis_stunde) > 0)) fehlt.push('Preis pro Stunde');
+  if(!(t.bio && String(t.bio).length > 10)) fehlt.push('Über mich');
+  if(!t.erfahrung) fehlt.push('Erfahrung');
+  if(!(Array.isArray(t.spezialisierungen) && t.spezialisierungen.length > 0)) fehlt.push('Spezialisierungen');
+  if(!(t.telefon && String(t.telefon).trim())) fehlt.push('Telefon');
+  return fehlt;
+}
+
+// Liefert die Gesamtzahl passender Anfragen ueber den Content-Range-Kopf,
+// ohne alle Zeilen zu laden. filter ist ein zusaetzlicher Abfrageteil wie
+// '&status=eq.angenommen'. Liefert null, wenn die Zahl nicht ermittelbar ist.
+async function anfrageAnzahl(filter) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/anfragen?select=id${filter || ''}&limit=1`, {
+      headers: authKopf({ Prefer: 'count=exact' })
+    });
+    if(istAbgemeldet(res)) return null;
+    if(!res.ok) return null;
+    const cr = res.headers.get('content-range');
+    if(!cr) return null;
+    const n = cr.split('/')[1];
+    return (!n || n === '*') ? null : parseInt(n, 10);
+  } catch(e) {
+    console.error('anfrageAnzahl:', e);
+    return null;
+  }
+}
+
+// Kennzahlen oben: gesamt, offen, angenommen, abgelehnt und letzte sieben Tage.
+async function ladeAnfragenKennzahlen() {
+  const z = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = (v == null ? '–' : v); };
+  const sieben = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const [gesamt, ang, abg, w7] = await Promise.all([
+    anfrageAnzahl(''),
+    anfrageAnzahl('&status=eq.angenommen'),
+    anfrageAnzahl('&status=eq.abgelehnt'),
+    anfrageAnzahl('&created_at=gte.' + sieben)
+  ]);
+  z('s-anfragen-total', gesamt);
+  z('s-anfragen-ang', ang);
+  z('s-anfragen-abg', abg);
+  // Offen = gesamt minus angenommen minus abgelehnt (gleiche Einteilung wie
+  // anfrageZustand: Altbestand ohne Zustand zaehlt als offen).
+  const offen = (gesamt != null && ang != null && abg != null) ? (gesamt - ang - abg) : null;
+  z('s-anfragen-offen', offen);
+  const s7 = document.getElementById('s-anfragen-7tage');
+  if(s7) s7.textContent = 'Letzte 7 Tage: ' + (w7 == null ? '–' : w7);
+}
+
+// Liste der Anfragen, neueste zuerst, hoechstens 50 Zeilen.
+async function ladeAnfragenListe() {
+  const tb = document.getElementById('anfragen-tbody');
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/anfragen?select=created_at,trainer_name,kunden_name,status,weitergeleitet&order=created_at.desc&limit=50`, {
+      headers: authKopf()
+    });
+    if(istAbgemeldet(res)) return;
+    if(!res.ok) throw new Error('Anfragen laden fehlgeschlagen: ' + res.status);
+    const rows = await res.json();
+    if(!Array.isArray(rows) || rows.length === 0) {
+      tb.innerHTML = '<tr><td colspan="5" class="loading-text">Noch keine Anfragen vorhanden.</td></tr>';
+      return;
+    }
+    tb.innerHTML = rows.map(a => {
+      const z = anfrageZustand(a);
+      const zBadge = z === 'angenommen' ? '<span class="badge badge-ang">Angenommen</span>'
+                   : z === 'abgelehnt' ? '<span class="badge badge-abg">Abgelehnt</span>'
+                   : '<span class="badge badge-offen">Offen</span>';
+      const w = a.weitergeleitet ? '<span class="badge badge-fwd">Ja</span>' : '<span class="badge badge-nofwd">Nein</span>';
+      return `<tr>
+        <td>${a.created_at ? new Date(a.created_at).toLocaleDateString('de-AT') : '–'}</td>
+        <td>${a.trainer_name || '–'}</td>
+        <td>${a.kunden_name || '–'}</td>
+        <td>${zBadge}</td>
+        <td>${w}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    console.error('ladeAnfragenListe:', e);
+    tb.innerHTML = '<tr><td colspan="5" class="loading-text">⚠️ Anfragen konnten nicht geladen werden.</td></tr>';
+  }
+}
+
+// Trainer ohne Anfrage: freigeschaltete Trainer (aktiv), zu deren Kennung es
+// keine einzige Anfrage gibt. Die Verknuepfung laeuft ueber anfragen.trainer_id.
+async function ladeTrainerOhneAnfrage() {
+  const tb = document.getElementById('ohneanfrage-tbody');
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/anfragen?select=trainer_id`, {
+      headers: authKopf()
+    });
+    if(istAbgemeldet(res)) return;
+    if(!res.ok) throw new Error('Anfragen laden fehlgeschlagen: ' + res.status);
+    const rows = await res.json();
+    const mitAnfrage = new Set((Array.isArray(rows) ? rows : []).map(r => r.trainer_id).filter(Boolean));
+    const trainer = (window.allTrainers || []).filter(t => t.aktiv && !mitAnfrage.has(t.id));
+    if(trainer.length === 0) {
+      tb.innerHTML = '<tr><td colspan="4" class="loading-text">Alle freigeschalteten Trainer haben mindestens eine Anfrage.</td></tr>';
+      return;
+    }
+    tb.innerHTML = trainer.map(t => `<tr>
+      <td><strong>${t.vorname} ${t.nachname}</strong></td>
+      <td>${t.email}</td>
+      <td>${t.stadt || '–'}</td>
+      <td>${t.created_at ? new Date(t.created_at).toLocaleDateString('de-AT') : '–'}</td>
+    </tr>`).join('');
+  } catch(e) {
+    console.error('ladeTrainerOhneAnfrage:', e);
+    tb.innerHTML = '<tr><td colspan="4" class="loading-text">⚠️ Konnte nicht geladen werden.</td></tr>';
+  }
+}
+
+// Profil unvollstaendig: freigeschaltete Trainer, bei denen mindestens eines
+// der sechs Vollstaendigkeitsfelder fehlt. Nutzt window.allTrainers aus loadData.
+function ladeProfilUnvollstaendig() {
+  const tb = document.getElementById('unvollstaendig-tbody');
+  try {
+    const trainer = (window.allTrainers || [])
+      .filter(t => t.aktiv)
+      .map(t => ({ t, fehlt: fehlendeProfilfelder(t) }))
+      .filter(x => x.fehlt.length > 0);
+    if(trainer.length === 0) {
+      tb.innerHTML = '<tr><td colspan="4" class="loading-text">Alle freigeschalteten Trainer haben ein vollständiges Profil.</td></tr>';
+      return;
+    }
+    tb.innerHTML = trainer.map(x => `<tr>
+      <td><strong>${x.t.vorname} ${x.t.nachname}</strong></td>
+      <td>${x.t.email}</td>
+      <td style="color:#ff6b6b">${x.fehlt.join(', ')}</td>
+      <td>${x.t.created_at ? new Date(x.t.created_at).toLocaleDateString('de-AT') : '–'}</td>
+    </tr>`).join('');
+  } catch(e) {
+    console.error('ladeProfilUnvollstaendig:', e);
+    tb.innerHTML = '<tr><td colspan="4" class="loading-text">⚠️ Konnte nicht geladen werden.</td></tr>';
+  }
+}
+
+// Verarbeitete Zahlungsereignisse, neueste zuerst, hoechstens 20. Die Tabelle
+// stripe_events_verarbeitet hat fuer das Admin-Konto bisher KEIN Leserecht
+// (RLS aktiv, keine Richtlinie, Rechte entzogen). Ohne eingespielte Migration
+// kommt daher eine Fehlerantwort - die wird hier bewusst NICHT ueber
+// istAbgemeldet() geleitet (das wuerde abmelden), sondern als Hinweis gezeigt.
+async function ladeZahlungen() {
+  const tb = document.getElementById('zahlungen-tbody');
+  const hinweis = 'Zugriff auf Zahlungsereignisse ist noch nicht freigeschaltet. Dafür muss die Datei migrations/2026-10-14-admin-stripe-events-lesen.sql im SQL-Editor eingespielt werden.';
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/stripe_events_verarbeitet?select=event_id,typ,verarbeitet_am&order=verarbeitet_am.desc&limit=20`, {
+      headers: authKopf()
+    });
+    if(!res.ok) {
+      tb.innerHTML = `<tr><td colspan="3" class="loading-text">${hinweis}</td></tr>`;
+      return;
+    }
+    const rows = await res.json();
+    if(!Array.isArray(rows) || rows.length === 0) {
+      tb.innerHTML = '<tr><td colspan="3" class="loading-text">Noch keine verarbeiteten Zahlungsereignisse.</td></tr>';
+      return;
+    }
+    tb.innerHTML = rows.map(e => `<tr>
+      <td>${e.verarbeitet_am ? new Date(e.verarbeitet_am).toLocaleString('de-AT') : '–'}</td>
+      <td>${e.typ || '–'}</td>
+      <td style="font-family:monospace;font-size:11px;word-break:break-all">${e.event_id || '–'}</td>
+    </tr>`).join('');
+  } catch(e) {
+    console.error('ladeZahlungen:', e);
+    tb.innerHTML = `<tr><td colspan="3" class="loading-text">${hinweis}</td></tr>`;
+  }
+}
+
+// Fuehrt alle Abschnitte des Plattform-Zustands aus. Jeder Abschnitt faengt
+// seine Fehler selbst ab, damit einer die anderen nicht blockiert.
+function loadPlattform() {
+  ladeAnfragenKennzahlen();
+  ladeAnfragenListe();
+  ladeTrainerOhneAnfrage();
+  ladeProfilUnvollstaendig();
+  ladeZahlungen();
 }
 
 // ──── AKTIONEN ────
