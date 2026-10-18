@@ -193,8 +193,8 @@ try {
 </div>
 
 <!-- GEFUEHRTER EINSTIEG: drei Fragen nacheinander, je eine Karte.
-     Fragen und Auswahlwerte stammen belegt aus den Profilformularen und der
-     vorhandenen Suche (siehe Kommentar bei SPEZ_EINSTIEG/ART_EINSTIEG unten). -->
+     Frage 1 Spezialisierungen (belegt, SPEZ_EINSTIEG unten), Frage 2 Ort (Vor Ort/
+     Online, filtert gegen trainers.trainingsort), Frage 3 PLZ+Umkreis (vorhandene Suche). -->
 <div class="einstieg hidden" id="einstieg">
   <div class="ein-progress">
     <div class="ein-dot" data-d="1"></div>
@@ -214,11 +214,14 @@ try {
     <div class="ein-skip"><a onclick="einstiegUeberspringen()">Einstieg überspringen</a></div>
   </div>
 
-  <!-- Frage 2: Trainingsart (Einfachauswahl aus den belegten Werten) -->
+  <!-- Frage 2: Wo trainierst du? Zwei Knoepfe, filtert gegen trainers.trainingsort. -->
   <div class="ein-card hidden" id="einCard2">
     <div class="ein-frage">Vor Ort oder <span>online?</span></div>
-    <div class="ein-hint">Wähle die Art, die zu dir passt – oder lass es offen.</div>
-    <div class="ein-chips" id="einArtChips"></div>
+    <div class="ein-hint">Wähle eine Antwort – oder lass die Frage offen.</div>
+    <div class="ein-chips" id="einOrtChips">
+      <div class="ein-chip" data-v="vor_ort" onclick="einOrtWaehle(this)">Vor Ort</div>
+      <div class="ein-chip" data-v="online" onclick="einOrtWaehle(this)">Online</div>
+    </div>
     <div class="ein-nav">
       <button class="ein-zurueck" onclick="einstiegZurueck()">←</button>
       <button class="ein-weiter" onclick="einstiegWeiter()">Weiter →</button>
@@ -304,21 +307,17 @@ try {
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
-let K = null, allT = [], activeFilter = 'alle', selT = null, lastSearch = null, einstiegSpez = [], letzteUmkreisListe = [];
+let K = null, allT = [], activeFilter = 'alle', selT = null, lastSearch = null, einstiegSpez = [], einstiegOrt = '', letzteUmkreisListe = [];
 
 // ──── GEFUEHRTER EINSTIEG ────
-// Die Auswahlwerte sind WORTGLEICH aus den Profilformularen uebernommen und
-// werden nicht erfunden:
-//   Spezialisierungen (Frage 1): profil-bearbeiten.html SPEZ_OPTIONS (Zeilen 235-239),
-//     identisch trainer-bereich.html (Zeilen 342-346).
-//   Trainingsarten (Frage 2): <select id="fTrainingsart"> in profil-bearbeiten.html
-//     (Zeilen 136-145), identisch trainer-bereich.html (Zeilen 230-240).
-// Weicht hier etwas ab, meldet das /tmp/vexfit-einstieg.sh.
+// Frage 1 (Spezialisierungen): Werte WORTGLEICH aus den Profilformularen
+//   (profil-bearbeiten.html SPEZ_OPTIONS Zeilen 235-239, identisch trainer-bereich.html).
+// Frage 2 (Wo trainierst du?): zwei Knoepfe "Vor Ort"/"Online"; gefiltert wird gegen
+//   trainers.trainingsort ('vor_ort'/'online'/'beides'/leer) - siehe renderTrainer.
 const SPEZ_EINSTIEG = ['Muskelaufbau','Abnehmen','Krafttraining','Ausdauer','HIIT','Functional Training','Mobility','Bodybuilding','Calisthenics','Schwangerschaft','Senioren','Rücken & Haltung','Ernährungsplanung','Wettkampfvorbereitung','Stressabbau','Flexibilität'];
-const ART_EINSTIEG = ['Personal Training','Gruppen Training','Online Coaching','Ernährungsberatung','Yoga','Pilates','Kampfsport','Rehabilitation','Sonstiges'];
 const EINSTIEG_KEY = 'vexfit_einstieg';
 let einSchritt = 1;
-let einAuswahl = { spezialisierungen: [], trainingsart: '', plz: '', umkreis: 25 };
+let einAuswahl = { spezialisierungen: [], ort: '', plz: '', umkreis: 25 };
 
 // Als Profilbild gilt nur eine Adresse aus dem eigenen Bilder-Behaelter;
 // alles andere (leer, fremde Adresse) faellt auf die Initialen zurueck.
@@ -434,11 +433,22 @@ function calcDist(lat1,lng1,lat2,lng2) {
 }
 
 async function loadTrainer() {
+  // Spaltenliste bewusst explizit (keine E-Mail/Telefon/user_id an den Browser).
+  const spalten = 'id,created_at,vorname,nachname,stadt,plz,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv';
   try {
-    const r = await fetch(`${SB}/rest/v1/trainers?aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv&order=created_at.desc`, {
+    // Zuerst MIT trainingsort. Fehlt die Spalte noch (Migration nicht eingespielt),
+    // antwortet Supabase mit 400 - dann ohne sie laden, dann wird nur nicht nach
+    // Ort gefiltert und die Seite zeigt keinen Fehler.
+    let r = await fetch(`${SB}/rest/v1/trainers?aktiv=eq.true&select=${spalten},trainingsort&order=created_at.desc`, {
       headers: authKopf()
     });
     if(istAbgemeldet(r)) return;
+    if(!r.ok && r.status === 400) {
+      r = await fetch(`${SB}/rest/v1/trainers?aktiv=eq.true&select=${spalten}&order=created_at.desc`, {
+        headers: authKopf()
+      });
+      if(istAbgemeldet(r)) return;
+    }
     if(!r.ok) throw new Error('Trainer laden fehlgeschlagen: ' + r.status);
     const daten = await r.json();
     if(!Array.isArray(daten)) throw new Error('Unerwartete Antwort beim Trainer laden');
@@ -482,16 +492,18 @@ async function searchByPLZ() {
 }
 
 function setFilter(f, el) {
-  einstiegSpez = [];   // ein Klick auf einen Filterknopf ersetzt die Einstieg-Mehrfachauswahl
+  einstiegSpez = [];   // ein Klick auf einen Filterknopf ersetzt die Einstieg-Auswahl
+  einstiegOrt = '';
   activeFilter = f;
   document.querySelectorAll('.fc').forEach(c => c.classList.remove('on'));
   el.classList.add('on');
   renderTrainer(allT);
 }
 
-// Hebt die Spezialisierungs-Filter auf und zeigt wieder alle Treffer im Umkreis.
+// Hebt die Einstieg-Filter (Spezialisierung + Ort) auf und zeigt wieder alle Treffer im Umkreis.
 function filterZuruecksetzen() {
   einstiegSpez = [];
+  einstiegOrt = '';
   activeFilter = 'alle';
   document.querySelectorAll('.filter-bar .fc').forEach(b => b.classList.toggle('on', /setFilter\('alle'/.test(b.getAttribute('onclick') || '')));
   renderTrainer(letzteUmkreisListe);
@@ -511,9 +523,22 @@ function renderTrainer(list) {
   } else if(activeFilter !== 'alle') {
     filtered = list.filter(t => (t.spezialisierungen||[]).join(' ').toLowerCase().includes(activeFilter.toLowerCase()));
   }
+  if(einstiegOrt) {
+    // Frage 2: "Vor Ort" -> trainingsort 'vor_ort'/'beides', "Online" -> 'online'/'beides'.
+    // Trainer OHNE Wert (noch nicht geantwortet) bleiben in beiden Faellen sichtbar,
+    // damit Bestandstrainer nicht verschwinden. Wie die Online-Trainer nach den
+    // Umkreistreffern ermittelt werden (trainingsart), bleibt davon unberuehrt.
+    filtered = filtered.filter(t => {
+      const o = t.trainingsort;
+      if(!o) return true;
+      if(einstiegOrt === 'vor_ort') return o === 'vor_ort' || o === 'beides';
+      if(einstiegOrt === 'online') return o === 'online' || o === 'beides';
+      return true;
+    });
+  }
   const el = document.getElementById('trainerList');
   if(!filtered.length) {
-    const filterAktiv = (einstiegSpez.length > 0) || (activeFilter !== 'alle');
+    const filterAktiv = (einstiegSpez.length > 0) || !!einstiegOrt || (activeFilter !== 'alle');
     if(list.length > 0 && filterAktiv) {
       // Es gibt Treffer im Umkreis, aber der Filter hat alle entfernt: Hinweis
       // und ein Knopf, der die Filter aufhebt und alle Umkreistreffer zeigt.
@@ -674,8 +699,6 @@ function einstiegGespeichert() {
 function einstiegChipsAufbauen() {
   const s = document.getElementById('einSpezChips');
   if(s && !s.childElementCount) s.innerHTML = SPEZ_EINSTIEG.map(x => `<div class="ein-chip" data-v="${x}" onclick="einSpezToggle(this)">${x}</div>`).join('');
-  const a = document.getElementById('einArtChips');
-  if(a && !a.childElementCount) a.innerHTML = ART_EINSTIEG.map(x => `<div class="ein-chip" data-v="${x}" onclick="einArtWaehle(this)">${x}</div>`).join('');
 }
 function einSpezToggle(el) {
   const v = el.getAttribute('data-v');
@@ -683,12 +706,13 @@ function einSpezToggle(el) {
   if(i >= 0) { einAuswahl.spezialisierungen.splice(i, 1); el.classList.remove('on'); }
   else { einAuswahl.spezialisierungen.push(v); el.classList.add('on'); }
 }
-function einArtWaehle(el) {
+// Frage 2: Einfachauswahl des Ortes ('vor_ort'/'online'). Erneuter Klick hebt die Wahl auf.
+function einOrtWaehle(el) {
   const v = el.getAttribute('data-v');
-  if(einAuswahl.trainingsart === v) { einAuswahl.trainingsart = ''; el.classList.remove('on'); }
+  if(einAuswahl.ort === v) { einAuswahl.ort = ''; el.classList.remove('on'); }
   else {
-    einAuswahl.trainingsart = v;
-    document.querySelectorAll('#einArtChips .ein-chip').forEach(c => c.classList.remove('on'));
+    einAuswahl.ort = v;
+    document.querySelectorAll('#einOrtChips .ein-chip').forEach(c => c.classList.remove('on'));
     el.classList.add('on');
   }
 }
@@ -703,8 +727,8 @@ function einstiegZurueck() { if(einSchritt > 1) einstiegZeige(einSchritt - 1); }
 // Startet den Einstieg frisch bei Frage 1.
 function einstiegStart() {
   einstiegChipsAufbauen();
-  einAuswahl = { spezialisierungen: [], trainingsart: '', plz: '', umkreis: 25 };
-  document.querySelectorAll('#einSpezChips .ein-chip, #einArtChips .ein-chip').forEach(c => c.classList.remove('on'));
+  einAuswahl = { spezialisierungen: [], ort: '', plz: '', umkreis: 25 };
+  document.querySelectorAll('#einSpezChips .ein-chip, #einOrtChips .ein-chip').forEach(c => c.classList.remove('on'));
   const ep = document.getElementById('einPlz');
   if(ep) { ep.value = (K && K.plz) ? K.plz : ''; einAuswahl.plz = ep.value; }
   const er = document.getElementById('einRadius');
@@ -738,6 +762,7 @@ function zeigeSuchmaske() {
 // Keine Wahl -> kein Spezialisierungsfilter.
 function einstiegFilterSetzen() {
   einstiegSpez = [...einAuswahl.spezialisierungen];
+  einstiegOrt = einAuswahl.ort || '';
   activeFilter = 'alle';
   // Filterleiste angleichen: bei genau einer Wahl den passenden Knopf markieren,
   // bei keiner 'Alle', bei mehreren keinen (die Leiste kann Mehrfachauswahl nicht abbilden).
@@ -755,7 +780,7 @@ function zeigeZusammenfassung() {
   const el = document.getElementById('sucheZusammenfassung');
   const sp = einAuswahl.spezialisierungen;
   const teile = [sp.length ? sp.join(', ') : 'Alle Ziele'];
-  if(einAuswahl.trainingsart) teile.push(einAuswahl.trainingsart);
+  if(einAuswahl.ort) teile.push(einAuswahl.ort === 'vor_ort' ? 'Vor Ort' : 'Online');
   if(einAuswahl.plz) teile.push(einAuswahl.plz + (einAuswahl.umkreis ? ' · ' + einAuswahl.umkreis + ' km' : ' · alle'));
   document.getElementById('szText').innerHTML = 'Gesucht: <b>' + teile.join('</b> · <b>') + '</b>';
   el.querySelector('.sz-btn').textContent = 'Neu starten';
@@ -778,7 +803,7 @@ async function einstiegFertig() {
     localStorage.setItem(EINSTIEG_KEY, JSON.stringify({
       abgeschlossen: true,
       spezialisierungen: einAuswahl.spezialisierungen,
-      trainingsart: einAuswahl.trainingsart,
+      ort: einAuswahl.ort,
       plz: einAuswahl.plz,
       umkreis: einAuswahl.umkreis
     }));
@@ -799,7 +824,7 @@ async function starteGemerkteSuche() {
 async function einstiegSpeichern(treffer) {
   const koerper = {
     spezialisierungen: einAuswahl.spezialisierungen,
-    trainingsart: einAuswahl.trainingsart || null,
+    trainingsart: null,  // Frage 2 ist jetzt der Ort; such_eingaben hat dafuer (noch) keine Spalte
     plz: einAuswahl.plz || null,
     umkreis: Number.isFinite(einAuswahl.umkreis) ? einAuswahl.umkreis : null,
     anzahl_treffer: treffer
@@ -820,7 +845,7 @@ function einstiegRouten() {
   if(g && g.abgeschlossen) {
     einAuswahl = {
       spezialisierungen: Array.isArray(g.spezialisierungen) ? g.spezialisierungen : [],
-      trainingsart: g.trainingsart || '',
+      ort: g.ort || '',
       plz: g.plz || '',
       umkreis: (g.umkreis != null) ? g.umkreis : 25
     };
