@@ -738,6 +738,7 @@ async function einstiegFertig() {
   document.getElementById('searchPage').classList.remove('hidden');
   if(allT.length === 0) await loadTrainer();
   await searchByPLZ();
+  const treffer = document.querySelectorAll('#trainerList .trainer-card').length;
   try {
     localStorage.setItem(EINSTIEG_KEY, JSON.stringify({
       abgeschlossen: true,
@@ -748,12 +749,34 @@ async function einstiegFertig() {
     }));
   } catch(e) {}
   zeigeZusammenfassung();
+  einstiegSpeichern(treffer);
 }
 // Fuehrt die gemerkte Suche beim naechsten Besuch direkt aus.
 async function starteGemerkteSuche() {
   if(allT.length === 0) await loadTrainer();
   await searchByPLZ();
   zeigeZusammenfassung();
+}
+// Speichert die Sucheingabe mit dem Nutzer-Token (wie alle angemeldeten Aufrufe).
+// Schlaegt es fehl - z.B. weil die Migration noch nicht eingespielt ist -, merkt der
+// Kunde nichts: nur Konsole (ohne Nutzerdaten), keine Abmeldung. Die Trefferliste ist
+// da schon sichtbar. Deshalb hier bewusst KEIN istAbgemeldet/Redirect.
+async function einstiegSpeichern(treffer) {
+  const koerper = {
+    spezialisierungen: einAuswahl.spezialisierungen,
+    trainingsart: einAuswahl.trainingsart || null,
+    plz: einAuswahl.plz || null,
+    umkreis: Number.isFinite(einAuswahl.umkreis) ? einAuswahl.umkreis : null,
+    anzahl_treffer: treffer
+  };
+  try {
+    const r = await fetch(`${SB}/rest/v1/such_eingaben`, {
+      method: 'POST',
+      headers: authKopf({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify(koerper)
+    });
+    if(!r.ok) console.error('Sucheingabe speichern fehlgeschlagen:', r.status);
+  } catch(e) { console.error('Sucheingabe speichern:', e && e.name); }
 }
 // Entscheidet beim Laden, was zuerst erscheint.
 function einstiegRouten() {
