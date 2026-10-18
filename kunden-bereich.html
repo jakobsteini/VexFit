@@ -106,6 +106,33 @@ textarea.modal-msg::placeholder{color:rgba(85,85,85,0.7)}
 @keyframes waBounce{0%{opacity:0;transform:scale(0.5)}100%{opacity:1;transform:scale(1)}}
 .wa{position:fixed;bottom:20px;right:16px;z-index:9999;width:46px;height:46px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 16px rgba(37,211,102,0.4);opacity:0;animation:waBounce 0.5s 2s ease both;text-decoration:none}
 @media(min-width:640px){nav{padding:0 32px}}
+/* GEFUEHRTER EINSTIEG */
+.einstieg{min-height:100vh;padding:80px 20px 40px;max-width:560px;margin:0 auto;display:flex;flex-direction:column}
+.ein-progress{display:flex;align-items:center;gap:8px;margin-bottom:28px}
+.ein-dot{width:28px;height:4px;border-radius:2px;background:var(--bi);transition:background 0.3s}
+.ein-dot.on{background:var(--accent)}
+.ein-step{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-left:auto}
+.ein-card{flex:1;display:flex;flex-direction:column;animation:fadeUp 0.35s ease both}
+.ein-frage{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,8vw,42px);line-height:0.95;letter-spacing:1.5px;margin-bottom:10px}
+.ein-frage span{color:var(--accent)}
+.ein-hint{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.6}
+.ein-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
+.ein-chip{padding:9px 15px;border:1px solid var(--bi);border-radius:100px;font-size:13px;color:var(--white);cursor:pointer;transition:all 0.2s;user-select:none}
+.ein-chip.on{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.08)}
+.ein-feld{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+.ein-feld label{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.ein-feld input,.ein-feld select{background:var(--mid);border:1px solid var(--bi);color:var(--white);padding:13px 14px;font-family:'DM Sans',sans-serif;font-size:15px;border-radius:3px;outline:none;width:100%;appearance:none;-webkit-appearance:none}
+.ein-feld input:focus,.ein-feld select:focus{border-color:rgba(232,255,0,0.35)}
+.ein-feld select option{background:#1a1a1a}
+.ein-nav{display:flex;gap:10px;margin-top:auto;padding-top:20px}
+.ein-zurueck{flex:0 0 auto;background:none;border:1px solid var(--border);color:var(--muted);padding:14px 20px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer}
+.ein-weiter{flex:1;background:var(--accent);color:var(--bg);border:none;padding:14px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer}
+.ein-skip{text-align:center;margin-top:16px}
+.ein-skip a{font-size:12px;color:var(--muted);text-decoration:underline;cursor:pointer}
+.suche-zusammenfassung{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sz-text{font-size:12px;color:var(--muted);line-height:1.5}
+.sz-text b{color:var(--white);font-weight:600}
+.sz-btn{flex-shrink:0;background:none;border:1px solid var(--bi);color:var(--accent);padding:7px 12px;border-radius:100px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.5px;cursor:pointer;white-space:nowrap}
 </style>
 <!-- Meta Pixel Code -->
 <!-- Laedt NICHT beim Seitenaufruf. Nur wenn eine Zustimmung fuer Marketing vorliegt. -->
@@ -143,8 +170,9 @@ try {
   </div>
 </nav>
 
-<!-- WILLKOMMENS-SEITE -->
-<div class="page" id="welcomePage">
+<!-- WILLKOMMENS-SEITE (beim Laden ausgeblendet; der Einstieg bzw. die Trefferliste
+     entscheidet unten, was zuerst erscheint. Sichtbar z.B. nach dem Senden einer Anfrage) -->
+<div class="page hidden" id="welcomePage">
   <div class="icon-wrap">🎯</div>
   <div class="title">WILLKOMMEN<br><span>BEI VEXFIT!</span></div>
   <p class="desc" id="welcomeDesc">Sobald ein Trainer in deiner Nähe mit deinen Anforderungen verfügbar ist, wirst du per E-Mail benachrichtigt.</p>
@@ -161,6 +189,66 @@ try {
   <div class="meine-anfragen hidden" id="meineAnfragen">
     <div class="ma-title">MEINE ANFRAGEN</div>
     <div id="maList"></div>
+  </div>
+</div>
+
+<!-- GEFUEHRTER EINSTIEG: drei Fragen nacheinander, je eine Karte.
+     Fragen und Auswahlwerte stammen belegt aus den Profilformularen und der
+     vorhandenen Suche (siehe Kommentar bei SPEZ_EINSTIEG/ART_EINSTIEG unten). -->
+<div class="einstieg hidden" id="einstieg">
+  <div class="ein-progress">
+    <div class="ein-dot" data-d="1"></div>
+    <div class="ein-dot" data-d="2"></div>
+    <div class="ein-dot" data-d="3"></div>
+    <div class="ein-step" id="einStep">Frage 1 von 3</div>
+  </div>
+
+  <!-- Frage 1: Spezialisierungen (Mehrfachauswahl, oder alles offen lassen) -->
+  <div class="ein-card" id="einCard1">
+    <div class="ein-frage">Woran willst du <span>arbeiten?</span></div>
+    <div class="ein-hint">Mehrfachauswahl möglich – oder lass einfach alles offen und tippe auf Weiter.</div>
+    <div class="ein-chips" id="einSpezChips"></div>
+    <div class="ein-nav">
+      <button class="ein-weiter" onclick="einstiegWeiter()">Weiter →</button>
+    </div>
+    <div class="ein-skip"><a onclick="einstiegUeberspringen()">Einstieg überspringen</a></div>
+  </div>
+
+  <!-- Frage 2: Trainingsart (Einfachauswahl aus den belegten Werten) -->
+  <div class="ein-card hidden" id="einCard2">
+    <div class="ein-frage">Vor Ort oder <span>online?</span></div>
+    <div class="ein-hint">Wähle die Art, die zu dir passt – oder lass es offen.</div>
+    <div class="ein-chips" id="einArtChips"></div>
+    <div class="ein-nav">
+      <button class="ein-zurueck" onclick="einstiegZurueck()">←</button>
+      <button class="ein-weiter" onclick="einstiegWeiter()">Weiter →</button>
+    </div>
+    <div class="ein-skip"><a onclick="einstiegUeberspringen()">Einstieg überspringen</a></div>
+  </div>
+
+  <!-- Frage 3: PLZ + Umkreis (genau wie in der vorhandenen Suche) -->
+  <div class="ein-card hidden" id="einCard3">
+    <div class="ein-frage">Wo bist <span>du?</span></div>
+    <div class="ein-hint">PLZ eingeben und Umkreis wählen.</div>
+    <div class="ein-feld">
+      <label>Deine PLZ</label>
+      <input type="text" id="einPlz" placeholder="Deine PLZ (z.B. 5026)" maxlength="5" inputmode="numeric" autocomplete="postal-code">
+    </div>
+    <div class="ein-feld">
+      <label>Umkreis</label>
+      <select id="einRadius">
+        <option value="10">10 km</option>
+        <option value="25" selected>25 km</option>
+        <option value="50">50 km</option>
+        <option value="100">100 km</option>
+        <option value="0">Alle</option>
+      </select>
+    </div>
+    <div class="ein-nav">
+      <button class="ein-zurueck" onclick="einstiegZurueck()">←</button>
+      <button class="ein-weiter" onclick="einstiegFertig()">Trainer anzeigen →</button>
+    </div>
+    <div class="ein-skip"><a onclick="einstiegUeberspringen()">Einstieg überspringen</a></div>
   </div>
 </div>
 
@@ -187,6 +275,11 @@ try {
     <div class="fc" onclick="setFilter('Ausdauer',this)">🏃 Ausdauer</div>
     <div class="fc" onclick="setFilter('Krafttraining',this)">⚡ Krafttraining</div>
   </div>
+  <!-- Zeigt ueber der Trefferliste, wonach gesucht wurde, und startet den Einstieg erneut -->
+  <div class="suche-zusammenfassung hidden" id="sucheZusammenfassung">
+    <div class="sz-text" id="szText"></div>
+    <button class="sz-btn" onclick="einstiegStart()">Geführte Suche</button>
+  </div>
   <div id="trainerList"><div class="empty-state">PLZ eingeben und auf → klicken</div></div>
 </div>
 
@@ -212,6 +305,20 @@ try {
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
 let K = null, allT = [], activeFilter = 'alle', selT = null, lastSearch = null;
+
+// ──── GEFUEHRTER EINSTIEG ────
+// Die Auswahlwerte sind WORTGLEICH aus den Profilformularen uebernommen und
+// werden nicht erfunden:
+//   Spezialisierungen (Frage 1): profil-bearbeiten.html SPEZ_OPTIONS (Zeilen 235-239),
+//     identisch trainer-bereich.html (Zeilen 342-346).
+//   Trainingsarten (Frage 2): <select id="fTrainingsart"> in profil-bearbeiten.html
+//     (Zeilen 136-145), identisch trainer-bereich.html (Zeilen 230-240).
+// Weicht hier etwas ab, meldet das /tmp/vexfit-einstieg.sh.
+const SPEZ_EINSTIEG = ['Muskelaufbau','Abnehmen','Krafttraining','Ausdauer','HIIT','Functional Training','Mobility','Bodybuilding','Calisthenics','Schwangerschaft','Senioren','Rücken & Haltung','Ernährungsplanung','Wettkampfvorbereitung','Stressabbau','Flexibilität'];
+const ART_EINSTIEG = ['Personal Training','Gruppen Training','Online Coaching','Ernährungsberatung','Yoga','Pilates','Kampfsport','Rehabilitation','Sonstiges'];
+const EINSTIEG_KEY = 'vexfit_einstieg';
+let einSchritt = 1;
+let einAuswahl = { spezialisierungen: [], trainingsart: '', plz: '', umkreis: 25 };
 
 // Als Profilbild gilt nur eine Adresse aus dem eigenen Bilder-Behaelter;
 // alles andere (leer, fremde Adresse) faellt auf die Initialen zurueck.
@@ -286,22 +393,27 @@ async function loadKunde(email) {
     const d = await r.json();
     if(Array.isArray(d) && d.length > 0) {
       K = d[0];
-      if(K.plz) document.getElementById('plzInput').value = K.plz;
+      if(K.plz) {
+        document.getElementById('plzInput').value = K.plz;
+        const ep = document.getElementById('einPlz');
+        if(ep && !ep.value) ep.value = K.plz;
+      }
     }
   } catch(e) { console.error(e); }
 }
 
+// "Trainer in meiner Nähe": wer den Einstieg schon abgeschlossen hat, kommt
+// direkt zur Trefferliste mit den letzten Werten; sonst startet der Einstieg.
 function toggleSearch(e) {
-  e.preventDefault();
-  const wp = document.getElementById('welcomePage');
-  const sp = document.getElementById('searchPage');
-  if(wp.classList.contains('hidden')) {
-    wp.classList.remove('hidden');
-    sp.classList.add('hidden');
+  if(e && e.preventDefault) e.preventDefault();
+  const g = einstiegGespeichert();
+  if(g && g.abgeschlossen) {
+    document.getElementById('welcomePage').classList.add('hidden');
+    document.getElementById('einstieg').classList.add('hidden');
+    document.getElementById('searchPage').classList.remove('hidden');
+    starteGemerkteSuche();
   } else {
-    wp.classList.add('hidden');
-    sp.classList.remove('hidden');
-    if(allT.length === 0) loadTrainer();
+    einstiegStart();
   }
 }
 
@@ -518,8 +630,155 @@ async function activateAlert() {
 
 function logout() {
   localStorage.removeItem('vexfit_session');
+  try { localStorage.removeItem(EINSTIEG_KEY); } catch(e) {}
   location.href = 'login.html';
 }
+
+// ──── EINSTIEG: Ablauf, Navigation, Speichern ────
+function einstiegGespeichert() {
+  try { return JSON.parse(localStorage.getItem(EINSTIEG_KEY) || 'null'); } catch(e) { return null; }
+}
+function einstiegChipsAufbauen() {
+  const s = document.getElementById('einSpezChips');
+  if(s && !s.childElementCount) s.innerHTML = SPEZ_EINSTIEG.map(x => `<div class="ein-chip" data-v="${x}" onclick="einSpezToggle(this)">${x}</div>`).join('');
+  const a = document.getElementById('einArtChips');
+  if(a && !a.childElementCount) a.innerHTML = ART_EINSTIEG.map(x => `<div class="ein-chip" data-v="${x}" onclick="einArtWaehle(this)">${x}</div>`).join('');
+}
+function einSpezToggle(el) {
+  const v = el.getAttribute('data-v');
+  const i = einAuswahl.spezialisierungen.indexOf(v);
+  if(i >= 0) { einAuswahl.spezialisierungen.splice(i, 1); el.classList.remove('on'); }
+  else { einAuswahl.spezialisierungen.push(v); el.classList.add('on'); }
+}
+function einArtWaehle(el) {
+  const v = el.getAttribute('data-v');
+  if(einAuswahl.trainingsart === v) { einAuswahl.trainingsart = ''; el.classList.remove('on'); }
+  else {
+    einAuswahl.trainingsart = v;
+    document.querySelectorAll('#einArtChips .ein-chip').forEach(c => c.classList.remove('on'));
+    el.classList.add('on');
+  }
+}
+function einstiegZeige(n) {
+  einSchritt = n;
+  for(let i = 1; i <= 3; i++) document.getElementById('einCard' + i).classList.toggle('hidden', i !== n);
+  document.querySelectorAll('.ein-dot').forEach(d => d.classList.toggle('on', parseInt(d.getAttribute('data-d')) <= n));
+  document.getElementById('einStep').textContent = 'Frage ' + n + ' von 3';
+}
+function einstiegWeiter() { if(einSchritt < 3) einstiegZeige(einSchritt + 1); }
+function einstiegZurueck() { if(einSchritt > 1) einstiegZeige(einSchritt - 1); }
+// Startet den Einstieg frisch bei Frage 1.
+function einstiegStart() {
+  einstiegChipsAufbauen();
+  einAuswahl = { spezialisierungen: [], trainingsart: '', plz: '', umkreis: 25 };
+  document.querySelectorAll('#einSpezChips .ein-chip, #einArtChips .ein-chip').forEach(c => c.classList.remove('on'));
+  const ep = document.getElementById('einPlz');
+  if(ep) { ep.value = (K && K.plz) ? K.plz : ''; einAuswahl.plz = ep.value; }
+  const er = document.getElementById('einRadius');
+  if(er) er.value = '25';
+  document.getElementById('welcomePage').classList.add('hidden');
+  document.getElementById('searchPage').classList.add('hidden');
+  document.getElementById('einstieg').classList.remove('hidden');
+  einstiegZeige(1);
+}
+// Unauffaelliger Weg: Einstieg ueberspringen und direkt zur bisherigen Suchmaske.
+function einstiegUeberspringen() {
+  try { localStorage.setItem(EINSTIEG_KEY, JSON.stringify({ uebersprungen: true })); } catch(e) {}
+  document.getElementById('einstieg').classList.add('hidden');
+  zeigeSuchmaske();
+}
+// Zeigt die vorhandene Suchmaske ohne automatische Suche (Skip / uebersprungener Stand).
+function zeigeSuchmaske() {
+  document.getElementById('welcomePage').classList.add('hidden');
+  document.getElementById('einstieg').classList.add('hidden');
+  document.getElementById('searchPage').classList.remove('hidden');
+  const el = document.getElementById('sucheZusammenfassung');
+  document.getElementById('szText').textContent = 'Lieber Schritt für Schritt suchen?';
+  el.querySelector('.sz-btn').textContent = 'Geführte Suche';
+  el.classList.remove('hidden');
+  if(allT.length === 0) loadTrainer();
+}
+// Bildet Frage 1 auf den VORHANDENEN Filter ab: genau eine Wahl -> dieser Filter,
+// sonst 'alle'. Es wird keine neue Filterlogik gebaut.
+function einstiegFilterSetzen() {
+  const sp = einAuswahl.spezialisierungen;
+  activeFilter = (sp.length === 1) ? sp[0] : 'alle';
+  let markiert = false;
+  document.querySelectorAll('.filter-bar .fc').forEach(b => {
+    const m = (b.getAttribute('onclick') || '').match(/setFilter\('([^']+)'/);
+    const val = m ? m[1] : '';
+    const on = (activeFilter === 'alle') ? (val === 'alle') : (val === activeFilter);
+    b.classList.toggle('on', on);
+    if(on) markiert = true;
+  });
+  // Spezialisierung ohne eigenen Knopf (z.B. HIIT): der Filter wirkt trotzdem,
+  // es ist nur kein Knopf markiert.
+  if(!markiert) document.querySelectorAll('.filter-bar .fc').forEach(b => b.classList.remove('on'));
+}
+// Zeigt ueber der Trefferliste, wonach gesucht wurde, mit Knopf zum Neustart.
+function zeigeZusammenfassung() {
+  const el = document.getElementById('sucheZusammenfassung');
+  const sp = einAuswahl.spezialisierungen;
+  const teile = [sp.length ? sp.join(', ') : 'Alle Ziele'];
+  if(einAuswahl.trainingsart) teile.push(einAuswahl.trainingsart);
+  if(einAuswahl.plz) teile.push(einAuswahl.plz + (einAuswahl.umkreis ? ' · ' + einAuswahl.umkreis + ' km' : ' · alle'));
+  document.getElementById('szText').innerHTML = 'Gesucht: <b>' + teile.join('</b> · <b>') + '</b>';
+  el.querySelector('.sz-btn').textContent = 'Neu starten';
+  el.classList.remove('hidden');
+}
+// Letzte Frage beantwortet: die VORHANDENE Suche mit diesen Werten ausfuehren.
+async function einstiegFertig() {
+  einAuswahl.plz = document.getElementById('einPlz').value.trim();
+  einAuswahl.umkreis = parseInt(document.getElementById('einRadius').value);
+  document.getElementById('plzInput').value = einAuswahl.plz;
+  document.getElementById('radiusInput').value = String(einAuswahl.umkreis);
+  einstiegFilterSetzen();
+  document.getElementById('einstieg').classList.add('hidden');
+  document.getElementById('welcomePage').classList.add('hidden');
+  document.getElementById('searchPage').classList.remove('hidden');
+  if(allT.length === 0) await loadTrainer();
+  await searchByPLZ();
+  try {
+    localStorage.setItem(EINSTIEG_KEY, JSON.stringify({
+      abgeschlossen: true,
+      spezialisierungen: einAuswahl.spezialisierungen,
+      trainingsart: einAuswahl.trainingsart,
+      plz: einAuswahl.plz,
+      umkreis: einAuswahl.umkreis
+    }));
+  } catch(e) {}
+  zeigeZusammenfassung();
+}
+// Fuehrt die gemerkte Suche beim naechsten Besuch direkt aus.
+async function starteGemerkteSuche() {
+  if(allT.length === 0) await loadTrainer();
+  await searchByPLZ();
+  zeigeZusammenfassung();
+}
+// Entscheidet beim Laden, was zuerst erscheint.
+function einstiegRouten() {
+  einstiegChipsAufbauen();
+  const g = einstiegGespeichert();
+  if(g && g.abgeschlossen) {
+    einAuswahl = {
+      spezialisierungen: Array.isArray(g.spezialisierungen) ? g.spezialisierungen : [],
+      trainingsart: g.trainingsart || '',
+      plz: g.plz || '',
+      umkreis: (g.umkreis != null) ? g.umkreis : 25
+    };
+    document.getElementById('plzInput').value = einAuswahl.plz;
+    document.getElementById('radiusInput').value = String(einAuswahl.umkreis);
+    einstiegFilterSetzen();
+    document.getElementById('welcomePage').classList.add('hidden');
+    document.getElementById('searchPage').classList.remove('hidden');
+    starteGemerkteSuche();
+  } else if(g && g.uebersprungen) {
+    zeigeSuchmaske();
+  } else {
+    einstiegStart();
+  }
+}
+einstiegRouten();
 </script>
 <div class="cookie-widerruf"><a href="rechtliches.html">Impressum</a><a href="rechtliches.html#datenschutz">Datenschutz</a><a href="#" onclick="return vexfitEinstellungenOeffnen()">Cookie-Einstellungen</a></div>
 <!-- Zustimmung fuer Marketing. Gleicher Aufbau und gleiche Gestaltung auf allen Seiten. -->
