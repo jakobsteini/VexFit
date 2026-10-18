@@ -304,7 +304,7 @@ try {
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
-let K = null, allT = [], activeFilter = 'alle', selT = null, lastSearch = null, einstiegSpez = [];
+let K = null, allT = [], activeFilter = 'alle', selT = null, lastSearch = null, einstiegSpez = [], letzteUmkreisListe = [];
 
 // ──── GEFUEHRTER EINSTIEG ────
 // Die Auswahlwerte sind WORTGLEICH aus den Profilformularen uebernommen und
@@ -455,7 +455,7 @@ async function searchByPLZ() {
   const plz = document.getElementById('plzInput').value.trim();
   const radius = parseInt(document.getElementById('radiusInput').value);
   const status = document.getElementById('plzStatus');
-  if(radius === 0) { if(!allT.length) await loadTrainer(); lastSearch = null; renderTrainer(allT); status.textContent = `Alle ${allT.length} Trainer`; return; }
+  if(radius === 0) { if(!allT.length) await loadTrainer(); lastSearch = null; letzteUmkreisListe = allT; renderTrainer(allT); status.textContent = `Alle ${allT.length} Trainer`; return; }
   if(!plz || plz.length < 4) { status.textContent = '⚠️ Bitte gültige PLZ eingeben'; return; }
   if(!allT.length) await loadTrainer();
   status.textContent = '📍 Standort wird ermittelt...';
@@ -477,6 +477,7 @@ async function searchByPLZ() {
   filtered.sort((a,b) => (a._online?1:0) - (b._online?1:0) || a._dist - b._dist);
   status.textContent = `📍 ${coords.city} · ${filtered.length} Trainer in ${radius} km`;
   lastSearch = { plz, city: coords.city, radius };
+  letzteUmkreisListe = filtered;
   renderTrainer(filtered);
 }
 
@@ -486,6 +487,14 @@ function setFilter(f, el) {
   document.querySelectorAll('.fc').forEach(c => c.classList.remove('on'));
   el.classList.add('on');
   renderTrainer(allT);
+}
+
+// Hebt die Spezialisierungs-Filter auf und zeigt wieder alle Treffer im Umkreis.
+function filterZuruecksetzen() {
+  einstiegSpez = [];
+  activeFilter = 'alle';
+  document.querySelectorAll('.filter-bar .fc').forEach(b => b.classList.toggle('on', /setFilter\('alle'/.test(b.getAttribute('onclick') || '')));
+  renderTrainer(letzteUmkreisListe);
 }
 
 function renderTrainer(list) {
@@ -504,6 +513,18 @@ function renderTrainer(list) {
   }
   const el = document.getElementById('trainerList');
   if(!filtered.length) {
+    const filterAktiv = (einstiegSpez.length > 0) || (activeFilter !== 'alle');
+    if(list.length > 0 && filterAktiv) {
+      // Es gibt Treffer im Umkreis, aber der Filter hat alle entfernt: Hinweis
+      // und ein Knopf, der die Filter aufhebt und alle Umkreistreffer zeigt.
+      el.innerHTML = `<div class="empty-state" style="padding:48px 20px 20px">
+      <div style="font-size:40px;margin-bottom:16px">🔍</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;color:rgba(255,255,255,0.3);margin-bottom:12px">KEIN TRAINER PASST ZU DEINER AUSWAHL</div>
+      <div style="font-size:14px;color:var(--muted);line-height:1.8;font-weight:300;margin-bottom:18px">Im Umkreis gibt es ${list.length} Trainer, aber keiner deckt deine gewählten Ziele ab.</div>
+      <button class="btn-alert" onclick="filterZuruecksetzen()">Alle Treffer im Umkreis zeigen</button>
+    </div>`;
+      return;
+    }
     const where = lastSearch ? `IN ${lastSearch.plz}${lastSearch.city ? ' ' + lastSearch.city.toUpperCase() : ''}` : 'IN DEINER NÄHE';
     const alertBox = lastSearch ? `
     <div class="alert-box" id="alertBox">
