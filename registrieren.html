@@ -354,7 +354,10 @@ async function submitTrainer(){
   const city=await plzPruefen('t');
   if(!city){showError('t-error','Die Stadt konnte nicht aus der Postleitzahl ermittelt werden. Bitte prüfe die PLZ.');return}
   const btn=document.getElementById('t-submit-btn');imVersand.t=true;btn.disabled=true;btn.textContent='Wird gespeichert...';
-  const td={vorname:fn,nachname:ln,email,telefon:'',stadt:city,plz,trainingsart:'',trainingsort:selectedOrt||null,erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
+  const td={vorname:fn,nachname:ln,email,telefon:'',stadt:city,plz,trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
+  // trainingsort nur mitsenden, wenn gewaehlt - so laeuft die Registrierung auch,
+  // solange die Spalte noch nicht existiert (Migration noch nicht eingespielt).
+  if(selectedOrt) td.trainingsort=selectedOrt;
   try{
     const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
     const ad=await ar.json();
