@@ -538,12 +538,13 @@ function anfrageZustand(a) {
   return (s === 'angenommen' || s === 'abgelehnt') ? s : 'offen';
 }
 
-// Profilvollstaendigkeit - dieselben sechs Felder wie die Anzeige im
+// Profilvollstaendigkeit - dieselben sieben Felder wie die Anzeige im
 // Trainerbereich (trainer-bereich.html: updateDots). Das Profilbild zaehlt
 // dort bewusst NICHT mit. Keine eigene Gewichtung.
 function fehlendeProfilfelder(t) {
   const fehlt = [];
   if(!t.trainingsart) fehlt.push('Trainingsart');
+  if(!t.trainingsort) fehlt.push('Trainingsort');
   if(!(Number(t.preis_stunde) > 0)) fehlt.push('Preis pro Stunde');
   if(!(t.bio && String(t.bio).length > 10)) fehlt.push('Über mich');
   if(!t.erfahrung) fehlt.push('Erfahrung');

@@ -147,6 +147,18 @@ try {
     </div>
   </div>
 
+  <!-- WO TRAINIERST DU? -->
+  <div class="section fade-in fade-d2">
+    <div class="section-title"><span class="dot dot-missing" id="dotTrainingsort"></span>WO TRAINIERST DU?</div>
+    <div class="field">
+      <div class="chips-wrap" id="ortWrap">
+        <div class="chip" data-val="vor_ort" onclick="waehleOrt(this)">Vor Ort</div>
+        <div class="chip" data-val="online" onclick="waehleOrt(this)">Online</div>
+        <div class="chip" data-val="beides" onclick="waehleOrt(this)">Beides</div>
+      </div>
+    </div>
+  </div>
+
   <!-- PREIS -->
   <div class="section fade-in fade-d2">
     <div class="section-title"><span class="dot dot-missing" id="dotPreis"></span>PREIS PRO STUNDE</div>
@@ -241,6 +253,7 @@ const SPEZ_OPTIONS = [
 
 let T = null;
 let selectedSpez = [];
+let selectedOrt = '';   // Ort des Trainings: '', 'vor_ort', 'online' oder 'beides'
 
 // AUTH
 const raw = localStorage.getItem('vexfit_session');
@@ -292,6 +305,19 @@ function toggleChip(el) {
   updateDots();
 }
 
+// Einfachauswahl fuer den Ort des Trainings. Erneuter Klick hebt die Wahl auf
+// (dann wieder "noch nicht geantwortet").
+function waehleOrt(el) {
+  const v = el.dataset.val;
+  if(el.classList.contains('active')) { el.classList.remove('active'); selectedOrt = ''; }
+  else {
+    selectedOrt = v;
+    document.querySelectorAll('#ortWrap .chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+  updateDots();
+}
+
 async function loadProfile(email) {
   try {
     const r = await fetch(`${SB}/rest/v1/trainers?email=eq.${encodeURIComponent(email)}&select=*`, {
@@ -329,8 +355,15 @@ function fillForm(t) {
   // Spezialisierungen
   if(t.spezialisierungen && Array.isArray(t.spezialisierungen)) {
     selectedSpez = [...t.spezialisierungen];
-    document.querySelectorAll('.chip').forEach(c => {
+    document.querySelectorAll('#chipWrap .chip').forEach(c => {
       if(selectedSpez.includes(c.dataset.val)) c.classList.add('active');
+    });
+  }
+  // Ort des Trainings
+  if(t.trainingsort) {
+    selectedOrt = t.trainingsort;
+    document.querySelectorAll('#ortWrap .chip').forEach(c => {
+      if(c.dataset.val === t.trainingsort) c.classList.add('active');
     });
   }
   // Telefon
@@ -358,6 +391,7 @@ function updateDots() {
     { dot: 'dotBio', done: !!bio && bio.length > 10 },
     { dot: 'dotErfahrung', done: !!erfahrung },
     { dot: 'dotSpez', done: selectedSpez.length > 0 },
+    { dot: 'dotTrainingsort', done: !!selectedOrt },
     { dot: 'dotTelefon', done: !!telefon },
     { dot: 'dotStandort', done: !!document.getElementById('fPlz').value.trim() }
   ];
@@ -474,7 +508,7 @@ async function saveProfile() {
   const telefon = document.getElementById('fTelefon').value.trim();
 
   // Validation
-  if(!trainingsart && !preis && !bio && !erfahrung && selectedSpez.length === 0 && !telefon && !plzWert) {
+  if(!trainingsart && !preis && !bio && !erfahrung && selectedSpez.length === 0 && !selectedOrt && !telefon && !plzWert) {
     showToast('Fülle mindestens ein Feld aus', true);
     btn.disabled = false;
     btn.textContent = 'Profil speichern';
@@ -487,6 +521,7 @@ async function saveProfile() {
   if(bio) body.bio = bio;
   if(erfahrung) body.erfahrung = erfahrung;
   if(selectedSpez.length > 0) body.spezialisierungen = selectedSpez;
+  if(selectedOrt) body.trainingsort = selectedOrt;
   if(telefon) body.telefon = telefon;
   if(plzWert && stadtNeu) { body.plz = plzWert; body.stadt = stadtNeu; }
 

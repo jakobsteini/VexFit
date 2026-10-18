@@ -85,6 +85,9 @@ select option{background:var(--gray);color:var(--white)}
 .iab-banner b{text-decoration:underline}
 .iab-banner + nav{top:38px}
 body.iab-active{padding-top:38px}
+.ort-chips{display:flex;flex-wrap:wrap;gap:8px}
+.ort-chip{padding:9px 16px;border:1px solid var(--border-input);border-radius:100px;font-size:13px;color:var(--text-muted);cursor:pointer;transition:all 0.2s;user-select:none}
+.ort-chip.active{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.08)}
 </style>
 <!-- Meta Pixel Code -->
 <!-- Laedt NICHT beim Seitenaufruf. Nur wenn eine Zustimmung fuer Marketing vorliegt. -->
@@ -145,6 +148,14 @@ try {
     <div class="error-banner" id="t-pw-error"></div>
     <div class="field"><label>PLZ</label><input type="text" placeholder="5020" id="t-plz" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="plzGeaendert('t')"></div>
     <div id="t-plz-status" style="display:none;font-size:12px;color:var(--text-muted);margin:-6px 0 12px"></div>
+    <div class="field">
+      <label>Wo trainierst du?</label>
+      <div class="ort-chips" id="t-ort">
+        <div class="ort-chip" data-val="vor_ort" onclick="waehleOrt(this)">Vor Ort</div>
+        <div class="ort-chip" data-val="online" onclick="waehleOrt(this)">Online</div>
+        <div class="ort-chip" data-val="beides" onclick="waehleOrt(this)">Beides</div>
+      </div>
+    </div>
     <label class="checkbox-field"><input type="checkbox" id="t-agb"><div class="custom-cb"></div><span class="cb-label">Ich akzeptiere die <a href="rechtliches.html" target="_blank">AGB</a> und <a href="rechtliches.html#datenschutz" target="_blank">Datenschutzbestimmungen</a></span></label>
     <div class="form-actions"><button class="btn-next" id="t-submit-btn" onclick="submitTrainer()">Profil gratis erstellen 🚀</button></div>
     <div class="trust-row"><div class="trust-item"><span>✓</span> Kostenlos</div><div class="trust-item"><span>✓</span> Kein Abo</div><div class="trust-item"><span>✓</span> DACH-Region</div></div>
@@ -320,6 +331,18 @@ async function plzPruefen(kuerzel){
   return null;
 }
 
+// Ort des Trainings (Einfachauswahl). Erneuter Klick hebt die Wahl auf.
+let selectedOrt = '';
+function waehleOrt(el){
+  const v = el.dataset.val;
+  if(el.classList.contains('active')){ el.classList.remove('active'); selectedOrt = ''; }
+  else {
+    selectedOrt = v;
+    document.querySelectorAll('#t-ort .ort-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+}
+
 async function submitTrainer(){
   hideError('t-error');
   const fn=document.getElementById('t-fn').value.trim(),ln=document.getElementById('t-ln').value.trim(),email=document.getElementById('t-email').value.trim(),plz=document.getElementById('t-plz').value.trim();
@@ -331,7 +354,7 @@ async function submitTrainer(){
   const city=await plzPruefen('t');
   if(!city){showError('t-error','Die Stadt konnte nicht aus der Postleitzahl ermittelt werden. Bitte prüfe die PLZ.');return}
   const btn=document.getElementById('t-submit-btn');imVersand.t=true;btn.disabled=true;btn.textContent='Wird gespeichert...';
-  const td={vorname:fn,nachname:ln,email,telefon:'',stadt:city,plz,trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
+  const td={vorname:fn,nachname:ln,email,telefon:'',stadt:city,plz,trainingsart:'',trainingsort:selectedOrt||null,erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
   try{
     const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
     const ad=await ar.json();

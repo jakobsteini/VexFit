@@ -242,6 +242,18 @@ try {
     </div>
   </div>
 
+  <!-- Wo trainierst du? -->
+  <div class="section fade fd2">
+    <div class="section-head"><span class="dot dot-no" id="dotTrainingsort"></span>WO TRAINIERST DU?</div>
+    <div class="field">
+      <div class="chips" id="ortWrap">
+        <div class="chip" data-val="vor_ort" onclick="waehleOrt(this)">Vor Ort</div>
+        <div class="chip" data-val="online" onclick="waehleOrt(this)">Online</div>
+        <div class="chip" data-val="beides" onclick="waehleOrt(this)">Beides</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Preis -->
   <div class="section fade fd2">
     <div class="section-head"><span class="dot dot-no" id="dotPreis"></span>PREIS PRO STUNDE</div>
@@ -348,6 +360,7 @@ const SPEZ_OPTIONS = [
 
 let T = null;
 let selectedSpez = [];
+let selectedOrt = '';   // Ort des Trainings: '', 'vor_ort', 'online' oder 'beides'
 let profileComplete = false;
 
 // ──── AUTH ────
@@ -395,6 +408,18 @@ function toggleChip(el) {
   } else {
     el.classList.add('on');
     selectedSpez.push(v);
+  }
+  updateDots();
+}
+
+// Einfachauswahl fuer den Ort des Trainings. Erneuter Klick hebt die Wahl auf.
+function waehleOrt(el) {
+  const v = el.dataset.val;
+  if(el.classList.contains('on')) { el.classList.remove('on'); selectedOrt = ''; }
+  else {
+    selectedOrt = v;
+    document.querySelectorAll('#ortWrap .chip').forEach(c => c.classList.remove('on'));
+    el.classList.add('on');
   }
   updateDots();
 }
@@ -454,8 +479,14 @@ function fillForm(t) {
   }
   if(t.spezialisierungen && Array.isArray(t.spezialisierungen)) {
     selectedSpez = [...t.spezialisierungen];
-    document.querySelectorAll('.chip').forEach(c => {
+    document.querySelectorAll('#chipWrap .chip').forEach(c => {
       if(selectedSpez.includes(c.dataset.val)) c.classList.add('on');
+    });
+  }
+  if(t.trainingsort) {
+    selectedOrt = t.trainingsort;
+    document.querySelectorAll('#ortWrap .chip').forEach(c => {
+      if(c.dataset.val === t.trainingsort) c.classList.add('on');
     });
   }
   if(t.telefon) document.getElementById('fTelefon').value = t.telefon;
@@ -563,6 +594,7 @@ function updateDots() {
     { id: 'dotBio', name: 'Über mich', ok: document.getElementById('fBio').value.length > 10 },
     { id: 'dotErfahrung', name: 'Erfahrung', ok: !!document.getElementById('fErfahrung').value },
     { id: 'dotSpez', name: 'Spezialisierungen', ok: selectedSpez.length > 0 },
+    { id: 'dotTrainingsort', name: 'Trainingsort', ok: !!selectedOrt },
     { id: 'dotTelefon', name: 'Telefon', ok: !!document.getElementById('fTelefon').value.trim() }
   ];
   let done = 0;
@@ -787,6 +819,7 @@ async function saveProfile() {
   if(bio) body.bio = bio;
   if(erfahrung) body.erfahrung = erfahrung;
   if(selectedSpez.length > 0) body.spezialisierungen = selectedSpez;
+  if(selectedOrt) body.trainingsort = selectedOrt;
   if(telefon) body.telefon = telefon;
 
   if(Object.keys(body).length === 0) {
