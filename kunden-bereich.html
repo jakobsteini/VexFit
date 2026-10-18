@@ -167,7 +167,7 @@ try {
 <!-- TRAINER SUCHE -->
 <div class="search-page hidden" id="searchPage">
   <div class="search-page-title">TRAINER IN DEINER NÄHE</div>
-  <p class="search-page-sub">PLZ eingeben und Umkreis wählen</p>
+  <p class="search-page-sub">PLZ eingeben und Umkreis wählen · Online-Trainer werden zusätzlich gezeigt</p>
   <div class="search-bar">
     <input type="text" id="plzInput" placeholder="Deine PLZ (z.B. 5026)" maxlength="5" inputmode="numeric" autocomplete="postal-code">
     <select id="radiusInput">
@@ -360,7 +360,10 @@ async function searchByPLZ() {
     const dist = calcDist(coords.lat,coords.lng,tc.lat,tc.lng);
     if(dist <= radius) filtered.push({...t,_dist:Math.round(dist)});
   }
-  filtered.sort((a,b) => a._dist - b._dist);
+  // Erst die Trainer im Umkreis (nach Entfernung), danach die Online-Trainer.
+  // Online-Trainer sind vom Umkreisfilter ausgenommen (siehe oben) und standen
+  // durch _dist:0 frueher ganz oben; jetzt stehen sie hinter den Treffern im Umkreis.
+  filtered.sort((a,b) => (a._online?1:0) - (b._online?1:0) || a._dist - b._dist);
   status.textContent = `📍 ${coords.city} · ${filtered.length} Trainer in ${radius} km`;
   lastSearch = { plz, city: coords.city, radius };
   renderTrainer(filtered);

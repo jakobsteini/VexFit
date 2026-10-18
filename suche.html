@@ -343,7 +343,10 @@ async function searchByPLZ() {
     if(dist <= radius) filtered.push({...t, _distance: Math.round(dist)});
   }
 
-  filtered.sort((a,b) => a._distance - b._distance);
+  // Erst die Trainer im Umkreis (nach Entfernung), danach die Online-Trainer.
+  // Online-Trainer sind vom Umkreisfilter ausgenommen und standen durch
+  // _distance:0 frueher ganz oben; jetzt stehen sie hinter den Treffern im Umkreis.
+  filtered.sort((a,b) => (a._online?1:0) - (b._online?1:0) || a._distance - b._distance);
   status.textContent = `📍 ${coords.city} · ${filtered.length} Trainer in ${radius} km gefunden`;
   renderTrainersWithDistance(filtered);
 }
