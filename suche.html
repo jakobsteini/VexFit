@@ -429,7 +429,7 @@ function renderTrainers(trainers) {
     const bg = bgColors[i % bgColors.length];
     const isOnline = t.trainingsart === 'Online';
     const tags = (t.spezialisierungen || []).slice(0, 3);
-    const preis = t.preis_stunde ? `€${t.preis_stunde}<span>/Std</span>` : t.preis_monat ? `€${t.preis_monat}<span>/Mo</span>` : '<span>Auf Anfrage</span>';
+    const preis = t.preis_stunde ? `€${t.preis_stunde}<span>/Std</span>` : '<span>Auf Anfrage</span>';
     const bild = avatarAdresse(t.avatar_url);
     const ciStyle = bild ? `background-image:url('${bild}');background-size:cover;background-position:center` : `background:${bg}`;
 
