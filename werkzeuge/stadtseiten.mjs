@@ -44,7 +44,7 @@ const STILLGELEGT = true;
 
 // Oeffentlicher (anon) Schluessel - steht in jeder Seite des Repos, kein Geheimnis.
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhiYXB6d3hkZWhmZ25wdXRyZmpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4NDc0NzQsImV4cCI6MjA5NDQyMzQ3NH0.vIQLcTObF5tmBEuxKL2EEUd4U88k0mdTmsAafG8djN4';
+const SUPABASE_KEY = 'sb_publishable_7We3LNN5Lhhvj0d_NmGfVw_FwDiilR2';
 
 // Genau die Spalten, die suche.html oeffentlich anzeigt - nichts darueber hinaus.
 const SPALTEN = 'id,created_at,vorname,nachname,stadt,plz,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv';
