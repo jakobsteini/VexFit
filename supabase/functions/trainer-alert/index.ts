@@ -19,7 +19,8 @@
 //   TRAINER_ALERT_KEY        — derselbe Wert wie im Vault-Eintrag trainer_alert_key
 //   GMAIL_PASSWORT           — App-Passwort des Gmail-Kontos des Absenders
 //   SUPABASE_URL             — von Supabase gesetzt
-//   SUPABASE_SERVICE_ROLE_KEY— von Supabase gesetzt
+//   SB_SECRET_KEY      — neuer geheimer Schluessel (sb_secret_…); bevorzugt, siehe restKopf()
+//   SUPABASE_SERVICE_ROLE_KEY— alter Schluessel; nur noch Rueckfall, von Supabase gesetzt
 //
 // Zum SMTP-Port: die Supabase-Doku sagt unter „Edge Functions / Limits"
 // woertlich „Outgoing connections to ports `25` and `587` are not allowed."
@@ -54,9 +55,17 @@ function pflicht(name: string): string {
   return wert;
 }
 
-/** PostgREST mit dem Service-Role-Schluessel — umgeht RLS, wie der Lauf es braucht. */
+/** PostgREST mit dem geheimen Schluessel — umgeht RLS, wie der Lauf es braucht. */
 function restKopf(): HeadersInit {
-  const schluessel = pflicht("SUPABASE_SERVICE_ROLE_KEY");
+  // Zwei Quellen, weil Supabase die Schluessel-Generationen umstellt: bevorzugt
+  // der neue geheime Schluessel aus SB_SECRET_KEY (sb_secret_…), sonst der
+  // alte SUPABASE_SERVICE_ROLE_KEY, den Supabase bisher selbst setzt. So faellt
+  // zwischen dem Ausliefern dieser Fassung und dem Setzen des neuen Geheimnisses
+  // nichts aus. Der Rueckfall auf SUPABASE_SERVICE_ROLE_KEY darf entfallen,
+  // sobald SB_SECRET_KEY gesetzt ist und die alten Schluessel im
+  // Supabase-Dashboard abgeschaltet wurden.
+  const schluessel = Deno.env.get("SB_SECRET_KEY") ||
+    pflicht("SUPABASE_SERVICE_ROLE_KEY");
   return {
     apikey: schluessel,
     Authorization: `Bearer ${schluessel}`,
