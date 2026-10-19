@@ -361,7 +361,11 @@ ladeMeineAnfragen();
 // oder gibt es noch keine, bleibt der Abschnitt einfach ausgeblendet.
 async function ladeMeineAnfragen() {
   try {
-    const r = await fetch(`${SB}/rest/v1/anfragen?kunden_email=eq.${encodeURIComponent(sess.email)}&select=id,trainer_name,status,created_at&order=created_at.desc`, {
+    // Kein kunden_email-Filter in der Abfrage: der Zeilenschutz (RLS) liefert dem
+    // Kunden ohnehin nur seine eigenen Anfragen (Policy: kunden_email = JWT-E-Mail).
+    // So bleibt die Liste lesbar, auch nachdem das direkte Leserecht auf kunden_email
+    // entzogen wurde (Schritt 3) - sonst wuerde der Filter auf die Spalte scheitern.
+    const r = await fetch(`${SB}/rest/v1/anfragen?select=id,trainer_name,status,created_at&order=created_at.desc`, {
       headers: authKopf()
     });
     if(!r.ok) return;
