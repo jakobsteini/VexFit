@@ -5,7 +5,7 @@
 <link rel="icon" type="image/png" href="vexfit-logo.png">
 <link rel="apple-touch-icon" href="vexfit-logo.png">
 <link rel="manifest" href="manifest.json">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Vexfit – Betreiber Anleitung</title>
 <meta name="description" content="Interne Betreiber-Anleitung für Vexfit: Trainer freischalten, Abläufe und Admin-Schritte.">
@@ -25,9 +25,9 @@
 body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased}
 .logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;color:var(--white);text-decoration:none}
 .logo span{color:var(--accent)}
-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:rgba(10,10,10,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:calc(14px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) 14px calc(20px + env(safe-area-inset-left));background:rgba(10,10,10,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
 .nav-back{color:var(--text-muted);text-decoration:none;font-size:13px}
-.wrap{max-width:720px;margin:0 auto;padding:80px 20px 60px}
+.wrap{max-width:720px;margin:0 auto;padding:calc(80px + env(safe-area-inset-top)) 20px 60px}
 .page-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px}
 .page-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(44px,10vw,72px);line-height:0.95;letter-spacing:2px;margin-bottom:8px}
 .page-sub{font-size:14px;color:var(--text-muted);margin-bottom:48px;font-weight:300;line-height:1.6}

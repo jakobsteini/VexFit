@@ -5,7 +5,7 @@
 <link rel="icon" type="image/png" href="vexfit-logo.png">
 <link rel="apple-touch-icon" href="vexfit-logo.png">
 <link rel="manifest" href="manifest.json">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Vexfit – Finde deinen Personal Trainer</title>
 <meta name="description" content="Finde deinen perfekten Personal Trainer im DACH-Raum. Lokal oder online. Verifiziert. Kostenlos.">
 <meta property="og:type" content="website">
@@ -25,7 +25,7 @@ html{scroll-behavior:smooth}
 body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased}
 .logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;color:var(--white);text-decoration:none}
 .logo span{color:var(--accent)}
-nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:rgba(10,10,10,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;justify-content:space-between;align-items:center;padding:calc(14px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) 14px calc(20px + env(safe-area-inset-left));background:rgba(10,10,10,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
 .nav-right{display:flex;align-items:center;gap:12px}
 .nav-cta{background:var(--accent);color:var(--black);padding:9px 16px;border-radius:3px;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-decoration:none}
 .nav-hamburger{display:flex;flex-direction:column;gap:5px;cursor:pointer;padding:4px;background:transparent;border:none}
@@ -41,7 +41,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;justify-conten
 .nav-drawer a:hover{color:var(--white)}
 .drawer-cta{background:var(--accent)!important;color:var(--black)!important;padding:14px 20px!important;border-radius:3px;font-weight:700!important;text-align:center;margin-top:12px;border-bottom:none!important}
 .nav-close{position:absolute;top:18px;right:18px;background:transparent;border:none;color:var(--white);font-size:22px;cursor:pointer;line-height:1;padding:4px}
-.hero{min-height:100vh;padding:100px 20px 60px;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+.hero{min-height:100vh;padding:calc(100px + env(safe-area-inset-top)) 20px 60px;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
 .hero-glow{position:absolute;width:300px;height:300px;right:-100px;top:30%;background:radial-gradient(circle,rgba(232,255,0,0.1) 0%,transparent 70%);pointer-events:none;animation:glowPulse 5s ease-in-out infinite}
 .hero-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);background-size:48px 48px;pointer-events:none}
 .hero-grid::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 100% 100% at 50% 50%,transparent 30%,var(--black) 100%)}

@@ -5,7 +5,7 @@
 <link rel="icon" type="image/png" href="vexfit-logo.png">
 <link rel="apple-touch-icon" href="vexfit-logo.png">
 <link rel="manifest" href="manifest.json">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>Vexfit – Trainer finden</title>
 <meta name="description" content="Durchsuche verifizierte Personal Trainer in deiner Nähe – nach Stadt, Ziel und Budget. Für Kunden kostenlos.">
@@ -25,12 +25,12 @@
 body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased}
 .logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;color:var(--white);text-decoration:none}
 .logo span{color:var(--accent)}
-nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:rgba(10,10,10,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:calc(14px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) 14px calc(20px + env(safe-area-inset-left));background:rgba(10,10,10,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
 .nav-r{display:flex;gap:12px;align-items:center}
 .nav-link{color:var(--text-muted);text-decoration:none;font-size:13px;transition:color 0.2s}
 .nav-link:hover{color:var(--white)}
 .nav-cta{background:var(--accent);color:var(--black);padding:9px 16px;border-radius:3px;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-decoration:none}
-.search-hero{padding:80px 20px 32px;background:var(--gray);border-bottom:1px solid var(--border)}
+.search-hero{padding:calc(80px + env(safe-area-inset-top)) 20px 32px;background:var(--gray);border-bottom:1px solid var(--border)}
 .sh-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:8px}
 .sh-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,8vw,60px);line-height:0.95;letter-spacing:2px;margin-bottom:24px}
 .search-bar{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}

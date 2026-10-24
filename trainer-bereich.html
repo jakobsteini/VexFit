@@ -5,7 +5,7 @@
 <link rel="icon" type="image/png" href="vexfit-logo.png">
 <link rel="apple-touch-icon" href="vexfit-logo.png">
 <link rel="manifest" href="manifest.json">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Vexfit – Trainer Bereich</title>
 <meta name="description" content="Dein Trainerbereich bei Vexfit: Profil pflegen und Kundenanfragen verwalten.">
 <meta property="og:type" content="website">
@@ -24,7 +24,7 @@
 body{background:var(--bg);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
 
 /* NAV */
-nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(10,10,10,0.98);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 20px}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;height:calc(56px + env(safe-area-inset-top));background:rgba(10,10,10,0.98);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:env(safe-area-inset-top) calc(20px + env(safe-area-inset-right)) 0 calc(20px + env(safe-area-inset-left))}
 .logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:4px;color:var(--white);text-decoration:none}
 .logo span{color:var(--accent)}
 .nav-right{display:flex;align-items:center;gap:12px}
@@ -40,7 +40,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:56px;background:rgba(
 
 /* SHARED */
 .hidden{display:none}
-.page-wrap{padding:80px 20px 60px;max-width:560px;margin:0 auto}
+.page-wrap{padding:calc(80px + env(safe-area-inset-top)) 20px 60px;max-width:560px;margin:0 auto}
 
 /* ═══ PROFIL BEARBEITEN ═══ */
 .edit-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,7vw,42px);letter-spacing:2px;line-height:1;margin-bottom:4px}
