@@ -280,6 +280,39 @@ try {
         </table>
       </div>
     </div>
+
+    <!-- NACHFRAGE-UEBERSICHT -->
+    <div class="section-title">Nachfrage je Ort</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ort</th>
+            <th>Suchen</th>
+            <th>Vormerkungen</th>
+            <th>Trainer</th>
+          </tr>
+        </thead>
+        <tbody id="nachfrage-tbody">
+          <tr><td colspan="4" class="loading-text">Lade Nachfrage...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section-title" style="margin-top:24px">Häufigste gesuchte Ziele</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ziel</th>
+            <th>Anzahl Suchen</th>
+          </tr>
+        </thead>
+        <tbody id="ziele-tbody">
+          <tr><td colspan="2" class="loading-text">Lade Ziele...</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -714,6 +747,72 @@ async function ladeZahlungen() {
   }
 }
 
+// ──── NACHFRAGE-UEBERSICHT (nur lesend) ────
+// Liest such_eingaben (alle Suchen, Admin) und warteliste (alle Vormerkungen,
+// Admin). Zaehlt je Postleitzahl die Suchen und Vormerkungen; die Zahl der
+// Trainer dort kommt aus window.allTrainers (bereits geladen). Der Ortsname ist
+// die zu dieser PLZ bekannte Stadt aus den Vormerkungen bzw. Trainern. Orte ohne
+// Trainer stehen oben und sind gekennzeichnet, sonst absteigend nach Nachfrage.
+// Fehlt eine der Tabellen (Migration nicht eingespielt), zeigt der Abschnitt
+// einen ruhigen Hinweis statt eines Fehlers - wie bei ladeZahlungen().
+async function ladeNachfrage() {
+  const tb = document.getElementById('nachfrage-tbody');
+  const zb = document.getElementById('ziele-tbody');
+  const hinweisWL = 'Die Nachfrage-Übersicht braucht die neue Tabelle warteliste. Dafür muss migrations/2026-10-24-warteliste.sql im SQL-Editor eingespielt werden.';
+  const hinweisSE = 'Die Nachfrage-Übersicht braucht die Tabelle such_eingaben. Dafür muss migrations/2026-10-18-such-eingaben.sql im SQL-Editor eingespielt werden.';
+  const zeige = (txt) => {
+    tb.innerHTML = `<tr><td colspan="4" class="loading-text">${txt}</td></tr>`;
+    zb.innerHTML = `<tr><td colspan="2" class="loading-text">${txt}</td></tr>`;
+  };
+  try {
+    const [seRes, wlRes] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/such_eingaben?select=plz,spezialisierungen&limit=5000`, { headers: authKopf() }),
+      fetch(`${SUPABASE_URL}/rest/v1/warteliste?select=plz,stadt&limit=5000`, { headers: authKopf() })
+    ]);
+    if(!seRes.ok) { zeige(hinweisSE); return; }
+    if(!wlRes.ok) { zeige(hinweisWL); return; }
+    const suchen = await seRes.json();
+    const vormerkungen = await wlRes.json();
+    if(!Array.isArray(suchen) || !Array.isArray(vormerkungen)) { zeige(hinweisWL); return; }
+
+    // Nachfrage-Orte aus Suchen + Vormerkungen (nur wo es Bedarf gibt).
+    const orte = {};
+    const slot = (plz) => (orte[plz] = orte[plz] || { plz, stadt: '', suchen: 0, vormerkungen: 0, trainer: 0 });
+    for(const s of suchen) if(s.plz) slot(s.plz).suchen++;
+    for(const v of vormerkungen) if(v.plz) { const o = slot(v.plz); o.vormerkungen++; if(!o.stadt && v.stadt) o.stadt = v.stadt; }
+    // Trainerzahl je PLZ und Ortsname aus den bereits geladenen Trainern.
+    const trainerProPlz = {}, stadtProPlz = {};
+    for(const t of (window.allTrainers || [])) if(t.plz) { trainerProPlz[t.plz] = (trainerProPlz[t.plz] || 0) + 1; if(t.stadt && !stadtProPlz[t.plz]) stadtProPlz[t.plz] = t.stadt; }
+    for(const plz in orte) { orte[plz].trainer = trainerProPlz[plz] || 0; if(!orte[plz].stadt && stadtProPlz[plz]) orte[plz].stadt = stadtProPlz[plz]; }
+
+    // Orte ohne Trainer zuerst, danach absteigend nach Nachfrage (Suchen + Vormerkungen).
+    const liste = Object.values(orte).sort((a, b) => {
+      const aNo = a.trainer === 0, bNo = b.trainer === 0;
+      if(aNo !== bNo) return aNo ? -1 : 1;
+      return (b.suchen + b.vormerkungen) - (a.suchen + a.vormerkungen);
+    });
+    tb.innerHTML = liste.map(o => {
+      const ort = o.stadt ? `${o.stadt} (${o.plz})` : o.plz;
+      const marke = o.trainer === 0 ? ' <span class="badge badge-unpaid">Kein Trainer</span>' : '';
+      return `<tr>
+        <td><strong>${ort}</strong>${marke}</td>
+        <td>${o.suchen}</td>
+        <td>${o.vormerkungen}</td>
+        <td>${o.trainer}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="4" class="loading-text">Noch keine Suchen erfasst.</td></tr>';
+
+    // Haeufigste gesuchte Ziele (such_eingaben.spezialisierungen), absteigend.
+    const zielZaehler = {};
+    for(const s of suchen) for(const z of (Array.isArray(s.spezialisierungen) ? s.spezialisierungen : [])) if(z) zielZaehler[z] = (zielZaehler[z] || 0) + 1;
+    const ziele = Object.entries(zielZaehler).sort((a, b) => b[1] - a[1]);
+    zb.innerHTML = ziele.map(([z, n]) => `<tr><td><strong>${z}</strong></td><td>${n}</td></tr>`).join('') || '<tr><td colspan="2" class="loading-text">Noch keine Ziele erfasst.</td></tr>';
+  } catch(e) {
+    console.error('ladeNachfrage:', e);
+    zeige(hinweisWL);
+  }
+}
+
 // Fuehrt alle Abschnitte des Plattform-Zustands aus. Jeder Abschnitt faengt
 // seine Fehler selbst ab, damit einer die anderen nicht blockiert.
 function loadPlattform() {
@@ -722,6 +821,7 @@ function loadPlattform() {
   ladeTrainerOhneAnfrage();
   ladeProfilUnvollstaendig();
   ladeZahlungen();
+  ladeNachfrage();
 }
 
 // ──── AKTIONEN ────
