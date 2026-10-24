@@ -367,5 +367,30 @@ function vexfitAblehnen(){
   if(stand !== 'zugestimmt' && stand !== 'abgelehnt') vexfitBannerZeigen();
 })();
 </script>
+<script>
+// Wege fuer bereits Angemeldete: die Einstiegsknoepfe fuehren dann in den
+// eigenen Bereich statt auf die Registrierung. Die Anmeldung wird genau wie
+// ueberall sonst erkannt - localStorage 'vexfit_session' mit access_token, Rolle
+// in .role (siehe login.html, kunden-bereich.html, trainer-bereich.html). Wer
+// nicht angemeldet ist, dessen Knoepfe bleiben unveraendert auf der Registrierung.
+(function(){
+  var sess = null;
+  try { sess = JSON.parse(localStorage.getItem('vexfit_session') || 'null'); } catch(e) {}
+  if(!sess || !sess.access_token) return;
+  var bereich = sess.role === 'trainer' ? 'trainer-bereich.html' : 'kunden-bereich.html';
+  var knoepfe = document.querySelectorAll('a[href^="registrieren.html"]');
+  for(var i=0;i<knoepfe.length;i++){
+    var a = knoepfe[i];
+    var text = (a.textContent || '').toLowerCase();
+    if(text.indexOf('trainer finden') >= 0){
+      // "Trainer finden": Kunde -> Suche, Trainer -> sein Trainerbereich
+      a.setAttribute('href', sess.role === 'trainer' ? 'trainer-bereich.html' : 'suche.html');
+    } else {
+      // uebrige Einstiegsknoepfe (Starten, Ich bin Trainer, ...): eigener Bereich
+      a.setAttribute('href', bereich);
+    }
+  }
+})();
+</script>
 </body>
 </html>

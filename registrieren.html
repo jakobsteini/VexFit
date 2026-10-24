@@ -136,6 +136,10 @@ try {
 <div class="iab-banner" id="iabBanner">📱 Für ein reibungsloses Erlebnis: Tippe oben rechts auf <b>⋯</b> und wähle <b>„Im Browser öffnen"</b></div>
 <nav><a href="index.html" class="logo">VEX<span>FIT</span></a><a href="index.html" class="nav-back">← Zurück</a></nav>
 <div class="page-wrap">
+  <div class="info-box" id="angemeldet-hinweis" style="display:none;text-align:center">
+    <div class="info-box-title">Du bist bereits angemeldet</div>
+    <p>Du brauchst kein zweites Konto. <a id="angemeldet-link" href="kunden-bereich.html" style="color:var(--accent);font-weight:600;text-decoration:none">→ Zu deinem Bereich</a></p>
+  </div>
   <div id="typeSelector" class="type-selector">
     <div class="page-label">Registrierung</div>
     <div class="page-title">WER BIST DU?</div>
@@ -249,6 +253,20 @@ const SUPABASE_KEY='sb_publishable_7We3LNN5Lhhvj0d_NmGfVw_FwDiilR2';
     document.getElementById('iabBanner').classList.add('show');
     document.body.classList.add('iab-active');
   }
+})();
+
+// Oeffnet ein bereits Angemeldeter diese Seite direkt, zeigen wir nur einen
+// Hinweis mit dem Weg in seinen Bereich - kein zweites Konto. Anmeldung wie
+// ueberall erkannt (vexfit_session + access_token, Rolle in .role). Das Formular
+// bleibt erreichbar, es wird nichts erzwungen.
+(function(){
+  var sess=null;
+  try { sess = JSON.parse(localStorage.getItem('vexfit_session') || 'null'); } catch(e) {}
+  if(!sess || !sess.access_token) return;
+  var h=document.getElementById('angemeldet-hinweis');
+  var a=document.getElementById('angemeldet-link');
+  if(a) a.setAttribute('href', sess.role === 'trainer' ? 'trainer-bereich.html' : 'kunden-bereich.html');
+  if(h) h.style.display='block';
 })();
 
 const urlType=new URLSearchParams(window.location.search).get('typ');
