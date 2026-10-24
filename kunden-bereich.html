@@ -561,12 +561,22 @@ function renderTrainer(list) {
       <div class="alert-box-sub">Sobald sich ein Trainer in ${lastSearch.plz} ${lastSearch.city || ''} registriert, bekommst du automatisch eine E-Mail mit seinen Daten.</div>
       <button class="btn-alert" id="alertBtn" onclick="activateAlert()">Aktivieren</button>
     </div>` : '';
+    // Warteliste: ein Klick merkt den Ort vor. PLZ, Stadt, Ziel und Umkreis sind
+    // aus dem Einstieg/der Suche schon bekannt (siehe vormerken()); nichts wird
+    // zusaetzlich abgefragt. Erscheint nur, wenn auch ohne Filter nichts gefunden
+    // wurde - diesen Zweig erreicht man nur dann.
+    const wartelisteBox = lastSearch ? `
+    <div class="alert-box" id="wartelisteBox">
+      <div class="alert-box-title">📝 Auf die Warteliste für ${lastSearch.city || lastSearch.plz}</div>
+      <div class="alert-box-sub">Ein Klick genügt — deine Angaben aus der Suche sind schon bekannt. So sieht Vexfit, dass hier Bedarf ist.</div>
+      <button class="btn-alert" id="wartelisteBtn" onclick="vormerken()">Für diesen Ort vormerken</button>
+    </div>` : '';
     el.innerHTML = `<div class="empty-state" style="padding:48px 20px 20px">
     <div style="font-size:40px;margin-bottom:16px">📍</div>
     <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;color:rgba(255,255,255,0.3);margin-bottom:12px">KEINE TRAINER ${where} GEFUNDEN</div>
     <div style="font-size:14px;color:var(--muted);line-height:1.8;font-weight:300">Aktuell ist hier noch kein Trainer verfügbar.</div>
-  </div>${alertBox}`;
-    if(lastSearch) checkAlertStatus();
+  </div>${alertBox}${wartelisteBox}`;
+    if(lastSearch) { checkAlertStatus(); checkWartelisteStatus(); }
     return; }
   el.innerHTML = filtered.map(t => {
     const ini = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
@@ -687,6 +697,64 @@ async function activateAlert() {
   } catch(e) {
     btn.disabled = false; btn.textContent = 'Aktivieren';
     alert('Fehler — bitte versuche es erneut.');
+  }
+}
+
+// ──── WARTELISTE (Vormerkung bei Orten ohne Trainer) ────
+// Das gewaehlte Ziel: die im Einstieg gewaehlten Spezialisierungen (einstiegSpez),
+// sonst der einzelne aktive Filter. Keine Wahl -> leere Liste. Keine neue Logik.
+function aktuellesZiel() {
+  if(einstiegSpez && einstiegSpez.length) return [...einstiegSpez];
+  if(activeFilter && activeFilter !== 'alle') return [activeFilter];
+  return [];
+}
+// Liest, ob der angemeldete Nutzer sich fuer diese PLZ schon vorgemerkt hat; der
+// Zeilenschutz liefert nur eigene Zeilen. Fehlt die Tabelle noch, bleibt es stumm.
+async function checkWartelisteStatus() {
+  if(!lastSearch) return;
+  try {
+    const r = await fetch(`${SB}/rest/v1/warteliste?plz=eq.${encodeURIComponent(lastSearch.plz)}&select=id&limit=1`, {
+      headers: authKopf()
+    });
+    if(!r.ok) return;
+    const d = await r.json();
+    if(Array.isArray(d) && d.length > 0) markWartelisteDone();
+  } catch(e) { console.error('checkWartelisteStatus:', e && e.name); }
+}
+function markWartelisteDone() {
+  const btn = document.getElementById('wartelisteBtn');
+  if(!btn) return;
+  btn.textContent = '✓ Du stehst auf der Warteliste';
+  btn.classList.add('active');
+  btn.disabled = true;
+}
+// Ein Klick: PLZ, Stadt, Ziel und Umkreis sind aus der Suche schon bekannt und
+// werden uebernommen; id, Zeitpunkt, Nutzerkennung und der Vermerk kommen aus den
+// Datenbank-Vorgaben. Schlaegt das Speichern fehl - z.B. weil die Migration noch
+// nicht eingespielt ist -, bleibt der Hinweis stehen und der Fehler steht nur in
+// der Konsole, ohne Nutzerdaten (bewusst KEIN istAbgemeldet/Redirect).
+async function vormerken() {
+  if(!lastSearch) return;
+  const btn = document.getElementById('wartelisteBtn');
+  btn.disabled = true; btn.textContent = 'Wird vorgemerkt...';
+  const koerper = {
+    plz: lastSearch.plz,
+    stadt: lastSearch.city || null,
+    ziel: aktuellesZiel(),
+    umkreis: Number.isFinite(lastSearch.radius) ? lastSearch.radius
+             : (Number.isFinite(einAuswahl.umkreis) ? einAuswahl.umkreis : null)
+  };
+  try {
+    const r = await fetch(`${SB}/rest/v1/warteliste`, {
+      method: 'POST',
+      headers: authKopf({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify(koerper)
+    });
+    if(!r.ok) { console.error('Vormerken fehlgeschlagen:', r.status); btn.disabled = false; btn.textContent = 'Für diesen Ort vormerken'; return; }
+    markWartelisteDone();
+  } catch(e) {
+    console.error('Vormerken fehlgeschlagen:', e && e.name);
+    btn.disabled = false; btn.textContent = 'Für diesen Ort vormerken';
   }
 }
 
