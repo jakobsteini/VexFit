@@ -484,7 +484,10 @@ async function submitTrainer(){
     fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-trainer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(td)}).catch(()=>{});
     if(ad.access_token){try{localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,user_id:ad.user?.id,email,role:'trainer'}));}catch(e){console.warn('localStorage blockiert:',e);}}
     if(typeof fbq==='function')fbq('track','CompleteRegistration',{content_name:'Trainer',value:0,currency:'EUR'});
-    showSuccess('successTrainer');
+    // Direkt ins Profilformular weiter (statt Bestaetigungsseite), solange der
+    // Trainer noch bereit ist, sein Profil fertig zu machen. ?neu=1 zeigt dort
+    // den kurzen Weiter-Hinweis. Nur das Ziel nach dem Absenden aendert sich.
+    window.location.href = 'trainer-bereich.html?neu=1';
   }catch(e){showError('t-error','Verbindungsfehler. Bitte prüfe deine Internetverbindung.');imVersand.t=false;btn.disabled=false;btn.textContent='Profil gratis erstellen 🚀';}
 }
 

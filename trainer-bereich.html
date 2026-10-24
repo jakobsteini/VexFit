@@ -99,6 +99,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:calc(56px + env(safe-
 .ub-num{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--accent);letter-spacing:1px;display:block;line-height:1}
 .ub-label{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:4px}
 .ub-hinweis{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:18px}
+.neu-hinweis{background:rgba(232,255,0,0.08);border:1px solid rgba(232,255,0,0.25);color:var(--white);padding:14px 16px;border-radius:4px;font-size:13px;line-height:1.6;margin-bottom:20px}
+.neu-hinweis b{color:var(--accent)}
 .ub-hinweis a{color:var(--accent);text-decoration:none}
 
 /* Mini-Banner in Anfragen */
@@ -205,6 +207,9 @@ try {
     <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
   </div>
 
+  <!-- Kurzer Weiter-Hinweis direkt nach der Registrierung (?neu=1) -->
+  <div class="neu-hinweis fade fd1 hidden" id="neuHinweis"><b>Geschafft — dein Konto steht.</b> Mach jetzt gleich dein Profil fertig: Nur ein vollständiges Profil wird Kunden gezeigt und bekommt Anfragen. Es dauert nur ein paar Minuten.</div>
+
   <!-- Profilbild: zaehlt bewusst NICHT in die Vollstaendigkeit, deshalb ohne Punkt -->
   <div class="section fade fd2">
     <div class="section-head">PROFILBILD</div>
@@ -254,15 +259,9 @@ try {
     </div>
   </div>
 
-  <!-- Preis -->
-  <div class="section fade fd2">
-    <div class="section-head"><span class="dot dot-no" id="dotPreis"></span>PREIS PRO STUNDE</div>
-    <div class="field">
-      <label>Dein Stundensatz in €</label>
-      <input type="number" id="fPreis" placeholder="z.B. 60" min="1" max="999" inputmode="numeric">
-      <div class="hint">Wird auf deinem Profil angezeigt.</div>
-    </div>
-  </div>
+  <!-- Reihenfolge nach dem, was ein Kunde zuerst sieht (Trefferliste in
+       kunden-bereich.html: Trainingsart, Ort, Bio, Spezialisierungen, Preis;
+       Erfahrung erst auf der Profilseite, Telefon fuer Kunden nicht oeffentlich). -->
 
   <!-- Bio -->
   <div class="section fade fd3">
@@ -274,8 +273,28 @@ try {
     </div>
   </div>
 
-  <!-- Erfahrung -->
+  <!-- Spezialisierungen -->
   <div class="section fade fd3">
+    <div class="section-head"><span class="dot dot-no" id="dotSpez"></span>SPEZIALISIERUNGEN</div>
+    <div class="field">
+      <label>Wähle alles, was zu dir passt</label>
+      <div class="chips" id="chipWrap"></div>
+      <div class="hint">Mehrfachauswahl möglich.</div>
+    </div>
+  </div>
+
+  <!-- Preis -->
+  <div class="section fade fd4">
+    <div class="section-head"><span class="dot dot-no" id="dotPreis"></span>PREIS PRO STUNDE</div>
+    <div class="field">
+      <label>Dein Stundensatz in €</label>
+      <input type="number" id="fPreis" placeholder="z.B. 60" min="1" max="999" inputmode="numeric">
+      <div class="hint">Wird auf deinem Profil angezeigt.</div>
+    </div>
+  </div>
+
+  <!-- Erfahrung -->
+  <div class="section fade fd4">
     <div class="section-head"><span class="dot dot-no" id="dotErfahrung"></span>ERFAHRUNG</div>
     <div class="field">
       <label>Wie lange trainierst du andere?</label>
@@ -287,16 +306,6 @@ try {
         <option value="5-10 Jahre">5–10 Jahre</option>
         <option value="10+ Jahre">10+ Jahre</option>
       </select>
-    </div>
-  </div>
-
-  <!-- Spezialisierungen -->
-  <div class="section fade fd4">
-    <div class="section-head"><span class="dot dot-no" id="dotSpez"></span>SPEZIALISIERUNGEN</div>
-    <div class="field">
-      <label>Wähle alles, was zu dir passt</label>
-      <div class="chips" id="chipWrap"></div>
-      <div class="hint">Mehrfachauswahl möglich.</div>
     </div>
   </div>
 
@@ -395,6 +404,12 @@ function istAbgemeldet(r) {
 // ──── INIT ────
 initChips();
 loadTrainer(sess.email);
+
+// Direkt nach der Registrierung (?neu=1) den kurzen Weiter-Hinweis zeigen.
+if(new URLSearchParams(location.search).get('neu') === '1') {
+  const nh = document.getElementById('neuHinweis');
+  if(nh) nh.classList.remove('hidden');
+}
 
 function initChips() {
   document.getElementById('chipWrap').innerHTML = SPEZ_OPTIONS.map(s =>
