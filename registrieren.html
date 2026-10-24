@@ -92,6 +92,22 @@ body.iab-active{padding-top:38px}
 .ort-chips{display:flex;flex-wrap:wrap;gap:8px}
 .ort-chip{padding:9px 16px;border:1px solid var(--border-input);border-radius:100px;font-size:13px;color:var(--text-muted);cursor:pointer;transition:all 0.2s;user-select:none}
 .ort-chip.active{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.08)}
+/* Passwortstaerke (Schritt 5). Farben aus dem Bestand: #ff6b6b (Fehlerrot),
+   #e8ff00 (Akzent), #25D366 (WhatsApp-Gruen). Das Wort neben dem Balken traegt
+   die Aussage - lesbar auch ohne Farbe. */
+.pw-meter{margin:-4px 0 12px}
+.pw-bar{display:flex;gap:4px;margin-bottom:5px}
+.pw-bar span{flex:1;height:5px;border-radius:3px;background:var(--border-input);transition:background 0.2s}
+.pw-word{font-size:12px;font-weight:600;letter-spacing:0.5px}
+.pw-meter.s-rot .pw-bar span:nth-child(1){background:#ff6b6b}
+.pw-meter.s-rot .pw-word{color:#ff6b6b}
+.pw-meter.s-gelb .pw-bar span:nth-child(-n+2){background:#e8ff00}
+.pw-meter.s-gelb .pw-word{color:#e8ff00}
+.pw-meter.s-gruen .pw-bar span{background:#25D366}
+.pw-meter.s-gruen .pw-word{color:#25D366}
+.pw-match{font-size:12px;margin:-6px 0 12px}
+.pw-match.ok{color:#25D366}
+.pw-match.no{color:#ff6b6b}
 </style>
 <!-- Meta Pixel Code -->
 <!-- Laedt NICHT beim Seitenaufruf. Nur wenn eine Zustimmung fuer Marketing vorliegt. -->
@@ -146,9 +162,11 @@ try {
     </div>
     <div class="field"><label>E-Mail</label><input type="email" placeholder="max@example.com" id="t-email" autocomplete="email"></div>
     <div class="field-row">
-      <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="t-pw" autocomplete="new-password"></div>
-      <div class="field"><label>Passwort wiederholen</label><input type="password" placeholder="Nochmal eingeben" id="t-pw2" autocomplete="new-password"></div>
+      <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="t-pw" autocomplete="new-password" oninput="pwMeter('t')"></div>
+      <div class="field"><label>Passwort wiederholen</label><input type="password" placeholder="Nochmal eingeben" id="t-pw2" autocomplete="new-password" oninput="pwMatch('t')"></div>
     </div>
+    <div class="pw-meter" id="t-pw-meter" style="display:none"><div class="pw-bar"><span></span><span></span><span></span></div><div class="pw-word"></div></div>
+    <div class="pw-match" id="t-pw-match" style="display:none"></div>
     <div class="error-banner" id="t-pw-error"></div>
     <div class="field"><label>PLZ</label><input type="text" placeholder="5020" id="t-plz" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="plzGeaendert('t')"></div>
     <div id="t-plz-status" style="display:none;font-size:12px;color:var(--text-muted);margin:-6px 0 12px"></div>
@@ -181,9 +199,11 @@ try {
     </div>
     <div class="field"><label>E-Mail</label><input type="email" placeholder="anna@example.com" id="c-email" autocomplete="email"></div>
     <div class="field-row">
-      <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="c-pw" autocomplete="new-password"></div>
-      <div class="field"><label>Passwort wiederholen</label><input type="password" placeholder="Nochmal eingeben" id="c-pw2" autocomplete="new-password"></div>
+      <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="c-pw" autocomplete="new-password" oninput="pwMeter('c')"></div>
+      <div class="field"><label>Passwort wiederholen</label><input type="password" placeholder="Nochmal eingeben" id="c-pw2" autocomplete="new-password" oninput="pwMatch('c')"></div>
     </div>
+    <div class="pw-meter" id="c-pw-meter" style="display:none"><div class="pw-bar"><span></span><span></span><span></span></div><div class="pw-word"></div></div>
+    <div class="pw-match" id="c-pw-match" style="display:none"></div>
     <div class="error-banner" id="c-pw-error"></div>
     <div class="field"><label>PLZ</label><input type="text" placeholder="5026" id="c-plz" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="plzGeaendert('c')"></div>
     <div id="c-plz-status" style="display:none;font-size:12px;color:var(--text-muted);margin:-6px 0 12px"></div>
@@ -254,13 +274,64 @@ function zielKnopfSetzen(id){
   try { sessionStorage.removeItem('vexfit_ziel'); } catch(e) {}
 }
 
+// ──── PASSWORTSTAERKE (Schritt 5) ────
+// Bewusst in wenigen Zeilen, ohne fremde Bibliothek. "Arten" = wie viele der
+// drei Zeichenklassen vorkommen: Buchstaben, Ziffern, Sonderzeichen.
+function pwArten(pw){
+  let n=0;
+  if(/[A-Za-zÀ-ÿ]/.test(pw)) n++;
+  if(/[0-9]/.test(pw)) n++;
+  if(/[^A-Za-z0-9À-ÿ]/.test(pw)) n++;
+  return n;
+}
+// 'gruen': mind. 12 Zeichen UND mind. 3 Arten. 'gelb': mind. 8 Zeichen UND mind.
+// 2 Arten. Alles andere (zu kurz ODER zu wenige Arten) ist 'rot'.
+function pwStufe(pw){
+  const len=pw.length, arten=pwArten(pw);
+  if(len>=12 && arten>=3) return 'gruen';
+  if(len>=8 && arten>=2) return 'gelb';
+  return 'rot';
+}
+// Ein Satz, was bei 'rot' noch fehlt.
+function pwMangel(pw){
+  if(pw.length<8) return 'Dein Passwort braucht mindestens 8 Zeichen.';
+  return 'Nutze mindestens zwei Arten: Buchstaben, Ziffern oder Sonderzeichen.';
+}
+const PW_WORT={rot:'zu schwach',gelb:'geht in Ordnung',gruen:'stark'};
+// Balken unter dem Passwortfeld, erscheint beim Tippen. Das Wort traegt die
+// Aussage - auch fuer Farbenblinde lesbar, nicht bloss die Farbe.
+function pwMeter(kuerzel){
+  const pw=document.getElementById(kuerzel+'-pw').value;
+  const m=document.getElementById(kuerzel+'-pw-meter');
+  if(!pw){ m.style.display='none'; m.className='pw-meter'; }
+  else{
+    const stufe=pwStufe(pw);
+    m.className='pw-meter s-'+stufe;
+    m.querySelector('.pw-word').textContent=PW_WORT[stufe];
+    m.style.display='block';
+  }
+  pwMatch(kuerzel);
+}
+// Beim Feld "wiederholen" nur der Hinweis, ob beide Eingaben uebereinstimmen -
+// kein zweiter Balken.
+function pwMatch(kuerzel){
+  const pw=document.getElementById(kuerzel+'-pw').value;
+  const pw2=document.getElementById(kuerzel+'-pw2').value;
+  const el=document.getElementById(kuerzel+'-pw-match');
+  if(!pw2){ el.style.display='none'; return; }
+  if(pw===pw2){ el.className='pw-match ok'; el.textContent='✓ Passwörter stimmen überein'; }
+  else{ el.className='pw-match no'; el.textContent='✗ Passwörter stimmen noch nicht überein'; }
+  el.style.display='block';
+}
+
 // Prueft die beiden Passwortfelder. Gibt das Passwort zurueck oder null bei Verstoss.
+// Solange die Stufe 'rot' ist, kommt man nicht durch - mit einem Satz, was fehlt.
 function pruefePasswort(kuerzel){
   hideError(kuerzel+'-pw-error');
   const pw=document.getElementById(kuerzel+'-pw').value;
   const pw2=document.getElementById(kuerzel+'-pw2').value;
   if(!pw||!pw2){showError(kuerzel+'-pw-error','Bitte wähle ein Passwort und wiederhole es.');return null}
-  if(pw.length<8){showError(kuerzel+'-pw-error','Dein Passwort muss mindestens 8 Zeichen haben.');return null}
+  if(pwStufe(pw)==='rot'){showError(kuerzel+'-pw-error',pwMangel(pw));return null}
   if(pw!==pw2){showError(kuerzel+'-pw-error','Die beiden Passwörter stimmen nicht überein.');return null}
   return pw;
 }
