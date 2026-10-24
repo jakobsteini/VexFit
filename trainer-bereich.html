@@ -101,6 +101,11 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:calc(56px + env(safe-
 .ub-hinweis{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:18px}
 .neu-hinweis{background:rgba(232,255,0,0.08);border:1px solid rgba(232,255,0,0.25);color:var(--white);padding:14px 16px;border-radius:4px;font-size:13px;line-height:1.6;margin-bottom:20px}
 .neu-hinweis b{color:var(--accent)}
+.profil-hinweis{padding:14px 16px;border-radius:4px;font-size:13px;line-height:1.6;margin-bottom:20px}
+.profil-hinweis.offen{background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.25);color:var(--white)}
+.profil-hinweis.offen b{color:var(--orange)}
+.profil-hinweis.fertig{background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.25);color:var(--white)}
+.profil-hinweis.fertig b{color:var(--green)}
 .ub-hinweis a{color:var(--accent);text-decoration:none}
 
 /* Mini-Banner in Anfragen */
@@ -209,6 +214,11 @@ try {
 
   <!-- Kurzer Weiter-Hinweis direkt nach der Registrierung (?neu=1) -->
   <div class="neu-hinweis fade fd1 hidden" id="neuHinweis"><b>Geschafft — dein Konto steht.</b> Mach jetzt gleich dein Profil fertig: Nur ein vollständiges Profil wird Kunden gezeigt und bekommt Anfragen. Es dauert nur ein paar Minuten.</div>
+
+  <!-- Klartext: was noch fehlt und was das bedeutet; dazu die Wahrheit ueber die
+       Sichtbarkeit (haengt an trainers.aktiv = Freigabe, nicht an der Vollstaendigkeit).
+       Gefuellt von updateDots(). -->
+  <div class="profil-hinweis fade fd1 hidden" id="profilHinweis"></div>
 
   <!-- Profilbild: zaehlt bewusst NICHT in die Vollstaendigkeit, deshalb ohne Punkt -->
   <div class="section fade fd2">
@@ -639,6 +649,27 @@ function updateDots() {
   }
 
   profileComplete = (pct >= 100);
+
+  // Klartext auf dem Profilformular: was fehlt, was das bedeutet, und ob der
+  // Trainer schon fuer Kunden sichtbar ist. Sichtbarkeit haengt an T.aktiv
+  // (Admin-Freigabe), NICHT an der Vollstaendigkeit - deshalb getrennt.
+  const ph = document.getElementById('profilHinweis');
+  if(ph) {
+    const fehltListe = checks.filter(c => !c.ok).map(c => c.name);
+    let sichtbar = '';
+    if(typeof T !== 'undefined' && T) {
+      sichtbar = T.aktiv
+        ? ' Dein Profil ist für Kunden sichtbar.'
+        : ' Dein Profil wird noch geprüft und ist noch nicht für Kunden sichtbar — wir melden uns per E-Mail, sobald es freigegeben ist.';
+    }
+    if(fehltListe.length > 0) {
+      ph.className = 'profil-hinweis offen';
+      ph.innerHTML = `<b>Es fehlt noch:</b> ${fehltListe.join(', ')}. Ohne diese Angaben wirkt dein Profil unfertig und bekommt kaum Anfragen.${sichtbar}`;
+    } else {
+      ph.className = 'profil-hinweis fertig';
+      ph.innerHTML = `<b>✓ Dein Profil ist vollständig.</b>${sichtbar}`;
+    }
+  }
 
   // Nav dot: orange if incomplete, hidden if complete
   const navDot = document.getElementById('navProfilDot');
