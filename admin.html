@@ -151,7 +151,8 @@ try {
     </div>
 
     <div class="tabs">
-      <button class="tab active" onclick="showTab('trainers', this)">Trainer</button>
+      <button class="tab active" onclick="showTab('freigabe', this)">Neu – wartet auf Freigabe</button>
+      <button class="tab" onclick="showTab('trainers', this)">Trainer</button>
       <button class="tab" onclick="showTab('kunden', this)">Kunden</button>
       <button class="tab" onclick="showTab('anfragen', this)">Anfragen</button>
       <button class="tab" onclick="showTab('ohneanfrage', this)">Trainer o. Anfrage</button>
@@ -159,8 +160,29 @@ try {
       <button class="tab" onclick="showTab('zahlungen', this)">Zahlungen</button>
     </div>
 
+    <!-- NEU – WARTET AUF FREIGABE (erscheint zuerst, neueste oben) -->
+    <div class="tab-content active" id="tab-freigabe">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>E-Mail</th>
+              <th>Stadt</th>
+              <th>Profil</th>
+              <th>Registriert</th>
+              <th>Aktion</th>
+            </tr>
+          </thead>
+          <tbody id="freigabe-tbody">
+            <tr><td colspan="6" class="loading-text">Lade Trainer...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- TRAINERS TAB -->
-    <div class="tab-content active" id="tab-trainers">
+    <div class="tab-content" id="tab-trainers">
       <div class="table-wrap">
         <table>
           <thead>
@@ -535,6 +557,9 @@ async function loadData() {
       </tr>`).join('');
   }
 
+  // Neu – wartet auf Freigabe (nutzt die eben geladenen Trainer).
+  ladeFreigabe();
+
   // Kunden table
   const ktbody = document.getElementById('kunden-tbody');
   if(kunden.length === 0) {
@@ -584,6 +609,35 @@ function fehlendeProfilfelder(t) {
   if(!(Array.isArray(t.spezialisierungen) && t.spezialisierungen.length > 0)) fehlt.push('Spezialisierungen');
   if(!(t.telefon && String(t.telefon).trim())) fehlt.push('Telefon');
   return fehlt;
+}
+
+// Neu – wartet auf Freigabe: alle noch nicht freigeschalteten Trainer
+// (aktiv=false), neueste zuerst (window.allTrainers ist nach created_at.desc
+// sortiert), mit Profil-Vollstaendigkeit (dieselben sieben Felder wie
+// fehlendeProfilfelder) und einem Freigabe-Knopf ueber die vorhandene Aktion
+// activateTrainer. Aendert nichts an den anderen Knoepfen und Listen.
+function ladeFreigabe() {
+  const tb = document.getElementById('freigabe-tbody');
+  if(!tb) return;
+  const neue = (window.allTrainers || []).filter(t => !t.aktiv);
+  if(neue.length === 0) {
+    tb.innerHTML = '<tr><td colspan="6" class="loading-text">Keine Trainer warten auf Freigabe.</td></tr>';
+    return;
+  }
+  tb.innerHTML = neue.map(t => {
+    const fehlt = fehlendeProfilfelder(t);
+    const voll = 7 - fehlt.length;
+    const farbe = fehlt.length === 0 ? '#4ade80' : (voll >= 4 ? 'var(--accent)' : '#ff6b6b');
+    const detail = fehlt.length === 0 ? 'vollständig' : ('fehlt: ' + fehlt.join(', '));
+    return `<tr>
+      <td><strong>${t.vorname} ${t.nachname}</strong></td>
+      <td>${t.email}</td>
+      <td>${t.stadt || '–'}</td>
+      <td><span style="color:${farbe};font-weight:700">${voll}/7</span> <span style="color:var(--text-muted);font-size:11px">${detail}</span></td>
+      <td>${t.created_at ? new Date(t.created_at).toLocaleDateString('de-AT') : '–'}</td>
+      <td><button class="btn-activate" onclick="activateTrainer('${t.id}')">👁️ Freigeben</button></td>
+    </tr>`;
+  }).join('');
 }
 
 // Liefert die Gesamtzahl passender Anfragen ueber den Content-Range-Kopf,
