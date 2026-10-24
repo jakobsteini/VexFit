@@ -258,6 +258,13 @@ export function hatEmpfaenger(mail: Pick<Alertmail, "kunden_email">): boolean {
 import { betreffSaeubern, maskieren, sichereAdresse } from "../_shared/text.ts";
 export { betreffSaeubern, maskieren, sichereAdresse };
 
+// Gemeinsames Mail-Geruest (HTML + Textfassung) fuer beide Edge Functions.
+import {
+  mailRahmen,
+  type MailAngaben,
+  mailText as baueText,
+} from "../_shared/mailgeruest.ts";
+
 /** Adresse der Profilseite eines Trainers — die einzige Adresse in der Mail. */
 export function profilAdresse(trainerId: string): string | null {
   return sichereAdresse(
@@ -271,71 +278,43 @@ export function profilAdresse(trainerId: string): string | null {
 // Betreff und HTML — Wortlaut und Auszeichnung 1:1 aus dem Workflow
 // ============================================================================
 
-export function mailBetreff(m: Alertmail): string {
-  // Wortlaut unveraendert; nur Zeilenumbrueche aus dem Namen fallen heraus.
-  return betreffSaeubern(
-    `🎉 Neuer Trainer in deiner Nähe: ${m.trainer_vorname} ${m.trainer_nachname}`,
-  );
+export function mailBetreff(_m: Alertmail): string {
+  // Neuer Wortlaut: ohne Namen, ohne Emoji. betreffSaeubern bleibt.
+  return betreffSaeubern("Ein neuer Trainer in deiner Nähe");
+}
+
+// Baut die gemeinsamen Mail-Angaben fuer das Geruest. Werte bleiben hier roh —
+// das Maskieren fuers HTML macht mailRahmen, die Textfassung bleibt roh. Zeilen
+// mit leerem Wert laesst das Geruest ganz weg.
+function alertAngaben(m: Alertmail): MailAngaben {
+  const name = `${m.trainer_vorname} ${m.trainer_nachname}`.trim();
+  const ort = `${m.trainer_plz} ${m.trainer_stadt}`.trim();
+  const preis = String(m.trainer_preis ?? "").trim();
+  const anrede = m.kunden_name ? `Hallo ${m.kunden_name}, ` : "Hallo, ";
+  return {
+    ueberschrift: "Ein neuer Trainer in deiner Nähe",
+    absatz: `${anrede}für deine Region ist ein neues Profil dazugekommen.`,
+    datenZeilen: [
+      { beschriftung: "Trainer", wert: name },
+      { beschriftung: "Ort", wert: ort },
+      { beschriftung: "Training", wert: m.trainer_trainingsart || "" },
+      { beschriftung: "Schwerpunkte", wert: m.trainer_spez || "" },
+      { beschriftung: "Preis", wert: preis ? `ab ${preis} €` : "" },
+    ],
+    bioAbsatz: m.trainer_bio || "",
+    knopfText: "Profil ansehen",
+    knopfLink: profilAdresse(m.trainer_id) ?? undefined,
+    grundZeile:
+      "Du erhältst diese E-Mail, weil du für deine Region Benachrichtigungen aktiviert hast.",
+  };
 }
 
 export function mailHtml(m: Alertmail): string {
-  // Aufbau und Wortlaut sind die des Workflows. Der Unterschied: jeder Wert
-  // aus der Datenbank laeuft durch `maskieren`, und der Knopf entfaellt, wenn
-  // die Profiladresse nicht `https://` ist (`profilAdresse` gibt dann null).
-  const vorname = maskieren(m.trainer_vorname);
-  const nachname = maskieren(m.trainer_nachname);
-  const stadt = maskieren(m.trainer_stadt);
-  const plz = maskieren(m.trainer_plz);
-  const trainingsart = maskieren(m.trainer_trainingsart);
-  const preis = maskieren(m.trainer_preis);
-  const bio = maskieren(m.trainer_bio);
-  const spez = maskieren(m.trainer_spez);
-  const kundenName = maskieren(m.kunden_name);
-  const adresse = profilAdresse(m.trainer_id);
+  return mailRahmen(alertAngaben(m));
+}
 
-  const knopf = adresse
-    ? `<a href="${
-      maskieren(adresse)
-    }" style="display:block;background:#e8ff00;color:#0a0a0a;text-decoration:none;text-align:center;padding:16px;border-radius:6px;font-weight:900;font-size:15px;letter-spacing:1px">JETZT ANFRAGEN →</a>`
-    : "";
-
-  return `<div style="background:#0a0a0a;padding:40px 20px;font-family:Arial,sans-serif">
-  <div style="max-width:520px;margin:0 auto;background:#141414;border:1px solid rgba(255,255,255,0.08);border-radius:8px;overflow:hidden">
-    <div style="background:#e8ff00;padding:18px;text-align:center">
-      <span style="font-size:22px;font-weight:900;letter-spacing:4px;color:#0a0a0a">VEXFIT</span>
-    </div>
-    <div style="padding:32px 28px">
-      <p style="color:#f5f5f0;font-size:16px;margin:0 0 8px">Hallo${
-    kundenName ? " " + kundenName : ""
-  }! 👋</p>
-      <h1 style="color:#e8ff00;font-size:24px;margin:0 0 20px;line-height:1.3">Ein neuer Trainer ist jetzt in deiner Nähe verfügbar!</h1>
-      <div style="background:#0f0f0f;border:1px solid rgba(232,255,0,0.2);border-radius:6px;padding:20px;margin-bottom:24px">
-        <p style="color:#f5f5f0;font-size:19px;font-weight:700;margin:0 0 4px">${vorname} ${nachname}</p>
-        <p style="color:#999;font-size:14px;margin:0 0 12px">${trainingsart} · ${plz} ${stadt}</p>
-        ${
-    spez
-      ? '<p style="color:#e8ff00;font-size:13px;margin:0 0 12px">' + spez +
-        "</p>"
-      : ""
-  }
-        ${
-    bio
-      ? '<p style="color:#bbb;font-size:14px;line-height:1.6;margin:0 0 12px">' +
-        bio + "</p>"
-      : ""
-  }
-        ${
-    preis
-      ? '<p style="color:#f5f5f0;font-size:14px;margin:0">ab €' + preis +
-        "</p>"
-      : ""
-  }
-      </div>
-      ${knopf}
-      <p style="color:#666;font-size:12px;margin:24px 0 0;text-align:center">Du erhältst diese E-Mail, weil du Trainer-Benachrichtigungen für deine Region aktiviert hast.</p>
-    </div>
-  </div>
-</div>`;
+export function mailText(m: Alertmail): string {
+  return baueText(alertAngaben(m));
 }
 
 // ============================================================================

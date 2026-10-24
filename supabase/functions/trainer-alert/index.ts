@@ -42,6 +42,7 @@ import {
   LAENDER,
   mailBetreff,
   mailHtml,
+  mailText,
   type Trainer,
   TRAINER_SPALTEN,
 } from "./kern.ts";
@@ -130,10 +131,16 @@ const anschluesse: Anschluesse = {
     });
     try {
       await client.send({
-        from: ABSENDER,
+        // Absendername statt nackter Adresse; die Adresse selbst bleibt gleich.
+        from: `Vexfit <${ABSENDER}>`,
         to: mail.kunden_email,
         subject: mailBetreff(mail),
-        html: mailHtml(mail),
+        // Multipart: Textfassung als text/plain, HTML als text/html, beide
+        // ausdruecklich mit charset=utf-8 (senkt die Spam-Bewertung).
+        mimeContent: [
+          { mimeType: "text/plain; charset=utf-8", content: mailText(mail) },
+          { mimeType: "text/html; charset=utf-8", content: mailHtml(mail) },
+        ],
       });
     } finally {
       await client.close();

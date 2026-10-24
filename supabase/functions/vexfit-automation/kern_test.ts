@@ -23,6 +23,12 @@ import {
   LINK_ERSTE,
   LINK_WEITERE,
   type Mail,
+  mailErsteAnfrage,
+  mailKundenDaten,
+  mailNeuerKunde,
+  mailNeuerTrainer,
+  mailWeitereAnfrage,
+  mailZahlungAnJakob,
   pfadTeil,
   type StripeEreignis,
   type Trainer,
@@ -205,39 +211,40 @@ Deno.test("/neuer-trainer: gueltige Eingabe → genau eine Mail an Jakob, Wortla
   assertEquals(auf.mails.length, 1);
   const m = auf.mails[0];
   assertEquals(m.an, "vexfit.info@gmail.com");
-  assertEquals(m.betreff, "🆕 Neuer Trainer: Eva Muster");
+  assertEquals(m.betreff, "Neuer Trainer: Eva Muster");
   assertEquals(
     m.text,
-    "Neuer Trainer registriert! 🆕\n\n" +
-      "👤 Name: Eva Muster\n📧 Email: eva@beispiel.at\n📍 Stadt: Wien\n" +
-      "💪 Trainingsart: Im Fitnessstudio\n\n" +
-      "→ Jetzt aktivieren:\nhttps://vexfit.app/admin.html",
+    "Neuer Trainer registriert\n\n" +
+      "Name: Eva Muster\nE-Mail: eva@beispiel.at\nStadt: Wien\n" +
+      "Trainingsart: Im Fitnessstudio\n\n" +
+      "Im Admin öffnen: https://vexfit.app/admin.html\n\n" +
+      "Interne Benachrichtigung.\nFIRMENANGABE_FEHLT",
   );
+  assertStringIncludes(m.html, "Neuer Trainer registriert");
+  assertStringIncludes(m.html, "FIRMENANGABE_FEHLT");
   // Es wird nichts in die Datenbank geschrieben.
   assertEquals(auf.bezahltMarkiert, []);
   assertEquals(auf.weitergeleitetMarkiert, []);
 });
 
-Deno.test("/neuer-trainer: die Passwortzeile kommt nur aus dem Secret", async () => {
-  const ohne = bau();
-  await bearbeiten(
-    anfrage("neuer-trainer", { email: "a@b.de" }, VOM_BROWSER),
-    ohne.anschluesse,
-  );
-  assert(
-    !ohne.auf.mails[0].text.includes("Passwort:"),
-    "Zeile steht da, obwohl kein Secret gesetzt ist",
-  );
-
-  const mit = bau({ adminHinweis: "PLATZHALTER-AUS-DEM-SECRET" });
-  await bearbeiten(
-    anfrage("neuer-trainer", { email: "a@b.de" }, VOM_BROWSER),
-    mit.anschluesse,
-  );
-  assertStringIncludes(
-    mit.auf.mails[0].text,
-    "\nPasswort: PLATZHALTER-AUS-DEM-SECRET",
-  );
+Deno.test("/neuer-trainer: keine Passwortzeile mehr (neuer Wortlaut)", async () => {
+  // Der neue, exakt vorgegebene Wortlaut hat keine Passwortzeile; ein gesetztes
+  // Secret aendert daran nichts mehr.
+  for (const adminHinweis of [undefined, "PLATZHALTER-AUS-DEM-SECRET"]) {
+    const { anschluesse, auf } = bau({ adminHinweis });
+    await bearbeiten(
+      anfrage("neuer-trainer", { email: "a@b.de" }, VOM_BROWSER),
+      anschluesse,
+    );
+    assert(
+      !auf.mails[0].text.includes("Passwort"),
+      "Passwortzeile steht noch in der Textfassung",
+    );
+    assert(
+      !auf.mails[0].html.includes("Passwort"),
+      "Passwortzeile steht noch im HTML",
+    );
+  }
 });
 
 Deno.test("/neuer-trainer: Pflichtfeld fehlt → 400 ohne Wirkung", async () => {
@@ -291,13 +298,16 @@ Deno.test("/neuer-kunde: gueltige Eingabe → genau eine Mail an Jakob, Wortlaut
   assertEquals(a.status, 200);
   assertEquals(auf.mails.length, 1);
   assertEquals(auf.mails[0].an, "vexfit.info@gmail.com");
-  assertEquals(auf.mails[0].betreff, "🎯 Neuer Kunde: Eva Muster");
+  assertEquals(auf.mails[0].betreff, "Neuer Kunde: Eva Muster");
   assertEquals(
     auf.mails[0].text,
-    "Neuer Kunde registriert! 🎯\n\n" +
-      "👤 Name: Eva Muster\n📧 Email: eva@beispiel.at\n📍 Stadt: Wien\n🎯 Ziel: Abnehmen\n\n" +
-      "→ Supabase:\nhttps://supabase.com/dashboard/project/hbapzwxdehfgnputrfjf",
+    "Neuer Kunde registriert\n\n" +
+      "Name: Eva Muster\nE-Mail: eva@beispiel.at\nStadt: Wien\nZiel: Abnehmen\n\n" +
+      "Im Admin öffnen: https://vexfit.app/admin.html\n\n" +
+      "Interne Benachrichtigung.\nFIRMENANGABE_FEHLT",
   );
+  assertStringIncludes(auf.mails[0].html, "Neuer Kunde registriert");
+  assertStringIncludes(auf.mails[0].html, "FIRMENANGABE_FEHLT");
 });
 
 Deno.test("/neuer-kunde: die Nutzlast von suche.html geht durch (leerer Nachname, leere Stadt)", async () => {
@@ -341,20 +351,21 @@ Deno.test("/neue-anfrage: noch nicht bezahlt → ERSTE Anfrage mit 49,99-Link an
   assertEquals(auf.mails.length, 1);
   const m = auf.mails[0];
   assertEquals(m.an, "trainer@beispiel.at");
-  assertEquals(
-    m.betreff,
-    "🎉 Erste Kunden-Anfrage auf Vexfit – Abo aktivieren!",
-  );
-  assertStringIncludes(m.text, "Hi Testvorname,");
+  assertEquals(m.betreff, "Deine erste Kundenanfrage auf Vexfit");
   assertStringIncludes(
     m.text,
-    "du hast deine erste Kunden-Anfrage erhalten! 🚀",
+    "Hallo Testvorname, über Vexfit hat dich jemand angefragt.",
   );
-  assertStringIncludes(m.text, "👤 Kunde: Testkundin");
-  assertStringIncludes(m.text, "🎯 Ziel: Abnehmen");
-  assertStringIncludes(m.text, "💬 Nachricht: Hallo!");
-  assertStringIncludes(m.text, LINK_ERSTE);
-  assertStringIncludes(m.text, "€49,99/Monat · Monatlich kündbar");
+  assertStringIncludes(m.text, "Ziel: Abnehmen");
+  assertStringIncludes(m.text, "Nachricht: Hallo!");
+  assertStringIncludes(m.text, "Abo aktivieren: " + LINK_ERSTE);
+  assertStringIncludes(m.text, "49,99 € pro Monat, monatlich kündbar");
+  // Der Kundenname wird vor der Zahlung NICHT gezeigt.
+  assert(
+    !m.text.includes("Testkundin"),
+    "Kundenname steht vor der Zahlung in der Mail",
+  );
+  assert(!m.html.includes("Testkundin"), "Kundenname steht im HTML");
   assert(!m.text.includes(LINK_WEITERE), "falscher Zahlungslink in der Mail");
 });
 
@@ -372,13 +383,13 @@ Deno.test("/neue-anfrage: schon bezahlt → WEITERE Anfrage mit 9,99-Link", asyn
     anschluesse,
   );
   const m = auf.mails[0];
-  assertEquals(
-    m.betreff,
-    "🎉 Neue Kunden-Anfrage auf Vexfit – Jetzt freischalten!",
+  assertEquals(m.betreff, "Neue Kundenanfrage auf Vexfit");
+  assertStringIncludes(
+    m.text,
+    "Hallo Testvorname, du hast eine neue Anfrage erhalten.",
   );
-  assertStringIncludes(m.text, "du hast eine neue Kunden-Anfrage! 🚀");
-  assertStringIncludes(m.text, "Einmalig freischalten für €9,99:");
-  assertStringIncludes(m.text, LINK_WEITERE);
+  assertStringIncludes(m.text, "9,99 € einmalig.");
+  assertStringIncludes(m.text, "Anfrage freischalten: " + LINK_WEITERE);
   assert(!m.text.includes(LINK_ERSTE), "falscher Zahlungslink in der Mail");
 });
 
@@ -417,9 +428,8 @@ Deno.test("/neue-anfrage: die Feldnamen von profil.html kommen jetzt gefuellt an
     anschluesse,
   );
   const text = auf.mails[0].text;
-  assertStringIncludes(text, "👤 Kunde: Eva Muster");
-  assertStringIncludes(text, "🎯 Ziel: Abnehmen");
-  assertStringIncludes(text, "💬 Nachricht: Ich moechte starten.");
+  assertStringIncludes(text, "Ziel: Abnehmen");
+  assertStringIncludes(text, "Nachricht: Ich moechte starten.");
 });
 
 Deno.test("/neue-anfrage: die Feldnamen von kunden-bereich.html gehen weiter", async () => {
@@ -435,9 +445,8 @@ Deno.test("/neue-anfrage: die Feldnamen von kunden-bereich.html gehen weiter", a
     anschluesse,
   );
   const text = auf.mails[0].text;
-  assertStringIncludes(text, "👤 Kunde: Eva Muster");
-  assertStringIncludes(text, "🎯 Ziel: Abnehmen");
-  assertStringIncludes(text, "💬 Nachricht: Ich moechte starten.");
+  assertStringIncludes(text, "Ziel: Abnehmen");
+  assertStringIncludes(text, "Nachricht: Ich moechte starten.");
 });
 
 Deno.test("/neue-anfrage: kundenAngaben nimmt die erste gefuellte Schreibweise", () => {
@@ -517,7 +526,7 @@ Deno.test("unbekannter Pfad → 404", async () => {
 // ===========================================================================
 // Einschleusen
 // ===========================================================================
-Deno.test("HTML im Namen bleibt Text — die Mails des Workflows sind Textmails", async () => {
+Deno.test("Name mit HTML: Textfassung roh, HTML-Fassung maskiert", async () => {
   const { anschluesse, auf } = bau();
   await bearbeiten(
     anfrage("neuer-trainer", {
@@ -527,9 +536,13 @@ Deno.test("HTML im Namen bleibt Text — die Mails des Workflows sind Textmails"
     }, VOM_BROWSER),
     anschluesse,
   );
-  // Kein HTML-Teil, deshalb auch keine Maskierung: der Text bleibt, wie er ist.
-  assertStringIncludes(auf.mails[0].text, "👤 Name: <b>Eva</b> A & B");
-  assertEquals(Object.keys(auf.mails[0]).sort(), ["an", "betreff", "text"]);
+  const m = auf.mails[0];
+  // Textfassung bleibt roh (keine Maskierung), HTML-Fassung ist maskiert.
+  assertStringIncludes(m.text, "Name: <b>Eva</b> A & B");
+  assertStringIncludes(m.html, "&lt;b&gt;Eva&lt;/b&gt; A &amp; B");
+  assert(!m.html.includes("<b>Eva</b>"), "Name steht roh im HTML");
+  // Jede Mail traegt jetzt beide Fassungen.
+  assertEquals(Object.keys(m).sort(), ["an", "betreff", "html", "text"]);
 });
 
 Deno.test("Zeilenumbruch im Namen kommt nicht in den Betreff", async () => {
@@ -547,7 +560,7 @@ Deno.test("Zeilenumbruch im Namen kommt nicht in den Betreff", async () => {
     !b.includes("\n") && !b.includes("\r"),
     `Betreff mit Umbruch: ${JSON.stringify(b)}`,
   );
-  assertEquals(b, "🆕 Neuer Trainer: Eva Bcc: fremd@beispiel.invalid M");
+  assertEquals(b, "Neuer Trainer: Eva Bcc: fremd@beispiel.invalid M");
 });
 
 Deno.test("Zeilenumbruch in der Empfaengeradresse → kein Versand", async () => {
@@ -637,22 +650,26 @@ Deno.test("Stripe: gueltige Signatur → markieren, weiterleiten, zwei Mails wie
 
   const anTrainer = auf.mails[0];
   assertEquals(anTrainer.an, "trainer@beispiel.at");
-  assertEquals(
-    anTrainer.betreff,
-    "✅ Zahlung bestätigt – Hier sind deine Kunden-Daten!",
+  assertEquals(anTrainer.betreff, "Deine Kundendaten");
+  assertStringIncludes(
+    anTrainer.text,
+    "Hallo Testvorname, hier sind die Kontaktdaten.",
   );
-  assertStringIncludes(anTrainer.text, "Hi Testvorname,");
-  assertStringIncludes(anTrainer.text, "👤 Name: Testkundin");
-  assertStringIncludes(anTrainer.text, "📧 Email: kundin@beispiel.at");
-  assertStringIncludes(anTrainer.text, "🎯 Ziel: Abnehmen");
-  assertStringIncludes(anTrainer.text, "💬 Nachricht: Ich moechte starten.");
+  assertStringIncludes(anTrainer.text, "Name: Testkundin");
+  assertStringIncludes(anTrainer.text, "E-Mail: kundin@beispiel.at");
+  assertStringIncludes(anTrainer.text, "Ziel: Abnehmen");
+  assertStringIncludes(anTrainer.text, "Nachricht: Ich moechte starten.");
 
   const anJakob = auf.mails[1];
   assertEquals(anJakob.an, "vexfit.info@gmail.com");
-  assertEquals(anJakob.betreff, "💰 Zahlung: trainer@beispiel.at");
-  assertStringIncludes(anJakob.text, "👤 Trainer: Testvorname Testnachname");
-  assertStringIncludes(anJakob.text, "💶 Betrag: 49.99€");
-  assertStringIncludes(anJakob.text, "→ Admin: https://vexfit.app/admin.html");
+  assertEquals(anJakob.betreff, "Zahlung: trainer@beispiel.at");
+  assertStringIncludes(anJakob.text, "Trainer: Testvorname Testnachname");
+  assertStringIncludes(anJakob.text, "Betrag: 49.99 €");
+  assertStringIncludes(anJakob.text, "Status: Kundendaten weitergeleitet");
+  assertStringIncludes(
+    anJakob.text,
+    "Im Admin öffnen: https://vexfit.app/admin.html",
+  );
 });
 
 Deno.test("Stripe: falsche Signatur → 400 ohne jede Wirkung", async () => {
@@ -761,12 +778,11 @@ Deno.test("E1 — Zahlung ohne offene Anfrage: verbucht, keine Trainer-Mail, Ver
   // genau eine Mail, und zwar die an Jakob
   assertEquals(auf.mails.length, 1);
   assertEquals(auf.mails[0].an, "vexfit.info@gmail.com");
-  assertEquals(auf.mails[0].betreff, "💰 Zahlung: trainer@beispiel.at");
-  assertStringIncludes(auf.mails[0].text, "✅ Als bezahlt markiert");
-  assertStringIncludes(auf.mails[0].text, "⚠️ keine offene Anfrage");
+  assertEquals(auf.mails[0].betreff, "Zahlung: trainer@beispiel.at");
+  assertStringIncludes(auf.mails[0].text, "Status: keine offene Anfrage");
   assert(
-    !auf.mails[0].text.includes("✅ Kunden-Daten weitergeleitet"),
-    "die Haken-Zeile behauptet eine Weiterleitung, die es nicht gab",
+    !auf.mails[0].text.includes("Kundendaten weitergeleitet"),
+    "die Status-Zeile behauptet eine Weiterleitung, die es nicht gab",
   );
   assertEquals(auf.vermerkt, ["evt_ohne_anfrage"]);
 });
@@ -777,7 +793,7 @@ Deno.test("E1 — mit offener Anfrage steht die urspruengliche Haken-Zeile in de
     await stripeAnfrage(zahlung("evt_mit_anfrage")),
     anschluesse,
   );
-  assertStringIncludes(auf.mails[1].text, "✅ Kunden-Daten weitergeleitet");
+  assertStringIncludes(auf.mails[1].text, "Status: Kundendaten weitergeleitet");
   assert(!auf.mails[1].text.includes("keine offene Anfrage"));
 });
 
@@ -826,8 +842,8 @@ Deno.test("E2 — drei offene Anfragen: nur die aelteste wird gemailt und markie
   );
   assertEquals(auf.mails.length, 2);
   const anTrainer = auf.mails[0];
-  assertStringIncludes(anTrainer.text, "👤 Name: Kundin Alt");
-  assertStringIncludes(anTrainer.text, "📧 Email: alt@beispiel.at");
+  assertStringIncludes(anTrainer.text, "Name: Kundin Alt");
+  assertStringIncludes(anTrainer.text, "E-Mail: alt@beispiel.at");
   assert(
     !anTrainer.text.includes("Kundin Mitte"),
     "eine zweite Anfrage steht in der Mail",
@@ -845,8 +861,8 @@ Deno.test("E2 — zweite Zahlung: die naechstaeltere wird freigeschaltet, die ju
 
   assertEquals(auf.weitergeleitetMarkiert, ["a-alt", "a-mitte"]);
   assertEquals(auf.mails.length, 4); // je Zahlung eine an den Trainer und eine an Jakob
-  assertStringIncludes(auf.mails[0].text, "👤 Name: Kundin Alt");
-  assertStringIncludes(auf.mails[2].text, "👤 Name: Kundin Mitte");
+  assertStringIncludes(auf.mails[0].text, "Name: Kundin Alt");
+  assertStringIncludes(auf.mails[2].text, "Name: Kundin Mitte");
 
   // Die juengste ist weiterhin offen und kaeme bei der naechsten Zahlung dran.
   await bearbeiten(await stripeAnfrage(zahlung("evt_e2_c")), anschluesse);
@@ -866,7 +882,7 @@ Deno.test("E2 — vierte Zahlung ohne offene Anfrage: verbucht, Vermerk, nichts 
   );
   assertStringIncludes(
     auf.mails[auf.mails.length - 1].text,
-    "⚠️ keine offene Anfrage",
+    "Status: keine offene Anfrage",
   );
 });
 
@@ -876,5 +892,66 @@ Deno.test("Stripe: Betrag wird wie im Workflow durch 100 geteilt", async () => {
     await stripeAnfrage(zahlung("evt_betrag", "trainer@beispiel.at", 999)),
     anschluesse,
   );
-  assertStringIncludes(auf.mails[1].text, "💶 Betrag: 9.99€");
+  assertStringIncludes(auf.mails[1].text, "Betrag: 9.99 €");
+});
+
+// ===========================================================================
+// Gemeinsame Hygiene: fuer jede der sechs Mails dieser Function pruefen, dass
+// der Betreff kein Emoji enthaelt, das HTML die Fusszeile traegt, die
+// Textfassung nicht leer ist und weder "=20" noch eine andere
+// Quoted-Printable-Sequenz entsteht und keine Zeile auf ein Leerzeichen endet.
+// (Die siebte Mail, der Trainer-Alert, wird in trainer-alert/kern_test.ts
+// genauso geprueft.)
+// ===========================================================================
+Deno.test("alle sechs Mails: kein Emoji im Betreff, Fusszeile im HTML, Text sauber", () => {
+  const trainer: Trainer = {
+    id: "t-1",
+    vorname: "Testvorname",
+    nachname: "Testnachname",
+    email: "trainer@beispiel.at",
+  };
+  const body: Record<string, unknown> = {
+    vorname: "Eva",
+    nachname: "Muster",
+    email: "eva@beispiel.at",
+    stadt: "Wien",
+    trainingsart: "Im Fitnessstudio",
+    ziel: "Abnehmen",
+    kunden_name: "Testkundin",
+    nachricht: "Hallo!",
+  };
+  const anfrage: Anfrage = {
+    id: "a-1",
+    kunden_name: "Testkundin",
+    kunden_email: "kundin@beispiel.at",
+    ziel: "Abnehmen",
+    nachricht: "Ich moechte starten.",
+  };
+  const mails: Mail[] = [
+    mailNeuerTrainer(body),
+    mailNeuerKunde(body),
+    mailErsteAnfrage(trainer, body),
+    mailWeitereAnfrage(trainer, body),
+    mailKundenDaten(trainer, anfrage, "kundin@beispiel.at"),
+    mailZahlungAnJakob(trainer, "trainer@beispiel.at", 4999, true),
+  ];
+  for (const m of mails) {
+    assert(
+      !/\p{Extended_Pictographic}/u.test(m.betreff),
+      `Betreff enthaelt ein Emoji: ${m.betreff}`,
+    );
+    assertStringIncludes(m.html, "FIRMENANGABE_FEHLT");
+    assert(m.text.trim().length > 0, `Textfassung leer: ${m.betreff}`);
+    assert(
+      !/=20/.test(m.betreff + "\n" + m.text),
+      `Quoted-Printable =20 bei: ${m.betreff}`,
+    );
+    assert(
+      !/=[0-9A-Fa-f]{2}/.test(m.text),
+      `Quoted-Printable-Sequenz im Text bei: ${m.betreff}`,
+    );
+    for (const zeile of m.text.split("\n")) {
+      assertEquals(zeile, zeile.replace(/[ \t]+$/, ""));
+    }
+  }
 });

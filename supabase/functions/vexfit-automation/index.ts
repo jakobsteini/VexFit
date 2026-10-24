@@ -173,10 +173,16 @@ const anschluesse: Anschluesse = {
     });
     try {
       await client.send({
-        from: ABSENDER,
+        // Absendername statt nackter Adresse; die Adresse selbst bleibt gleich.
+        from: `Vexfit <${ABSENDER}>`,
         to: mail.an,
         subject: mail.betreff,
-        content: mail.text,
+        // Multipart: Textfassung als text/plain, HTML als text/html, beide
+        // ausdruecklich mit charset=utf-8 (senkt die Spam-Bewertung).
+        mimeContent: [
+          { mimeType: "text/plain; charset=utf-8", content: mail.text },
+          { mimeType: "text/html; charset=utf-8", content: mail.html },
+        ],
       });
     } finally {
       await client.close();

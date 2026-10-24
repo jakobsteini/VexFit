@@ -18,6 +18,12 @@
 // ../_shared/text.ts und wird von trainer-alert benutzt, das HTML verschickt.
 
 import { adresseGueltig, betreffSaeubern } from "../_shared/text.ts";
+// Gemeinsames Mail-Geruest (HTML + Textfassung) fuer beide Edge Functions.
+import {
+  mailRahmen,
+  type MailAngaben,
+  mailText as baueText,
+} from "../_shared/mailgeruest.ts";
 
 // ============================================================================
 // Festwerte aus dem Workflow
@@ -88,7 +94,10 @@ export interface Anfrage {
 export interface Mail {
   an: string;
   betreff: string;
+  /** Reine Textfassung (text/plain). */
   text: string;
+  /** HTML-Fassung (text/html). */
+  html: string;
 }
 
 export interface StripeSitzung {
@@ -211,138 +220,134 @@ function w(wert: unknown): string {
 // Mails — Wortlaut, Zeilenumbrueche und Reihenfolge 1:1 aus dem Workflow
 // ============================================================================
 
-/** Node "Email Jakob - Neuer Trainer". */
-export function mailNeuerTrainer(
-  body: Record<string, unknown>,
-  adminHinweis?: string,
-): Mail {
-  const hinweis = adminHinweis ? `\nPasswort: ${adminHinweis}` : "";
+/** Baut aus Betreff und Angaben eine fertige Mail (Text + HTML aus dem Geruest). */
+function baueMail(an: string, betreff: string, angaben: MailAngaben): Mail {
   return {
-    an: BETREIBER,
-    betreff: betreffSaeubern(
-      `🆕 Neuer Trainer: ${w(body.vorname)} ${w(body.nachname)}`,
-    ),
-    text: "Neuer Trainer registriert! 🆕\n" +
-      "\n" +
-      `👤 Name: ${w(body.vorname)} ${w(body.nachname)}\n` +
-      `📧 Email: ${w(body.email)}\n` +
-      `📍 Stadt: ${w(body.stadt)}\n` +
-      `💪 Trainingsart: ${w(body.trainingsart)}\n` +
-      "\n" +
-      "→ Jetzt aktivieren:\n" +
-      "https://vexfit.app/admin.html" + hinweis,
+    an,
+    betreff: betreffSaeubern(betreff),
+    text: baueText(angaben),
+    html: mailRahmen(angaben),
   };
 }
 
-/** Node "Email Jakob - Neuer Kunde". */
+const ADMIN_LINK = "https://vexfit.app/admin.html";
+
+/** Mail 5 (intern an BETREIBER): neuer Trainer. */
+export function mailNeuerTrainer(body: Record<string, unknown>): Mail {
+  return baueMail(
+    BETREIBER,
+    `Neuer Trainer: ${w(body.vorname)} ${w(body.nachname)}`,
+    {
+      ueberschrift: "Neuer Trainer registriert",
+      datenZeilen: [
+        {
+          beschriftung: "Name",
+          wert: `${w(body.vorname)} ${w(body.nachname)}`.trim(),
+        },
+        { beschriftung: "E-Mail", wert: w(body.email) },
+        { beschriftung: "Stadt", wert: w(body.stadt) },
+        { beschriftung: "Trainingsart", wert: w(body.trainingsart) },
+      ],
+      knopfText: "Im Admin öffnen",
+      knopfLink: ADMIN_LINK,
+      grundZeile: "Interne Benachrichtigung.",
+    },
+  );
+}
+
+/** Mail 6 (intern an BETREIBER): neuer Kunde. */
 export function mailNeuerKunde(body: Record<string, unknown>): Mail {
-  return {
-    an: BETREIBER,
-    betreff: betreffSaeubern(
-      `🎯 Neuer Kunde: ${w(body.vorname)} ${w(body.nachname)}`,
-    ),
-    text: "Neuer Kunde registriert! 🎯\n" +
-      "\n" +
-      `👤 Name: ${w(body.vorname)} ${w(body.nachname)}\n` +
-      `📧 Email: ${w(body.email)}\n` +
-      `📍 Stadt: ${w(body.stadt)}\n` +
-      `🎯 Ziel: ${w(body.ziel)}\n` +
-      "\n" +
-      "→ Supabase:\n" +
-      "https://supabase.com/dashboard/project/hbapzwxdehfgnputrfjf",
-  };
+  return baueMail(
+    BETREIBER,
+    `Neuer Kunde: ${w(body.vorname)} ${w(body.nachname)}`,
+    {
+      ueberschrift: "Neuer Kunde registriert",
+      datenZeilen: [
+        {
+          beschriftung: "Name",
+          wert: `${w(body.vorname)} ${w(body.nachname)}`.trim(),
+        },
+        { beschriftung: "E-Mail", wert: w(body.email) },
+        { beschriftung: "Stadt", wert: w(body.stadt) },
+        { beschriftung: "Ziel", wert: w(body.ziel) },
+      ],
+      knopfText: "Im Admin öffnen",
+      knopfLink: ADMIN_LINK,
+      grundZeile: "Interne Benachrichtigung.",
+    },
+  );
 }
 
-/** Node "Email Trainer - ERSTE Anfrage 49,99€" (stripe_bezahlt ist nicht true). */
+/** Mail 1 (an den Trainer): erste Anfrage (stripe_bezahlt ist nicht true). */
 export function mailErsteAnfrage(
   trainer: Trainer,
   body: Record<string, unknown>,
 ): Mail {
   const kunde = kundenAngaben(body);
-  return {
-    an: w(trainer.email),
-    betreff: betreffSaeubern(
-      "🎉 Erste Kunden-Anfrage auf Vexfit – Abo aktivieren!",
-    ),
-    text: `Hi ${w(trainer.vorname)},\n` +
-      "\n" +
-      "du hast deine erste Kunden-Anfrage erhalten! 🚀\n" +
-      "\n" +
-      `👤 Kunde: ${w(kunde.name)}\n` +
-      `🎯 Ziel: ${w(kunde.ziel)}\n` +
-      `💬 Nachricht: ${w(kunde.nachricht)}\n` +
-      "\n" +
-      "Um die Kontaktdaten zu erhalten aktiviere dein Abo:\n" +
-      "\n" +
-      `👉 ${LINK_ERSTE}\n` +
-      "\n" +
-      "€49,99/Monat · Monatlich kündbar\n" +
-      "Nach der Zahlung bekommst du sofort alle Kunden-Daten!\n" +
-      "\n" +
-      "Viel Erfolg! 💪\n" +
-      "Jakob von Vexfit",
-  };
+  return baueMail(w(trainer.email), "Deine erste Kundenanfrage auf Vexfit", {
+    ueberschrift: "Deine erste Kundenanfrage",
+    absatz:
+      `Hallo ${w(trainer.vorname)}, über Vexfit hat dich jemand angefragt. ` +
+      "Um Name und E-Mail-Adresse zu sehen, aktiviere dein Abo.",
+    datenZeilen: [
+      { beschriftung: "Ziel", wert: w(kunde.ziel) },
+      { beschriftung: "Nachricht", wert: w(kunde.nachricht) },
+    ],
+    knopfText: "Abo aktivieren",
+    knopfLink: LINK_ERSTE,
+    hinweis:
+      "49,99 € pro Monat, monatlich kündbar. Die Kontaktdaten erhältst du " +
+      "unmittelbar nach der Zahlung.",
+    grundZeile:
+      "Du erhältst diese E-Mail, weil du ein Trainerprofil auf Vexfit angelegt hast.",
+  });
 }
 
-/** Node "Email Trainer - WEITERE Anfrage 9,99€" (stripe_bezahlt ist true). */
+/** Mail 2 (an den Trainer): weitere Anfrage (stripe_bezahlt ist true). */
 export function mailWeitereAnfrage(
   trainer: Trainer,
   body: Record<string, unknown>,
 ): Mail {
   const kunde = kundenAngaben(body);
-  return {
-    an: w(trainer.email),
-    betreff: betreffSaeubern(
-      "🎉 Neue Kunden-Anfrage auf Vexfit – Jetzt freischalten!",
-    ),
-    text: `Hi ${w(trainer.vorname)},\n` +
-      "\n" +
-      "du hast eine neue Kunden-Anfrage! 🚀\n" +
-      "\n" +
-      `👤 Kunde: ${w(kunde.name)}\n` +
-      `🎯 Ziel: ${w(kunde.ziel)}\n` +
-      `💬 Nachricht: ${w(kunde.nachricht)}\n` +
-      "\n" +
-      "Einmalig freischalten für €9,99:\n" +
-      "\n" +
-      `👉 ${LINK_WEITERE}\n` +
-      "\n" +
-      "Nach der Zahlung bekommst du sofort alle Kunden-Daten!\n" +
-      "\n" +
-      "Viel Erfolg! 💪\n" +
-      "Jakob von Vexfit",
-  };
+  return baueMail(w(trainer.email), "Neue Kundenanfrage auf Vexfit", {
+    ueberschrift: "Neue Kundenanfrage",
+    absatz: `Hallo ${w(trainer.vorname)}, du hast eine neue Anfrage erhalten.`,
+    datenZeilen: [
+      { beschriftung: "Ziel", wert: w(kunde.ziel) },
+      { beschriftung: "Nachricht", wert: w(kunde.nachricht) },
+    ],
+    knopfText: "Anfrage freischalten",
+    knopfLink: LINK_WEITERE,
+    hinweis:
+      "9,99 € einmalig. Die Kontaktdaten erhältst du unmittelbar nach der Zahlung.",
+    grundZeile:
+      "Du erhältst diese E-Mail, weil du ein Trainerprofil auf Vexfit angelegt hast.",
+  });
 }
 
-/** Node "Kunden-Daten an Trainer". */
+/** Mail 3 (an den Trainer, nach der Zahlung): Kundendaten. */
 export function mailKundenDaten(
   trainer: Trainer,
   anfrage: Anfrage,
   zahlerEmail: string,
 ): Mail {
-  return {
-    an: zahlerEmail,
-    betreff: betreffSaeubern(
-      "✅ Zahlung bestätigt – Hier sind deine Kunden-Daten!",
-    ),
-    text: `Hi ${w(trainer.vorname)},\n` +
-      "\n" +
-      "deine Zahlung war erfolgreich! ✅\n" +
-      "\n" +
-      "Hier sind deine Kunden-Daten:\n" +
-      "━━━━━━━━━━━━━━━━━━━━\n" +
-      `👤 Name: ${w(anfrage.kunden_name)}\n` +
-      `📧 Email: ${w(anfrage.kunden_email)}\n` +
-      `🎯 Ziel: ${w(anfrage.ziel)}\n` +
-      `💬 Nachricht: ${w(anfrage.nachricht)}\n` +
-      "━━━━━━━━━━━━━━━━━━━━\n" +
-      "\n" +
-      "Viel Erfolg! 💪\n" +
-      "Jakob von Vexfit",
-  };
+  return baueMail(zahlerEmail, "Deine Kundendaten", {
+    ueberschrift: "Zahlung bestätigt",
+    absatz:
+      `Hallo ${w(trainer.vorname)}, hier sind die Kontaktdaten. Melde dich am ` +
+      "besten noch heute - Anfragen werden kalt, wenn man wartet.",
+    datenZeilen: [
+      { beschriftung: "Name", wert: w(anfrage.kunden_name) },
+      { beschriftung: "E-Mail", wert: w(anfrage.kunden_email) },
+      { beschriftung: "Ziel", wert: w(anfrage.ziel) },
+      { beschriftung: "Nachricht", wert: w(anfrage.nachricht) },
+    ],
+    grundZeile:
+      "Du erhältst diese E-Mail, weil du eine Anfrage auf Vexfit freigeschaltet hast.",
+  });
 }
 
-/** Node "💰 Email Jakob - Zahlung". */
+/** Mail 7 (intern an BETREIBER): Zahlung eingegangen. */
 export function mailZahlungAnJakob(
   trainer: Trainer,
   zahlerEmail: string,
@@ -353,24 +358,25 @@ export function mailZahlungAnJakob(
     ? ""
     : String(betragCent / 100);
   // E1 (Jakob, 26.09.2026): eine Zahlung ohne offene Anfrage wird trotzdem
-  // verbucht. Dann stimmt die zweite Haken-Zeile des Workflows nicht mehr.
-  const zweiteZeile = anfrageWeitergeleitet
-    ? "✅ Kunden-Daten weitergeleitet"
-    : "⚠️ keine offene Anfrage";
-  return {
-    an: BETREIBER,
-    betreff: betreffSaeubern(`💰 Zahlung: ${zahlerEmail}`),
-    text: "💰 Neue Zahlung eingegangen!\n" +
-      "\n" +
-      `👤 Trainer: ${w(trainer.vorname)} ${w(trainer.nachname)}\n` +
-      `📧 Email: ${zahlerEmail}\n` +
-      `💶 Betrag: ${betrag}€\n` +
-      "\n" +
-      "✅ Als bezahlt markiert\n" +
-      zweiteZeile + "\n" +
-      "\n" +
-      "→ Admin: https://vexfit.app/admin.html",
-  };
+  // verbucht; dann lautet der Status "keine offene Anfrage".
+  const status = anfrageWeitergeleitet
+    ? "Kundendaten weitergeleitet"
+    : "keine offene Anfrage";
+  return baueMail(BETREIBER, `Zahlung: ${zahlerEmail}`, {
+    ueberschrift: "Zahlung eingegangen",
+    datenZeilen: [
+      {
+        beschriftung: "Trainer",
+        wert: `${w(trainer.vorname)} ${w(trainer.nachname)}`.trim(),
+      },
+      { beschriftung: "E-Mail", wert: zahlerEmail },
+      { beschriftung: "Betrag", wert: betrag ? `${betrag} €` : "" },
+      { beschriftung: "Status", wert: status },
+    ],
+    knopfText: "Im Admin öffnen",
+    knopfLink: ADMIN_LINK,
+    grundZeile: "Interne Benachrichtigung.",
+  });
 }
 
 // ============================================================================
@@ -497,10 +503,10 @@ async function neuerTrainer(
   const geprueft = eingabePruefen(body, ["email"]);
   if (!geprueft.ok) return antwort(400, { fehler: geprueft.grund }, herkunft);
 
-  const gesendet = await sendeWennAdresseTaugt(
-    a,
-    mailNeuerTrainer(body, a.adminHinweis?.()),
-  );
+  // Die fruehere Passwort-Zeile des alten Workflows faellt mit dem neuen,
+  // exakt vorgegebenen Wortlaut der Trainer-Mail weg; a.adminHinweis bleibt im
+  // Anschluss, wird aber nicht mehr verwendet.
+  const gesendet = await sendeWennAdresseTaugt(a, mailNeuerTrainer(body));
   return antwort(200, { ok: true, mails: gesendet ? 1 : 0 }, herkunft);
 }
 

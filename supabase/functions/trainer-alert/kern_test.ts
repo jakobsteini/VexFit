@@ -23,6 +23,7 @@ import {
   type Koordinate,
   mailBetreff,
   mailHtml,
+  mailText,
   maskieren,
   profilAdresse,
   schluesselGueltig,
@@ -257,28 +258,28 @@ Deno.test("Betreff und Empfaenger entsprechen dem Workflow", async () => {
   await bearbeiten(anfrage(`Bearer ${SCHLUESSEL}`), SCHLUESSEL, anschluesse);
   const m = auf.gesendet[0];
   assertEquals(m.kunden_email, "kundin@beispiel.at");
-  assertEquals(
-    mailBetreff(m),
-    "🎉 Neuer Trainer in deiner Nähe: Testvorname Testnachname",
-  );
+  assertEquals(mailBetreff(m), "Ein neuer Trainer in deiner Nähe");
 });
 
 Deno.test("HTML enthaelt Anrede, Trainerdaten, Preis und den Profil-Link", () => {
   const z = zuordnen([T_WIEN], [A_WIEN], new Map());
   const html = mailHtml(z.mails[0]);
-  assertStringIncludes(html, "Hallo Testkundin! 👋");
   assertStringIncludes(
     html,
-    "Ein neuer Trainer ist jetzt in deiner Nähe verfügbar!",
+    "Hallo Testkundin, für deine Region ist ein neues Profil dazugekommen.",
   );
+  assertStringIncludes(html, "Ein neuer Trainer in deiner Nähe");
   assertStringIncludes(html, "Testvorname Testnachname");
-  assertStringIncludes(html, "Im Fitnessstudio · 1010 Wien");
-  assertStringIncludes(html, "ab €60");
+  assertStringIncludes(html, "Im Fitnessstudio");
+  assertStringIncludes(html, "1010 Wien");
+  assertStringIncludes(html, "ab 60 €");
   assertStringIncludes(html, "https://vexfit.app/profil.html?id=t-wien");
+  assertStringIncludes(html, "Profil ansehen");
   assertStringIncludes(
     html,
-    "Du erhältst diese E-Mail, weil du Trainer-Benachrichtigungen",
+    "Du erhältst diese E-Mail, weil du für deine Region Benachrichtigungen",
   );
+  assertStringIncludes(html, "FIRMENANGABE_FEHLT");
 });
 
 Deno.test("hoechstens drei Spezialisierungen, Bio auf 200 Zeichen gekuerzt", () => {
@@ -302,8 +303,11 @@ Deno.test('ohne Kundenname steht nur "Hallo!", leere Felder entfallen', () => {
   };
   const z = zuordnen([schmal], [{ ...A_WIEN, kunden_name: null }], new Map());
   const html = mailHtml(z.mails[0]);
-  assertStringIncludes(html, "Hallo! 👋");
-  assert(!html.includes("ab €"), "Preiszeile darf ohne Preis fehlen");
+  assertStringIncludes(
+    html,
+    "Hallo, für deine Region ist ein neues Profil dazugekommen.",
+  );
+  assert(!html.includes("Preis"), "Preiszeile darf ohne Preis fehlen");
 });
 
 // --------------------------------------------------------------- Doppelversand
@@ -481,7 +485,9 @@ Deno.test("Trainername mit Skript, Verweis, Anfuehrungszeichen und & wird nur ma
       );
     }
   }
-  assert(!html.includes("<br>"), "<br> steht roh im HTML");
+  // Das strukturelle <br> der Fusszeile ist erlaubt; geprueft wird, dass das
+  // <br> AUS DEN DATEN (stadt "Wien<br>Zweitzeile") nicht roh durchkommt.
+  assert(!html.includes("Wien<br>"), "<br> aus den Daten steht roh im HTML");
   assert(!html.includes("<b>"), "<b> steht roh im HTML");
   assert(
     !html.includes('<a href="https://beispiel.invalid"'),
@@ -511,7 +517,7 @@ Deno.test("Kundenname wird ebenfalls maskiert", () => {
     zuordnen([T_WIEN], [{ ...A_WIEN, kunden_name: "<b>Eva</b>" }], new Map())
       .mails[0],
   );
-  assertStringIncludes(html, "Hallo &lt;b&gt;Eva&lt;/b&gt;! 👋");
+  assertStringIncludes(html, "Hallo &lt;b&gt;Eva&lt;/b&gt;, für deine Region");
   assert(!html.includes("<b>Eva</b>"));
 });
 
@@ -560,11 +566,12 @@ Deno.test("ohne zulaessige Adresse entfaellt der Knopf ganz", () => {
   // profilAdresse liefert immer https; hier wird die Weiche selbst geprueft.
   assertEquals(sichereAdresse("ftp://vexfit.app"), null);
   const html = mailHtml(zuordnen([T_WIEN], [A_WIEN], new Map()).mails[0]);
-  assertStringIncludes(html, "JETZT ANFRAGEN");
+  assertStringIncludes(html, "Profil ansehen");
   assertEquals(html.match(/href=/g)?.length, 1);
 });
 
-Deno.test("Betreff: Zeilenumbrueche im Namen kommen nicht in die Kopfzeile", () => {
+Deno.test("Betreff bleibt fest und ohne Steuerzeichen (unabhaengig vom Namen)", () => {
+  // Der neue Betreff traegt keinen Namen mehr; er ist fuer jede Mail gleich.
   const boes = {
     ...T_WIEN,
     vorname: "Eva\r\nBcc: fremd@beispiel.invalid",
@@ -573,15 +580,29 @@ Deno.test("Betreff: Zeilenumbrueche im Namen kommen nicht in die Kopfzeile", () 
   const betreff = mailBetreff(zuordnen([boes], [A_WIEN], new Map()).mails[0]);
   assert(!betreff.includes("\n"), "Betreff enthaelt noch \\n");
   assert(!betreff.includes("\r"), "Betreff enthaelt noch \\r");
-  assertEquals(
-    betreff,
-    "🎉 Neuer Trainer in deiner Nähe: Eva Bcc: fremd@beispiel.invalid M X",
-  );
-  // Der normale Fall bleibt Zeichen fuer Zeichen derselbe wie vorher.
+  assertEquals(betreff, "Ein neuer Trainer in deiner Nähe");
   assertEquals(
     mailBetreff(zuordnen([T_WIEN], [A_WIEN], new Map()).mails[0]),
-    "🎉 Neuer Trainer in deiner Nähe: Testvorname Testnachname",
+    "Ein neuer Trainer in deiner Nähe",
   );
+});
+
+Deno.test("Mail 4: kein Emoji im Betreff, Fusszeile im HTML, Textfassung sauber", () => {
+  const m = zuordnen([T_WIEN], [A_WIEN], new Map()).mails[0];
+  const betreff = mailBetreff(m);
+  const html = mailHtml(m);
+  const text = mailText(m);
+  assert(
+    !/\p{Extended_Pictographic}/u.test(betreff),
+    "Betreff enthaelt ein Emoji",
+  );
+  assertStringIncludes(html, "FIRMENANGABE_FEHLT");
+  assert(text.trim().length > 0, "Textfassung ist leer");
+  assert(!/=20/.test(betreff + "\n" + text), "Quoted-Printable =20 vorhanden");
+  assert(!/=[0-9A-Fa-f]{2}/.test(text), "Quoted-Printable-Sequenz im Text");
+  for (const zeile of text.split("\n")) {
+    assertEquals(zeile, zeile.replace(/[ \t]+$/, ""));
+  }
 });
 
 Deno.test("betreffSaeubern fasst Steuerzeichen zu einem Leerzeichen zusammen", () => {
