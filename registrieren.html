@@ -5,7 +5,7 @@
 <link rel="icon" type="image/png" href="vexfit-logo.png">
 <link rel="apple-touch-icon" href="vexfit-logo.png">
 <link rel="manifest" href="manifest.json">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Vexfit – Registrieren</title>
 <meta name="description" content="Erstelle in wenigen Minuten deinen kostenlosen Vexfit-Account – als Kunde oder als Personal Trainer.">
 <meta property="og:type" content="website">
@@ -23,9 +23,9 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100vh}
 .logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;color:var(--white);text-decoration:none}.logo span{color:var(--accent)}
-nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:rgba(10,10,10,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+nav{position:fixed;top:0;left:0;right:0;z-index:1000;display:flex;justify-content:space-between;align-items:center;padding:calc(14px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) 14px calc(20px + env(safe-area-inset-left));background:rgba(10,10,10,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
 .nav-back{color:var(--text-muted);text-decoration:none;font-size:13px}
-.page-wrap{padding:80px 20px 60px;max-width:540px;margin:0 auto}
+.page-wrap{padding:calc(80px + env(safe-area-inset-top)) 20px 60px;max-width:540px;margin:0 auto}
 .type-selector{text-align:center;padding:32px 0;animation:fadeUp 0.5s ease both}
 .page-label{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px}
 .page-title{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:2px;margin-bottom:8px}
@@ -83,7 +83,11 @@ select option{background:var(--gray);color:var(--white)}
 .iab-banner{display:none;position:fixed;top:0;left:0;right:0;z-index:2000;background:#e8ff00;color:#0a0a0a;padding:10px 16px;font-size:12px;font-weight:600;text-align:center;line-height:1.5}
 .iab-banner.show{display:block}
 .iab-banner b{text-decoration:underline}
-.iab-banner + nav{top:38px}
+/* Nur wenn der In-App-Hinweis wirklich sichtbar ist (.show), rueckt die Navi
+   darunter. Ohne diese .show-Bedingung schob der Nachbar-Selektor die Navi
+   dauerhaft um 38px nach unten - dann ragte sie in den Seiteninhalt und der
+   obere Rand (Badge "Trainer finden") wurde angeschnitten. */
+.iab-banner.show + nav{top:calc(38px + env(safe-area-inset-top))}
 body.iab-active{padding-top:38px}
 .ort-chips{display:flex;flex-wrap:wrap;gap:8px}
 .ort-chip{padding:9px 16px;border:1px solid var(--border-input);border-radius:100px;font-size:13px;color:var(--text-muted);cursor:pointer;transition:all 0.2s;user-select:none}
