@@ -47,6 +47,8 @@ interface Aufzeichnung {
   vermerkt: string[];
   adminTrainer: { id: string; felder: Record<string, unknown> }[];
   adminLoeschen: { tabelle: string; id: string }[];
+  // Fix 7b: vorgemerkte anonyme Formular-Eintraege (fuer die Spam-Grenze).
+  spamEintraege: { email: string; ip: string; zeit: number }[];
 }
 
 const T_STANDARD: Trainer = {
@@ -78,6 +80,10 @@ function bau(opt: {
   nutzer?: { id: string; email: string } | null;
   /** Teil 8: vorhandene Anfragen der letzten Stunde (Ratenbremse). */
   anfragenZahl?: number;
+  /** Fix 7b: schon vorhandene Eintraege je E-Mail (zusaetzlich zu den im Lauf gemerkten). */
+  spamEmailVorlauf?: number;
+  /** Fix 7b: schon vorhandene Eintraege je IP (zusaetzlich zu den im Lauf gemerkten). */
+  spamIpVorlauf?: number;
 } = {}): { anschluesse: Anschluesse; auf: Aufzeichnung } {
   const auf: Aufzeichnung = {
     mails: [],
@@ -86,6 +92,7 @@ function bau(opt: {
     vermerkt: [],
     adminTrainer: [],
     adminLoeschen: [],
+    spamEintraege: [],
   };
   const schon = opt.schonVerarbeitet ?? new Set<string>();
   /** Schon weitergeleitete Anfragen — die Sperre der Datenbank nachgebaut. */
@@ -158,6 +165,22 @@ function bau(opt: {
         opt.nutzer === undefined ? { id: "u-1", email: "kundin@beispiel.at" } : opt.nutzer,
       ),
     anfragenAnzahlSeit: () => Promise.resolve(opt.anfragenZahl ?? 0),
+    // Fix 7b: Spam-Grenze. Zaehlt im Lauf gemerkte Eintraege seit einem
+    // Zeitpunkt, plus optionalen Vorlauf (als ob schon welche in der DB stehen).
+    spamProEmailSeit: (email, seitISO) => {
+      const seit = Date.parse(seitISO);
+      const n = auf.spamEintraege.filter((e) => e.email === email && e.zeit >= seit).length;
+      return Promise.resolve(n + (opt.spamEmailVorlauf ?? 0));
+    },
+    spamProIpSeit: (ip, seitISO) => {
+      const seit = Date.parse(seitISO);
+      const n = auf.spamEintraege.filter((e) => e.ip === ip && e.zeit >= seit).length;
+      return Promise.resolve(n + (opt.spamIpVorlauf ?? 0));
+    },
+    spamEintragVormerken: (email, ip) => {
+      auf.spamEintraege.push({ email, ip, zeit: Date.now() });
+      return Promise.resolve();
+    },
     adminTrainerSetzen: (id, felder) => {
       auf.adminTrainer.push({ id, felder });
       return Promise.resolve(1);
@@ -235,7 +258,7 @@ Deno.test("/neuer-trainer: gueltige Eingabe → genau eine Mail an Jakob, Wortla
       email: "eva@beispiel.at",
       stadt: "Wien",
       trainingsart: "Im Fitnessstudio",
-    }, VOM_BROWSER),
+    }, MIT_TOKEN),
     anschluesse,
   );
   assertEquals(a.status, 200);
@@ -264,7 +287,7 @@ Deno.test("/neuer-trainer: keine Passwortzeile mehr (neuer Wortlaut)", async () 
   for (const adminHinweis of [undefined, "PLATZHALTER-AUS-DEM-SECRET"]) {
     const { anschluesse, auf } = bau({ adminHinweis });
     await bearbeiten(
-      anfrage("neuer-trainer", { email: "a@b.de" }, VOM_BROWSER),
+      anfrage("neuer-trainer", { email: "a@b.de" }, MIT_TOKEN),
       anschluesse,
     );
     assert(
@@ -289,7 +312,7 @@ Deno.test("/neuer-trainer: Pflichtfeld fehlt → 400 ohne Wirkung", async () => 
   ) {
     const { anschluesse, auf } = bau();
     const a = await bearbeiten(
-      anfrage("neuer-trainer", koerper, VOM_BROWSER),
+      anfrage("neuer-trainer", koerper, MIT_TOKEN),
       anschluesse,
     );
     assertEquals(a.status, 400, `Koerper: ${JSON.stringify(koerper)}`);
@@ -303,7 +326,7 @@ Deno.test("/neuer-trainer: zu langes Feld → 400", async () => {
     anfrage(
       "neuer-trainer",
       { email: "a@b.de", vorname: "x".repeat(201) },
-      VOM_BROWSER,
+      MIT_TOKEN,
     ),
     anschluesse,
   );
@@ -323,7 +346,7 @@ Deno.test("/neuer-kunde: gueltige Eingabe → genau eine Mail an Jakob, Wortlaut
       email: "eva@beispiel.at",
       stadt: "Wien",
       ziel: "Abnehmen",
-    }, VOM_BROWSER),
+    }, MIT_TOKEN),
     anschluesse,
   );
   assertEquals(a.status, 200);
@@ -351,6 +374,7 @@ Deno.test("/neuer-kunde: die Nutzlast von suche.html geht durch (leerer Nachname
       stadt: "",
       ziel: "Benachrichtigung gewünscht",
       budget: "",
+      webseite: "",
     }, VOM_BROWSER),
     anschluesse,
   );
@@ -360,6 +384,78 @@ Deno.test("/neuer-kunde: die Nutzlast von suche.html geht durch (leerer Nachname
     "suche.html prueft r.ok — eine 400 wuerde dem Besucher einen Fehler zeigen",
   );
   assertEquals(auf.mails.length, 1);
+});
+
+// ===========================================================================
+// Fix 7b: Spam-Schutz fuer /neuer-kunde und /neuer-trainer
+// ===========================================================================
+Deno.test("Fix 7b: neuer-kunde ohne Token (angemeldeter Pfad) -> 401, keine Mail", async () => {
+  const { anschluesse, auf } = bau();
+  const a = await bearbeiten(
+    anfrage("neuer-kunde", { email: "eva@beispiel.at", vorname: "Eva" }, VOM_BROWSER),
+    anschluesse,
+  );
+  assertEquals(a.status, 401);
+  assertEquals(auf.mails, []);
+});
+
+Deno.test("Fix 7b: neuer-trainer ohne Token -> 401, keine Mail", async () => {
+  const { anschluesse, auf } = bau();
+  const a = await bearbeiten(
+    anfrage("neuer-trainer", { email: "eva@beispiel.at" }, VOM_BROWSER),
+    anschluesse,
+  );
+  assertEquals(a.status, 401);
+  assertEquals(auf.mails, []);
+});
+
+Deno.test("Fix 7b: anonymes Formular - zweiter Eintrag gleiche E-Mail in 24 h -> 429", async () => {
+  const { anschluesse, auf } = bau();
+  const koerper = {
+    vorname: "Interessent",
+    email: "doppelt@beispiel.at",
+    stadt: "Wien",
+    ziel: "Benachrichtigung gewünscht",
+    webseite: "",
+  };
+  const erste = await bearbeiten(anfrage("neuer-kunde", koerper, VOM_BROWSER), anschluesse);
+  assertEquals(erste.status, 200);
+  assertEquals(auf.mails.length, 1);
+  const zweite = await bearbeiten(anfrage("neuer-kunde", koerper, VOM_BROWSER), anschluesse);
+  assertEquals(zweite.status, 429);
+  // Keine zweite Mail.
+  assertEquals(auf.mails.length, 1);
+});
+
+Deno.test("Fix 7b: anonymes Formular - gefuellter Honeypot -> kein Eintrag, keine Mail", async () => {
+  const { anschluesse, auf } = bau();
+  const a = await bearbeiten(
+    anfrage("neuer-kunde", {
+      vorname: "Bot",
+      email: "bot@beispiel.at",
+      ziel: "Benachrichtigung gewünscht",
+      webseite: "http://spam.example",
+    }, VOM_BROWSER),
+    anschluesse,
+  );
+  assertEquals(a.status, 200);
+  assertEquals(auf.mails, []);
+  assertEquals(auf.spamEintraege, []);
+});
+
+Deno.test("Fix 7b: anonymes Formular - IP-Grenze (20/Stunde) erreicht -> 429", async () => {
+  const { anschluesse, auf } = bau({ spamIpVorlauf: 20 });
+  const a = await bearbeiten(
+    anfrage("neuer-kunde", {
+      vorname: "Interessent",
+      email: "ip@beispiel.at",
+      ziel: "Benachrichtigung gewünscht",
+      webseite: "",
+    }, { ...VOM_BROWSER, kopf: { "x-forwarded-for": "203.0.113.7" } }),
+    anschluesse,
+  );
+  assertEquals(a.status, 429);
+  assertEquals(auf.mails, []);
 });
 
 // ===========================================================================
@@ -559,7 +655,7 @@ Deno.test("fremde Herkunft → 403 und keine CORS-Freigabe", async () => {
 Deno.test("eigene Herkunft → CORS-Freigabe genau fuer vexfit.app", async () => {
   const { anschluesse } = bau();
   const a = await bearbeiten(
-    anfrage("neuer-trainer", { email: "a@b.de" }, VOM_BROWSER),
+    anfrage("neuer-trainer", { email: "a@b.de" }, MIT_TOKEN),
     anschluesse,
   );
   assertEquals(
@@ -587,7 +683,9 @@ Deno.test("OPTIONS wird mit 204 und Freigabe beantwortet, ohne Wirkung", async (
 Deno.test("ohne Herkunft (curl, Stripe) laeuft es durch, aber ohne CORS-Kopf", async () => {
   const { anschluesse, auf } = bau();
   const a = await bearbeiten(
-    anfrage("neuer-trainer", { email: "a@b.de" }),
+    anfrage("neuer-trainer", { email: "a@b.de" }, {
+      kopf: { Authorization: "Bearer test-token" },
+    }),
     anschluesse,
   );
   assertEquals(a.status, 200);
@@ -614,7 +712,7 @@ Deno.test("Name mit HTML: Textfassung roh, HTML-Fassung maskiert", async () => {
       email: "a@b.de",
       vorname: "<b>Eva</b>",
       nachname: "A & B",
-    }, VOM_BROWSER),
+    }, MIT_TOKEN),
     anschluesse,
   );
   const m = auf.mails[0];
@@ -633,7 +731,7 @@ Deno.test("Zeilenumbruch im Namen kommt nicht in den Betreff", async () => {
       email: "a@b.de",
       vorname: "Eva\r\nBcc: fremd@beispiel.invalid",
       nachname: "M",
-    }, VOM_BROWSER),
+    }, MIT_TOKEN),
     anschluesse,
   );
   const b = auf.mails[0].betreff;

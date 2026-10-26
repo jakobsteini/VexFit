@@ -140,6 +140,7 @@ try {
 @media (max-width:640px){.footer-links a,.nav-link{min-height:44px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}}</style>
 <style>/* Platz fuer WhatsApp-Knopf (Fix 3) */
 @media (max-width:640px){body{padding-bottom:84px}}</style>
+<script type="module" src="vexfit-sitzung.js"></script>
 </head>
 <body>
 
@@ -198,6 +199,9 @@ try {
         <div class="notify-title">Benachrichtige mich!</div>
         <p class="notify-sub">Gib deine E-Mail ein – wir melden uns, sobald Trainer in deiner Stadt verfügbar sind.</p>
         <div class="notify-field"><label>Deine E-Mail</label><input type="email" placeholder="deine@email.com" id="notif-email" autocomplete="email"></div>
+        <!-- Fix 7b: verstecktes Koederfeld (Honeypot). Menschen sehen und fuellen es nicht;
+             fuellt ein Bot es, verwirft der Server den Eintrag ohne Mail. -->
+        <input type="text" id="notif-webseite" name="webseite" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
         <button class="notify-btn" onclick="submitNotify()">🔔 Jetzt benachrichtigen</button>
       </div>
       <div id="notifySuccess" style="display:none;text-align:center;padding:16px 0">
@@ -221,6 +225,8 @@ try {
     <a href="rechtliches.html#agb">AGB</a>
       <a href="#" onclick="return vexfitEinstellungenOeffnen()">Cookie-Einstellungen</a>
   </div>
+  <!-- STADTSEITEN-ANFANG: wird von werkzeuge/stadtseiten.mjs gepflegt, nicht von Hand aendern -->
+  <!-- STADTSEITEN-ENDE -->
 </footer>
 
 <script src="vexfit-escape.js"></script>
@@ -583,16 +589,23 @@ async function submitNotify() {
   const email = document.getElementById('notif-email').value.trim();
   if(!email) { alert('Bitte E-Mail eingeben!'); return; }
   const stadt = document.getElementById('searchInput')?.value || '';
+  // Fix 7b: verstecktes Koederfeld mitschicken (bleibt bei Menschen leer).
+  const koeder = document.getElementById('notif-webseite')?.value || '';
   try {
     const r = await fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-kunde', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        vorname: 'Interessent', nachname: '', 
+        vorname: 'Interessent', nachname: '',
         email: email, stadt: stadt,
-        ziel: 'Benachrichtigung gewünscht', budget: ''
+        ziel: 'Benachrichtigung gewünscht', budget: '', webseite: koeder
       })
     });
+    // Fix 7b: Bei zu vielen Eintraegen (429) eine ruhige Meldung, kein Fehler.
+    if(r.status === 429) {
+      alert('Wir haben deine Anmeldung schon. Bitte versuche es spaeter noch einmal.');
+      return;
+    }
     if(!r.ok) throw new Error('Benachrichtigung fehlgeschlagen: ' + r.status);
   } catch(e) {
     console.error('submitNotify:', e);

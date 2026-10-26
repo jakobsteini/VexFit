@@ -88,6 +88,19 @@ async function lesen<T>(pfad: string): Promise<T[]> {
   return await a.json() as T[];
 }
 
+/** Zahl der Treffer eines Lesepfads (count=exact, Content-Range "*\/<n>"). */
+async function zaehlen(pfad: string): Promise<number> {
+  const a = await fetch(restAdresse(pfad), {
+    headers: { ...restKopf(), Prefer: "count=exact" },
+  });
+  if (!a.ok) throw new Error(`Zaehlen von ${pfad.split("?")[0]} fehlgeschlagen: HTTP ${a.status}`);
+  const bereich = a.headers.get("content-range");
+  const n = bereich && bereich.includes("/")
+    ? parseInt(bereich.split("/")[1], 10)
+    : (await a.json() as unknown[]).length;
+  return Number.isFinite(n) ? n : 0;
+}
+
 async function schreiben(pfad: string, daten: unknown): Promise<void> {
   const a = await fetch(restAdresse(pfad), {
     method: "PATCH",
@@ -279,6 +292,34 @@ const anschluesse: Anschluesse = {
       ? parseInt(bereich.split("/")[1], 10)
       : (await a.json() as unknown[]).length;
     return Number.isFinite(n) ? n : 0;
+  },
+
+  // Fix 7b: Spam-Grenze fuer das anonyme suche.html-Formular. Zaehlt bzw. legt
+  // Eintraege in der Tabelle spam_schutz an (Migration 2026-10-26-06). Beide
+  // Zaehler lesen die Gesamtzahl aus dem Content-Range-Kopf (count=exact).
+  async spamProEmailSeit(email: string, seitISO: string): Promise<number> {
+    return await zaehlen(
+      `spam_schutz?email=ilike.${encodeURIComponent(email)}` +
+        `&erstellt_am=gte.${encodeURIComponent(seitISO)}&select=id`,
+    );
+  },
+
+  async spamProIpSeit(ip: string, seitISO: string): Promise<number> {
+    return await zaehlen(
+      `spam_schutz?ip=eq.${encodeURIComponent(ip)}` +
+        `&erstellt_am=gte.${encodeURIComponent(seitISO)}&select=id`,
+    );
+  },
+
+  async spamEintragVormerken(email: string, ip: string): Promise<void> {
+    const a = await fetch(restAdresse("spam_schutz"), {
+      method: "POST",
+      headers: { ...restKopf(), Prefer: "return=minimal" },
+      body: JSON.stringify({ email, ip }),
+    });
+    if (!a.ok) {
+      throw new Error(`spamEintragVormerken fehlgeschlagen: HTTP ${a.status}`);
+    }
   },
 
   // Admin-Aktion: setzt feste Felder einer Trainerzeile mit service_role.

@@ -397,25 +397,32 @@ export function sitemapXml(trainer, seiten, heute) {
 }
 
 // ──── Stadt-Links im Fussbereich ────
-const MARKER_ANFANG = '<!-- STADTSEITEN-ANFANG: wird von werkzeuge/stadtseiten.mjs gepflegt, nicht von Hand aendern -->';
-const MARKER_ENDE = '<!-- STADTSEITEN-ENDE -->';
+export const MARKER_ANFANG = '<!-- STADTSEITEN-ANFANG: wird von werkzeuge/stadtseiten.mjs gepflegt, nicht von Hand aendern -->';
+export const MARKER_ENDE = '<!-- STADTSEITEN-ENDE -->';
 
-function fussblock(staedte) {
+export function fussblock(staedte) {
   if (!staedte.length) return '';
   const links = staedte.map(st => `<a href="personal-trainer-${slug(st)}.html">${escapeHtml(st)}</a>`).join('\n    ');
   return `\n  <div class="footer-links"><span style="font-size:12px;color:var(--text-muted)">Trainer nach Stadt:</span>\n    ${links}\n  </div>`;
 }
 
+// Reine Funktion (fuer Tests): ersetzt den Inhalt zwischen den beiden Markern
+// durch `block`. Fehlen die Marker, bleibt die Quelle unveraendert (null).
+export function fussblockErsetzen(quelle, block) {
+  const anfang = quelle.indexOf(MARKER_ANFANG);
+  const ende = quelle.indexOf(MARKER_ENDE);
+  if (anfang === -1 || ende === -1 || ende < anfang) return null;
+  return quelle.slice(0, anfang + MARKER_ANFANG.length) + block + '\n  ' + quelle.slice(ende);
+}
+
 function fussblockEinsetzen(datei, block) {
   const pfad = join(REPO, datei);
   const quelle = readFileSync(pfad, 'utf8');
-  const anfang = quelle.indexOf(MARKER_ANFANG);
-  const ende = quelle.indexOf(MARKER_ENDE);
-  if (anfang === -1 || ende === -1 || ende < anfang) {
+  const neu = fussblockErsetzen(quelle, block);
+  if (neu === null) {
     console.log(`  WARNUNG: Marker in ${datei} nicht gefunden - Fussbereich nicht angepasst.`);
     return false;
   }
-  const neu = quelle.slice(0, anfang + MARKER_ANFANG.length) + block + '\n  ' + quelle.slice(ende);
   if (neu !== quelle) { writeFileSync(pfad, neu); return true; }
   return false;
 }

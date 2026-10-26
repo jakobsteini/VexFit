@@ -57,6 +57,20 @@ export const ADMIN_ID = "ee744b01-0a70-4da5-a19b-6c905c8479b5";
 export const KOERPER_GRENZE = 20000;
 
 /**
+ * Fix 7b (Spam-Schutz): verstecktes Koederfeld des anonymen suche.html-Formulars.
+ * Steht dieser Feldname im Koerper, ist der Aufruf das anonyme
+ * Benachrichtigungs-Formular (Honeypot + Ratengrenze). Fehlt er, gilt der
+ * angemeldete Pfad (z. B. Registrierung): dann ist ein gueltiges Zugangs-Token
+ * noetig, genau wie bei /neue-anfrage.
+ */
+export const KOEDER_FELD = "webseite";
+
+/** Fix 7b: hoechstens 1 anonymer Eintrag je E-Mail in 24 h. */
+export const SPAM_PRO_EMAIL_24H = 1;
+/** Fix 7b: hoechstens 20 anonyme Eintraege je IP-Adresse in 1 h. */
+export const SPAM_PRO_IP_1H = 20;
+
+/**
  * Laengengrenzen je Feld. Der Workflow hatte keine — n8n nahm alles an.
  * Bewusst weit: sie halten Unsinn heraus, ohne eine echte Eingabe zu kuerzen.
  */
@@ -142,6 +156,12 @@ export interface Anschluesse {
   benutzerAusToken(token: string): Promise<{ id: string; email: string } | null>;
   /** Teil 8: Anzahl Anfragen dieses Kunden seit einem Zeitpunkt (Ratenbremse). */
   anfragenAnzahlSeit(kundenEmail: string, seitISO: string): Promise<number>;
+  /** Fix 7b: Zahl anonymer Formular-Eintraege dieser E-Mail seit einem Zeitpunkt. */
+  spamProEmailSeit(email: string, seitISO: string): Promise<number>;
+  /** Fix 7b: Zahl anonymer Formular-Eintraege dieser IP-Adresse seit einem Zeitpunkt. */
+  spamProIpSeit(ip: string, seitISO: string): Promise<number>;
+  /** Fix 7b: einen anonymen Formular-Eintrag vormerken (fuer die Grenze). */
+  spamEintragVormerken(email: string, ip: string): Promise<void>;
   /** Admin-Aktion: setzt feste Felder (aktiv/stripe_bezahlt) einer Trainerzeile
    *  mit service_role. Gibt die Zahl geaenderter Zeilen zurueck. */
   adminTrainerSetzen(id: string, felder: Record<string, unknown>): Promise<number>;
@@ -510,6 +530,54 @@ function bearerToken(r: Request): string | null {
   return m ? m[1].trim() : null;
 }
 
+/** Fix 7b: Klient-IP aus dem X-Forwarded-For-Kopf (erste Adresse), sonst "". */
+function klientIp(r: Request): string {
+  const h = r.headers.get("x-forwarded-for") || "";
+  return h.split(",")[0].trim();
+}
+
+/**
+ * Fix 7b: Torwache fuer /neuer-trainer und /neuer-kunde.
+ *   - OHNE Koederfeld (angemeldeter Pfad, z. B. Registrierung): gueltiges
+ *     Zugangs-Token noetig, sonst 401 — genau wie bei /neue-anfrage.
+ *   - MIT Koederfeld (anonymes suche.html-Formular): ist der Koeder gefuellt,
+ *     kein Eintrag und keine Mail (nach aussen Erfolg); sonst Ratengrenze
+ *     (1 je E-Mail/24 h, 20 je IP/1 h) -> 429, darunter Eintrag vormerken.
+ * Gibt eine Antwort zurueck, wenn der Aufruf hier endet, sonst null (weiter).
+ */
+async function torwacheMailEndpunkt(
+  r: Request,
+  a: Anschluesse,
+  body: Record<string, unknown>,
+  herkunft: string | null,
+): Promise<Response | null> {
+  const istFormular = Object.prototype.hasOwnProperty.call(body, KOEDER_FELD);
+  if (!istFormular) {
+    // Angemeldeter Pfad: Token verlangen wie bei /neue-anfrage.
+    const token = bearerToken(r);
+    const nutzer = token ? await a.benutzerAusToken(token) : null;
+    if (!nutzer) return antwort(401, { fehler: "Anmeldung erforderlich" }, herkunft);
+    return null;
+  }
+  // Anonymes Formular: versteckter Koeder. Ein Bot fuellt ihn aus — dann still
+  // verwerfen (kein Eintrag, keine Mail), nach aussen aber wie Erfolg.
+  if (text(body[KOEDER_FELD])) {
+    return antwort(200, { ok: true, mails: 0 }, herkunft);
+  }
+  const email = text(body.email).toLowerCase();
+  const ip = klientIp(r);
+  const vor24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const vor1h = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  if (email && (await a.spamProEmailSeit(email, vor24h)) >= SPAM_PRO_EMAIL_24H) {
+    return antwort(429, { fehler: "Zu viele Eintraege. Bitte spaeter erneut." }, herkunft);
+  }
+  if (ip && (await a.spamProIpSeit(ip, vor1h)) >= SPAM_PRO_IP_1H) {
+    return antwort(429, { fehler: "Zu viele Eintraege von dieser Verbindung." }, herkunft);
+  }
+  await a.spamEintragVormerken(email, ip);
+  return null;
+}
+
 async function koerperLesen(
   anfrageObjekt: Request,
 ): Promise<Record<string, unknown> | null> {
@@ -575,6 +643,8 @@ async function neuerTrainer(
   if (!body) {
     return antwort(400, { fehler: "Die Anfrage war nicht lesbar." }, herkunft);
   }
+  const tor = await torwacheMailEndpunkt(r, a, body, herkunft);
+  if (tor) return tor;
   const geprueft = eingabePruefen(body, ["email"]);
   if (!geprueft.ok) return antwort(400, { fehler: geprueft.grund }, herkunft);
 
@@ -594,6 +664,8 @@ async function neuerKunde(
   if (!body) {
     return antwort(400, { fehler: "Die Anfrage war nicht lesbar." }, herkunft);
   }
+  const tor = await torwacheMailEndpunkt(r, a, body, herkunft);
+  if (tor) return tor;
   const geprueft = eingabePruefen(body, ["email"]);
   if (!geprueft.ok) return antwort(400, { fehler: geprueft.grund }, herkunft);
 

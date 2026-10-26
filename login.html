@@ -78,6 +78,7 @@ try {
 @media (max-width:640px){.nav-link{min-height:44px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}}</style>
 <style>/* Platz fuer WhatsApp-Knopf (Fix 3) */
 @media (max-width:640px){body{padding-bottom:84px}}</style>
+<script type="module" src="vexfit-sitzung.js"></script>
 </head>
 <body>
 <div class="page-bg"></div>
@@ -168,18 +169,19 @@ async function doLogin() {
         return;
       }
 
+      // Fix 7a: "Eingeloggt bleiben" speichert zusaetzlich das refresh_token.
+      // Nur dann erneuert vexfit-sitzung.js das Zugangs-Token vor Ablauf; ohne
+      // Haken bleibt es beim bisherigen Verhalten (kein refresh_token, keine
+      // Erneuerung).
+      const bleibe = document.getElementById('stayLoggedIn').checked;
       const sessionData = JSON.stringify({
         access_token: data.access_token,
+        refresh_token: bleibe ? (data.refresh_token || null) : null,
         user_id: data.user.id,
         email: data.user.email,
         role: role
       });
-      // Eingeloggt bleiben = localStorage (persistent), sonst sessionStorage
-      if(document.getElementById('stayLoggedIn').checked) {
-        localStorage.setItem('vexfit_session', sessionData);
-      } else {
-        localStorage.setItem('vexfit_session', sessionData); // always save for now, session ends on logout
-      }
+      localStorage.setItem('vexfit_session', sessionData);
       window.location.href = gemerktesZiel() || (role === 'kunde' ? 'kunden-bereich.html' : 'trainer-bereich.html');
     } else {
       showError('Falsche E-Mail oder Passwort!');
