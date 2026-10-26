@@ -99,7 +99,7 @@ textarea.modal-msg::placeholder{color:rgba(85,85,85,0.7)}
 .btn-cancel{background:none;border:1px solid var(--border);color:var(--muted);padding:12px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
 .btn-send{background:var(--accent);color:var(--bg);padding:12px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
 .btn-send:disabled{opacity:0.4;cursor:not-allowed}
-.hidden{display:none}
+.hidden{display:none !important}
 @keyframes popIn{from{opacity:0;transform:scale(0.4)}to{opacity:1;transform:scale(1)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
@@ -109,6 +109,7 @@ textarea.modal-msg::placeholder{color:rgba(85,85,85,0.7)}
 /* GEFUEHRTER EINSTIEG */
 .einstieg{min-height:100vh;padding:calc(80px + env(safe-area-inset-top)) 20px 40px;max-width:560px;margin:0 auto;display:flex;flex-direction:column}
 .ein-progress{display:flex;align-items:center;gap:8px;margin-bottom:28px}
+.ein-back{flex:0 0 auto;background:none;border:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px 2px 0}
 .ein-dot{width:28px;height:4px;border-radius:2px;background:var(--bi);transition:background 0.3s}
 .ein-dot.on{background:var(--accent)}
 .ein-step{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-left:auto}
@@ -197,59 +198,48 @@ try {
      Online, filtert gegen trainers.trainingsort), Frage 3 PLZ+Umkreis (vorhandene Suche). -->
 <div class="einstieg hidden" id="einstieg">
   <div class="ein-progress">
-    <div class="ein-dot" data-d="1"></div>
-    <div class="ein-dot" data-d="2"></div>
-    <div class="ein-dot" data-d="3"></div>
-    <div class="ein-step" id="einStep">Frage 1 von 3</div>
+    <button class="ein-back hidden" id="einBack" onclick="einstiegZurueck()" aria-label="Zurück">←</button>
+    <div class="ein-step" id="einStep">Frage 1 von 2</div>
   </div>
 
-  <!-- Frage 1: Spezialisierungen (Mehrfachauswahl, oder alles offen lassen) -->
-  <div class="ein-card" id="einCard1">
+  <!-- Ziel-Frage: NUR fuer Altkonten ohne gespeichertes kunden.ziel. Einzige
+       Karte mit Weiter-Knopf (Mehrfachauswahl). -->
+  <div class="ein-card hidden" id="einCardZiel">
     <div class="ein-frage">Woran willst du <span>arbeiten?</span></div>
-    <div class="ein-hint">Mehrfachauswahl möglich – oder lass einfach alles offen und tippe auf Weiter.</div>
+    <div class="ein-hint">Mehrfachauswahl möglich.</div>
     <div class="ein-chips" id="einSpezChips"></div>
     <div class="ein-nav">
-      <button class="ein-weiter" onclick="einstiegWeiter()">Weiter →</button>
+      <button class="ein-weiter" onclick="einstiegZielWeiter()">Weiter →</button>
     </div>
     <div class="ein-skip"><a onclick="einstiegUeberspringen()">Einstieg überspringen</a></div>
   </div>
 
-  <!-- Frage 2: Wo trainierst du? Zwei Knoepfe, filtert gegen trainers.trainingsort. -->
-  <div class="ein-card hidden" id="einCard2">
+  <!-- Frage Ort: Vor Ort / Online / Beides. Ein Tipp waehlt und geht weiter. -->
+  <div class="ein-card hidden" id="einCardOrt">
     <div class="ein-frage">Vor Ort oder <span>online?</span></div>
-    <div class="ein-hint">Wähle eine Antwort – oder lass die Frage offen.</div>
-    <div class="ein-chips" id="einOrtChips">
-      <div class="ein-chip" data-v="vor_ort" onclick="einOrtWaehle(this)">Vor Ort</div>
-      <div class="ein-chip" data-v="online" onclick="einOrtWaehle(this)">Online</div>
-    </div>
-    <div class="ein-nav">
-      <button class="ein-zurueck" onclick="einstiegZurueck()">←</button>
-      <button class="ein-weiter" onclick="einstiegWeiter()">Weiter →</button>
+    <div class="ein-chips">
+      <div class="ein-chip" data-v="vor_ort" onclick="einOrtTipp('vor_ort')">Vor Ort</div>
+      <div class="ein-chip" data-v="online" onclick="einOrtTipp('online')">Online</div>
+      <div class="ein-chip" data-v="beides" onclick="einOrtTipp('beides')">Beides</div>
     </div>
     <div class="ein-skip"><a onclick="einstiegUeberspringen()">Einstieg überspringen</a></div>
   </div>
 
-  <!-- Frage 3: PLZ + Umkreis (genau wie in der vorhandenen Suche) -->
-  <div class="ein-card hidden" id="einCard3">
-    <div class="ein-frage">Wo bist <span>du?</span></div>
-    <div class="ein-hint">PLZ eingeben und Umkreis wählen.</div>
-    <div class="ein-feld">
+  <!-- Frage Umkreis: optionales PLZ-Feld (Altkonto ohne kunden.plz) + Umkreis-
+       Knoepfe. Ein Tipp startet die Suche. -->
+  <div class="ein-card hidden" id="einCardUmkreis">
+    <div class="ein-frage">In welchem <span>Umkreis?</span></div>
+    <div class="ein-feld hidden" id="einPlzFeld">
       <label>Deine PLZ</label>
       <input type="text" id="einPlz" placeholder="Deine PLZ (z.B. 5026)" maxlength="5" inputmode="numeric" autocomplete="postal-code">
     </div>
-    <div class="ein-feld">
-      <label>Umkreis</label>
-      <select id="einRadius">
-        <option value="10">10 km</option>
-        <option value="25" selected>25 km</option>
-        <option value="50">50 km</option>
-        <option value="100">100 km</option>
-        <option value="0">Alle</option>
-      </select>
-    </div>
-    <div class="ein-nav">
-      <button class="ein-zurueck" onclick="einstiegZurueck()">←</button>
-      <button class="ein-weiter" onclick="einstiegFertig()">Trainer anzeigen →</button>
+    <div class="ein-hint hidden" id="einPlzHint"></div>
+    <div class="ein-chips">
+      <div class="ein-chip" data-v="10" onclick="einUmkreisTipp(10)">10 km</div>
+      <div class="ein-chip" data-v="25" onclick="einUmkreisTipp(25)">25 km</div>
+      <div class="ein-chip" data-v="50" onclick="einUmkreisTipp(50)">50 km</div>
+      <div class="ein-chip" data-v="100" onclick="einUmkreisTipp(100)">100 km</div>
+      <div class="ein-chip" data-v="0" onclick="einUmkreisTipp(0)">Alle</div>
     </div>
     <div class="ein-skip"><a onclick="einstiegUeberspringen()">Einstieg überspringen</a></div>
   </div>
@@ -307,6 +297,7 @@ try {
 <script src="vexfit-escape.js"></script>
 <script src="vexfit-plz.js"></script>
 <script src="vexfit-ziele.js"></script>
+<script src="vexfit-einstieg.js"></script>
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -319,7 +310,9 @@ let K = null, allT = [], activeFilter = 'alle', selT = null, lastSearch = null, 
 //   trainers.trainingsort ('vor_ort'/'online'/'beides'/leer) - siehe renderTrainer.
 const SPEZ_EINSTIEG = window.SPEZ_EINSTIEG; // gemeinsame Liste aus vexfit-ziele.js
 const EINSTIEG_KEY = 'vexfit_einstieg';
-let einSchritt = 1;
+let einSchritte = ['ort', 'umkreis']; // dynamische Fragenfolge (ziel nur fuer Altkonten)
+let einIndex = 0;
+let einPlzFeldNoetig = false;
 let einAuswahl = { spezialisierungen: [], ort: '', plz: '', umkreis: 25 };
 
 // Als Profilbild gilt nur eine Adresse aus dem eigenen Bilder-Behaelter;
@@ -432,7 +425,12 @@ const plzCache = new Map();
 // (4-stellig in AT und CH) erscheinen zwei Wahlknoepfe im Status-Element; die
 // gewaehlte Koordinate wird zurueckgegeben.
 // Rueckgabe: { lat, lng, city } | { netzfehler:true } | null (ungueltig/unbekannt).
-async function ermittleNutzerCoords(plz, statusEl) {
+async function ermittleNutzerCoords(plz, statusEl, land) {
+  // Ist das Land des Kunden bekannt (kunden.land), wird nur dieses Land
+  // abgefragt - KEINE "Welcher Ort?"-Rueckfrage, auch bei vierstelliger PLZ.
+  if(land) {
+    return await trainerCoords(plz, land);
+  }
   const e = await vexPlz.aufloesen(plz, { cache: plzCache });
   if(!e) return null;
   if(e.netzfehler) return { netzfehler: true };
@@ -521,7 +519,7 @@ async function searchByPLZ() {
   if(!plz || plz.length < 4) { status.textContent = '⚠️ Bitte gültige PLZ eingeben'; return; }
   if(!allT.length) await loadTrainer();
   status.textContent = '📍 Standort wird ermittelt...';
-  const coords = await ermittleNutzerCoords(plz, status);
+  const coords = await ermittleNutzerCoords(plz, status, K && K.land);
   if(coords && coords.netzfehler) { status.textContent = '⚠️ Standort konnte nicht ermittelt werden. Bitte später erneut versuchen.'; return; }
   if(!coords) { status.textContent = '⚠️ PLZ nicht gefunden'; return; }
   status.textContent = `📍 ${coords.city} · Suche läuft...`;
@@ -827,40 +825,64 @@ function einSpezToggle(el) {
   if(i >= 0) { einAuswahl.spezialisierungen.splice(i, 1); el.classList.remove('on'); }
   else { einAuswahl.spezialisierungen.push(v); el.classList.add('on'); }
 }
-// Frage 2: Einfachauswahl des Ortes ('vor_ort'/'online'). Erneuter Klick hebt die Wahl auf.
-function einOrtWaehle(el) {
-  const v = el.getAttribute('data-v');
-  if(einAuswahl.ort === v) { einAuswahl.ort = ''; el.classList.remove('on'); }
-  else {
-    einAuswahl.ort = v;
-    document.querySelectorAll('#einOrtChips .ein-chip').forEach(c => c.classList.remove('on'));
-    el.classList.add('on');
+// Zeigt genau die Karte des aktuellen Schritts (einSchritte[einIndex]); alle
+// anderen sind hidden. Fortschrittsanzeige "Frage X von N", Zurueck-Pfeil nur
+// ab dem zweiten Schritt.
+const EIN_KARTEN = { ziel: 'einCardZiel', ort: 'einCardOrt', umkreis: 'einCardUmkreis' };
+function einstiegZeige() {
+  const aktuell = einSchritte[einIndex];
+  Object.keys(EIN_KARTEN).forEach(k => document.getElementById(EIN_KARTEN[k]).classList.add('hidden'));
+  document.getElementById(EIN_KARTEN[aktuell]).classList.remove('hidden');
+  document.getElementById('einStep').textContent = 'Frage ' + (einIndex + 1) + ' von ' + einSchritte.length;
+  document.getElementById('einBack').classList.toggle('hidden', einIndex === 0);
+}
+function einstiegZurueck() { if(einIndex > 0) { einIndex--; einstiegZeige(); } }
+// Ziel-Frage (nur Altkonto): die markierten Ziele stehen in einAuswahl, weiter.
+function einstiegZielWeiter() { if(einIndex < einSchritte.length - 1) { einIndex++; einstiegZeige(); } }
+// Ort-Frage: ein Tipp waehlt ('vor_ort'/'online'/'beides') und geht sofort weiter.
+// 'beides' = kein Filter nach Trainingsort.
+function einOrtTipp(v) {
+  einAuswahl.ort = v;
+  if(einIndex < einSchritte.length - 1) { einIndex++; einstiegZeige(); }
+}
+// Umkreis-Frage: ein Tipp startet die Suche. Ist das PLZ-Feld sichtbar
+// (Altkonto ohne kunden.plz), wird die eingegebene PLZ geprueft und uebernommen.
+function einUmkreisTipp(km) {
+  if(einPlzFeldNoetig) {
+    const wert = (document.getElementById('einPlz').value || '').trim();
+    const hint = document.getElementById('einPlzHint');
+    if(!/^\d{4,5}$/.test(wert)) {
+      hint.textContent = 'Bitte gib eine gültige Postleitzahl ein (4 oder 5 Ziffern).';
+      hint.classList.remove('hidden');
+      return;
+    }
+    hint.classList.add('hidden');
+    einAuswahl.plz = wert;
   }
+  einAuswahl.umkreis = km;
+  einstiegAbschluss();
 }
-function einstiegZeige(n) {
-  einSchritt = n;
-  for(let i = 1; i <= 3; i++) document.getElementById('einCard' + i).classList.toggle('hidden', i !== n);
-  document.querySelectorAll('.ein-dot').forEach(d => d.classList.toggle('on', parseInt(d.getAttribute('data-d')) <= n));
-  document.getElementById('einStep').textContent = 'Frage ' + n + ' von 3';
-}
-function einstiegWeiter() { if(einSchritt < 3) einstiegZeige(einSchritt + 1); }
-function einstiegZurueck() { if(einSchritt > 1) einstiegZeige(einSchritt - 1); }
-// Startet den Einstieg frisch bei Frage 1.
+// Startet den Einstieg frisch. Fragenfolge aus den gespeicherten Kundendaten:
+// Ziel-Frage nur ohne kunden.ziel, PLZ-Feld nur ohne kunden.plz.
 function einstiegStart() {
   einstiegChipsAufbauen();
+  const zielGesetzt = !!(K && K.ziel && String(K.ziel).trim());
+  const plzGesetzt = !!(K && K.plz && String(K.plz).trim());
   // Gespeicherte Ziele des Kunden (kunden.ziel) als Vorauswahl uebernehmen.
   const vorwahl = window.vexZiele.zieleAusText(K && K.ziel);
-  einAuswahl = { spezialisierungen: [...vorwahl], ort: '', plz: '', umkreis: 25 };
-  document.querySelectorAll('#einSpezChips .ein-chip, #einOrtChips .ein-chip').forEach(c => c.classList.remove('on'));
-  document.querySelectorAll('#einSpezChips .ein-chip').forEach(c => { if(vorwahl.indexOf(c.dataset.v) >= 0) c.classList.add('on'); });
+  einAuswahl = { spezialisierungen: [...vorwahl], ort: '', plz: plzGesetzt ? String(K.plz) : '', umkreis: 25 };
+  document.querySelectorAll('#einSpezChips .ein-chip').forEach(c => c.classList.toggle('on', vorwahl.indexOf(c.dataset.v) >= 0));
+  einPlzFeldNoetig = window.vexEinstieg.plzFeldNoetig({ plzGesetzt });
+  document.getElementById('einPlzFeld').classList.toggle('hidden', !einPlzFeldNoetig);
+  document.getElementById('einPlzHint').classList.add('hidden');
   const ep = document.getElementById('einPlz');
-  if(ep) { ep.value = (K && K.plz) ? K.plz : ''; einAuswahl.plz = ep.value; }
-  const er = document.getElementById('einRadius');
-  if(er) er.value = '25';
+  if(ep) ep.value = plzGesetzt ? String(K.plz) : '';
+  einSchritte = window.vexEinstieg.einstiegSchritte({ zielGesetzt, plzGesetzt });
+  einIndex = 0;
   document.getElementById('welcomePage').classList.add('hidden');
   document.getElementById('searchPage').classList.add('hidden');
   document.getElementById('einstieg').classList.remove('hidden');
-  einstiegZeige(1);
+  einstiegZeige();
 }
 // Unauffaelliger Weg: Einstieg ueberspringen und direkt zur bisherigen Suchmaske.
 function einstiegUeberspringen() {
@@ -900,24 +922,29 @@ function einstiegFilterSetzen() {
   });
 }
 // Zeigt ueber der Trefferliste, wonach gesucht wurde, mit Knopf zum Neustart.
+// Zeigt ueber der Trefferliste, wonach gesucht wurde (z. B.
+// "Abnehmen · Vor Ort · 25 km um Zug"). Die Stadt kommt aus dem Suchergebnis
+// (lastSearch.city, aus der aufgeloesten PLZ - bei gesetztem Land ohne Rueckfrage).
 function zeigeZusammenfassung() {
   const el = document.getElementById('sucheZusammenfassung');
-  const sp = einAuswahl.spezialisierungen;
-  const teile = [sp.length ? sp.join(', ') : 'Alle Ziele'];
-  if(einAuswahl.ort) teile.push(einAuswahl.ort === 'vor_ort' ? 'Vor Ort' : 'Online');
-  if(einAuswahl.plz) teile.push(vexEsc(einAuswahl.plz) + (einAuswahl.umkreis ? ' · ' + einAuswahl.umkreis + ' km' : ' · alle'));
-  document.getElementById('szText').innerHTML = 'Gesucht: <b>' + teile.join('</b> · <b>') + '</b>';
+  const text = window.vexEinstieg.szTextBauen({
+    ziele: einAuswahl.spezialisierungen,
+    ort: einAuswahl.ort,
+    umkreis: einAuswahl.umkreis,
+    stadt: (lastSearch && lastSearch.city) ? lastSearch.city : ''
+  });
+  document.getElementById('szText').textContent = text;
   el.querySelector('.sz-btn').textContent = 'Neu starten';
   el.classList.remove('hidden');
 }
-// Letzte Frage beantwortet: die VORHANDENE Suche mit diesen Werten ausfuehren.
-async function einstiegFertig() {
-  einAuswahl.plz = document.getElementById('einPlz').value.trim();
-  einAuswahl.umkreis = parseInt(document.getElementById('einRadius').value);
+// Letzte Frage (Umkreis) beantwortet: die VORHANDENE Suche mit den Einstieg-
+// Werten ausfuehren. PLZ und Umkreis stehen bereits in einAuswahl.
+async function einstiegAbschluss() {
   document.getElementById('plzInput').value = einAuswahl.plz;
   document.getElementById('radiusInput').value = String(einAuswahl.umkreis);
   einstiegFilterSetzen();
   await zielSpeichernWennGeaendert();
+  await plzSpeichernWennGeaendert();
   document.getElementById('einstieg').classList.add('hidden');
   document.getElementById('welcomePage').classList.add('hidden');
   document.getElementById('searchPage').classList.remove('hidden');
@@ -956,8 +983,38 @@ async function zielSpeichernWennGeaendert() {
     else console.error('Ziel speichern fehlgeschlagen:', r.status);
   } catch(e) { console.error('zielSpeichernWennGeaendert:', e); }
 }
-// Fuehrt die gemerkte Suche beim naechsten Besuch direkt aus.
+// Hat ein Altkonto im Einstieg eine PLZ eingegeben, wird sie in kunden.plz der
+// eigenen Zeile gespeichert (gleiche Rechte-Begruendung wie beim Ziel). Schlaegt
+// es fehl, merkt der Kunde nichts - die Suche laeuft weiter.
+async function plzSpeichernWennGeaendert() {
+  if(!K || !K.id) return;
+  const neu = (einAuswahl.plz || '').trim();
+  if(!neu || neu === (K.plz || '')) return;
+  try {
+    const r = await fetch(`${SB}/rest/v1/kunden?id=eq.${encodeURIComponent(K.id)}`, {
+      method: 'PATCH',
+      headers: authKopf({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify({ plz: neu })
+    });
+    if(r.ok) K.plz = neu;
+    else console.error('PLZ speichern fehlgeschlagen:', r.status);
+  } catch(e) { console.error('plzSpeichernWennGeaendert:', e); }
+}
+// Fuehrt die gemerkte Suche beim naechsten Besuch direkt aus. Stellt die
+// gemerkten Werte wieder her, damit Filter und Zusammenfassung stimmen.
 async function starteGemerkteSuche() {
+  const g = einstiegGespeichert();
+  if(g && g.abgeschlossen) {
+    einAuswahl = {
+      spezialisierungen: Array.isArray(g.spezialisierungen) ? g.spezialisierungen : [],
+      ort: g.ort || '',
+      plz: g.plz || '',
+      umkreis: (g.umkreis != null) ? g.umkreis : 25
+    };
+    document.getElementById('plzInput').value = einAuswahl.plz;
+    document.getElementById('radiusInput').value = String(einAuswahl.umkreis);
+    einstiegFilterSetzen();
+  }
   if(allT.length === 0) await loadTrainer();
   await searchByPLZ();
   zeigeZusammenfassung();
