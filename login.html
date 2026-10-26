@@ -74,6 +74,8 @@ try {
 } catch(e) {}
 </script>
 <!-- End Meta Pixel Code -->
+<style>/* Tippflaechen Handy (Fix 2) */
+@media (max-width:640px){.nav-link{min-height:44px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}}</style>
 </head>
 <body>
 <div class="page-bg"></div>
@@ -90,7 +92,7 @@ try {
   <div class="field"><label>Passwort</label><input type="password" placeholder="Dein Passwort" id="pw" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--text-muted);text-transform:none;letter-spacing:0;font-weight:400">
-      <input type="checkbox" id="stayLoggedIn" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;background:var(--card);border:1px solid var(--border-input)">
+      <input type="checkbox" id="stayLoggedIn" style="width:22px;height:22px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;background:var(--card);border:1px solid var(--border-input)">
       Eingeloggt bleiben
     </label>
     <a href="passwort-vergessen.html" style="font-size:13px;color:var(--text-muted);text-decoration:none">Passwort vergessen?</a>
