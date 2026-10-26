@@ -1,3 +1,4 @@
+-- VERALTET – nicht verwenden, maßgeblich sind die Dateien in migrations/
 -- Vexfit Datenbank Setup
 -- Kopiere alles und füge es im Supabase SQL Editor ein
 

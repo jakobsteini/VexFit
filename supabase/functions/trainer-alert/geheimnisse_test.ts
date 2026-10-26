@@ -155,14 +155,16 @@ Deno.test("die neuen Dateien des Bausteins enthalten keine Zugangsdaten", () => 
     "supabase/functions/trainer-alert/kern_test.ts",
     "supabase/functions/trainer-alert/geheimnisse_test.ts",
     "supabase/migrations/20260926193000_trainer_alert_zeitplan.sql",
-    "supabase/migrations/20260926193100_trainer_alert_zeitplan_entfernen.sql",
+    // 26.10.2026 (Teil 2) nach migrations/ruecknahmen/ verschoben.
+    "migrations/ruecknahmen/20260926193100_trainer_alert_zeitplan_entfernen.sql",
     // 26.09.2026 dazugekommen (Ersatz fuer "Komplette Automation v4")
     "supabase/functions/_shared/text.ts",
     "supabase/functions/vexfit-automation/index.ts",
     "supabase/functions/vexfit-automation/kern.ts",
     "supabase/functions/vexfit-automation/kern_test.ts",
     "supabase/migrations/20260926210000_stripe_events_verarbeitet.sql",
-    "supabase/migrations/20260926210100_stripe_events_verarbeitet_entfernen.sql",
+    // 26.10.2026 (Teil 2) nach migrations/ruecknahmen/ verschoben.
+    "migrations/ruecknahmen/20260926210100_stripe_events_verarbeitet_entfernen.sql",
     "werkzeuge/stripe-endpunkt-anlegen.sh",
   ];
   const funde: string[] = [];
