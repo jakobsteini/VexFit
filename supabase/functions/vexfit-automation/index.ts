@@ -120,10 +120,13 @@ const anschluesse: Anschluesse = {
     return zeilen[0] ?? null;
   },
 
-  // Node "Trainer finden"
+  // Node "Trainer finden". Ohne Gross-/Kleinschreibung (ilike): bei Stripe kann
+  // die E-Mail anders geschrieben eingetippt werden als im Profil gespeichert.
+  // E-Mails enthalten normal keine ilike-Platzhalter (% _), daher exakter
+  // case-insensitiver Vergleich.
   async trainerNachEmail(email: string): Promise<Trainer | null> {
     const zeilen = await lesen<Trainer>(
-      `trainers?email=eq.${
+      `trainers?email=ilike.${
         encodeURIComponent(email)
       }&select=id,vorname,nachname,email,stripe_bezahlt`,
     );
@@ -135,11 +138,15 @@ const anschluesse: Anschluesse = {
   // (`select=id,trainer_name,status,created_at`), trainer-bereich.html:647
   // sortiert danach (`order=created_at.desc`).
   async aeltesteOffeneAnfrage(trainerId: string): Promise<Anfrage | null> {
+    // Weder bereits weitergeleitet noch abgelehnt: eine Zahlung schaltet keine
+    // vom Trainer abgelehnte Anfrage frei. status='abgelehnt' kommt aus
+    // trainer-bereich.html (beantworteAnfrage); Altzeilen ohne status (NULL)
+    // gelten als offen (or=...status.is.null).
     const zeilen = await lesen<Anfrage>(
       `anfragen?trainer_id=eq.${
         encodeURIComponent(trainerId)
-      }&weitergeleitet=eq.false` +
-        `&select=id,kunden_name,kunden_email,ziel,nachricht,created_at` +
+      }&weitergeleitet=eq.false&or=(status.neq.abgelehnt,status.is.null)` +
+        `&select=id,kunden_name,kunden_email,ziel,nachricht,created_at,status` +
         `&order=created_at.asc&limit=1`,
     );
     return zeilen[0] ?? null;

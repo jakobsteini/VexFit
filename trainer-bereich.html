@@ -372,6 +372,15 @@ const KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
 // Die beiden Zahlungslinks WORTGLEICH aus der Edge Function (kern.ts LINK_ERSTE/LINK_WEITERE).
 const LINK_ERSTE = 'https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00';
 const LINK_WEITERE = 'https://buy.stripe.com/7sYbJ1fkl8sX8jxfxM2oE01';
+// Haengt die Trainer-Zuordnung an den Zahlungslink (wie kern.ts zahlungslink):
+// ?client_reference_id=<id>&prefilled_email=<E-Mail>. So ordnet der Webhook die
+// Zahlung sicher zu, auch bei abweichend eingetippter E-Mail.
+function zahlungslink(basis){
+  const p=[];
+  if(T&&T.id)p.push('client_reference_id='+encodeURIComponent(T.id));
+  if(T&&T.email)p.push('prefilled_email='+encodeURIComponent(T.email));
+  return p.length?basis+'?'+p.join('&'):basis;
+}
 
 const SPEZ_OPTIONS = [
   'Muskelaufbau','Abnehmen','Krafttraining','Ausdauer','HIIT',
@@ -803,7 +812,7 @@ function renderAnfragen(data) {
       // wie in der Edge Function (kern.ts:549): stripe_bezahlt === true -> WEITERE (9,99),
       // sonst ERSTE (49,99). Keine zweite Bedingung.
       const bezahlt = !!(T && T.stripe_bezahlt === true);
-      const link = bezahlt ? LINK_WEITERE : LINK_ERSTE;
+      const link = zahlungslink(bezahlt ? LINK_WEITERE : LINK_ERSTE);
       const knopf = bezahlt ? 'Einmalig für €9,99 freischalten →' : 'Für €49,99/Mo freischalten →';
       contactHTML = `<div class="locked-box"><div style="font-size:12px;color:var(--muted);margin-bottom:8px">🔒 Kontaktdaten werden nach der Zahlung freigeschaltet</div><a href="${link}" target="_blank" class="btn-stripe">${knopf}</a></div>`;
     }

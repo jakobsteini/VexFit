@@ -93,16 +93,20 @@ function bau(opt: {
       Promise.resolve(opt.trainer === undefined ? T_STANDARD : opt.trainer),
     // Bildet die Abfrage nach: offen, nach created_at aufsteigend, erste Zeile.
     aeltesteOffeneAnfrage: () => {
+      // Bildet die Function-Abfrage nach: nicht weitergeleitet UND nicht
+      // abgelehnt, nach created_at aufsteigend, erste Zeile.
       if (opt.offene) {
         const offen = opt.offene
-          .filter((x) => !erledigt.has(x.id))
+          .filter((x) => !erledigt.has(x.id) && x.status !== "abgelehnt")
           .sort((x, y) =>
             String(x.created_at).localeCompare(String(y.created_at))
           );
         return Promise.resolve(offen[0] ?? null);
       }
       const einzeln = opt.anfrage === undefined ? A_STANDARD : opt.anfrage;
-      if (einzeln && erledigt.has(einzeln.id)) return Promise.resolve(null);
+      if (einzeln && (erledigt.has(einzeln.id) || einzeln.status === "abgelehnt")) {
+        return Promise.resolve(null);
+      }
       return Promise.resolve(einzeln);
     },
     trainerBezahltMarkieren: (email) => {
@@ -748,16 +752,61 @@ Deno.test("Stripe: anderer Ereignistyp → 200 ohne Wirkung", async () => {
   assertEquals(auf.vermerkt, []);
 });
 
-Deno.test("Stripe: kein Trainer zur Zahleradresse → nichts markiert, Ereignis vermerkt", async () => {
+Deno.test("Stripe: kein Trainer (Kennung/E-Mail) → Mail an Jakob, Ereignis NICHT vermerkt", async () => {
   const { anschluesse, auf } = bau({ trainer: null });
   const a = await bearbeiten(
     await stripeAnfrage(zahlung("evt_ohne_trainer")),
     anschluesse,
   );
   assertEquals(a.status, 200);
-  assertEquals(auf.mails, []);
   assertEquals(auf.bezahltMarkiert, []);
-  assertEquals(auf.vermerkt, ["evt_ohne_trainer"]);
+  assertEquals(auf.weitergeleitetMarkiert, []);
+  // Teil 5: Ereignis bleibt offen (Stripe stellt erneut zu), Jakob wird gewarnt.
+  assertEquals(auf.vermerkt, []);
+  assertEquals(auf.mails.length, 1);
+  assertEquals(auf.mails[0].an, "vexfit.info@gmail.com");
+  assertStringIncludes(auf.mails[0].betreff, "ohne passenden Trainer");
+  assertStringIncludes(auf.mails[0].text, "evt_ohne_trainer");
+});
+
+Deno.test("Teil 5: Zuordnung ueber client_reference_id (ohne Zahler-E-Mail)", async () => {
+  // Kein customer_details.email -> Zuordnung muss ueber die Kennung gelingen.
+  const { anschluesse, auf } = bau();
+  const ereignis = {
+    id: "evt_ref",
+    type: "checkout.session.completed",
+    data: { object: { client_reference_id: "t-1", amount_total: 4999 } },
+  };
+  const a = await bearbeiten(await stripeAnfrage(ereignis), anschluesse);
+  assertEquals(a.status, 200);
+  // Trainer wurde gefunden und verbucht (ueber die Trainer-E-Mail als Zielzeile).
+  assertEquals(auf.bezahltMarkiert.length, 1);
+  assertEquals(auf.vermerkt, ["evt_ref"]);
+});
+
+Deno.test("Teil 5: abgelehnte aeltere Anfrage wird uebersprungen", async () => {
+  const abgelehntAlt = {
+    id: "a-alt",
+    kunden_name: "Alt",
+    kunden_email: "alt@beispiel.at",
+    ziel: "X",
+    nachricht: "Y",
+    created_at: "2026-09-01T10:00:00Z",
+    status: "abgelehnt",
+  };
+  const offenNeu = {
+    id: "a-neu",
+    kunden_name: "Neu",
+    kunden_email: "neu@beispiel.at",
+    ziel: "Z",
+    nachricht: "W",
+    created_at: "2026-09-10T10:00:00Z",
+    status: "ausstehend",
+  };
+  const { anschluesse, auf } = bau({ offene: [abgelehntAlt, offenNeu] });
+  await bearbeiten(await stripeAnfrage(zahlung("evt_skip")), anschluesse);
+  // Nicht die aeltere abgelehnte, sondern die juengere offene wird freigeschaltet.
+  assertEquals(auf.weitergeleitetMarkiert, ["a-neu"]);
 });
 
 Deno.test("E1 — Zahlung ohne offene Anfrage: verbucht, keine Trainer-Mail, Vermerk an Jakob", async () => {

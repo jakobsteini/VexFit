@@ -89,6 +89,9 @@ export interface Anfrage {
   ziel?: string | null;
   nachricht?: string | null;
   created_at?: string | null;
+  /** Bearbeitungsstand: 'ausstehend' | 'angenommen' | 'abgelehnt' (Beleg:
+   *  trainer-bereich.html beantworteAnfrage). Abgelehnte werden nicht freigeschaltet. */
+  status?: string | null;
 }
 
 export interface Mail {
@@ -103,6 +106,8 @@ export interface Mail {
 export interface StripeSitzung {
   customer_details?: { email?: string | null } | null;
   amount_total?: number | null;
+  /** Vom Zahlungslink durchgereicht: die Trainer-Kennung (bevorzugte Zuordnung). */
+  client_reference_id?: string | null;
 }
 
 export interface StripeEreignis {
@@ -278,6 +283,21 @@ export function mailNeuerKunde(body: Record<string, unknown>): Mail {
   );
 }
 
+/**
+ * Haengt an einen Zahlungslink die Trainer-Zuordnung an:
+ * ?client_reference_id=<trainer-id>&prefilled_email=<E-Mail URL-kodiert>.
+ * Stripe stellt client_reference_id und die vorausgefuellte E-Mail im
+ * checkout.session.completed-Ereignis wieder bereit, damit die Zahlung sicher
+ * dem richtigen Trainer zugeordnet werden kann - auch wenn bei Stripe eine
+ * andere Adresse eingetippt wird.
+ */
+export function zahlungslink(basis: string, trainer: Trainer): string {
+  const teile: string[] = [];
+  if (trainer.id) teile.push("client_reference_id=" + encodeURIComponent(trainer.id));
+  if (trainer.email) teile.push("prefilled_email=" + encodeURIComponent(trainer.email));
+  return teile.length ? basis + "?" + teile.join("&") : basis;
+}
+
 /** Mail 1 (an den Trainer): erste Anfrage (stripe_bezahlt ist nicht true). */
 export function mailErsteAnfrage(
   trainer: Trainer,
@@ -294,7 +314,7 @@ export function mailErsteAnfrage(
       { beschriftung: "Nachricht", wert: w(kunde.nachricht) },
     ],
     knopfText: "Abo aktivieren",
-    knopfLink: LINK_ERSTE,
+    knopfLink: zahlungslink(LINK_ERSTE, trainer),
     hinweis:
       "49,99 € pro Monat, monatlich kündbar. Die Kontaktdaten erhältst du " +
       "unmittelbar nach der Zahlung.",
@@ -317,7 +337,7 @@ export function mailWeitereAnfrage(
       { beschriftung: "Nachricht", wert: w(kunde.nachricht) },
     ],
     knopfText: "Anfrage freischalten",
-    knopfLink: LINK_WEITERE,
+    knopfLink: zahlungslink(LINK_WEITERE, trainer),
     hinweis:
       "9,99 € einmalig. Die Kontaktdaten erhältst du unmittelbar nach der Zahlung.",
     grundZeile:
@@ -372,6 +392,36 @@ export function mailZahlungAnJakob(
       { beschriftung: "E-Mail", wert: zahlerEmail },
       { beschriftung: "Betrag", wert: betrag ? `${betrag} €` : "" },
       { beschriftung: "Status", wert: status },
+    ],
+    knopfText: "Im Admin öffnen",
+    knopfLink: ADMIN_LINK,
+    grundZeile: "Interne Benachrichtigung.",
+  });
+}
+
+/**
+ * Mail an Jakob, wenn eine Stripe-Zahlung KEINEM Trainer zugeordnet werden kann
+ * (weder ueber client_reference_id noch ueber die eingetippte E-Mail). Das
+ * Ereignis wird dann NICHT als erledigt vermerkt, damit Stripe es erneut
+ * zustellt und das Geld nicht still verfaellt.
+ */
+export function mailKeinTrainer(
+  zahlerEmail: string,
+  ereignisId: string,
+  betragCent: number | null | undefined,
+): Mail {
+  const betrag = betragCent === null || betragCent === undefined
+    ? ""
+    : String(betragCent / 100);
+  return baueMail(BETREIBER, "Stripe-Zahlung ohne passenden Trainer", {
+    ueberschrift: "Zahlung ohne passenden Trainer",
+    absatz:
+      "Zu dieser Stripe-Zahlung wurde kein Trainer gefunden. Das Ereignis " +
+      "wurde NICHT als erledigt vermerkt (Stripe stellt es erneut zu). Bitte pruefen.",
+    datenZeilen: [
+      { beschriftung: "Betrag", wert: betrag ? `${betrag} €` : "" },
+      { beschriftung: "Stripe-Ereignis", wert: ereignisId },
+      { beschriftung: "Eingegebene E-Mail", wert: zahlerEmail },
     ],
     knopfText: "Im Admin öffnen",
     knopfLink: ADMIN_LINK,
@@ -595,30 +645,43 @@ async function stripe(r: Request, a: Anschluesse): Promise<Response> {
   }
 
   const sitzung = ereignis.data?.object ?? {};
+  const refId = String(sitzung.client_reference_id ?? "");
   const zahlerEmail = String(sitzung.customer_details?.email ?? "");
-  if (!zahlerEmail) {
-    await a.ereignisVermerken(ereignis.id, ereignis.type);
-    return antwort(200, { ok: true, uebersprungen: "keine Zahleradresse" });
+
+  // Zuordnung: zuerst ueber die mitgegebene Trainer-Kennung
+  // (client_reference_id aus dem Zahlungslink), sonst ueber die E-Mail. Die
+  // E-Mail-Suche ist in der Function ohne Gross-/Kleinschreibung umgesetzt
+  // (index.ts: ilike).
+  let trainer: Trainer | null = null;
+  if (refId) trainer = await a.trainerNachId(refId);
+  if (!trainer && zahlerEmail) trainer = await a.trainerNachEmail(zahlerEmail);
+  if (!trainer) {
+    // Kein Treffer: Ereignis NICHT vermerken (Stripe stellt erneut zu) und
+    // Jakob mit Betrag, Ereignis-ID und eingegebener E-Mail benachrichtigen.
+    await sendeWennAdresseTaugt(
+      a,
+      mailKeinTrainer(zahlerEmail || "(keine)", ereignis.id, sitzung.amount_total),
+    );
+    a.melden?.("kein Trainer zu dieser Zahlung — gemeldet, nicht vermerkt");
+    return antwort(200, { ok: true, uebersprungen: "kein Trainer", gemeldet: true });
   }
 
-  const trainer = await a.trainerNachEmail(zahlerEmail);
-  if (!trainer) {
-    await a.ereignisVermerken(ereignis.id, ereignis.type);
-    a.melden?.("kein Trainer zu dieser Zahlung");
-    return antwort(200, { ok: true, uebersprungen: "kein Trainer" });
-  }
+  // Zielzeile sicher ueber die E-Mail des gefundenen Trainers (bei Zuordnung per
+  // Kennung kann die eingetippte Zahler-E-Mail abweichen oder fehlen). Im
+  // Normalfall ist zahlerEmail gesetzt und gleich.
+  const zielEmail = zahlerEmail || w(trainer.email);
 
   // E1: die Zahlung wird in jedem Fall verbucht.
-  await a.trainerBezahltMarkieren(zahlerEmail);
+  await a.trainerBezahltMarkieren(zielEmail);
 
-  // E2: genau die aelteste offene Anfrage.
+  // E2: genau die aelteste offene Anfrage (die Function laesst abgelehnte aus).
   const anfrage = await a.aeltesteOffeneAnfrage(trainer.id);
 
   let mails = 0;
   if (anfrage) {
     const ging = await sendeWennAdresseTaugt(
       a,
-      mailKundenDaten(trainer, anfrage, zahlerEmail),
+      mailKundenDaten(trainer, anfrage, zielEmail),
     );
     if (ging) mails++;
     await a.anfrageWeitergeleitetMarkieren(anfrage.id);
@@ -632,7 +695,7 @@ async function stripe(r: Request, a: Anschluesse): Promise<Response> {
     a,
     mailZahlungAnJakob(
       trainer,
-      zahlerEmail,
+      zielEmail,
       sitzung.amount_total,
       Boolean(anfrage),
     ),

@@ -445,12 +445,12 @@ Admin: https://vexfit.app/admin.html
     body += `💳 STRIPE LINK SCHICKEN (${ohneZahlung.length}):
 `;
     ohneZahlung.forEach(t => {
+      const link = 'https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00?client_reference_id=' + encodeURIComponent(t.id) + '&prefilled_email=' + encodeURIComponent(t.email || '');
       body += `→ ${t.vorname} ${t.nachname} | ${t.email}
+   ${link}
 `;
     });
     body += `
-Stripe Link: https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00
-
 `;
   }
 
@@ -956,7 +956,7 @@ Trainer Details:
 💪 Trainingsart: ${t.trainingsart}
 
 Sobald der Trainer seinen ersten Kunden hat:
-→ Stripe Link schicken: https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00
+→ Stripe Link schicken: https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00?client_reference_id=${encodeURIComponent(t.id)}&prefilled_email=${encodeURIComponent(t.email||'')}
 
 Admin: https://vexfit.app/admin.html`);
 
@@ -986,7 +986,7 @@ function sendStripeLink(email, name) {
 Herzlichen Glückwunsch! Du hast deinen ersten Kunden über Vexfit gewonnen! 🚀
 
 Aktiviere jetzt dein Abo für €49,99/Monat:
-https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00
+https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00?prefilled_email=${encodeURIComponent(email)}
 
 Was du bekommst:
 ✅ Profil bleibt dauerhaft sichtbar
