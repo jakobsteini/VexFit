@@ -447,7 +447,7 @@ async function sendContact() {
     try {
       await fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neue-anfrage', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (sess && sess.access_token || '')},
         body: JSON.stringify({
           trainer_id: trainerData ? trainerData.id : '',
           trainer_name: trainerData ? trainerData.vorname + ' ' + trainerData.nachname : '',

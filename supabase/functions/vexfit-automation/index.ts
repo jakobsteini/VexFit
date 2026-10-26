@@ -243,6 +243,44 @@ const anschluesse: Anschluesse = {
     }
   },
 
+  // Teil 8: Nutzer zu einem Zugangs-Token ueber die Supabase-Auth-API. apikey
+  // ist der geheime Schluessel (wie restKopf), Authorization das Nutzer-Token.
+  async benutzerAusToken(
+    token: string,
+  ): Promise<{ id: string; email: string } | null> {
+    const schluessel = Deno.env.get("SB_SECRET_KEY") ||
+      pflicht("SUPABASE_SERVICE_ROLE_KEY");
+    const a = await fetch(
+      `${pflicht("SUPABASE_URL").replace(/\/+$/, "")}/auth/v1/user`,
+      { headers: { apikey: schluessel, Authorization: `Bearer ${token}` } },
+    );
+    if (!a.ok) return null;
+    const u = await a.json().catch(() => null);
+    if (!u || !u.id) return null;
+    return { id: String(u.id), email: String(u.email ?? "") };
+  },
+
+  // Teil 8: Anzahl Anfragen dieses Kunden seit einem Zeitpunkt. Nutzt den
+  // vorhandenen created_at-Zeitstempel der Tabelle anfragen (keine neue Tabelle).
+  async anfragenAnzahlSeit(kundenEmail: string, seitISO: string): Promise<number> {
+    const a = await fetch(
+      restAdresse(
+        `anfragen?kunden_email=ilike.${encodeURIComponent(kundenEmail)}` +
+          `&created_at=gte.${encodeURIComponent(seitISO)}&select=id`,
+      ),
+      { headers: { ...restKopf(), Prefer: "count=exact" } },
+    );
+    if (!a.ok) {
+      throw new Error(`Anfragen zaehlen fehlgeschlagen: HTTP ${a.status}`);
+    }
+    // PostgREST liefert die Gesamtzahl im Content-Range-Kopf ("*/<n>").
+    const bereich = a.headers.get("content-range");
+    const n = bereich && bereich.includes("/")
+      ? parseInt(bereich.split("/")[1], 10)
+      : (await a.json() as unknown[]).length;
+    return Number.isFinite(n) ? n : 0;
+  },
+
   adminHinweis(): string | undefined {
     return Deno.env.get("ADMIN_PASSWORT_HINWEIS") || undefined;
   },

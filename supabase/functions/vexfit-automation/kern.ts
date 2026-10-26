@@ -133,6 +133,10 @@ export interface Anschluesse {
   ): Promise<StripeEreignis | null>;
   ereignisSchonVerarbeitet(id: string): Promise<boolean>;
   ereignisVermerken(id: string, typ: string): Promise<void>;
+  /** Teil 8: Nutzer zu einem Zugangs-Token (ueber Supabase Auth), sonst null. */
+  benutzerAusToken(token: string): Promise<{ id: string; email: string } | null>;
+  /** Teil 8: Anzahl Anfragen dieses Kunden seit einem Zeitpunkt (Ratenbremse). */
+  anfragenAnzahlSeit(kundenEmail: string, seitISO: string): Promise<number>;
   /** Optionaler Zusatz fuer die Trainer-Mail an Jakob, aus einem Secret. */
   adminHinweis?(): string | undefined;
   melden?(text: string, mehr?: unknown): void;
@@ -487,6 +491,14 @@ async function sendeWennAdresseTaugt(
   return true;
 }
 
+/** Liest das Bearer-Token aus dem Authorization-Kopf, sonst null. */
+function bearerToken(r: Request): string | null {
+  const h = r.headers.get("authorization") || r.headers.get("Authorization");
+  if (!h) return null;
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  return m ? m[1].trim() : null;
+}
+
 async function koerperLesen(
   anfrageObjekt: Request,
 ): Promise<Record<string, unknown> | null> {
@@ -587,12 +599,31 @@ async function neueAnfrage(
   a: Anschluesse,
   herkunft: string | null,
 ): Promise<Response> {
+  // Teil 8: Nur fuer angemeldete Nutzer, und nur fuer die eigene E-Mail. Ohne
+  // gueltiges Zugangs-Token 401; passt die Kunden-E-Mail nicht zum Konto 403;
+  // mehr als 10 Anfragen in der letzten Stunde 429. So kann niemand ueber den
+  // offenen Endpunkt fremde Trainer mit Mails zuschuetten.
+  const token = bearerToken(r);
+  const nutzer = token ? await a.benutzerAusToken(token) : null;
+  if (!nutzer) return antwort(401, { fehler: "Anmeldung erforderlich" }, herkunft);
+
   const body = await koerperLesen(r);
   if (!body) {
     return antwort(400, { fehler: "Die Anfrage war nicht lesbar." }, herkunft);
   }
   const geprueft = eingabePruefen(body, ["trainer_id"]);
   if (!geprueft.ok) return antwort(400, { fehler: geprueft.grund }, herkunft);
+
+  const kundenEmail = String(body.kunden_email ?? body.kunde_email ?? "")
+    .trim().toLowerCase();
+  if (!kundenEmail || kundenEmail !== String(nutzer.email ?? "").toLowerCase()) {
+    return antwort(403, { fehler: "E-Mail gehoert nicht zum Konto" }, herkunft);
+  }
+
+  const seitISO = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  if (await a.anfragenAnzahlSeit(kundenEmail, seitISO) >= 10) {
+    return antwort(429, { fehler: "Zu viele Anfragen in kurzer Zeit." }, herkunft);
+  }
 
   const trainer = await a.trainerNachId(String(body.trainer_id));
   if (!trainer) {

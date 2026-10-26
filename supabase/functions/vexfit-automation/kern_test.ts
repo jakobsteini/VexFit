@@ -71,6 +71,10 @@ function bau(opt: {
   schonVerarbeitet?: Set<string>;
   adminHinweis?: string;
   smtpFehler?: boolean;
+  /** Teil 8: Nutzer zum Token (null = ungueltiges Token). */
+  nutzer?: { id: string; email: string } | null;
+  /** Teil 8: vorhandene Anfragen der letzten Stunde (Ratenbremse). */
+  anfragenZahl?: number;
 } = {}): { anschluesse: Anschluesse; auf: Aufzeichnung } {
   const auf: Aufzeichnung = {
     mails: [],
@@ -144,6 +148,11 @@ function bau(opt: {
       schon.add(id);
       return Promise.resolve();
     },
+    benutzerAusToken: () =>
+      Promise.resolve(
+        opt.nutzer === undefined ? { id: "u-1", email: "kundin@beispiel.at" } : opt.nutzer,
+      ),
+    anfragenAnzahlSeit: () => Promise.resolve(opt.anfragenZahl ?? 0),
     adminHinweis: () => opt.adminHinweis,
     melden: () => {},
   };
@@ -177,6 +186,11 @@ function anfrage(
 }
 
 const VOM_BROWSER = { herkunft: ERLAUBTE_HERKUNFT };
+// Teil 8: /neue-anfrage verlangt jetzt ein Zugangs-Token.
+const MIT_TOKEN = {
+  herkunft: ERLAUBTE_HERKUNFT,
+  kopf: { Authorization: "Bearer test-token" },
+};
 
 // ===========================================================================
 // Grundlagen
@@ -346,9 +360,10 @@ Deno.test("/neue-anfrage: noch nicht bezahlt → ERSTE Anfrage mit 49,99-Link an
     anfrage("neue-anfrage", {
       trainer_id: "t-1",
       kunden_name: "Testkundin",
+      kunden_email: "kundin@beispiel.at",
       ziel: "Abnehmen",
       nachricht: "Hallo!",
-    }, VOM_BROWSER),
+    }, MIT_TOKEN),
     anschluesse,
   );
   assertEquals(a.status, 200);
@@ -381,9 +396,10 @@ Deno.test("/neue-anfrage: schon bezahlt → WEITERE Anfrage mit 9,99-Link", asyn
     anfrage("neue-anfrage", {
       trainer_id: "t-1",
       kunden_name: "K",
+      kunden_email: "kundin@beispiel.at",
       ziel: "Z",
       nachricht: "N",
-    }, VOM_BROWSER),
+    }, MIT_TOKEN),
     anschluesse,
   );
   const m = auf.mails[0];
@@ -400,7 +416,7 @@ Deno.test("/neue-anfrage: schon bezahlt → WEITERE Anfrage mit 9,99-Link", asyn
 Deno.test("/neue-anfrage: ohne trainer_id → 400, unbekannte Kennung → 200 ohne Mail", async () => {
   const ohne = bau();
   const a1 = await bearbeiten(
-    anfrage("neue-anfrage", { kunden_name: "K" }, VOM_BROWSER),
+    anfrage("neue-anfrage", { kunden_name: "K" }, MIT_TOKEN),
     ohne.anschluesse,
   );
   assertEquals(a1.status, 400);
@@ -408,7 +424,10 @@ Deno.test("/neue-anfrage: ohne trainer_id → 400, unbekannte Kennung → 200 oh
 
   const leer = bau({ trainer: null });
   const a2 = await bearbeiten(
-    anfrage("neue-anfrage", { trainer_id: "gibtsnicht" }, VOM_BROWSER),
+    anfrage("neue-anfrage", {
+      trainer_id: "gibtsnicht",
+      kunden_email: "kundin@beispiel.at",
+    }, MIT_TOKEN),
     leer.anschluesse,
   );
   assertEquals(a2.status, 200);
@@ -419,7 +438,7 @@ Deno.test("/neue-anfrage: die Feldnamen von profil.html kommen jetzt gefuellt an
   // profil.html:350-355 schickt kunde_name / kunde_ziel / kunde_nachricht,
   // kunden-bereich.html:435-441 schickt kunden_name / ziel / nachricht.
   // Seit dem 26.09.2026 liest die Function beide Schreibweisen.
-  const { anschluesse, auf } = bau();
+  const { anschluesse, auf } = bau({ nutzer: { id: "u-1", email: "eva@beispiel.at" } });
   await bearbeiten(
     anfrage("neue-anfrage", {
       trainer_id: "t-1",
@@ -428,7 +447,7 @@ Deno.test("/neue-anfrage: die Feldnamen von profil.html kommen jetzt gefuellt an
       kunde_email: "eva@beispiel.at",
       kunde_ziel: "Abnehmen",
       kunde_nachricht: "Ich moechte starten.",
-    }, VOM_BROWSER),
+    }, MIT_TOKEN),
     anschluesse,
   );
   const text = auf.mails[0].text;
@@ -437,7 +456,7 @@ Deno.test("/neue-anfrage: die Feldnamen von profil.html kommen jetzt gefuellt an
 });
 
 Deno.test("/neue-anfrage: die Feldnamen von kunden-bereich.html gehen weiter", async () => {
-  const { anschluesse, auf } = bau();
+  const { anschluesse, auf } = bau({ nutzer: { id: "u-1", email: "eva@beispiel.at" } });
   await bearbeiten(
     anfrage("neue-anfrage", {
       trainer_id: "t-1",
@@ -445,12 +464,57 @@ Deno.test("/neue-anfrage: die Feldnamen von kunden-bereich.html gehen weiter", a
       kunden_email: "eva@beispiel.at",
       ziel: "Abnehmen",
       nachricht: "Ich moechte starten.",
-    }, VOM_BROWSER),
+    }, MIT_TOKEN),
     anschluesse,
   );
   const text = auf.mails[0].text;
   assertStringIncludes(text, "Ziel: Abnehmen");
   assertStringIncludes(text, "Nachricht: Ich moechte starten.");
+});
+
+Deno.test("Teil 8: /neue-anfrage ohne Token → 401, keine Mail", async () => {
+  const { anschluesse, auf } = bau();
+  const a = await bearbeiten(
+    anfrage("neue-anfrage", {
+      trainer_id: "t-1",
+      kunden_email: "kundin@beispiel.at",
+      ziel: "Z",
+      nachricht: "N",
+    }, VOM_BROWSER), // ohne Authorization-Kopf
+    anschluesse,
+  );
+  assertEquals(a.status, 401);
+  assertEquals(auf.mails, []);
+});
+
+Deno.test("Teil 8: /neue-anfrage fremde E-Mail → 403, keine Mail", async () => {
+  const { anschluesse, auf } = bau({ nutzer: { id: "u-1", email: "ich@konto.at" } });
+  const a = await bearbeiten(
+    anfrage("neue-anfrage", {
+      trainer_id: "t-1",
+      kunden_email: "fremd@woanders.at",
+      ziel: "Z",
+      nachricht: "N",
+    }, MIT_TOKEN),
+    anschluesse,
+  );
+  assertEquals(a.status, 403);
+  assertEquals(auf.mails, []);
+});
+
+Deno.test("Teil 8: elfte Anfrage in einer Stunde → 429, keine Mail", async () => {
+  const { anschluesse, auf } = bau({ anfragenZahl: 10 });
+  const a = await bearbeiten(
+    anfrage("neue-anfrage", {
+      trainer_id: "t-1",
+      kunden_email: "kundin@beispiel.at",
+      ziel: "Z",
+      nachricht: "N",
+    }, MIT_TOKEN),
+    anschluesse,
+  );
+  assertEquals(a.status, 429);
+  assertEquals(auf.mails, []);
 });
 
 Deno.test("/neue-anfrage: kundenAngaben nimmt die erste gefuellte Schreibweise", () => {
@@ -575,7 +639,10 @@ Deno.test("Zeilenumbruch in der Empfaengeradresse → kein Versand", async () =>
     },
   });
   const a = await bearbeiten(
-    anfrage("neue-anfrage", { trainer_id: "t-1" }, VOM_BROWSER),
+    anfrage("neue-anfrage", {
+      trainer_id: "t-1",
+      kunden_email: "kundin@beispiel.at",
+    }, MIT_TOKEN),
     anschluesse,
   );
   assertEquals(a.status, 200);
@@ -588,7 +655,10 @@ Deno.test("unbrauchbare Traineradresse → kein Versand", async () => {
       trainer: { ...T_STANDARD, email: adresse },
     });
     await bearbeiten(
-      anfrage("neue-anfrage", { trainer_id: "t-1" }, VOM_BROWSER),
+      anfrage("neue-anfrage", {
+        trainer_id: "t-1",
+        kunden_email: "kundin@beispiel.at",
+      }, MIT_TOKEN),
       anschluesse,
     );
     assertEquals(
