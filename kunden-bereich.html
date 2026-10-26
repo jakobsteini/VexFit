@@ -306,6 +306,7 @@ try {
 
 <script src="vexfit-escape.js"></script>
 <script src="vexfit-plz.js"></script>
+<script src="vexfit-ziele.js"></script>
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -316,7 +317,7 @@ let K = null, allT = [], activeFilter = 'alle', selT = null, lastSearch = null, 
 //   (profil-bearbeiten.html SPEZ_OPTIONS Zeilen 235-239, identisch trainer-bereich.html).
 // Frage 2 (Wo trainierst du?): zwei Knoepfe "Vor Ort"/"Online"; gefiltert wird gegen
 //   trainers.trainingsort ('vor_ort'/'online'/'beides'/leer) - siehe renderTrainer.
-const SPEZ_EINSTIEG = ['Muskelaufbau','Abnehmen','Krafttraining','Ausdauer','HIIT','Functional Training','Mobility','Bodybuilding','Calisthenics','Schwangerschaft','Senioren','Rücken & Haltung','Ernährungsplanung','Wettkampfvorbereitung','Stressabbau','Flexibilität'];
+const SPEZ_EINSTIEG = window.SPEZ_EINSTIEG; // gemeinsame Liste aus vexfit-ziele.js
 const EINSTIEG_KEY = 'vexfit_einstieg';
 let einSchritt = 1;
 let einAuswahl = { spezialisierungen: [], ort: '', plz: '', umkreis: 25 };
@@ -847,8 +848,11 @@ function einstiegZurueck() { if(einSchritt > 1) einstiegZeige(einSchritt - 1); }
 // Startet den Einstieg frisch bei Frage 1.
 function einstiegStart() {
   einstiegChipsAufbauen();
-  einAuswahl = { spezialisierungen: [], ort: '', plz: '', umkreis: 25 };
+  // Gespeicherte Ziele des Kunden (kunden.ziel) als Vorauswahl uebernehmen.
+  const vorwahl = window.vexZiele.zieleAusText(K && K.ziel);
+  einAuswahl = { spezialisierungen: [...vorwahl], ort: '', plz: '', umkreis: 25 };
   document.querySelectorAll('#einSpezChips .ein-chip, #einOrtChips .ein-chip').forEach(c => c.classList.remove('on'));
+  document.querySelectorAll('#einSpezChips .ein-chip').forEach(c => { if(vorwahl.indexOf(c.dataset.v) >= 0) c.classList.add('on'); });
   const ep = document.getElementById('einPlz');
   if(ep) { ep.value = (K && K.plz) ? K.plz : ''; einAuswahl.plz = ep.value; }
   const er = document.getElementById('einRadius');
@@ -913,6 +917,7 @@ async function einstiegFertig() {
   document.getElementById('plzInput').value = einAuswahl.plz;
   document.getElementById('radiusInput').value = String(einAuswahl.umkreis);
   einstiegFilterSetzen();
+  await zielSpeichernWennGeaendert();
   document.getElementById('einstieg').classList.add('hidden');
   document.getElementById('welcomePage').classList.add('hidden');
   document.getElementById('searchPage').classList.remove('hidden');
@@ -930,6 +935,26 @@ async function einstiegFertig() {
   } catch(e) {}
   zeigeZusammenfassung();
   einstiegSpeichern(treffer);
+}
+// Aendert der Kunde seine Ziele im Einstieg, wird kunden.ziel der eigenen Zeile
+// aktualisiert (", "-getrennt, Listen-Reihenfolge). authenticated hat das
+// tabellenweite UPDATE auf kunden (2026-09-19-zugriffsregeln-neuaufbau.sql:145,
+// von 2026-10-26-01 NICHT eingeschraenkt); die eigene Zeile erlaubt die Policy
+// kunden_eigene_zeile_aendern. Schlaegt es fehl, merkt der Kunde nichts (die
+// Suche laeuft weiter) - deshalb bewusst KEIN istAbgemeldet/Redirect.
+async function zielSpeichernWennGeaendert() {
+  if(!K || !K.id) return;
+  const neu = window.vexZiele.zieleText(einAuswahl.spezialisierungen);
+  if(neu === (K.ziel || '')) return;
+  try {
+    const r = await fetch(`${SB}/rest/v1/kunden?id=eq.${encodeURIComponent(K.id)}`, {
+      method: 'PATCH',
+      headers: authKopf({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify({ ziel: neu })
+    });
+    if(r.ok) K.ziel = neu;
+    else console.error('Ziel speichern fehlgeschlagen:', r.status);
+  } catch(e) { console.error('zielSpeichernWennGeaendert:', e); }
 }
 // Fuehrt die gemerkte Suche beim naechsten Besuch direkt aus.
 async function starteGemerkteSuche() {

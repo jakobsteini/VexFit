@@ -211,6 +211,7 @@ try {
     <div class="error-banner" id="c-pw-error"></div>
     <div class="field"><label>PLZ</label><input type="text" placeholder="5026" id="c-plz" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="plzGeaendert('c')"></div>
     <div id="c-plz-status" style="display:none;font-size:12px;color:var(--text-muted);margin:-6px 0 12px"></div>
+    <div class="field"><label>Was ist dein Ziel?</label><div class="ort-chips" id="c-ziel"></div></div>
     <label class="checkbox-field"><input type="checkbox" id="c-agb"><div class="custom-cb"></div><span class="cb-label">Ich akzeptiere die <a href="rechtliches.html#agb" target="_blank">AGB & Datenschutz</a></span></label>
     <div class="form-actions"><button class="btn-next" id="c-submit-btn" onclick="submitClient()">Trainer finden →</button></div>
     <div class="trust-row"><div class="trust-item"><span>✓</span> 100% kostenlos</div><div class="trust-item"><span>✓</span> Kein Abo</div><div class="trust-item"><span>✓</span> Sofort loslegen</div></div>
@@ -242,6 +243,7 @@ try {
 </a>
 
 <script src="vexfit-plz.js"></script>
+<script src="vexfit-ziele.js"></script>
 <script>
 const SUPABASE_URL='https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY='sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -506,11 +508,16 @@ async function submitClient(){
   const pw=pruefePasswort('c');
   if(pw===null)return;
   if(!document.getElementById('c-agb').checked){showError('c-error','Bitte AGB akzeptieren!');return}
+  // Pflichtfeld Ziel: mindestens ein Ziel waehlen; gespeichert wird ", "-getrennt
+  // in Listen-Reihenfolge (vexZiele.zieleText), derselbe Wert geht an neuer-kunde.
+  const zielWahl=[...document.querySelectorAll('#c-ziel .ort-chip.active')].map(c=>c.dataset.val);
+  if(zielWahl.length===0){showError('c-error','Bitte wähle mindestens ein Ziel.');return}
+  const zielText=window.vexZiele.zieleText(zielWahl);
   // Ohne ermittelte Stadt wird nicht abgeschickt; der Grund steht am PLZ-Feld.
   const city=await plzPruefen('c');
   if(!city){showError('c-error','Die Stadt konnte nicht aus der Postleitzahl ermittelt werden. Bitte prüfe die PLZ.');return}
   const btn=document.getElementById('c-submit-btn');imVersand.c=true;btn.disabled=true;btn.textContent='Wird gespeichert...';
-  const cd={vorname:fn,nachname:ln,email,stadt:city,plz,ziel:'',erwartungen:''};
+  const cd={vorname:fn,nachname:ln,email,stadt:city,plz,ziel:zielText,erwartungen:''};
   // Land nur mitsenden, wenn aus der PLZ ermittelt - sonst bleibt die Spalte NULL.
   if(plzStand['c'].land) cd.land=plzStand['c'].land;
   try{
@@ -528,6 +535,16 @@ async function submitClient(){
 
 function showError(id,msg){const el=document.getElementById(id);el.textContent='⚠️ '+msg;el.classList.add('show')}
 function hideError(id){document.getElementById(id).classList.remove('show')}
+
+// Zielknoepfe des Kundenformulars aus der gemeinsamen Liste (SPEZ_EINSTIEG)
+// aufbauen; mehrere waehlbar. Gestaltung wie die vorhandenen Ort-Knoepfe.
+function zielChipsAufbauen(){
+  const box=document.getElementById('c-ziel');
+  if(!box||box.childElementCount) return;
+  box.innerHTML=window.SPEZ_EINSTIEG.map(z=>`<div class="ort-chip" data-val="${z}" onclick="zielToggle(this)">${z}</div>`).join('');
+}
+function zielToggle(el){ el.classList.toggle('active'); }
+zielChipsAufbauen();
 </script>
 <div class="cookie-widerruf"><a href="rechtliches.html">Impressum</a><a href="rechtliches.html#datenschutz">Datenschutz</a><a href="#" onclick="return vexfitEinstellungenOeffnen()">Cookie-Einstellungen</a></div>
 <!-- Zustimmung fuer Marketing. Gleicher Aufbau und gleiche Gestaltung auf allen Seiten. -->
