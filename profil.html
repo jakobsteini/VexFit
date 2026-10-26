@@ -233,6 +233,7 @@ try {
   <p>© 2026 Vexfit</p>
 </footer>
 
+<script src="vexfit-escape.js"></script>
 <script>
 // ──── ZUGANG ────
 // Trainerprofile sind nur nach Anmeldung sichtbar (Geschaeftsmodell). Ohne
@@ -335,7 +336,7 @@ function renderProfile(t) {
 
   // Tags
   const tags = (t.spezialisierungen || []);
-  const tagsHTML = tags.map(tag => `<span class="profile-tag">${tag}</span>`).join('');
+  const tagsHTML = tags.map(tag => `<span class="profile-tag">${vexEsc(tag)}</span>`).join('');
   document.getElementById('pTags').innerHTML = tagsHTML;
   document.getElementById('pTagsDetail').innerHTML = tagsHTML;
 
@@ -347,8 +348,8 @@ function renderProfile(t) {
 
   // Pricing
   let pricingHTML = '';
-  if(t.preis_stunde) pricingHTML += `<div class="pricing-item"><div><div class="pricing-label">Einzelstunde</div><div class="pricing-sub">60 Minuten · Vor Ort</div></div><div class="pricing-price">€${t.preis_stunde}</div></div>`;
-  if(t.preis_monat) pricingHTML += `<div class="pricing-item"><div><div class="pricing-label">Monatspaket</div><div class="pricing-sub">Monatlich · inkl. Plan</div></div><div class="pricing-price">€${t.preis_monat}</div></div>`;
+  if(t.preis_stunde) pricingHTML += `<div class="pricing-item"><div><div class="pricing-label">Einzelstunde</div><div class="pricing-sub">60 Minuten · Vor Ort</div></div><div class="pricing-price">€${vexEsc(t.preis_stunde)}</div></div>`;
+  if(t.preis_monat) pricingHTML += `<div class="pricing-item"><div><div class="pricing-label">Monatspaket</div><div class="pricing-sub">Monatlich · inkl. Plan</div></div><div class="pricing-price">€${vexEsc(t.preis_monat)}</div></div>`;
   if(!pricingHTML) pricingHTML = `<div class="pricing-item"><div class="pricing-label">Preis auf Anfrage</div></div>`;
 
   // Show Calendly button if trainer has link

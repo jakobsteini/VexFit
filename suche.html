@@ -219,6 +219,7 @@ try {
   </div>
 </footer>
 
+<script src="vexfit-escape.js"></script>
 <script>
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -391,20 +392,20 @@ function renderTrainersWithDistance(trainers) {
   count.textContent = trainers.length + ' Trainer';
   const bgColors = ['linear-gradient(135deg,#1a1a1a,#2a2a2a)','linear-gradient(135deg,#1e1a0a,#2a2800)','linear-gradient(135deg,#0a1a1a,#002a2a)'];
   grid.innerHTML = trainers.map((t,i) => {
-    const initials = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
-    const tags = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="ctag">${s}</span>`).join('');
+    const initials = vexEsc(((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase());
+    const tags = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="ctag">${vexEsc(s)}</span>`).join('');
     const preis = t.preis_stunde ? `€${t.preis_stunde}<span>/Std</span>` : '<span>Auf Anfrage</span>';
     const distLabel = t._online ? '<span style="color:#e8ff00;font-size:11px">🌐 Online</span>' : t._distance !== undefined ? `<span style="color:#888;font-size:11px">📍 ${t._distance} km</span>` : '';
     const bild = avatarAdresse(t.avatar_url);
-    const ciStyle = bild ? `background-image:url('${bild}');background-size:cover;background-position:center` : `background:${bgColors[i%bgColors.length]}`;
+    const ciStyle = bild ? `background-image:url('${vexEsc(bild)}');background-size:cover;background-position:center` : `background:${bgColors[i%bgColors.length]}`;
     return `<div class="tc" onclick="window.location='profil.html?id=${t.id}'">
       <div class="ci" style="${ciStyle}">
         ${bild ? '' : `<div class="cav">${initials}</div>`}
         <div class="cbadge ${t._online?'online':''}">Verifiziert ✓</div>
       </div>
       <div class="cb">
-        <div class="cn">${t.vorname||''} ${t.nachname||''}</div>
-        <div class="cl">${t.trainingsart||''} · ${t.stadt||''}</div>
+        <div class="cn">${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</div>
+        <div class="cl">${vexEsc(t.trainingsart)} · ${vexEsc(t.stadt)}</div>
         <div class="ctags">${tags}</div>
         <div class="cf"><div class="cp">${preis}</div>${distLabel}</div>
       </div>
@@ -458,13 +459,13 @@ function renderTrainers(trainers) {
   count.textContent = trainers.length + ' Trainer';
 
   grid.innerHTML = trainers.map((t, i) => {
-    const initials = ((t.vorname||'?')[0] + (t.nachname||'?')[0]).toUpperCase();
+    const initials = vexEsc(((t.vorname||'?')[0] + (t.nachname||'?')[0]).toUpperCase());
     const bg = bgColors[i % bgColors.length];
     const isOnline = t.trainingsart === 'Online';
     const tags = (t.spezialisierungen || []).slice(0, 3);
     const preis = t.preis_stunde ? `€${t.preis_stunde}<span>/Std</span>` : '<span>Auf Anfrage</span>';
     const bild = avatarAdresse(t.avatar_url);
-    const ciStyle = bild ? `background-image:url('${bild}');background-size:cover;background-position:center` : `background:${bg}`;
+    const ciStyle = bild ? `background-image:url('${vexEsc(bild)}');background-size:cover;background-position:center` : `background:${bg}`;
 
     return `
       <div class="tc" onclick="window.location='profil.html?id=${t.id}'">
@@ -475,9 +476,9 @@ function renderTrainers(trainers) {
           </div>
         </div>
         <div class="cb">
-          <div class="cn">${t.vorname} ${t.nachname}</div>
-          <div class="cl">${isOnline ? '🌐 Online · DACH-weit' : '📍 ' + t.stadt + ' · ' + t.trainingsart}</div>
-          <div class="ctags">${tags.map(tag => `<span class="ctag">${tag}</span>`).join('')}</div>
+          <div class="cn">${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</div>
+          <div class="cl">${isOnline ? '🌐 Online · DACH-weit' : '📍 ' + vexEsc(t.stadt) + ' · ' + vexEsc(t.trainingsart)}</div>
+          <div class="ctags">${tags.map(tag => `<span class="ctag">${vexEsc(tag)}</span>`).join('')}</div>
           <div class="cf">
             <div class="cp">${preis}</div>
             <div class="cr">⭐ Neu</div>

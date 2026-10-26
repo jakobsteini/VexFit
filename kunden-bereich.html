@@ -304,6 +304,7 @@ try {
   <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 </a>
 
+<script src="vexfit-escape.js"></script>
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -378,7 +379,7 @@ async function ladeMeineAnfragen() {
       const z = (a.status === 'angenommen' || a.status === 'abgelehnt') ? a.status : 'offen';
       const text = z === 'angenommen' ? 'Angenommen' : z === 'abgelehnt' ? 'Abgelehnt' : 'Wartet auf Antwort';
       return `<div class="trainer-card">
-        <div class="ma-row"><div class="ma-name">${a.trainer_name || 'Trainer'}</div><div class="ma-date">${datum}</div></div>
+        <div class="ma-row"><div class="ma-name">${vexEsc(a.trainer_name) || 'Trainer'}</div><div class="ma-date">${datum}</div></div>
         <div class="ma-status ${z}">${text}</div>
       </div>`;
     }).join('');
@@ -554,11 +555,11 @@ function renderTrainer(list) {
     </div>`;
       return;
     }
-    const where = lastSearch ? `IN ${lastSearch.plz}${lastSearch.city ? ' ' + lastSearch.city.toUpperCase() : ''}` : 'IN DEINER NÄHE';
+    const where = lastSearch ? `IN ${vexEsc(lastSearch.plz)}${lastSearch.city ? ' ' + vexEsc(lastSearch.city.toUpperCase()) : ''}` : 'IN DEINER NÄHE';
     const alertBox = lastSearch ? `
     <div class="alert-box" id="alertBox">
       <div class="alert-box-title">🔔 Informiere mich sobald es einen Trainer für mich gibt</div>
-      <div class="alert-box-sub">Sobald sich ein Trainer in ${lastSearch.plz} ${lastSearch.city || ''} registriert, bekommst du automatisch eine E-Mail mit seinen Daten.</div>
+      <div class="alert-box-sub">Sobald sich ein Trainer in ${vexEsc(lastSearch.plz)} ${vexEsc(lastSearch.city || '')} registriert, bekommst du automatisch eine E-Mail mit seinen Daten.</div>
       <button class="btn-alert" id="alertBtn" onclick="activateAlert()">Aktivieren</button>
     </div>` : '';
     // Warteliste: ein Klick merkt den Ort vor. PLZ, Stadt, Ziel und Umkreis sind
@@ -567,7 +568,7 @@ function renderTrainer(list) {
     // wurde - diesen Zweig erreicht man nur dann.
     const wartelisteBox = lastSearch ? `
     <div class="alert-box" id="wartelisteBox">
-      <div class="alert-box-title">📝 Auf die Warteliste für ${lastSearch.city || lastSearch.plz}</div>
+      <div class="alert-box-title">📝 Auf die Warteliste für ${vexEsc(lastSearch.city || lastSearch.plz)}</div>
       <div class="alert-box-sub">Ein Klick genügt — deine Angaben aus der Suche sind schon bekannt. So sieht Vexfit, dass hier Bedarf ist.</div>
       <button class="btn-alert" id="wartelisteBtn" onclick="vormerken()">Für diesen Ort vormerken</button>
     </div>` : '';
@@ -581,16 +582,16 @@ function renderTrainer(list) {
   el.innerHTML = filtered.map(t => {
     const ini = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
     const bild = avatarAdresse(t.avatar_url);
-    const avStyle = bild ? `background-image:url('${bild}');background-size:cover;background-position:center` : '';
-    const chips = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="tc-chip">${s}</span>`).join('');
+    const avStyle = bild ? `background-image:url('${vexEsc(bild)}');background-size:cover;background-position:center` : '';
+    const chips = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="tc-chip">${vexEsc(s)}</span>`).join('');
     const dist = t._online ? '<div class="tc-dist">🌐 Online</div>' : t._dist !== undefined ? `<div class="tc-dist">📍 ${t._dist} km</div>` : '';
     const price = t.preis_stunde ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">ab €${t.preis_stunde}/Std</div>` : '';
     return `<div class="trainer-card">
       <div class="tc-top">
-        <div class="tc-av" style="${avStyle}">${avStyle?'':ini}</div>
-        <div><div class="tc-name">${t.vorname||''} ${t.nachname||''}</div><div class="tc-meta">${t.trainingsart||''} · ${t.stadt||''}</div>${dist}</div>
+        <div class="tc-av" style="${avStyle}">${avStyle?'':vexEsc(ini)}</div>
+        <div><div class="tc-name">${vexEsc(t.vorname||'')} ${vexEsc(t.nachname||'')}</div><div class="tc-meta">${vexEsc(t.trainingsart||'')} · ${vexEsc(t.stadt||'')}</div>${dist}</div>
       </div>
-      ${t.bio?`<div class="tc-bio">${t.bio}</div>`:''}
+      ${t.bio?`<div class="tc-bio">${vexEsc(t.bio)}</div>`:''}
       <div class="tc-chips">${chips}</div>
       ${price}
       <div class="tc-actions">
@@ -853,7 +854,7 @@ function zeigeZusammenfassung() {
   const sp = einAuswahl.spezialisierungen;
   const teile = [sp.length ? sp.join(', ') : 'Alle Ziele'];
   if(einAuswahl.ort) teile.push(einAuswahl.ort === 'vor_ort' ? 'Vor Ort' : 'Online');
-  if(einAuswahl.plz) teile.push(einAuswahl.plz + (einAuswahl.umkreis ? ' · ' + einAuswahl.umkreis + ' km' : ' · alle'));
+  if(einAuswahl.plz) teile.push(vexEsc(einAuswahl.plz) + (einAuswahl.umkreis ? ' · ' + einAuswahl.umkreis + ' km' : ' · alle'));
   document.getElementById('szText').innerHTML = 'Gesucht: <b>' + teile.join('</b> · <b>') + '</b>';
   el.querySelector('.sz-btn').textContent = 'Neu starten';
   el.classList.remove('hidden');

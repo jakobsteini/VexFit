@@ -338,6 +338,7 @@ try {
   </div>
 </div>
 
+<script src="vexfit-escape.js"></script>
 <script>
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -540,18 +541,18 @@ async function loadData() {
   } else {
     tbody.innerHTML = trainers.map(t => `
       <tr>
-        <td><strong>${t.vorname} ${t.nachname}</strong></td>
-        <td>${t.email}</td>
-        <td>${t.telefon ? `<a href="tel:${t.telefon}" style="color:var(--accent);text-decoration:none;font-weight:600">${t.telefon}</a>` : '<span style="color:var(--text-muted)">–</span>'}</td>
-        <td>${t.stadt || '–'}</td>
-        <td>${t.trainingsart || '–'}</td>
-        <td>${t.preis_stunde ? '€' + t.preis_stunde : '–'}</td>
+        <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
+        <td>${vexEsc(t.email)}</td>
+        <td>${t.telefon ? `<a href="tel:${vexEsc(t.telefon)}" style="color:var(--accent);text-decoration:none;font-weight:600">${vexEsc(t.telefon)}</a>` : '<span style="color:var(--text-muted)">–</span>'}</td>
+        <td>${vexEsc(t.stadt) || '–'}</td>
+        <td>${vexEsc(t.trainingsart) || '–'}</td>
+        <td>${t.preis_stunde ? '€' + vexEsc(t.preis_stunde) : '–'}</td>
         <td><span class="badge ${t.stripe_bezahlt ? 'badge-paid' : 'badge-unpaid'}">${t.stripe_bezahlt ? '✓ Bezahlt' : '✕ Ausstehend'}</span></td>
         <td><span class="badge ${t.aktiv ? 'badge-active' : 'badge-unpaid'}">${t.aktiv ? 'Aktiv' : 'Inaktiv'}</span></td>
         <td style="display:flex;flex-direction:column;gap:5px;padding:8px 16px">
           ${!t.aktiv ? `<button class="btn-activate" onclick="activateTrainer('${t.id}')">👁️ Profil freigeben</button>` : `<span style="color:#4ade80;font-size:11px;font-weight:600">✅ Aktiv</span>`}
-          ${t.aktiv ? `<button onclick="banTrainer('${t.id}', '${t.vorname} ${t.nachname}')" style="background:rgba(255,165,0,0.12);border:1px solid rgba(255,165,0,0.3);color:#ffaa00;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🚫 Sperren</button>` : ''}
-          <button onclick="deleteTrainer('${t.id}', '${t.vorname} ${t.nachname}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
+          ${t.aktiv ? `<button onclick="banTrainer('${t.id}', '${vexEsc(t.vorname)} ${vexEsc(t.nachname)}')" style="background:rgba(255,165,0,0.12);border:1px solid rgba(255,165,0,0.3);color:#ffaa00;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🚫 Sperren</button>` : ''}
+          <button onclick="deleteTrainer('${t.id}', '${vexEsc(t.vorname)} ${vexEsc(t.nachname)}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
         </td>
         <td>${t.created_at ? new Date(t.created_at).toLocaleDateString('de-AT') : '–'}</td>
       </tr>`).join('');
@@ -567,12 +568,12 @@ async function loadData() {
   } else {
     ktbody.innerHTML = kunden.map(k => `
       <tr>
-        <td><strong>${k.vorname} ${k.nachname}</strong></td>
-        <td>${k.email}</td>
-        <td>${k.stadt || '–'}</td>
-        <td>${k.ziel || '–'}</td>
+        <td><strong>${vexEsc(k.vorname)} ${vexEsc(k.nachname)}</strong></td>
+        <td>${vexEsc(k.email)}</td>
+        <td>${vexEsc(k.stadt) || '–'}</td>
+        <td>${vexEsc(k.ziel) || '–'}</td>
         <td>
-          <button onclick="deleteKunde('${k.id}', '${k.vorname} ${k.nachname}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
+          <button onclick="deleteKunde('${k.id}', '${vexEsc(k.vorname)} ${vexEsc(k.nachname)}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
         </td>
         <td>${k.created_at ? new Date(k.created_at).toLocaleDateString('de-AT') : '–'}</td>
       </tr>`).join('');
@@ -630,9 +631,9 @@ function ladeFreigabe() {
     const farbe = fehlt.length === 0 ? '#4ade80' : (voll >= 4 ? 'var(--accent)' : '#ff6b6b');
     const detail = fehlt.length === 0 ? 'vollständig' : ('fehlt: ' + fehlt.join(', '));
     return `<tr>
-      <td><strong>${t.vorname} ${t.nachname}</strong></td>
-      <td>${t.email}</td>
-      <td>${t.stadt || '–'}</td>
+      <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
+      <td>${vexEsc(t.email)}</td>
+      <td>${vexEsc(t.stadt) || '–'}</td>
       <td><span style="color:${farbe};font-weight:700">${voll}/7</span> <span style="color:var(--text-muted);font-size:11px">${detail}</span></td>
       <td>${t.created_at ? new Date(t.created_at).toLocaleDateString('de-AT') : '–'}</td>
       <td><button class="btn-activate" onclick="activateTrainer('${t.id}')">👁️ Freigeben</button></td>
@@ -703,8 +704,8 @@ async function ladeAnfragenListe() {
       const w = a.weitergeleitet ? '<span class="badge badge-fwd">Ja</span>' : '<span class="badge badge-nofwd">Nein</span>';
       return `<tr>
         <td>${a.created_at ? new Date(a.created_at).toLocaleDateString('de-AT') : '–'}</td>
-        <td>${a.trainer_name || '–'}</td>
-        <td>${a.kunden_name || '–'}</td>
+        <td>${vexEsc(a.trainer_name) || '–'}</td>
+        <td>${vexEsc(a.kunden_name) || '–'}</td>
         <td>${zBadge}</td>
         <td>${w}</td>
       </tr>`;
@@ -733,9 +734,9 @@ async function ladeTrainerOhneAnfrage() {
       return;
     }
     tb.innerHTML = trainer.map(t => `<tr>
-      <td><strong>${t.vorname} ${t.nachname}</strong></td>
-      <td>${t.email}</td>
-      <td>${t.stadt || '–'}</td>
+      <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
+      <td>${vexEsc(t.email)}</td>
+      <td>${vexEsc(t.stadt) || '–'}</td>
       <td>${t.created_at ? new Date(t.created_at).toLocaleDateString('de-AT') : '–'}</td>
     </tr>`).join('');
   } catch(e) {
@@ -758,8 +759,8 @@ function ladeProfilUnvollstaendig() {
       return;
     }
     tb.innerHTML = trainer.map(x => `<tr>
-      <td><strong>${x.t.vorname} ${x.t.nachname}</strong></td>
-      <td>${x.t.email}</td>
+      <td><strong>${vexEsc(x.t.vorname)} ${vexEsc(x.t.nachname)}</strong></td>
+      <td>${vexEsc(x.t.email)}</td>
       <td style="color:#ff6b6b">${x.fehlt.join(', ')}</td>
       <td>${x.t.created_at ? new Date(x.t.created_at).toLocaleDateString('de-AT') : '–'}</td>
     </tr>`).join('');
@@ -792,8 +793,8 @@ async function ladeZahlungen() {
     }
     tb.innerHTML = rows.map(e => `<tr>
       <td>${e.verarbeitet_am ? new Date(e.verarbeitet_am).toLocaleString('de-AT') : '–'}</td>
-      <td>${e.typ || '–'}</td>
-      <td style="font-family:monospace;font-size:11px;word-break:break-all">${e.event_id || '–'}</td>
+      <td>${vexEsc(e.typ) || '–'}</td>
+      <td style="font-family:monospace;font-size:11px;word-break:break-all">${vexEsc(e.event_id) || '–'}</td>
     </tr>`).join('');
   } catch(e) {
     console.error('ladeZahlungen:', e);
@@ -846,7 +847,7 @@ async function ladeNachfrage() {
       return (b.suchen + b.vormerkungen) - (a.suchen + a.vormerkungen);
     });
     tb.innerHTML = liste.map(o => {
-      const ort = o.stadt ? `${o.stadt} (${o.plz})` : o.plz;
+      const ort = o.stadt ? `${vexEsc(o.stadt)} (${vexEsc(o.plz)})` : vexEsc(o.plz);
       const marke = o.trainer === 0 ? ' <span class="badge badge-unpaid">Kein Trainer</span>' : '';
       return `<tr>
         <td><strong>${ort}</strong>${marke}</td>
@@ -860,7 +861,7 @@ async function ladeNachfrage() {
     const zielZaehler = {};
     for(const s of suchen) for(const z of (Array.isArray(s.spezialisierungen) ? s.spezialisierungen : [])) if(z) zielZaehler[z] = (zielZaehler[z] || 0) + 1;
     const ziele = Object.entries(zielZaehler).sort((a, b) => b[1] - a[1]);
-    zb.innerHTML = ziele.map(([z, n]) => `<tr><td><strong>${z}</strong></td><td>${n}</td></tr>`).join('') || '<tr><td colspan="2" class="loading-text">Noch keine Ziele erfasst.</td></tr>';
+    zb.innerHTML = ziele.map(([z, n]) => `<tr><td><strong>${vexEsc(z)}</strong></td><td>${n}</td></tr>`).join('') || '<tr><td colspan="2" class="loading-text">Noch keine Ziele erfasst.</td></tr>';
   } catch(e) {
     console.error('ladeNachfrage:', e);
     zeige(hinweisWL);
