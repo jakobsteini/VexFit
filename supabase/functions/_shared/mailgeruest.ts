@@ -13,10 +13,12 @@
 import { maskieren, sichereAdresse } from "./text.ts";
 
 /**
- * Platzhalter fuer die Firmenangabe in der zweiten Fusszeile (Firmenname,
- * Adresse, UID). Bleibt bewusst so stehen; Jakob ersetzt ihn selbst.
+ * Firmenangabe fuer die zweite Fusszeile. WORTGLEICH aus dem Impressum
+ * (rechtliches.html, "BETREIBER & KONTAKT": Name + Adresse). Eine GISA-Zahl
+ * steht im Impressum NICHT - sie fehlt daher hier bewusst (als Luecke gemeldet),
+ * statt sie zu erfinden.
  */
-export const FIRMENANGABE = "FIRMENANGABE_FEHLT";
+export const FIRMENANGABE = "Jakob Steinbacher, 5330 Fuschl am See, Österreich";
 
 /** Eine Datenzeile der zweispaltigen Tabelle: Beschriftung links, Wert rechts. */
 export interface DatenZeile {

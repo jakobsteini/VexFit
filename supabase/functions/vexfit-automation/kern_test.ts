@@ -222,10 +222,10 @@ Deno.test("/neuer-trainer: gueltige Eingabe → genau eine Mail an Jakob, Wortla
       "Name: Eva Muster\nE-Mail: eva@beispiel.at\nStadt: Wien\n" +
       "Trainingsart: Im Fitnessstudio\n\n" +
       "Im Admin öffnen: https://vexfit.app/admin.html\n\n" +
-      "Interne Benachrichtigung.\nFIRMENANGABE_FEHLT",
+      "Interne Benachrichtigung.\nJakob Steinbacher, 5330 Fuschl am See, Österreich",
   );
   assertStringIncludes(m.html, "Neuer Trainer registriert");
-  assertStringIncludes(m.html, "FIRMENANGABE_FEHLT");
+  assertStringIncludes(m.html, "Jakob Steinbacher, 5330 Fuschl am See, Österreich");
   // Es wird nichts in die Datenbank geschrieben.
   assertEquals(auf.bezahltMarkiert, []);
   assertEquals(auf.weitergeleitetMarkiert, []);
@@ -308,10 +308,10 @@ Deno.test("/neuer-kunde: gueltige Eingabe → genau eine Mail an Jakob, Wortlaut
     "Neuer Kunde registriert\n\n" +
       "Name: Eva Muster\nE-Mail: eva@beispiel.at\nStadt: Wien\nZiel: Abnehmen\n\n" +
       "Im Admin öffnen: https://vexfit.app/admin.html\n\n" +
-      "Interne Benachrichtigung.\nFIRMENANGABE_FEHLT",
+      "Interne Benachrichtigung.\nJakob Steinbacher, 5330 Fuschl am See, Österreich",
   );
   assertStringIncludes(auf.mails[0].html, "Neuer Kunde registriert");
-  assertStringIncludes(auf.mails[0].html, "FIRMENANGABE_FEHLT");
+  assertStringIncludes(auf.mails[0].html, "Jakob Steinbacher, 5330 Fuschl am See, Österreich");
 });
 
 Deno.test("/neuer-kunde: die Nutzlast von suche.html geht durch (leerer Nachname, leere Stadt)", async () => {
@@ -989,7 +989,7 @@ Deno.test("alle sechs Mails: kein Emoji im Betreff, Fusszeile im HTML, Text saub
       !/\p{Extended_Pictographic}/u.test(m.betreff),
       `Betreff enthaelt ein Emoji: ${m.betreff}`,
     );
-    assertStringIncludes(m.html, "FIRMENANGABE_FEHLT");
+    assertStringIncludes(m.html, "Jakob Steinbacher, 5330 Fuschl am See, Österreich");
     assert(m.text.trim().length > 0, `Textfassung leer: ${m.betreff}`);
     assert(
       !/=20/.test(m.betreff + "\n" + m.text),

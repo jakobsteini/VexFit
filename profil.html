@@ -207,10 +207,14 @@ try {
           <p class="contact-sub">Sende eine Anfrage – wir vermitteln den Kontakt für dich</p>
           <div class="alert-error" id="contactError"></div>
           <div class="field"><label>Dein Name</label><input type="text" placeholder="Anna Muster" id="c-name" autocomplete="name"></div>
-          <div class="field"><label>Deine E-Mail</label><input type="email" placeholder="anna@example.com" id="c-email" autocomplete="email"></div>
           <div class="field"><label>Dein Ziel</label><input type="text" placeholder="z.B. Abnehmen, Muskelaufbau..." id="c-goal"></div>
           <div class="field"><label>Nachricht</label><textarea placeholder="Erzähl dem Trainer kurz was du suchst..." id="c-message"></textarea></div>
           <button class="btn-send" id="sendBtn" onclick="sendContact()">Nachricht senden →</button>
+        </div>
+        <div id="anonHinweis" style="display:none">
+          <div class="contact-title">TRAINER ANFRAGEN</div>
+          <p class="contact-sub">Melde dich an, um diesem Trainer eine unverbindliche Anfrage zu senden.</p>
+          <button class="btn-send" id="loginAnfrageBtn" onclick="zurAnmeldung()">Anmelden, um anzufragen →</button>
         </div>
         <div class="contact-success" id="contactSuccess">
           <div class="contact-success-icon">🎉</div>
@@ -236,34 +240,27 @@ try {
 <script src="vexfit-escape.js"></script>
 <script>
 // ──── ZUGANG ────
-// Trainerprofile sind nur nach Anmeldung sichtbar (Geschaeftsmodell). Ohne
-// Sitzung geht es zur Kundenregistrierung, BEVOR das Profil geladen wird;
-// die gewuenschte Adresse (samt ?id=...) wird gemerkt, damit die
-// Registrierung hierher zurueckfuehren kann. Eine Beschraenkung auf eine
-// bestimmte Rolle legt der Code nirgends fest - deshalb kommt jede
-// angemeldete Person durch.
-(function(){
-  let sess = null;
-  try { sess = JSON.parse(localStorage.getItem('vexfit_session') || 'null'); } catch(e) {}
-  if(sess && sess.access_token) return;
-  try { sessionStorage.setItem('vexfit_ziel', location.pathname.split('/').pop() + location.search); } catch(e) {}
-  location.replace('registrieren.html?typ=kunde');
-  throw new Error('nicht angemeldet');
-})();
+// Trainerprofile sind OHNE Anmeldung sichtbar (Geschaeftsmodell): das Profil
+// wird fuer alle normal geladen und angezeigt. Nur die Kontaktdaten bzw. das
+// Anfrageformular bleiben angemeldeten Kunden vorbehalten - nicht Angemeldete
+// sehen stattdessen einen Knopf, der zuerst dieses Profil merkt und dann zur
+// Anmeldung fuehrt (siehe weiter unten). KEINE Umleitung mehr vor dem Profil.
 
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
 const FORMSPREE = 'https://formspree.io/f/xaqvodqb';
 
 // ──── ZUGANG ────
-// Das Lesen des Trainerprofils geht mit dem Zugangs-Token des angemeldeten
-// Nutzers (vexfit_session); der oeffentliche Schluessel bleibt nur im
-// apikey-Kopf, so erwartet es Supabase. Muster wie in kunden-bereich.html.
-// Die Anmeldepruefung oben hat sichergestellt, dass ein Token vorliegt.
+// Das oeffentliche Trainerprofil muss auch ohne Anmeldung ladbar sein.
+// Angemeldet: Nutzer-Token (vexfit_session) im Authorization-Kopf. Nicht
+// angemeldet: der oeffentliche Schluessel (anon) steht im apikey- UND im
+// Authorization-Kopf. Muster wie in suche.html/kunden-bereich.html.
 let sess = null;
 try { sess = JSON.parse(localStorage.getItem('vexfit_session') || 'null'); } catch(e) {}
+const angemeldet = !!(sess && sess.access_token);
 function authKopf(weitere) {
-  const k = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + (sess && sess.access_token) };
+  const token = angemeldet ? sess.access_token : SUPABASE_KEY;
+  const k = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token };
   if(weitere) for(const n in weitere) k[n] = weitere[n];
   return k;
 }
@@ -363,29 +360,90 @@ function renderProfile(t) {
   }
   document.getElementById('pPricingItems').innerHTML = pricingHTML;
 
+  // Kontakt-/Anfrage-Bereich nur fuer Angemeldete. Nicht Angemeldete sehen den
+  // Anmelde-Knopf (merkt dieses Profil und fuehrt zur Anmeldung).
+  const contactForm = document.getElementById('contactForm');
+  const anonHinweis = document.getElementById('anonHinweis');
+  if(angemeldet) {
+    if(contactForm) contactForm.style.display = 'block';
+    if(anonHinweis) anonHinweis.style.display = 'none';
+  } else {
+    if(contactForm) contactForm.style.display = 'none';
+    if(anonHinweis) anonHinweis.style.display = 'block';
+  }
+
   document.getElementById('loadingProfile').style.display = 'none';
   document.getElementById('profileContent').style.display = 'block';
 }
 
+// Merkt dieses Profil (inkl. ?id=...) und fuehrt zur Anmeldung; login.html
+// springt ein gemerktes Ziel (vexfit_ziel) nach dem Anmelden wieder an.
+function zurAnmeldung() {
+  try { sessionStorage.setItem('vexfit_ziel', location.pathname.split('/').pop() + location.search); } catch(e) {}
+  location.href = 'login.html';
+}
+
+// Verhindert doppeltes Absenden (Mehrfachklick), auch falls der Knopf-Status
+// mal nicht greift.
+let anfrageLaeuft = false;
+
 async function sendContact() {
+  if(anfrageLaeuft) return;
+
+  const btn = document.getElementById('sendBtn');
+  const err = document.getElementById('contactError');
+  err.classList.remove('show');
+
+  // Nur angemeldete Kunden duerfen anfragen; die Kunden-E-Mail ist die des
+  // angemeldeten Kontos - kein frei eingebbares Feld mehr.
+  const email = (sess && sess.email) ? String(sess.email).trim() : '';
+  if(!angemeldet || !email) {
+    zurAnmeldung();
+    return;
+  }
+
   const name = document.getElementById('c-name').value.trim();
-  const email = document.getElementById('c-email').value.trim();
   const goal = document.getElementById('c-goal').value.trim();
   const message = document.getElementById('c-message').value.trim();
 
-  if(!name || !email || !message) {
-    const err = document.getElementById('contactError');
-    err.textContent = '⚠️ Bitte alle Pflichtfelder ausfüllen!';
+  if(!name || !message) {
+    err.textContent = '⚠️ Bitte Name und Nachricht ausfüllen!';
     err.classList.add('show');
     return;
   }
 
-  const btn = document.getElementById('sendBtn');
+  // Sofort gegen Mehrfachklick sichern.
+  anfrageLaeuft = true;
   btn.disabled = true;
   btn.textContent = 'Wird gesendet...';
 
   try {
-    // 0. Notify n8n webhook
+    // 1. ZUERST: Anfrage in der Tabelle anfragen speichern.
+    // Spaltennamen muessen exakt der Tabelle entsprechen, sonst geht die Anfrage verloren.
+    const anfrageRes = await fetch(`${SUPABASE_URL}/rest/v1/anfragen`, {
+      method: 'POST',
+      headers: authKopf({
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      }),
+      body: JSON.stringify({
+        trainer_id: trainerData ? trainerData.id : null,
+        trainer_name: trainerData ? trainerData.vorname + ' ' + trainerData.nachname : '–',
+        kunden_name: name,
+        kunden_email: email,
+        ziel: goal || '–',
+        nachricht: message,
+        weitergeleitet: false
+      })
+    });
+    if(istAbgemeldet(anfrageRes)) { anfrageLaeuft = false; return; }
+    if(!anfrageRes.ok) {
+      console.error('Anfrage speichern fehlgeschlagen:', anfrageRes.status);
+      throw new Error('Anfrage konnte nicht gespeichert werden');
+    }
+
+    // 2. ERST DANACH: Mail/Formspree + n8n-Webhook ausloesen. Scheitert NUR
+    // der Versand (nicht das Speichern), zeigen wir trotzdem Erfolg an.
     try {
       await fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neue-anfrage', {
         method: 'POST',
@@ -401,61 +459,35 @@ async function sendContact() {
       });
     } catch(e) { console.log('Webhook failed silently'); }
 
-    // 1. Save to Supabase anfragen table
-    // Spaltennamen muessen exakt der Tabelle entsprechen, sonst geht die Anfrage verloren.
-    const anfrageRes = await fetch(`${SUPABASE_URL}/rest/v1/anfragen`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({
-        trainer_id: trainerData ? trainerData.id : null,
-        trainer_name: trainerData ? trainerData.vorname + ' ' + trainerData.nachname : '–',
-        kunden_name: name,
-        kunden_email: email,
-        ziel: goal || '–',
-        nachricht: message,
-        weitergeleitet: false
-      })
-    });
-    if(!anfrageRes.ok) {
-      console.error('Anfrage speichern fehlgeschlagen:', anfrageRes.status);
-      throw new Error('Anfrage konnte nicht gespeichert werden');
-    }
+    try {
+      await fetch(FORMSPREE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          _subject: `🔔 NEUE ANFRAGE: ${name} → ${trainerData ? trainerData.vorname + ' ' + trainerData.nachname : 'Trainer'}`,
+          '👤 TRAINER Name': trainerData ? trainerData.vorname + ' ' + trainerData.nachname : '–',
+          '🆔 TRAINER Kennung': trainerData ? trainerData.id : '–',
+          '🙋 KUNDE Name': name,
+          '📩 KUNDE Email': email,
+          '🎯 KUNDE Ziel': goal || '–',
+          '💬 KUNDE Nachricht': message,
+          '💳 STRIPE LINK': 'https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00',
+          '⚠️ WICHTIG': 'Kunden-Daten ERST nach Zahlung weiterleiten!',
+          '🔗 ADMIN': 'https://vexfit.app/admin.html',
+          _replyto: 'vexfit.info@gmail.com',
+        })
+      });
+    } catch(e) { console.log('Formspree failed silently'); }
 
-    // 2. Send to Formspree (notify Jakob)
-    const res = await fetch(FORMSPREE, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({
-        _subject: `🔔 NEUE ANFRAGE: ${name} → ${trainerData ? trainerData.vorname + ' ' + trainerData.nachname : 'Trainer'}`,
-        '👤 TRAINER Name': trainerData ? trainerData.vorname + ' ' + trainerData.nachname : '–',
-        '🆔 TRAINER Kennung': trainerData ? trainerData.id : '–',
-        '🙋 KUNDE Name': name,
-        '📩 KUNDE Email': email,
-        '🎯 KUNDE Ziel': goal || '–',
-        '💬 KUNDE Nachricht': message,
-        '💳 STRIPE LINK': 'https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00',
-        '⚠️ WICHTIG': 'Kunden-Daten ERST nach Zahlung weiterleiten!',
-        '🔗 ADMIN': 'https://vexfit.app/admin.html',
-        _replyto: 'vexfit.info@gmail.com',
-      })
-    });
-
-    if(res.ok) {
-      document.getElementById('contactForm').style.display = 'none';
-      document.getElementById('contactSuccess').style.display = 'block';
-    } else {
-      throw new Error('Send failed');
-    }
+    // Gespeichert = Erfolg, unabhaengig vom Versand.
+    document.getElementById('contactForm').style.display = 'none';
+    document.getElementById('contactSuccess').style.display = 'block';
   } catch(e) {
     console.error('sendContact:', e);
-    const err = document.getElementById('contactError');
     err.textContent = '⚠️ Deine Anfrage konnte nicht gesendet werden. Bitte versuche es erneut oder schreib uns per WhatsApp.';
     err.classList.add('show');
+    // Nur bei Fehler wieder freigeben.
+    anfrageLaeuft = false;
     btn.disabled = false;
     btn.textContent = 'Nachricht senden →';
   }

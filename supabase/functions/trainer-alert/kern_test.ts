@@ -279,7 +279,7 @@ Deno.test("HTML enthaelt Anrede, Trainerdaten, Preis und den Profil-Link", () =>
     html,
     "Du erhältst diese E-Mail, weil du für deine Region Benachrichtigungen",
   );
-  assertStringIncludes(html, "FIRMENANGABE_FEHLT");
+  assertStringIncludes(html, "Jakob Steinbacher, 5330 Fuschl am See, Österreich");
 });
 
 Deno.test("hoechstens drei Spezialisierungen, Bio auf 200 Zeichen gekuerzt", () => {
@@ -596,7 +596,7 @@ Deno.test("Mail 4: kein Emoji im Betreff, Fusszeile im HTML, Textfassung sauber"
     !/\p{Extended_Pictographic}/u.test(betreff),
     "Betreff enthaelt ein Emoji",
   );
-  assertStringIncludes(html, "FIRMENANGABE_FEHLT");
+  assertStringIncludes(html, "Jakob Steinbacher, 5330 Fuschl am See, Österreich");
   assert(text.trim().length > 0, "Textfassung ist leer");
   assert(!/=20/.test(betreff + "\n" + text), "Quoted-Printable =20 vorhanden");
   assert(!/=[0-9A-Fa-f]{2}/.test(text), "Quoted-Printable-Sequenz im Text");
