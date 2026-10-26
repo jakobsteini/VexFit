@@ -48,6 +48,11 @@ export const STRIPE_EREIGNIS = "checkout.session.completed";
  *  und alle 58 Verweise im Repo lauten https://vexfit.app — kein www. */
 export const ERLAUBTE_HERKUNFT = "https://vexfit.app";
 
+/** Das einzige Konto mit Admin-Zugriff. WORTGLEICH wie in admin.html:348
+ *  (ADMIN_USER_ID) und in migrations/2026-09-20-admin-vollzugriff.sql
+ *  (ist_vexfit_admin). Keine neue Kennung erfunden. */
+export const ADMIN_ID = "ee744b01-0a70-4da5-a19b-6c905c8479b5";
+
 /** Obergrenze fuer den Anfragekoerper der Browser-Pfade. */
 export const KOERPER_GRENZE = 20000;
 
@@ -137,6 +142,12 @@ export interface Anschluesse {
   benutzerAusToken(token: string): Promise<{ id: string; email: string } | null>;
   /** Teil 8: Anzahl Anfragen dieses Kunden seit einem Zeitpunkt (Ratenbremse). */
   anfragenAnzahlSeit(kundenEmail: string, seitISO: string): Promise<number>;
+  /** Admin-Aktion: setzt feste Felder (aktiv/stripe_bezahlt) einer Trainerzeile
+   *  mit service_role. Gibt die Zahl geaenderter Zeilen zurueck. */
+  adminTrainerSetzen(id: string, felder: Record<string, unknown>): Promise<number>;
+  /** Admin-Aktion: loescht eine Zeile in trainers oder kunden (service_role).
+   *  Gibt die Zahl geloeschter Zeilen zurueck. */
+  adminZeileLoeschen(tabelle: string, id: string): Promise<number>;
   /** Optionaler Zusatz fuer die Trainer-Mail an Jakob, aus einem Secret. */
   adminHinweis?(): string | undefined;
   melden?(text: string, mehr?: unknown): void;
@@ -546,6 +557,8 @@ export async function bearbeiten(
       return await neuerKunde(anfrageObjekt, a, herkunft);
     case "neue-anfrage":
       return await neueAnfrage(anfrageObjekt, a, herkunft);
+    case "admin-aktion":
+      return await adminAktion(anfrageObjekt, a, herkunft);
     case "stripe":
       return await stripe(anfrageObjekt, a);
     default:
@@ -638,6 +651,60 @@ async function neueAnfrage(
     : mailErsteAnfrage(trainer, body);
   const gesendet = await sendeWennAdresseTaugt(a, mail);
   return antwort(200, { ok: true, mails: gesendet ? 1 : 0 }, herkunft);
+}
+
+/**
+ * Admin-Pfad. Fuehrt die Schreib-/Loeschaktionen aus, die admin.html seit
+ * 2026-10-26-01 nicht mehr direkt darf, mit service_role - aber nur fuer das
+ * eine Admin-Konto (serverseitig ueber Supabase Auth geprueft) und nur aus
+ * einer festen Liste von Aktionen und Spalten.
+ *   ohne gueltiges Token   -> 401
+ *   kein Admin             -> 403
+ *   unbekannte Aktion      -> 400
+ * Jede Aktion wird protokolliert (Zeitpunkt, Admin-ID, Aktion, Ziel-ID).
+ */
+async function adminAktion(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const token = bearerToken(r);
+  const nutzer = token ? await a.benutzerAusToken(token) : null;
+  if (!nutzer) return antwort(401, { fehler: "Anmeldung erforderlich" }, herkunft);
+  if (nutzer.id !== ADMIN_ID) return antwort(403, { fehler: "kein Admin" }, herkunft);
+
+  const body = await koerperLesen(r);
+  if (!body) return antwort(400, { fehler: "Die Anfrage war nicht lesbar." }, herkunft);
+  const aktion = String(body.aktion ?? "");
+  const zielId = String(body.ziel_id ?? "");
+  if (!zielId) return antwort(400, { fehler: "ziel_id fehlt" }, herkunft);
+
+  // Protokoll: Zeitpunkt, Admin-ID, Aktion, Ziel-ID (keine neue Tabelle).
+  a.melden?.(
+    `admin-aktion ${new Date().toISOString()} admin=${nutzer.id} aktion=${aktion} ziel=${zielId}`,
+  );
+
+  let geaendert = 0;
+  switch (aktion) {
+    case "trainer_aktivieren":
+      geaendert = await a.adminTrainerSetzen(zielId, { aktiv: true });
+      break;
+    case "trainer_sperren":
+      geaendert = await a.adminTrainerSetzen(zielId, { aktiv: false });
+      break;
+    case "trainer_bezahlt":
+      geaendert = await a.adminTrainerSetzen(zielId, { stripe_bezahlt: true });
+      break;
+    case "trainer_loeschen":
+      geaendert = await a.adminZeileLoeschen("trainers", zielId);
+      break;
+    case "kunde_loeschen":
+      geaendert = await a.adminZeileLoeschen("kunden", zielId);
+      break;
+    default:
+      return antwort(400, { fehler: "unbekannte Aktion" }, herkunft);
+  }
+  return antwort(200, { ok: true, geaendert }, herkunft);
 }
 
 /**

@@ -13,6 +13,7 @@ import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import Stripe from "npm:stripe@18.5.0";
 import {
   ABSENDER,
+  ADMIN_ID,
   type Anfrage,
   type Anschluesse,
   bearbeiten,
@@ -44,6 +45,8 @@ interface Aufzeichnung {
   bezahltMarkiert: string[];
   weitergeleitetMarkiert: string[]; // jetzt Anfrage-Kennungen (E2)
   vermerkt: string[];
+  adminTrainer: { id: string; felder: Record<string, unknown> }[];
+  adminLoeschen: { tabelle: string; id: string }[];
 }
 
 const T_STANDARD: Trainer = {
@@ -81,6 +84,8 @@ function bau(opt: {
     bezahltMarkiert: [],
     weitergeleitetMarkiert: [],
     vermerkt: [],
+    adminTrainer: [],
+    adminLoeschen: [],
   };
   const schon = opt.schonVerarbeitet ?? new Set<string>();
   /** Schon weitergeleitete Anfragen — die Sperre der Datenbank nachgebaut. */
@@ -153,6 +158,14 @@ function bau(opt: {
         opt.nutzer === undefined ? { id: "u-1", email: "kundin@beispiel.at" } : opt.nutzer,
       ),
     anfragenAnzahlSeit: () => Promise.resolve(opt.anfragenZahl ?? 0),
+    adminTrainerSetzen: (id, felder) => {
+      auf.adminTrainer.push({ id, felder });
+      return Promise.resolve(1);
+    },
+    adminZeileLoeschen: (tabelle, id) => {
+      auf.adminLoeschen.push({ tabelle, id });
+      return Promise.resolve(1);
+    },
     adminHinweis: () => opt.adminHinweis,
     melden: () => {},
   };
@@ -1073,4 +1086,81 @@ Deno.test("alle sechs Mails: kein Emoji im Betreff, Fusszeile im HTML, Text saub
       assertEquals(zeile, zeile.replace(/[ \t]+$/, ""));
     }
   }
+});
+
+// ===========================================================================
+// /admin-aktion (Admin-Schreibaktionen ueber die Function)
+// ===========================================================================
+const ADMIN = { id: ADMIN_ID, email: "admin@vexfit.app" };
+
+Deno.test("/admin-aktion: ohne Token → 401, nichts geschrieben", async () => {
+  const { anschluesse, auf } = bau();
+  const a = await bearbeiten(
+    anfrage("admin-aktion", { aktion: "trainer_aktivieren", ziel_id: "t-1" }, VOM_BROWSER),
+    anschluesse,
+  );
+  assertEquals(a.status, 401);
+  assertEquals(auf.adminTrainer, []);
+  assertEquals(auf.adminLoeschen, []);
+});
+
+Deno.test("/admin-aktion: Nicht-Admin → 403, nichts geschrieben", async () => {
+  const { anschluesse, auf } = bau({ nutzer: { id: "u-1", email: "kein@admin.at" } });
+  const a = await bearbeiten(
+    anfrage("admin-aktion", { aktion: "trainer_aktivieren", ziel_id: "t-1" }, MIT_TOKEN),
+    anschluesse,
+  );
+  assertEquals(a.status, 403);
+  assertEquals(auf.adminTrainer, []);
+});
+
+Deno.test("/admin-aktion: unbekannte Aktion → 400, nichts geschrieben", async () => {
+  const { anschluesse, auf } = bau({ nutzer: ADMIN });
+  const a = await bearbeiten(
+    anfrage("admin-aktion", { aktion: "quatsch", ziel_id: "t-1" }, MIT_TOKEN),
+    anschluesse,
+  );
+  assertEquals(a.status, 400);
+  assertEquals(auf.adminTrainer, []);
+  assertEquals(auf.adminLoeschen, []);
+});
+
+Deno.test("/admin-aktion: Admin kann aktiv und stripe_bezahlt setzen", async () => {
+  const { anschluesse, auf } = bau({ nutzer: ADMIN });
+  const a1 = await bearbeiten(
+    anfrage("admin-aktion", { aktion: "trainer_aktivieren", ziel_id: "t-1" }, MIT_TOKEN),
+    anschluesse,
+  );
+  assertEquals(a1.status, 200);
+  const a2 = await bearbeiten(
+    anfrage("admin-aktion", { aktion: "trainer_sperren", ziel_id: "t-2" }, MIT_TOKEN),
+    anschluesse,
+  );
+  assertEquals(a2.status, 200);
+  const a3 = await bearbeiten(
+    anfrage("admin-aktion", { aktion: "trainer_bezahlt", ziel_id: "t-3" }, MIT_TOKEN),
+    anschluesse,
+  );
+  assertEquals(a3.status, 200);
+  assertEquals(auf.adminTrainer, [
+    { id: "t-1", felder: { aktiv: true } },
+    { id: "t-2", felder: { aktiv: false } },
+    { id: "t-3", felder: { stripe_bezahlt: true } },
+  ]);
+});
+
+Deno.test("/admin-aktion: Admin kann Trainer und Kunde loeschen", async () => {
+  const { anschluesse, auf } = bau({ nutzer: ADMIN });
+  await bearbeiten(
+    anfrage("admin-aktion", { aktion: "trainer_loeschen", ziel_id: "t-1" }, MIT_TOKEN),
+    anschluesse,
+  );
+  await bearbeiten(
+    anfrage("admin-aktion", { aktion: "kunde_loeschen", ziel_id: "k-1" }, MIT_TOKEN),
+    anschluesse,
+  );
+  assertEquals(auf.adminLoeschen, [
+    { tabelle: "trainers", id: "t-1" },
+    { tabelle: "kunden", id: "k-1" },
+  ]);
 });

@@ -281,6 +281,44 @@ const anschluesse: Anschluesse = {
     return Number.isFinite(n) ? n : 0;
   },
 
+  // Admin-Aktion: setzt feste Felder einer Trainerzeile mit service_role.
+  // Welche Felder erlaubt sind, entscheidet kern.ts (feste Liste). Gibt die
+  // Zahl geaenderter Zeilen zurueck (return=representation).
+  async adminTrainerSetzen(
+    id: string,
+    felder: Record<string, unknown>,
+  ): Promise<number> {
+    const a = await fetch(
+      restAdresse(`trainers?id=eq.${encodeURIComponent(id)}`),
+      {
+        method: "PATCH",
+        headers: { ...restKopf(), Prefer: "return=representation" },
+        body: JSON.stringify(felder),
+      },
+    );
+    if (!a.ok) throw new Error(`adminTrainerSetzen fehlgeschlagen: HTTP ${a.status}`);
+    const zeilen = await a.json().catch(() => []);
+    return Array.isArray(zeilen) ? zeilen.length : 0;
+  },
+
+  // Admin-Aktion: loescht eine Zeile in trainers oder kunden (service_role).
+  // Tabelle zusaetzlich hier abgesichert (nur diese zwei).
+  async adminZeileLoeschen(tabelle: string, id: string): Promise<number> {
+    if (tabelle !== "trainers" && tabelle !== "kunden") {
+      throw new Error("adminZeileLoeschen: unzulaessige Tabelle");
+    }
+    const a = await fetch(
+      restAdresse(`${tabelle}?id=eq.${encodeURIComponent(id)}`),
+      {
+        method: "DELETE",
+        headers: { ...restKopf(), Prefer: "return=representation" },
+      },
+    );
+    if (!a.ok) throw new Error(`adminZeileLoeschen fehlgeschlagen: HTTP ${a.status}`);
+    const zeilen = await a.json().catch(() => []);
+    return Array.isArray(zeilen) ? zeilen.length : 0;
+  },
+
   adminHinweis(): string | undefined {
     return Deno.env.get("ADMIN_PASSWORT_HINWEIS") || undefined;
   },

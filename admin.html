@@ -879,43 +879,45 @@ function loadPlattform() {
   ladeNachfrage();
 }
 
-// ──── AKTIONEN ────
-// Setzt trainers.aktiv fuer eine Zeile; liefert wahr bei Erfolg. Supabase
-// meldet auch dann Erfolg, wenn die Regeln null Zeilen zulassen - deshalb
-// wird die geaenderte Zeile zurueckverlangt und gezaehlt.
-async function setzeTrainerAktiv(id, neu) {
+// ──── AKTIONEN (ueber die Edge Function /admin-aktion) ────
+// Seit migrations/2026-10-26-01-zugriffsschutz.sql darf auch der Admin die
+// geschuetzten Spalten (aktiv, stripe_bezahlt) nicht mehr direkt in trainers
+// schreiben. Freischalten/Sperren/Bezahlt/Loeschen laufen deshalb ueber den
+// Endpunkt /admin-aktion: er prueft serverseitig ueber Supabase Auth das
+// Admin-Konto und fuehrt die Aktion mit service_role aus. Rueckgabe: Anzahl
+// tatsaechlich geaenderter/geloeschter Zeilen (0 = nichts passiert).
+async function adminAktion(aktion, zielId) {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${encodeURIComponent(id)}`, {
-      method: 'PATCH',
-      headers: authKopf({ 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
-      body: JSON.stringify({ aktiv: neu })
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/vexfit-automation/admin-aktion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (sess && sess.access_token || '') },
+      body: JSON.stringify({ aktion: aktion, ziel_id: zielId })
     });
-    if(istAbgemeldet(res)) return false;
-    if(!res.ok) return false;
-    const zeilen = await res.json();
-    return Array.isArray(zeilen) && zeilen.length > 0;
+    if(istAbgemeldet(res)) return 0;
+    if(!res.ok) return 0;
+    const d = await res.json().catch(() => null);
+    return (d && typeof d.geaendert === 'number') ? d.geaendert : 0;
   } catch(e) {
-    console.error('setzeTrainerAktiv:', e);
-    return false;
+    console.error('adminAktion:', e);
+    return 0;
   }
 }
 
-// Loescht eine Zeile; liefert wahr, wenn tatsaechlich eine Zeile entfernt
-// wurde. Gleiche Kontrolle wie oben: die geloeschte Zeile wird zurueckverlangt.
+// Setzt trainers.aktiv ueber /admin-aktion; liefert wahr, wenn eine Zeile
+// tatsaechlich geaendert wurde.
+async function setzeTrainerAktiv(id, neu) {
+  const geaendert = await adminAktion(neu ? 'trainer_aktivieren' : 'trainer_sperren', id);
+  return geaendert > 0;
+}
+
+// Loescht eine Zeile (trainers oder kunden) ueber /admin-aktion; liefert wahr,
+// wenn tatsaechlich eine Zeile entfernt wurde.
 async function loescheZeile(tabelle, id) {
-  try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${tabelle}?id=eq.${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      headers: authKopf({ 'Prefer': 'return=representation' })
-    });
-    if(istAbgemeldet(res)) return false;
-    if(!res.ok) return false;
-    const zeilen = await res.json();
-    return Array.isArray(zeilen) && zeilen.length > 0;
-  } catch(e) {
-    console.error('loescheZeile:', e);
-    return false;
-  }
+  const aktion = tabelle === 'trainers' ? 'trainer_loeschen'
+    : (tabelle === 'kunden' ? 'kunde_loeschen' : '');
+  if(!aktion) return false;
+  const geaendert = await adminAktion(aktion, id);
+  return geaendert > 0;
 }
 
 async function banTrainer(id, name) {
@@ -966,12 +968,8 @@ Admin: https://vexfit.app/admin.html`);
 }
 
 async function markAsPaid(id, email, name) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    headers: authKopf({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ stripe_bezahlt: true })
-  });
-  if(res.ok) {
+  const geaendert = await adminAktion('trainer_bezahlt', id);
+  if(geaendert > 0) {
     alert('✅ Als bezahlt markiert!');
     loadData();
   } else {
