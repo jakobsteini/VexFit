@@ -42,6 +42,33 @@ Deno.test("Fix 2: jede Seite hat die 44px-Tippflaechen-Regel unter 640px", async
   }
 });
 
+const WIDERRUF_SEITEN = [
+  "404.html",
+  "anleitung.html",
+  "admin.html",
+  "kunden-bereich.html",
+  "passwort-vergessen.html",
+  "login.html",
+  "profil-bearbeiten.html",
+  "registrieren.html",
+  "passwort-neu.html",
+  "trainer-bereich.html",
+];
+
+Deno.test("Fix 2 (Nachtrag): Cookie-Widerruf-Fusszeilenlinks sind unter 640px 44px hoch", async () => {
+  for (const f of WIDERRUF_SEITEN) {
+    const s = await lies("./" + f);
+    assertStringIncludes(s, "/* Tippflaechen Handy Fusszeile (Fix 2 Nachtrag) */", `${f}`);
+    const block = s.match(
+      /\/\* Tippflaechen Handy Fusszeile \(Fix 2 Nachtrag\) \*\/[\s\S]*?<\/style>/,
+    );
+    assert(block, `${f}: Nachtrag-Block fehlt`);
+    assertStringIncludes(block[0], "@media (max-width:640px)", `${f}`);
+    assertStringIncludes(block[0], ".cookie-widerruf a", `${f}`);
+    assertStringIncludes(block[0], "min-height:44px", `${f}`);
+  }
+});
+
 Deno.test("Fix 2: Checkbox 'Eingeloggt bleiben' ist mindestens 22px, Label klickbar", async () => {
   const s = await lies("./login.html");
   assertStringIncludes(s, 'id="stayLoggedIn" style="width:22px;height:22px;');
