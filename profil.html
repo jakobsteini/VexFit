@@ -419,6 +419,7 @@ function renderProfile(t) {
   if(angemeldet) {
     if(contactForm) contactForm.style.display = 'block';
     if(anonHinweis) anonHinweis.style.display = 'none';
+    vorfuellenAusKunde();
   } else {
     if(contactForm) contactForm.style.display = 'none';
     if(anonHinweis) anonHinweis.style.display = 'block';
@@ -433,6 +434,27 @@ function renderProfile(t) {
 function zurAnmeldung() {
   try { sessionStorage.setItem('vexfit_ziel', location.pathname.split('/').pop() + location.search); } catch(e) {}
   location.href = 'login.html';
+}
+
+// Fuer angemeldete Kunden Name und Ziel aus der eigenen kunden-Zeile vorausfuellen.
+// Der Name ist nicht aenderbar (nur Anzeige), das Ziel bleibt aenderbar; die
+// E-Mail ist ohnehin die des Kontos (siehe sendContact).
+let kundenData = null;
+async function vorfuellenAusKunde() {
+  if(!angemeldet || !sess || !sess.email) return;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/kunden?email=eq.${encodeURIComponent(sess.email)}&select=vorname,nachname,ziel`, { headers: authKopf() });
+    if(istAbgemeldet(r)) return;
+    if(!r.ok) return;
+    const rows = await r.json();
+    kundenData = (rows && rows[0]) || null;
+    if(!kundenData) return;
+    const name = ((kundenData.vorname || '') + ' ' + (kundenData.nachname || '')).trim();
+    const nameEl = document.getElementById('c-name');
+    const goalEl = document.getElementById('c-goal');
+    if(nameEl && name) { nameEl.value = name; nameEl.readOnly = true; }
+    if(goalEl && kundenData.ziel) goalEl.value = String(kundenData.ziel);
+  } catch(e) {}
 }
 
 // Verhindert doppeltes Absenden (Mehrfachklick), auch falls der Knopf-Status
