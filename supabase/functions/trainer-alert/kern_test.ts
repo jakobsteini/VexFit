@@ -465,7 +465,11 @@ Deno.test("Trainername mit Skript, Verweis, Anfuehrungszeichen und & wird nur ma
   // Kein einziges rohes Steuerzeichen aus den Daten darf durchkommen.
   assert(!html.includes("<script>"), "<script> steht roh im HTML");
   assert(!html.includes("</script>"), "</script> steht roh im HTML");
-  assert(!html.includes("<img"), "<img steht roh im HTML");
+  // Das einzige erlaubte <img> ist das Wortmarkenbild im Kopf (fest im Geruest,
+  // nicht aus Daten). Aus den Daten darf kein weiteres <img> kommen.
+  const imgs = html.match(/<img\b[^>]*>/g) ?? [];
+  assertEquals(imgs.length, 1, "unerwartetes <img> im HTML");
+  assertStringIncludes(imgs[0] ?? "", "vexfit-wortmarke-transparent.png");
   // `onerror=` darf als TEXT vorkommen (die spitzen Klammern sind maskiert),
   // aber in keinem echten Tag. Deshalb jedes Tag einzeln ansehen.
   const tags = html.match(/<[^>]*>/g) ?? [];
