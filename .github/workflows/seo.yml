@@ -1,0 +1,28 @@
+name: seo
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  stadtseiten:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Stadtseiten und Sitemap erzeugen
+        run: node werkzeuge/stadtseiten.mjs
+      - name: Nur bei Aenderungen committen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "SEO: Sitemap und Stadtseiten aktualisiert"
+            git push
+          else
+            echo "Keine Aenderungen."
+          fi

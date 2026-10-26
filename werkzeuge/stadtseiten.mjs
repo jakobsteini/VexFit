@@ -31,7 +31,7 @@
 
 import { readFileSync, writeFileSync, unlinkSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join, basename } from 'node:path';
+import { dirname, join } from 'node:path';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASIS = 'https://vexfit.app';
@@ -40,20 +40,20 @@ const SCHWELLE = 3;
 // ████ ABSCHALTUNG ████ Trainer sind nur nach Anmeldung sichtbar; oeffentliche
 // Stadtseiten wuerden Suchmaschinen etwas zeigen, was Besucher nicht sehen
 // duerfen. Solange das gilt, bleibt dieser Schalter auf true.
-const STILLGELEGT = true;
+const STILLGELEGT = false;
 
 // Oeffentlicher (anon) Schluessel - steht in jeder Seite des Repos, kein Geheimnis.
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_7We3LNN5Lhhvj0d_NmGfVw_FwDiilR2';
+const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
 
 // Genau die Spalten, die suche.html oeffentlich anzeigt - nichts darueber hinaus.
-const SPALTEN = 'id,created_at,vorname,nachname,stadt,plz,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv';
+const SPALTEN = 'id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url';
 
 // Wie in suche.html: als Profilbild gilt nur eine Adresse aus dem eigenen Behaelter.
 const AVATAR_PREFIX = SUPABASE_URL + '/storage/v1/object/public/avatars/';
 
 // 404.html ist die Fehlerseite von GitHub Pages und gehoert nie in die sitemap.
-const SITEMAP_AUSSCHLUSS = new Set(['404.html']);
+const SITEMAP_AUSSCHLUSS = new Set(['404.html', 'profil.html']);
 
 // Ob eine Seite in die sitemap gehoert, wird aus der Datei selbst gelesen,
 // nicht aus einer festen Liste. Draussen bleibt, was
@@ -161,7 +161,7 @@ export function jsonLd(stadt, trainer) {
 export function stadtseiteHtml(stadt, trainer) {
   const s = escapeHtml(stadt);
   const datei = `personal-trainer-${slug(stadt)}.html`;
-  const titel = `Personal Trainer ${s} – Vexfit`;
+  const titel = `Personal Trainer in ${s} | Vexfit`;
   const beschreibung = escapeHtml(`${trainer.length} verifizierte Personal Trainer in ${stadt} – Profile mit Spezialisierungen und Preisen auf Vexfit ansehen.`);
   const karten = trainer.map((t, i) => trainerKarte(t, i)).join('\n');
   return `<!DOCTYPE html>
@@ -278,7 +278,7 @@ ${jsonLd(stadt, trainer)}
 
 <div class="search-hero">
   <div class="sh-label">Personal Trainer</div>
-  <h1 class="sh-title">PERSONAL TRAINER<br>${s.toUpperCase()}</h1>
+  <h1 class="sh-title">Personal Trainer in ${s}</h1>
   <p class="sh-intro">${einleitung(stadt, trainer)}</p>
 </div>
 
@@ -289,6 +289,7 @@ ${jsonLd(stadt, trainer)}
   <div class="grid">
 ${karten}
   </div>
+  <div style="margin-top:28px"><a class="nav-cta" href="registrieren.html?typ=kunde">Kostenlos registrieren und anfragen</a></div>
   <p class="umkreis-hinweis">Du wohnst nicht direkt in ${s}? <a href="suche.html">Zur Suche im Umkreis →</a></p>
 </div>
 
@@ -374,13 +375,24 @@ function vexfitAblehnen(){
 // Adresse seines oeffentlichen Profils in der sitemap. Die Datei wird bei
 // jedem Lauf komplett neu geschrieben - Profile von Trainern, die nicht mehr
 // freigeschaltet sind, fallen dadurch automatisch wieder heraus.
-function sitemapXml(trainer) {
-  const seiten = readdirSync(REPO)
+// Liest die indexierbaren Repo-Seiten (ohne noindex / Login-Weiterleitung / Auth).
+function repoSeiten() {
+  return readdirSync(REPO)
     .filter(f => f.endsWith('.html') && seiteFuerSitemap(f))
     .sort();
+}
+
+// Reine Funktion (fuer Tests): baut die Sitemap aus den Seiten + den Profilen
+// der aktiven Trainer, jeweils mit lastmod. index.html wird als Wurzel "/"
+// ausgewiesen.
+export function sitemapXml(trainer, seiten, heute) {
+  heute = heute || new Date().toISOString().slice(0, 10);
   const profile = (trainer || []).map(t => `profil.html?id=${t.id}`).sort();
-  const eintraege = [...seiten, ...profile]
-    .map(f => `  <url><loc>${BASIS}/${f}</loc></url>`).join('\n');
+  const eintraege = [...(seiten || []), ...profile]
+    .map(f => {
+      const loc = f === 'index.html' ? `${BASIS}/` : `${BASIS}/${f}`;
+      return `  <url><loc>${loc}</loc><lastmod>${heute}</lastmod></url>`;
+    }).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${eintraege}\n</urlset>\n`;
 }
 
@@ -408,6 +420,23 @@ function fussblockEinsetzen(datei, block) {
   return false;
 }
 
+// Reine Funktion (fuer Tests): gruppiert nach Stadt, laesst Trainer ohne Stadt
+// und die Alt-Angabe "Online" aus, und liefert fuer jede Stadt ab SCHWELLE
+// Trainern { stadt, datei, trainer }. Alphabetisch nach Stadt.
+export function stadtDateien(trainer) {
+  const proStadt = new Map();
+  for (const t of (trainer || [])) {
+    const stadt = (t.stadt || '').trim();
+    if (!stadt || stadt.toLowerCase() === 'online') continue;
+    if (!proStadt.has(stadt)) proStadt.set(stadt, []);
+    proStadt.get(stadt).push(t);
+  }
+  return [...proStadt.entries()]
+    .filter(([, ts]) => ts.length >= SCHWELLE)
+    .sort((a, b) => a[0].localeCompare(b[0], 'de'))
+    .map(([stadt, ts]) => ({ stadt, datei: `personal-trainer-${slug(stadt)}.html`, trainer: ts }));
+}
+
 // ──── Hauptlauf ────
 async function main() {
   if (STILLGELEGT) {
@@ -418,12 +447,12 @@ async function main() {
     for (const f of readdirSync(REPO)) {
       if (/^personal-trainer-.+\.html$/.test(f)) { unlinkSync(join(REPO, f)); geloescht.push(f); }
     }
-    writeFileSync(join(REPO, 'sitemap.xml'), sitemapXml([]));
+    writeFileSync(join(REPO, 'sitemap.xml'), sitemapXml([], repoSeiten()));
     console.log(`Geloescht (${geloescht.length}): ${geloescht.join(', ') || 'keine'}`);
     console.log('sitemap.xml neu geschrieben.');
     return;
   }
-  const antwort = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=${SPALTEN}&order=created_at.desc`, {
+  const antwort = await fetch(`${SUPABASE_URL}/rest/v1/trainers_oeffentlich?select=${SPALTEN}&order=nachname.asc`, {
     headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
   });
   if (!antwort.ok) {
@@ -450,16 +479,14 @@ async function main() {
   }
   if (uebersprungen) console.log(`Ohne Stadtangabe oder "Online" (keine Stadtseite): ${uebersprungen}`);
 
-  const erreicht = [...proStadt.entries()].filter(([, ts]) => ts.length >= SCHWELLE)
-    .sort((a, b) => a[0].localeCompare(b[0], 'de'));
   const verfehlt = [...proStadt.entries()].filter(([, ts]) => ts.length < SCHWELLE)
     .sort((a, b) => b[1].length - a[1].length);
+  const geplant = stadtDateien(trainer); // [{ stadt, datei, trainer }], ab SCHWELLE
 
   // Seiten schreiben.
   const angelegt = [], aktualisiert = [], unveraendert = [];
   const sollDateien = new Set();
-  for (const [stadt, ts] of erreicht) {
-    const datei = `personal-trainer-${slug(stadt)}.html`;
+  for (const { stadt, datei, trainer: ts } of geplant) {
     sollDateien.add(datei);
     const inhalt = stadtseiteHtml(stadt, ts);
     const pfad = join(REPO, datei);
@@ -478,8 +505,8 @@ async function main() {
   }
 
   // sitemap.xml und Fussbereichs-Links pflegen.
-  writeFileSync(join(REPO, 'sitemap.xml'), sitemapXml(trainer));
-  const staedte = erreicht.map(([stadt]) => stadt);
+  writeFileSync(join(REPO, 'sitemap.xml'), sitemapXml(trainer, repoSeiten()));
+  const staedte = geplant.map(g => g.stadt);
   const fussGeaendert = ['index.html', 'suche.html']
     .filter(d => fussblockEinsetzen(d, fussblock(staedte)));
 
@@ -491,7 +518,7 @@ async function main() {
   console.log(`Geloescht (${geloescht.length}):    ${geloescht.join(', ') || 'keine'}`);
   console.log(`Schwelle (${SCHWELLE}) verfehlt: ${verfehlt.length ? verfehlt.map(([s, ts]) => `${s} (${ts.length})`).join(', ') : 'keine Stadt'}`);
   console.log(`sitemap.xml neu geschrieben; Fussbereich angepasst in: ${fussGeaendert.join(', ') || 'keiner Datei (schon aktuell)'}`);
-  if (!erreicht.length) {
+  if (!geplant.length) {
     console.log(`\nKeine Stadt erreicht derzeit ${SCHWELLE} freigeschaltete Trainer - es wurde keine einzige Stadtseite angelegt.`);
   }
 }

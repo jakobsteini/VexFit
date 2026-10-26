@@ -6,7 +6,6 @@
 <link rel="apple-touch-icon" href="marke/favicon-180.png">
 <link rel="manifest" href="manifest.json">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="robots" content="noindex">
 <title>Vexfit – Trainer Profil</title>
 <meta name="description" content="Sieh dir das Profil eines verifizierten Personal Trainers an und stelle direkt eine unverbindliche Anfrage.">
 <meta property="og:type" content="website">
@@ -285,23 +284,69 @@ function avatarAdresse(u) {
   return (typeof u === 'string' && u.indexOf(AVATAR_PREFIX) === 0) ? u : null;
 }
 
+// ──── SEO (dynamisch nach dem Laden gesetzt) ────
+function metaName(n, c){ let el=document.head.querySelector('meta[name="'+n+'"]'); if(!el){el=document.createElement('meta');el.setAttribute('name',n);document.head.appendChild(el);} el.setAttribute('content',c); }
+function metaProp(p, c){ let el=document.head.querySelector('meta[property="'+p+'"]'); if(!el){el=document.createElement('meta');el.setAttribute('property',p);document.head.appendChild(el);} el.setAttribute('content',c); }
+function setCanonical(u){ let el=document.head.querySelector('link[rel="canonical"]'); if(!el){el=document.createElement('link');el.setAttribute('rel','canonical');document.head.appendChild(el);} el.setAttribute('href',u); }
+function addJsonLd(obj){ const s=document.createElement('script'); s.type='application/ld+json'; s.textContent=JSON.stringify(obj); document.head.appendChild(s); }
+// Trainer nicht gefunden/nicht aktiv: fuer Suchmaschinen aussperren.
+function seoNichtGefunden(){ metaName('robots','noindex'); }
+
+// Setzt Titel, Beschreibung, canonical, og und JSON-LD (Person) aus den
+// geladenen oeffentlichen Trainerdaten. Keine erfundenen Angaben.
+function setzeProfilSeo(t, id){
+  const name = (t.vorname + ' ' + t.nachname).trim();
+  const stadt = (t.stadt || '').trim();
+  const online = t.trainingsart === 'Online';
+  const ortText = online ? 'Online' : (stadt || 'der Nähe');
+  const url = 'https://vexfit.app/profil.html?id=' + id;
+  const titel = name + ' – Personal Trainer in ' + ortText + ' | Vexfit';
+  document.title = titel;
+  const spez = (t.spezialisierungen || []).filter(Boolean);
+  let beschreibung = name + ', Personal Trainer' + (stadt ? ' in ' + stadt : '') +
+    (spez.length ? ' – ' + spez.slice(0,4).join(', ') + '.' : '.') + ' Jetzt auf Vexfit ansehen.';
+  if(beschreibung.length > 155) beschreibung = beschreibung.slice(0,152).replace(/\s+\S*$/,'') + '…';
+  metaName('description', beschreibung);
+  metaProp('og:title', titel);
+  metaProp('og:description', beschreibung);
+  metaProp('og:url', url);
+  metaName('twitter:title', titel);
+  metaName('twitter:description', beschreibung);
+  setCanonical(url);
+  const bild = avatarAdresse(t.avatar_url);
+  const ld = { '@context':'https://schema.org', '@type':'Person', name: name, jobTitle:'Personal Trainer', url: url };
+  const adr = { '@type':'PostalAddress' };
+  if(stadt) adr.addressLocality = stadt;
+  if(t.land) adr.addressCountry = t.land;
+  if(stadt || t.land) ld.address = adr;
+  if(spez.length) ld.knowsAbout = spez;
+  if(bild) ld.image = bild;
+  addJsonLd(ld);
+}
+
 async function loadProfile() {
   const urlParams = new URLSearchParams(window.location.search);
   const id = urlParams.get('id');
   if(!id) { window.location.href = 'suche.html'; return; }
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv`, {
-      headers: authKopf()
-    });
+    // Angemeldete lesen die Trainertabelle mit ihrem Token (wie bisher, inkl.
+    // Calendly). Nicht Angemeldete UND Suchmaschinen lesen NUR die oeffentliche
+    // Sicht trainers_oeffentlich - dort gibt es keine Kontaktdaten (weder
+    // E-Mail noch Telefon noch Calendly), damit nichts davon im HTML/JSON landet.
+    const res = angemeldet
+      ? await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv`, { headers: authKopf() })
+      : await fetch(`${SUPABASE_URL}/rest/v1/trainers_oeffentlich?id=eq.${id}&select=id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url`, { headers: authKopf() });
     if(istAbgemeldet(res)) return;
     if(!res.ok) throw new Error('Profil laden fehlgeschlagen: ' + res.status);
     const data = await res.json();
     if(!Array.isArray(data)) throw new Error('Unerwartete Antwort beim Profil laden');
-    // Kein Treffer heisst: Profil gibt es nicht oder es ist nicht freigeschaltet.
-    if(data.length === 0) { window.location.href = 'suche.html'; return; }
+    // Kein Treffer: Profil gibt es nicht oder es ist nicht freigeschaltet ->
+    // fuer Suchmaschinen noindex setzen, dann zur Suche.
+    if(data.length === 0) { seoNichtGefunden(); window.location.href = 'suche.html'; return; }
     trainerData = data[0];
     renderProfile(trainerData);
+    setzeProfilSeo(trainerData, id);
   } catch(e) {
     console.error(e);
     const lp = document.getElementById('loadingProfile');
@@ -319,6 +364,9 @@ function renderProfile(t) {
     avatarEl.style.backgroundSize = 'cover';
     avatarEl.style.backgroundPosition = 'center';
     avatarEl.textContent = '';
+    // Profilbild ist ein Hintergrundbild (kein <img>): alt-Text ueber role/aria-label.
+    avatarEl.setAttribute('role', 'img');
+    avatarEl.setAttribute('aria-label', 'Personal Trainer ' + t.vorname + ' ' + t.nachname + (t.stadt ? ' in ' + t.stadt : ''));
   } else {
     avatarEl.style.backgroundImage = '';
     avatarEl.textContent = initials;
