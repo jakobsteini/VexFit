@@ -26,7 +26,7 @@ async function htmlDateien(): Promise<string[]> {
   return out.sort();
 }
 
-Deno.test("kein Verweis mehr auf vexfit-logo.png (HTML, Manifest, Mailgeruest)", async () => {
+Deno.test("kein Verweis mehr auf vexfit-logo.png; Datei geloescht", async () => {
   for (const f of await htmlDateien()) {
     const s = await lies("./" + f);
     assert(!s.includes("vexfit-logo.png"), `${f} verweist noch auf vexfit-logo.png`);
@@ -35,6 +35,11 @@ Deno.test("kein Verweis mehr auf vexfit-logo.png (HTML, Manifest, Mailgeruest)",
   assert(
     !(await lies("./supabase/functions/_shared/mailgeruest.ts")).includes("vexfit-logo.png"),
   );
+  assert(
+    !(await lies("./werkzeuge/stadtseiten.mjs")).includes("vexfit-logo.png"),
+    "stadtseiten.mjs verweist noch auf vexfit-logo.png",
+  );
+  assert(!(await existiert("./vexfit-logo.png")), "vexfit-logo.png existiert noch");
 });
 
 Deno.test("jede .html hat beide Favicon-Links auf existierende Dateien", async () => {
@@ -79,9 +84,29 @@ Deno.test("Kopf-/Fusszeilen mit Logo tragen das Inline-V und EXFIT", async () =>
   assert(geprueft >= 14, `zu wenige Seiten mit Logo geprueft: ${geprueft}`);
 });
 
-Deno.test("Mailkopf: Wortmarkenbild mit alt=VEXFIT", async () => {
+Deno.test("Mailkopf: dunkler Balken (#0A0A0A) + Wortmarkenbild mit alt=VEXFIT", async () => {
   const mg = await lies("./supabase/functions/_shared/mailgeruest.ts");
   assertStringIncludes(mg, "https://vexfit.app/marke/vexfit-wortmarke-transparent.png");
   assertStringIncludes(mg, 'alt="VEXFIT"');
   assertStringIncludes(mg, 'width="180"');
+  // Kopfbalken jetzt dunkel (statt #e8ff00), zusaetzlich bgcolor gegen Gmail-Dunkelmodus.
+  assertStringIncludes(mg, 'bgcolor="#0A0A0A"');
+  assertStringIncludes(mg, "background:#0A0A0A;padding:18px;text-align:center");
+});
+
+Deno.test("jeder Wortmarken-Link traegt aria-label", async () => {
+  let geprueft = 0;
+  for (const f of await htmlDateien()) {
+    const s = await lies("./" + f);
+    // Jeder <a ... class="logo"/"footer-logo"> muss das aria-label tragen.
+    const offen = s.match(/<a [^>]*class="(?:logo|footer-logo)"[^>]*>/g) ?? [];
+    for (const tag of offen) {
+      assert(
+        tag.includes('aria-label="Vexfit – zur Startseite"'),
+        `${f}: Wortmarken-Link ohne aria-label: ${tag}`,
+      );
+      geprueft++;
+    }
+  }
+  assert(geprueft >= 19, `zu wenige Links geprueft: ${geprueft}`);
 });

@@ -90,7 +90,7 @@ export function mailRahmen(a: MailAngaben): string {
 
   return `<div style="background:#0a0a0a;padding:40px 20px;font-family:Arial,sans-serif">
   <div style="max-width:520px;margin:0 auto;background:#141414;border:1px solid rgba(255,255,255,0.08);border-radius:8px;overflow:hidden">
-    <div style="background:#e8ff00;padding:18px;text-align:center">
+    <div bgcolor="#0A0A0A" style="background:#0A0A0A;padding:18px;text-align:center">
       <img src="https://vexfit.app/marke/vexfit-wortmarke-transparent.png" width="180" alt="VEXFIT" style="border:0;max-width:180px;height:auto">
     </div>
     <div style="padding:32px 28px">
