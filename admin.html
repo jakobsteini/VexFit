@@ -530,11 +530,13 @@ async function loadData() {
 
   // Stats
   const paidCount = trainers.filter(t => t.stripe_bezahlt).length;
+  // Geldbetrag im oesterreichischen Format, zwei Nachkommastellen (nur Anzeige).
+  const eurFormat = new Intl.NumberFormat('de-AT', { style: 'currency', currency: 'EUR' });
   document.getElementById('s-total-trainer').textContent = trainers.length;
   document.getElementById('s-paid-trainer').textContent = paidCount;
-  document.getElementById('s-umsatz').textContent = '€' + (paidCount * 49.99).toFixed(0);
+  document.getElementById('s-umsatz').textContent = eurFormat.format(paidCount * 49.99);
   document.getElementById('s-total-kunden').textContent = kunden.length;
-  document.getElementById('s-umsatz').textContent = '€' + (paidCount * 49.99).toFixed(0);
+  document.getElementById('s-umsatz').textContent = eurFormat.format(paidCount * 49.99);
 
   // Trainers table
   const tbody = document.getElementById('trainers-tbody');
