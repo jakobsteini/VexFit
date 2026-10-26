@@ -305,6 +305,7 @@ try {
 </a>
 
 <script src="vexfit-escape.js"></script>
+<script src="vexfit-plz.js"></script>
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -421,14 +422,59 @@ function toggleSearch(e) {
   }
 }
 
-async function getCoords(plz) {
-  for(const c of ['at','de','ch']) {
-    try {
-      const r = await fetch(`https://api.zippopotam.us/${c}/${plz}`);
-      if(r.ok) { const d = await r.json(); if(d.places?.length) return {lat:parseFloat(d.places[0].latitude),lng:parseFloat(d.places[0].longitude),city:d.places[0]['place name']}; }
-    } catch(e) {}
+// Gemeinsamer Zwischenspeicher fuer die PLZ-Aufloesung: dieselbe PLZ wird pro
+// Seitenaufruf nur einmal abgefragt. Schluessel ist die PLZ; bei Landbegrenzung
+// (Trainer mit gesetztem Land) zusaetzlich mit Land-Praefix ('at:5026').
+const plzCache = new Map();
+
+// Nutzer-PLZ ueber das gemeinsame Modul aufloesen. Bei Mehrdeutigkeit
+// (4-stellig in AT und CH) erscheinen zwei Wahlknoepfe im Status-Element; die
+// gewaehlte Koordinate wird zurueckgegeben.
+// Rueckgabe: { lat, lng, city } | { netzfehler:true } | null (ungueltig/unbekannt).
+async function ermittleNutzerCoords(plz, statusEl) {
+  const e = await vexPlz.aufloesen(plz, { cache: plzCache });
+  if(!e) return null;
+  if(e.netzfehler) return { netzfehler: true };
+  if(e.mehrdeutig) {
+    return await new Promise((resolve) => {
+      statusEl.textContent = '';
+      vexPlz.auswahlKnoepfe(e.optionen, statusEl, (ort) => {
+        statusEl.innerHTML = '';
+        resolve({ lat: ort.lat, lng: ort.lng, city: ort.stadt });
+      });
+    });
   }
-  return null;
+  return { lat: e.lat, lng: e.lng, city: e.stadt };
+}
+
+// Trainer-Koordinaten. Ist t.land gesetzt, wird nur dieses Land abgefragt
+// (direkt bei zippopotam.us, Schluessel im Zwischenspeicher inkl. Land), sonst
+// wie die Nutzer-PLZ ueber vexPlz.aufloesen. Bei Mehrdeutigkeit ohne gesetztes
+// Land wird der erste Treffer genommen (keine Nutzerwahl noetig).
+// Rueckgabe: { lat, lng, city } | null.
+async function trainerCoords(plz, land) {
+  if(!plz) return null;
+  if(land) {
+    const lk = String(land).toLowerCase();
+    const key = lk + ':' + plz;
+    if(plzCache.has(key)) return plzCache.get(key);
+    try {
+      const r = await fetch(`https://api.zippopotam.us/${lk}/${plz}`);
+      if(r.ok) {
+        const d = await r.json();
+        if(d.places?.length) {
+          const c = { lat: parseFloat(d.places[0].latitude), lng: parseFloat(d.places[0].longitude), city: d.places[0]['place name'] };
+          plzCache.set(key, c);
+          return c;
+        }
+      }
+    } catch(e) {}
+    return null;
+  }
+  const e = await vexPlz.aufloesen(plz, { cache: plzCache });
+  if(!e || e.netzfehler) return null;
+  if(e.mehrdeutig) { const o = e.optionen[0]; return { lat: o.lat, lng: o.lng, city: o.stadt }; }
+  return { lat: e.lat, lng: e.lng, city: e.stadt };
 }
 
 function calcDist(lat1,lng1,lat2,lng2) {
@@ -439,7 +485,7 @@ function calcDist(lat1,lng1,lat2,lng2) {
 
 async function loadTrainer() {
   // Spaltenliste bewusst explizit (keine E-Mail/Telefon/user_id an den Browser).
-  const spalten = 'id,created_at,vorname,nachname,stadt,plz,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv';
+  const spalten = 'id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv';
   try {
     // Zuerst MIT trainingsort. Fehlt die Spalte noch (Migration nicht eingespielt),
     // antwortet Supabase mit 400 - dann ohne sie laden, dann wird nur nicht nach
@@ -474,14 +520,15 @@ async function searchByPLZ() {
   if(!plz || plz.length < 4) { status.textContent = '⚠️ Bitte gültige PLZ eingeben'; return; }
   if(!allT.length) await loadTrainer();
   status.textContent = '📍 Standort wird ermittelt...';
-  const coords = await getCoords(plz);
+  const coords = await ermittleNutzerCoords(plz, status);
+  if(coords && coords.netzfehler) { status.textContent = '⚠️ Standort konnte nicht ermittelt werden. Bitte später erneut versuchen.'; return; }
   if(!coords) { status.textContent = '⚠️ PLZ nicht gefunden'; return; }
   status.textContent = `📍 ${coords.city} · Suche läuft...`;
   const filtered = [];
   for(const t of allT) {
     if((t.trainingsart||'').toLowerCase().includes('online')) { filtered.push({...t,_dist:0,_online:true}); continue; }
     if(!t.plz) continue;
-    const tc = await getCoords(t.plz);
+    const tc = await trainerCoords(t.plz, t.land);
     if(!tc) continue;
     const dist = calcDist(coords.lat,coords.lng,tc.lat,tc.lng);
     if(dist <= radius) filtered.push({...t,_dist:Math.round(dist)});

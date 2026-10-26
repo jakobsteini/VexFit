@@ -241,6 +241,7 @@ try {
   <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 </a>
 
+<script src="vexfit-plz.js"></script>
 <script>
 const SUPABASE_URL='https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY='sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -354,30 +355,17 @@ function pruefePasswort(kuerzel){
   return pw;
 }
 
-// ──── PLZ -> STADT ────
-// Die Stadt wird nicht mehr gewaehlt, sondern aus der Postleitzahl ermittelt -
-// auf demselben Weg wie die Umkreissuche (suche.html, getCoords):
-// api.zippopotam.us, Laender at, de und ch in dieser Reihenfolge.
-const plzStand={t:{plz:'',stadt:null},c:{plz:'',stadt:null}};
+// ──── PLZ -> STADT + LAND ────
+// Die Stadt (und das Land) wird nicht mehr gewaehlt, sondern aus der
+// Postleitzahl ermittelt - ueber das gemeinsame Modul vexPlz (vexfit-plz.js).
+// Bei einer 4-stelligen PLZ mit zwei Treffern (AT/CH) waehlt der Nutzer am
+// PLZ-Feld ueber zwei Knoepfe; erst danach gilt Stadt+Land als gesetzt.
+const plzStand={t:{plz:'',stadt:null,land:null},c:{plz:'',stadt:null,land:null}};
 const plzTimer={t:null,c:null};
 const plzLauf={t:0,c:0};
 const imVersand={t:false,c:false};
-
-// Liefert {stadt} bei Treffer, {netzfehler:true} wenn der Dienst nicht
-// erreichbar war, sonst null (Postleitzahl in keinem der drei Laender bekannt).
-async function ortZuPlz(plz){
-  let netzfehler=false;
-  for(const land of ['at','de','ch']){
-    try{
-      const r=await fetch(`https://api.zippopotam.us/${land}/${plz}`);
-      if(r.ok){
-        const d=await r.json();
-        if(d.places&&d.places.length>0)return{stadt:d.places[0]['place name']};
-      }
-    }catch(e){netzfehler=true;}
-  }
-  return netzfehler?{netzfehler:true}:null;
-}
+// Gemeinsamer Zwischenspeicher fuer vexPlz.aufloesen (beide Formulare).
+const plzCache=new Map();
 
 function plzStatusZeigen(kuerzel,html,fehler){
   const el=document.getElementById(kuerzel+'-plz-status');
@@ -389,7 +377,7 @@ function plzStatusZeigen(kuerzel,html,fehler){
 
 function plzGeaendert(kuerzel){
   plzLauf[kuerzel]++;
-  plzStand[kuerzel]={plz:'',stadt:null};
+  plzStand[kuerzel]={plz:'',stadt:null,land:null};
   plzStatusZeigen(kuerzel,'');
   if(!imVersand[kuerzel])document.getElementById(kuerzel+'-submit-btn').disabled=false;
   if(plzTimer[kuerzel])clearTimeout(plzTimer[kuerzel]);
@@ -409,15 +397,33 @@ async function plzPruefen(kuerzel){
   const btn=document.getElementById(kuerzel+'-submit-btn');
   btn.disabled=true;
   plzStatusZeigen(kuerzel,'Postleitzahl wird geprüft...');
-  const erg=await ortZuPlz(wert);
+  const erg=await vexPlz.aufloesen(wert,{cache:plzCache});
   if(lauf!==plzLauf[kuerzel])return null; // inzwischen wurde weiter getippt
-  if(!imVersand[kuerzel])btn.disabled=false;
-  if(erg&&erg.stadt){
-    plzStand[kuerzel]={plz:wert,stadt:erg.stadt};
+  // Eindeutiger Treffer: Stadt + Land uebernehmen.
+  if(erg&&erg.stadt&&!erg.mehrdeutig){
+    plzStand[kuerzel]={plz:wert,stadt:erg.stadt,land:erg.land||null};
     plzStatusZeigen(kuerzel,erg.stadt);
+    if(!imVersand[kuerzel])btn.disabled=false;
     return erg.stadt;
   }
-  plzStand[kuerzel]={plz:'',stadt:null};
+  // Mehrdeutig (4-stellig in AT und CH): der Nutzer waehlt ueber zwei Knoepfe.
+  // Bis zur Wahl gilt die PLZ als noch nicht aufgeloest -> Stadt/Land ungesetzt,
+  // der Absende-Knopf bleibt gesperrt.
+  if(erg&&erg.mehrdeutig){
+    plzStand[kuerzel]={plz:'',stadt:null,land:null};
+    const statusEl=document.getElementById(kuerzel+'-plz-status');
+    statusEl.style.color='var(--text-muted)';
+    statusEl.style.display='block';
+    vexPlz.auswahlKnoepfe(erg.optionen,statusEl,(ort)=>{
+      plzStand[kuerzel]={plz:wert,stadt:ort.stadt,land:ort.land};
+      plzCache.set(wert,ort);
+      plzStatusZeigen(kuerzel,ort.stadt);
+      if(!imVersand[kuerzel])document.getElementById(kuerzel+'-submit-btn').disabled=false;
+    });
+    return null;
+  }
+  if(!imVersand[kuerzel])btn.disabled=false;
+  plzStand[kuerzel]={plz:'',stadt:null,land:null};
   if(erg&&erg.netzfehler){
     plzStatusZeigen(kuerzel,'Der Ort konnte gerade nicht ermittelt werden. <a href="#" style="color:var(--accent)" onclick="plzPruefen(\''+kuerzel+'\');return false">Erneut versuchen</a>',true);
   }else{
@@ -475,6 +481,8 @@ async function submitTrainer(){
   // trainingsort nur mitsenden, wenn gewaehlt - so laeuft die Registrierung auch,
   // solange die Spalte noch nicht existiert (Migration noch nicht eingespielt).
   if(selectedOrt) td.trainingsort=selectedOrt;
+  // Land nur mitsenden, wenn aus der PLZ ermittelt - sonst bleibt die Spalte NULL.
+  if(plzStand['t'].land) td.land=plzStand['t'].land;
   try{
     const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
     const ad=await ar.json();
@@ -503,6 +511,8 @@ async function submitClient(){
   if(!city){showError('c-error','Die Stadt konnte nicht aus der Postleitzahl ermittelt werden. Bitte prüfe die PLZ.');return}
   const btn=document.getElementById('c-submit-btn');imVersand.c=true;btn.disabled=true;btn.textContent='Wird gespeichert...';
   const cd={vorname:fn,nachname:ln,email,stadt:city,plz,ziel:'',erwartungen:''};
+  // Land nur mitsenden, wenn aus der PLZ ermittelt - sonst bleibt die Spalte NULL.
+  if(plzStand['c'].land) cd.land=plzStand['c'].land;
   try{
     const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
     const ad=await ar.json();

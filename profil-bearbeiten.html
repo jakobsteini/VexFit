@@ -241,6 +241,7 @@ try {
 </a>
 
 <script src="vexfit-escape.js"></script>
+<script src="vexfit-plz.js"></script>
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -372,7 +373,7 @@ function fillForm(t) {
   // Stadt und Postleitzahl: gespeicherten Stand anzeigen
   if(t.plz) document.getElementById('fPlz').value = t.plz;
   if(t.plz && t.stadt) {
-    plzStand = { plz: String(t.plz), stadt: t.stadt };
+    plzStand = { plz: String(t.plz), stadt: t.stadt, land: t.land || null };
     plzStatusZeigen(vexEsc(t.stadt), false);
   }
 
@@ -417,27 +418,13 @@ function updateDots() {
 
 // ──── PLZ -> STADT ────
 // Die Stadt wird nicht getippt, sondern aus der Postleitzahl ermittelt -
-// derselbe Weg wie in registrieren.html und der Umkreissuche (suche.html):
-// api.zippopotam.us, Laender at, de und ch in dieser Reihenfolge.
-let plzStand = { plz: '', stadt: null };
+// ueber das gemeinsame Modul vexfit-plz.js (window.vexPlz): 5 Ziffern -> DE,
+// 4 Ziffern -> AT und CH parallel (bei zwei Treffern Wahl ueber Knoepfe).
+// Neben der Stadt wird auch das Land (AT/DE/CH) gehalten und mitgespeichert.
+let plzStand = { plz: '', stadt: null, land: null };
+const plzCache = new Map();
 let plzTimer = null;
 let plzLauf = 0;
-
-// Liefert {stadt} bei Treffer, {netzfehler:true} wenn der Dienst nicht
-// erreichbar war, sonst null (Postleitzahl in keinem der drei Laender bekannt).
-async function ortZuPlz(plz) {
-  let netzfehler = false;
-  for(const land of ['at','de','ch']) {
-    try {
-      const r = await fetch(`https://api.zippopotam.us/${land}/${plz}`);
-      if(r.ok) {
-        const d = await r.json();
-        if(d.places && d.places.length > 0) return { stadt: d.places[0]['place name'] };
-      }
-    } catch(e) { netzfehler = true; }
-  }
-  return netzfehler ? { netzfehler: true } : null;
-}
 
 function plzStatusZeigen(html, fehler) {
   const el = document.getElementById('plzStatus');
@@ -470,15 +457,26 @@ async function plzPruefen() {
   const btn = document.getElementById('btnSave');
   btn.disabled = true;
   plzStatusZeigen('Postleitzahl wird geprüft...');
-  const erg = await ortZuPlz(wert);
+  const erg = await vexPlz.aufloesen(wert, { cache: plzCache });
   if(lauf !== plzLauf) return null; // inzwischen wurde weiter getippt
   btn.disabled = false;
+  // Vierstellig in AT und CH: der Nutzer waehlt den Ort ueber zwei Knoepfe.
+  if(erg && erg.mehrdeutig) {
+    plzStand = { plz: '', stadt: null, land: null };
+    vexPlz.auswahlKnoepfe(erg.optionen, document.getElementById('plzStatus'), (ort) => {
+      // Gewaehlten Ort merken; saveProfile liest Stadt/Land aus plzStand.
+      plzStand = { plz: wert, stadt: ort.stadt, land: ort.land };
+      plzCache.set(wert, ort);
+      plzStatusZeigen(vexEsc(ort.stadt));
+    });
+    return null; // Wahl steht noch aus
+  }
   if(erg && erg.stadt) {
-    plzStand = { plz: wert, stadt: erg.stadt };
+    plzStand = { plz: wert, stadt: erg.stadt, land: erg.land };
     plzStatusZeigen(vexEsc(erg.stadt));
     return erg.stadt;
   }
-  plzStand = { plz: '', stadt: null };
+  plzStand = { plz: '', stadt: null, land: null };
   if(erg && erg.netzfehler) {
     plzStatusZeigen('Der Ort konnte gerade nicht ermittelt werden. <a href="#" style="color:var(--accent)" onclick="plzPruefen();return false">Erneut versuchen</a>', true);
   } else {
@@ -494,9 +492,11 @@ async function saveProfile() {
   // Ohne ermittelten Ort wird nicht gespeichert - der Grund steht am Feld.
   const plzWert = document.getElementById('fPlz').value.trim();
   let stadtNeu = null;
+  let landNeu = null;
   if(plzWert) {
     stadtNeu = await plzPruefen();
     if(!stadtNeu) { showToast('Die Stadt konnte nicht aus der PLZ ermittelt werden', true); return; }
+    landNeu = plzStand.land;
   }
 
   btn.disabled = true;
@@ -525,6 +525,7 @@ async function saveProfile() {
   if(selectedOrt) body.trainingsort = selectedOrt;
   if(telefon) body.telefon = telefon;
   if(plzWert && stadtNeu) { body.plz = plzWert; body.stadt = stadtNeu; }
+  if(landNeu) body.land = landNeu;
 
   try {
     const r = await fetch(`${SB}/rest/v1/trainers?email=eq.${encodeURIComponent(sess.email)}`, {

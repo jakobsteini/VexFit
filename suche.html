@@ -220,6 +220,7 @@ try {
 </footer>
 
 <script src="vexfit-escape.js"></script>
+<script src="vexfit-plz.js"></script>
 <script>
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -307,19 +308,40 @@ const bgColors = [
   'linear-gradient(135deg,#1a1500,#2a2200)',
 ];
 
-async function getCoords(plz) {
-  for(const country of ['at','de','ch']) {
+// Ein gemeinsamer Zwischenspeicher fuer alle PLZ-Abfragen dieses Seitenaufrufs,
+// damit dieselbe PLZ nur einmal beim Standortdienst nachgefragt wird. Wird an
+// vexPlz.aufloesen als {cache} uebergeben; die landbegrenzten Trainer-Abfragen
+// legen unter dem eigenen Schluessel "land:plz" ab (keine Kollision).
+const plzCache = new Map();
+
+// Koordinaten fuer einen Trainer. Mit gesetztem Feld t.land ('AT'/'DE'/'CH')
+// wird nur dieses eine Land abgefragt (direkte Abfrage, eigener Cache-Schluessel);
+// ohne land loest vexPlz.aufloesen wie fuer die Nutzer-PLZ auf (bei mehrdeutiger
+// 4-stelliger PLZ reicht fuer Trainer-Koordinaten der erste Treffer, keine
+// Nutzerwahl noetig). Rueckgabe {stadt,lat,lng} oder null.
+async function trainerCoords(t) {
+  const plz = t.plz;
+  if(!plz) return null;
+  if(t.land) {
+    const land = String(t.land).toLowerCase();
+    const key = land + ':' + plz;
+    if(plzCache.has(key)) return plzCache.get(key);
     try {
-      const r = await fetch(`https://api.zippopotam.us/${country}/${plz}`);
+      const r = await fetch(`https://api.zippopotam.us/${land}/${plz}`);
       if(r.ok) {
         const d = await r.json();
         if(d.places && d.places.length > 0) {
-          return { lat: parseFloat(d.places[0].latitude), lng: parseFloat(d.places[0].longitude), city: d.places[0]['place name'] };
+          const coords = { stadt: d.places[0]['place name'], lat: parseFloat(d.places[0].latitude), lng: parseFloat(d.places[0].longitude) };
+          plzCache.set(key, coords);
+          return coords;
         }
       }
     } catch(e) {}
+    return null;
   }
-  return null;
+  const o = await vexPlz.aufloesen(plz, { cache: plzCache });
+  if(!o || o.netzfehler) return null;
+  return o.mehrdeutig ? o.optionen[0] : o;
 }
 
 function calcDistance(lat1, lng1, lat2, lng2) {
@@ -347,13 +369,23 @@ async function searchByPLZ() {
   }
 
   status.textContent = '📍 Standort wird ermittelt...';
-  const coords = await getCoords(plz);
-  if(!coords) {
-    status.textContent = '⚠️ PLZ nicht gefunden. Bitte prüfen.';
+  const ergebnis = await vexPlz.aufloesen(plz, { cache: plzCache });
+  if(!ergebnis || ergebnis.netzfehler) {
+    status.textContent = (ergebnis && ergebnis.netzfehler)
+      ? '⚠️ Standortdienst nicht erreichbar. Bitte später erneut versuchen.'
+      : '⚠️ PLZ nicht gefunden. Bitte prüfen.';
     return;
   }
+  // 4-stellige PLZ kann in AT und CH liegen: Nutzer waehlt den Ort.
+  if(ergebnis.mehrdeutig) {
+    vexPlz.auswahlKnoepfe(ergebnis.optionen, status, (ort) => umkreisSuche(ort, radius, status));
+    return;
+  }
+  umkreisSuche(ergebnis, radius, status);
+}
 
-  status.textContent = `📍 ${coords.city} · Suche in ${radius} km Umkreis...`;
+async function umkreisSuche(coords, radius, status) {
+  status.textContent = `📍 ${coords.stadt} · Suche in ${radius} km Umkreis...`;
 
   // Filter trainers with known PLZ by distance, also include online trainers
   const filtered = [];
@@ -363,7 +395,7 @@ async function searchByPLZ() {
       continue;
     }
     if(!t.plz) continue;
-    const tc = await getCoords(t.plz);
+    const tc = await trainerCoords(t);
     if(!tc) continue;
     const dist = calcDistance(coords.lat, coords.lng, tc.lat, tc.lng);
     if(dist <= radius) filtered.push({...t, _distance: Math.round(dist)});
@@ -373,7 +405,7 @@ async function searchByPLZ() {
   // Online-Trainer sind vom Umkreisfilter ausgenommen und standen durch
   // _distance:0 frueher ganz oben; jetzt stehen sie hinter den Treffern im Umkreis.
   filtered.sort((a,b) => (a._online?1:0) - (b._online?1:0) || a._distance - b._distance);
-  status.textContent = `📍 ${coords.city} · ${filtered.length} Trainer in ${radius} km gefunden`;
+  status.textContent = `📍 ${coords.stadt} · ${filtered.length} Trainer in ${radius} km gefunden`;
   renderTrainersWithDistance(filtered);
 }
 
@@ -420,7 +452,7 @@ async function loadTrainers() {
     let daten;
     if(angemeldet) {
       // Fuer Angemeldete unveraendert: die Tabelle trainers mit Nutzer-Token.
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv&order=created_at.desc`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv&order=created_at.desc`, {
         headers: authKopf()
       });
       if(istAbgemeldet(res)) return;
