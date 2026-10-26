@@ -287,7 +287,12 @@ else if(urlType==='kunde'||urlType==='client')selectType('client');
 
 function selectType(t){document.getElementById('typeSelector').style.display='none';if(t==='trainer'){document.getElementById('cardTrainer').classList.add('active');document.getElementById('formTrainer').classList.add('active')}else{document.getElementById('cardClient').classList.add('active');document.getElementById('formClient').classList.add('active')}}
 function backToSelector(){document.getElementById('typeSelector').style.display='block';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active')}
-function showSuccess(id){document.getElementById('typeSelector').style.display='none';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active');document.getElementById(id).classList.add('active');window.scrollTo({top:0,behavior:'smooth'});zielKnopfSetzen(id)}
+function showSuccess(id){document.getElementById('typeSelector').style.display='none';document.getElementById('formTrainer').classList.remove('active');document.getElementById('formClient').classList.remove('active');
+  // Befund A: Nach einer gerade erfolgreichen Registrierung nie den Kasten
+  // "Du bist bereits angemeldet" zeigen (auch wenn der Aufrufer schon eine
+  // Sitzung hatte und das Lade-Skript ihn eingeblendet hat).
+  var hA=document.getElementById('angemeldet-hinweis'); if(hA) hA.style.display='none';
+  document.getElementById(id).classList.add('active');window.scrollTo({top:0,behavior:'smooth'});zielKnopfSetzen(id)}
 
 // Hat das Zugangs-Gate (suche.html/profil.html) eine gewuenschte Adresse
 // gemerkt, fuehrt der Erfolgs-Knopf dorthin zurueck. Zugelassen sind

@@ -108,29 +108,43 @@ textarea.modal-msg::placeholder{color:rgba(85,85,85,0.7)}
 .wa{position:fixed;bottom:20px;right:16px;z-index:9999;width:46px;height:46px;background:#25D366;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 16px rgba(37,211,102,0.4);opacity:0;animation:waBounce 0.5s 2s ease both;text-decoration:none}
 @media(min-width:640px){nav{padding:0 32px}}
 /* GEFUEHRTER EINSTIEG */
-.einstieg{min-height:100vh;padding:calc(80px + env(safe-area-inset-top)) 20px 40px;max-width:560px;margin:0 auto;display:flex;flex-direction:column}
-.ein-progress{display:flex;align-items:center;gap:8px;margin-bottom:28px}
-.ein-back{flex:0 0 auto;background:none;border:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:2px 6px 2px 0}
-.ein-dot{width:28px;height:4px;border-radius:2px;background:var(--bi);transition:background 0.3s}
-.ein-dot.on{background:var(--accent)}
+/* Gefuehrter Einstieg: eine Karte, waagrecht UND senkrecht mittig. */
+.einstieg{min-height:100vh;padding:calc(72px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ein-karte{width:100%;max-width:640px;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px 20px 26px;box-sizing:border-box}
+.ein-bar{height:6px;border-radius:3px;background:var(--bi);overflow:hidden;margin-bottom:14px}
+.ein-bar-fill{height:100%;width:0;background:var(--accent);border-radius:3px;transition:width 0.3s ease}
+.ein-top{display:flex;align-items:center;gap:8px;margin-bottom:20px;min-height:44px}
+.ein-back{flex:0 0 auto;background:none;border:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:flex-start}
 .ein-step{font-size:11px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-left:auto}
-.ein-card{flex:1;display:flex;flex-direction:column;animation:fadeUp 0.35s ease both}
-.ein-frage{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,8vw,42px);line-height:0.95;letter-spacing:1.5px;margin-bottom:10px}
+.ein-card{display:flex;flex-direction:column;animation:fadeUp 0.35s ease both}
+.ein-frage{font-family:'Bebas Neue',sans-serif;font-size:clamp(26px,6vw,38px);line-height:0.98;letter-spacing:1.5px;margin-bottom:8px}
 .ein-frage span{color:var(--accent)}
-.ein-hint{font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.6}
-.ein-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px}
-.ein-chip{padding:9px 15px;border:1px solid var(--bi);border-radius:100px;font-size:13px;color:var(--white);cursor:pointer;transition:all 0.2s;user-select:none}
-.ein-chip.on{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.08)}
-.ein-feld{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+.ein-hint{font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6}
+.ein-kacheln{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.ein-kacheln-5{grid-template-columns:repeat(5,1fr)}
+.ein-kachel{min-height:64px;display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;border:1px solid var(--bi);border-radius:10px;font-size:14px;color:var(--white);cursor:pointer;transition:border-color 0.2s,background 0.2s,color 0.2s;user-select:none}
+.ein-kachel.on{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.08)}
+.ein-feld{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
 .ein-feld label{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
-.ein-feld input,.ein-feld select{background:var(--mid);border:1px solid var(--bi);color:var(--white);padding:13px 14px;font-family:'DM Sans',sans-serif;font-size:15px;border-radius:3px;outline:none;width:100%;appearance:none;-webkit-appearance:none}
-.ein-feld input:focus,.ein-feld select:focus{border-color:rgba(232,255,0,0.35)}
-.ein-feld select option{background:#1a1a1a}
-.ein-nav{display:flex;gap:10px;margin-top:auto;padding-top:20px}
-.ein-zurueck{flex:0 0 auto;background:none;border:1px solid var(--border);color:var(--muted);padding:14px 20px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer}
-.ein-weiter{flex:1;background:var(--accent);color:var(--bg);border:none;padding:14px;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer}
+.ein-feld input{background:var(--mid);border:1px solid var(--bi);color:var(--white);padding:14px;font-family:'DM Sans',sans-serif;font-size:16px;border-radius:8px;outline:none;width:100%;box-sizing:border-box}
+.ein-feld input:focus{border-color:rgba(232,255,0,0.35)}
+.ein-ort-zeile{font-size:13px;color:var(--muted);margin-bottom:14px}
+.ein-ort-zeile a{color:var(--accent);text-decoration:underline;cursor:pointer;margin-left:6px}
+.ein-weiter{margin-top:18px;background:var(--accent);color:var(--bg);border:none;min-height:52px;border-radius:8px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer}
 .ein-skip{text-align:center;margin-top:16px}
-.ein-skip a{font-size:12px;color:var(--muted);text-decoration:underline;cursor:pointer}
+.ein-skip a{font-size:12px;color:var(--muted);text-decoration:underline;cursor:pointer;display:inline-flex;min-height:44px;align-items:center;padding:0 10px}
+/* Leerer Zustand (0 Trainer im Umkreis) + Abschnittsueberschriften der Trefferliste. */
+.leer-karte{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px 22px;text-align:center;margin-top:8px}
+.leer-title{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;margin-bottom:10px}
+.leer-sub{font-size:14px;color:var(--muted);line-height:1.7;font-weight:300;margin-bottom:20px}
+.leer-zweit{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:14px}
+.btn-zweit{background:none;border:1px solid var(--border);color:var(--white);min-height:44px;padding:0 16px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
+.tl-abschnitt{margin-bottom:8px}
+.tl-head{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin:18px 0 10px}
+@media (max-width:640px){
+  .ein-kacheln{grid-template-columns:1fr}
+  .ein-kacheln-5{grid-template-columns:repeat(2,1fr)}
+}
 .suche-zusammenfassung{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .sz-text{font-size:12px;color:var(--muted);line-height:1.5}
 .sz-text b{color:var(--white);font-weight:600}
@@ -205,52 +219,53 @@ try {
      Frage 1 Spezialisierungen (belegt, SPEZ_EINSTIEG unten), Frage 2 Ort (Vor Ort/
      Online, filtert gegen trainers.trainingsort), Frage 3 PLZ+Umkreis (vorhandene Suche). -->
 <div class="einstieg hidden" id="einstieg">
-  <div class="ein-progress">
-    <button class="ein-back hidden" id="einBack" onclick="einstiegZurueck()" aria-label="Zurück">←</button>
-    <div class="ein-step" id="einStep">Frage 1 von 2</div>
-  </div>
+  <div class="ein-karte">
+    <!-- Fortschrittsbalken ueber die volle Kartenbreite; darunter Zurueck + "Frage x von y". -->
+    <div class="ein-bar"><div class="ein-bar-fill" id="einBarFill"></div></div>
+    <div class="ein-top">
+      <button class="ein-back hidden" id="einBack" onclick="einstiegZurueck()" aria-label="Zurück">←</button>
+      <div class="ein-step" id="einStep">Frage 1 von 2</div>
+    </div>
 
-  <!-- Ziel-Frage: NUR fuer Altkonten ohne gespeichertes kunden.ziel. Einzige
-       Karte mit Weiter-Knopf (Mehrfachauswahl). -->
-  <div class="ein-card hidden" id="einCardZiel">
-    <div class="ein-frage">Woran willst du <span>arbeiten?</span></div>
-    <div class="ein-hint">Mehrfachauswahl möglich.</div>
-    <div class="ein-chips" id="einSpezChips"></div>
-    <div class="ein-nav">
+    <!-- Ziel-Frage: NUR fuer Altkonten ohne gespeichertes kunden.ziel. Einzige
+         Karte mit Weiter-Knopf (Mehrfachauswahl). -->
+    <div class="ein-card hidden" id="einCardZiel">
+      <div class="ein-frage">Woran willst du <span>arbeiten?</span></div>
+      <div class="ein-hint">Mehrfachauswahl möglich.</div>
+      <div class="ein-kacheln" id="einSpezChips"></div>
       <button class="ein-weiter" onclick="einstiegZielWeiter()">Weiter →</button>
     </div>
-    <div class="ein-skip"><a onclick="einstiegUeberspringen()">Einstieg überspringen</a></div>
-  </div>
 
-  <!-- Frage Ort: Vor Ort / Online / Beides. Ein Tipp waehlt und geht weiter. -->
-  <div class="ein-card hidden" id="einCardOrt">
-    <div class="ein-frage">Vor Ort oder <span>online?</span></div>
-    <div class="ein-chips">
-      <div class="ein-chip" data-v="vor_ort" onclick="einOrtTipp('vor_ort')">Vor Ort</div>
-      <div class="ein-chip" data-v="online" onclick="einOrtTipp('online')">Online</div>
-      <div class="ein-chip" data-v="beides" onclick="einOrtTipp('beides')">Beides</div>
+    <!-- Frage Ort: Vor Ort / Online / Beides. Ein Tipp waehlt und geht weiter. -->
+    <div class="ein-card hidden" id="einCardOrt">
+      <div class="ein-frage">Vor Ort oder <span>online?</span></div>
+      <div class="ein-kacheln ein-kacheln-3">
+        <div class="ein-kachel" data-v="vor_ort" onclick="einOrtTipp('vor_ort')">Vor Ort</div>
+        <div class="ein-kachel" data-v="online" onclick="einOrtTipp('online')">Online</div>
+        <div class="ein-kachel" data-v="beides" onclick="einOrtTipp('beides')">Beides</div>
+      </div>
     </div>
-    <div class="ein-skip"><a onclick="einstiegUeberspringen()">Einstieg überspringen</a></div>
-  </div>
 
-  <!-- Frage Umkreis: optionales PLZ-Feld (Altkonto ohne kunden.plz) + Umkreis-
-       Knoepfe. Ein Tipp startet die Suche. -->
-  <div class="ein-card hidden" id="einCardUmkreis">
-    <div class="ein-frage">In welchem <span>Umkreis?</span></div>
-    <div class="ein-feld hidden" id="einPlzFeld">
-      <label>Deine PLZ</label>
-      <input type="text" id="einPlz" placeholder="Deine PLZ (z.B. 5026)" maxlength="5" inputmode="numeric" autocomplete="postal-code">
+    <!-- Frage Umkreis: PLZ-Feld nur fuer Altkonten ohne kunden.plz; sonst Zeile
+         "um <PLZ> <Stadt>" mit "ändern". Ein Tipp startet die Suche. -->
+    <div class="ein-card hidden" id="einCardUmkreis">
+      <div class="ein-frage">In welchem <span>Umkreis?</span></div>
+      <div class="ein-feld hidden" id="einPlzFeld">
+        <label>Deine PLZ</label>
+        <input type="text" id="einPlz" placeholder="Deine PLZ (z.B. 5026)" maxlength="5" inputmode="numeric" autocomplete="postal-code">
+      </div>
+      <div class="ein-ort-zeile hidden" id="einOrtZeile"></div>
+      <div class="ein-hint hidden" id="einPlzHint"></div>
+      <div class="ein-kacheln ein-kacheln-5">
+        <div class="ein-kachel" data-v="10" onclick="einUmkreisTipp(10)">10 km</div>
+        <div class="ein-kachel" data-v="25" onclick="einUmkreisTipp(25)">25 km</div>
+        <div class="ein-kachel" data-v="50" onclick="einUmkreisTipp(50)">50 km</div>
+        <div class="ein-kachel" data-v="100" onclick="einUmkreisTipp(100)">100 km</div>
+        <div class="ein-kachel" data-v="0" onclick="einUmkreisTipp(0)">Alle</div>
+      </div>
     </div>
-    <div class="ein-hint hidden" id="einPlzHint"></div>
-    <div class="ein-chips">
-      <div class="ein-chip" data-v="10" onclick="einUmkreisTipp(10)">10 km</div>
-      <div class="ein-chip" data-v="25" onclick="einUmkreisTipp(25)">25 km</div>
-      <div class="ein-chip" data-v="50" onclick="einUmkreisTipp(50)">50 km</div>
-      <div class="ein-chip" data-v="100" onclick="einUmkreisTipp(100)">100 km</div>
-      <div class="ein-chip" data-v="0" onclick="einUmkreisTipp(0)">Alle</div>
-    </div>
-    <div class="ein-skip"><a onclick="einstiegUeberspringen()">Einstieg überspringen</a></div>
   </div>
+  <div class="ein-skip"><a onclick="einstiegUeberspringen()">Einstieg überspringen</a></div>
 </div>
 
 <!-- TRAINER SUCHE -->
@@ -309,13 +324,13 @@ try {
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
-let K = null, allT = [], activeFilter = 'alle', selT = null, lastSearch = null, einstiegSpez = [], einstiegOrt = '', letzteUmkreisListe = [];
+let K = null, allT = [], activeFilter = 'alle', selT = null, lastSearch = null, einstiegSpez = [], einstiegOrt = '', letzteTreffer = [];
 
 // ──── GEFUEHRTER EINSTIEG ────
 // Frage 1 (Spezialisierungen): Werte WORTGLEICH aus den Profilformularen
 //   (profil-bearbeiten.html SPEZ_OPTIONS Zeilen 235-239, identisch trainer-bereich.html).
 // Frage 2 (Wo trainierst du?): zwei Knoepfe "Vor Ort"/"Online"; gefiltert wird gegen
-//   trainers.trainingsort ('vor_ort'/'online'/'beides'/leer) - siehe renderTrainer.
+//   trainers.trainingsort ('vor_ort'/'online'/'beides'/leer) - siehe renderErgebnis/trefferAufteilen.
 const SPEZ_EINSTIEG = window.SPEZ_EINSTIEG; // gemeinsame Liste aus vexfit-ziele.js
 const EINSTIEG_KEY = 'vexfit_einstieg';
 let einSchritte = ['ort', 'umkreis']; // dynamische Fragenfolge (ziel nur fuer Altkonten)
@@ -358,7 +373,6 @@ function istAbgemeldet(r) {
 }
 
 document.getElementById('emailNote').textContent = 'Eingeloggt als: ' + sess.email;
-loadKunde(sess.email);
 ladeMeineAnfragen();
 
 // Zeigt die eigenen Anfragen mit Bearbeitungsstand. Schlaegt das Laden fehl
@@ -390,14 +404,25 @@ async function ladeMeineAnfragen() {
   } catch(e) { console.error('ladeMeineAnfragen:', e); }
 }
 
-async function loadKunde(email) {
+// Laedt die EIGENE kunden-Zeile. Primaer ueber user_id des angemeldeten Kontos,
+// Rueckfall ueber die E-Mail ohne Gross-/Kleinschreibung (Altbestand ohne
+// user_id). Der Zeilenschutz erlaubt beide Wege fuer die eigene Zeile
+// (2026-09-19-zugriffsregeln-neuaufbau.sql: Policy kunden_eigene_zeile_lesen,
+// USING user_id = auth.uid() OR email = jwt-email). Wird VOR dem Einstieg
+// abgewartet, sonst startet der Einstieg ohne K und fragt Ziel/PLZ erneut (Befund B).
+async function loadKunde() {
   try {
-    const r = await fetch(`${SB}/rest/v1/kunden?email=eq.${encodeURIComponent(email)}&select=*`, {
-      headers: authKopf()
-    });
-    if(istAbgemeldet(r)) return;
-    if(!r.ok) throw new Error('Kundendaten laden fehlgeschlagen: ' + r.status);
-    const d = await r.json();
+    let d = null;
+    if(sess.user_id) {
+      const r = await fetch(`${SB}/rest/v1/kunden?user_id=eq.${encodeURIComponent(sess.user_id)}&select=*`, { headers: authKopf() });
+      if(istAbgemeldet(r)) return;
+      if(r.ok) d = await r.json();
+    }
+    if(!Array.isArray(d) || d.length === 0) {
+      const r2 = await fetch(`${SB}/rest/v1/kunden?email=ilike.${encodeURIComponent(sess.email)}&select=*`, { headers: authKopf() });
+      if(istAbgemeldet(r2)) return;
+      if(r2.ok) d = await r2.json();
+    }
     if(Array.isArray(d) && d.length > 0) {
       K = d[0];
       if(K.plz) {
@@ -511,7 +536,6 @@ async function loadTrainer() {
     const daten = await r.json();
     if(!Array.isArray(daten)) throw new Error('Unerwartete Antwort beim Trainer laden');
     allT = daten;
-    renderTrainer(allT);
   } catch(e) {
     console.error(e);
     const g = document.getElementById('trainerList');
@@ -519,35 +543,42 @@ async function loadTrainer() {
   }
 }
 
+// Ermittelt die Treffer. Online (ortsunabhaengig) braucht keine PLZ; sonst wird
+// zu jedem Trainer mit PLZ die Entfernung bestimmt (_dist in km, sonst null).
+// Die Aufteilung in Umkreis/Online und die Zaehlung uebernimmt vexEinstieg.
 async function searchByPLZ() {
   const plz = document.getElementById('plzInput').value.trim();
   const radius = parseInt(document.getElementById('radiusInput').value);
   const status = document.getElementById('plzStatus');
-  if(radius === 0) { if(!allT.length) await loadTrainer(); lastSearch = null; letzteUmkreisListe = allT; renderTrainer(allT); status.textContent = `Alle ${allT.length} Trainer`; return; }
-  if(!plz || plz.length < 4) { status.textContent = '⚠️ Bitte gültige PLZ eingeben'; return; }
+  const ort = einstiegOrt || 'beides';
   if(!allT.length) await loadTrainer();
+
+  // Online: keine PLZ noetig, Entfernung spielt keine Rolle.
+  if(ort === 'online') {
+    letzteTreffer = allT.map(t => ({ ...t, _dist: null }));
+    lastSearch = { plz: plz || (K && K.plz) || '', city: '', radius: 0, ort: 'online' };
+    renderErgebnis();
+    return;
+  }
+
+  if(!plz || plz.length < 4) { status.textContent = '⚠️ Bitte gültige PLZ eingeben'; return; }
   status.textContent = '📍 Standort wird ermittelt...';
   const coords = await ermittleNutzerCoords(plz, status, K && K.land);
   if(coords && coords.netzfehler) { status.textContent = '⚠️ Standort konnte nicht ermittelt werden. Bitte später erneut versuchen.'; return; }
   if(!coords) { status.textContent = '⚠️ PLZ nicht gefunden'; return; }
   status.textContent = `📍 ${coords.city} · Suche läuft...`;
-  const filtered = [];
+  const mitDist = [];
   for(const t of allT) {
-    if((t.trainingsart||'').toLowerCase().includes('online')) { filtered.push({...t,_dist:0,_online:true}); continue; }
-    if(!t.plz) continue;
-    const tc = await trainerCoords(t.plz, t.land);
-    if(!tc) continue;
-    const dist = calcDist(coords.lat,coords.lng,tc.lat,tc.lng);
-    if(dist <= radius) filtered.push({...t,_dist:Math.round(dist)});
+    let dist = null;
+    if(t.plz) {
+      const tc = await trainerCoords(t.plz, t.land);
+      if(tc) dist = Math.round(calcDist(coords.lat, coords.lng, tc.lat, tc.lng));
+    }
+    mitDist.push({ ...t, _dist: dist });
   }
-  // Erst die Trainer im Umkreis (nach Entfernung), danach die Online-Trainer.
-  // Online-Trainer sind vom Umkreisfilter ausgenommen (siehe oben) und standen
-  // durch _dist:0 frueher ganz oben; jetzt stehen sie hinter den Treffern im Umkreis.
-  filtered.sort((a,b) => (a._online?1:0) - (b._online?1:0) || a._dist - b._dist);
-  status.textContent = `📍 ${coords.city} · ${filtered.length} Trainer in ${radius} km`;
-  lastSearch = { plz, city: coords.city, radius };
-  letzteUmkreisListe = filtered;
-  renderTrainer(filtered);
+  letzteTreffer = mitDist;
+  lastSearch = { plz, city: coords.city, radius: Number.isFinite(radius) ? radius : 0, ort };
+  renderErgebnis();
 }
 
 function setFilter(f, el) {
@@ -556,104 +587,175 @@ function setFilter(f, el) {
   activeFilter = f;
   document.querySelectorAll('.fc').forEach(c => c.classList.remove('on'));
   el.classList.add('on');
-  renderTrainer(allT);
+  if(lastSearch) renderErgebnis();
 }
 
-// Hebt die Einstieg-Filter (Spezialisierung + Ort) auf und zeigt wieder alle Treffer im Umkreis.
+// Hebt die Einstieg-Filter (Spezialisierung + Ort) auf und zeigt wieder alle Treffer.
 function filterZuruecksetzen() {
   einstiegSpez = [];
   einstiegOrt = '';
   activeFilter = 'alle';
   document.querySelectorAll('.filter-bar .fc').forEach(b => b.classList.toggle('on', /setFilter\('alle'/.test(b.getAttribute('onclick') || '')));
-  renderTrainer(letzteUmkreisListe);
+  if(lastSearch) { lastSearch = { ...lastSearch, ort: 'beides' }; renderErgebnis(); }
 }
 
-function renderTrainer(list) {
-  let filtered = list;
+// Spezialisierungs-Filter: Einstieg-Mehrfachauswahl (mind. eine davon) oder der
+// einzelne aktive Filterknopf. Keine Wahl -> ganze Liste.
+function spezFilter(list) {
   if(einstiegSpez.length) {
-    // Einstieg-Mehrfachauswahl: Trainer mit MINDESTENS EINER der gewaehlten
-    // Spezialisierungen (ohne Beachtung von Gross-/Kleinschreibung). Reihenfolge
-    // der Liste bleibt unveraendert (Umkreistreffer zuerst, Online danach).
     const wahl = einstiegSpez.map(s => String(s).toLowerCase());
-    filtered = list.filter(t => {
-      const haben = (t.spezialisierungen||[]).join(' ').toLowerCase();
-      return wahl.some(w => haben.includes(w));
-    });
-  } else if(activeFilter !== 'alle') {
-    filtered = list.filter(t => (t.spezialisierungen||[]).join(' ').toLowerCase().includes(activeFilter.toLowerCase()));
+    return list.filter(t => { const h = (t.spezialisierungen||[]).join(' ').toLowerCase(); return wahl.some(w => h.includes(w)); });
   }
-  if(einstiegOrt) {
-    // Frage 2: "Vor Ort" -> trainingsort 'vor_ort'/'beides', "Online" -> 'online'/'beides'.
-    // Trainer OHNE Wert (noch nicht geantwortet) bleiben in beiden Faellen sichtbar,
-    // damit Bestandstrainer nicht verschwinden. Wie die Online-Trainer nach den
-    // Umkreistreffern ermittelt werden (trainingsart), bleibt davon unberuehrt.
-    filtered = filtered.filter(t => {
-      const o = t.trainingsort;
-      if(!o) return true;
-      if(einstiegOrt === 'vor_ort') return o === 'vor_ort' || o === 'beides';
-      if(einstiegOrt === 'online') return o === 'online' || o === 'beides';
-      return true;
-    });
+  if(activeFilter !== 'alle') {
+    return list.filter(t => (t.spezialisierungen||[]).join(' ').toLowerCase().includes(activeFilter.toLowerCase()));
   }
+  return list;
+}
+
+// Eine Trainerkarte. modus 'online' zeigt das Online-Abzeichen, 'umkreis' die
+// Entfernung (falls bekannt).
+function karte(t, modus) {
+  const ini = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
+  const bild = avatarAdresse(t.avatar_url);
+  const avStyle = bild ? `background-image:url('${vexEsc(bild)}');background-size:cover;background-position:center` : '';
+  const chips = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="tc-chip">${vexEsc(s)}</span>`).join('');
+  const dist = modus === 'online'
+    ? '<div class="tc-dist">🌐 Online</div>'
+    : (t._dist != null ? `<div class="tc-dist">📍 ${t._dist} km</div>` : '');
+  const price = t.preis_stunde ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">ab €${t.preis_stunde}/Std</div>` : '';
+  return `<div class="trainer-card">
+    <div class="tc-top">
+      <div class="tc-av" style="${avStyle}">${avStyle?'':vexEsc(ini)}</div>
+      <div><div class="tc-name">${vexEsc(t.vorname||'')} ${vexEsc(t.nachname||'')}</div><div class="tc-meta">${vexEsc(t.trainingsart||'')} · ${vexEsc(t.stadt||'')}</div>${dist}</div>
+    </div>
+    ${t.bio?`<div class="tc-bio">${vexEsc(t.bio)}</div>`:''}
+    <div class="tc-chips">${chips}</div>
+    ${price}
+    <div class="tc-actions">
+      <a href="profil.html?id=${t.id}" class="btn-profil">Profil →</a>
+      <button class="btn-anfrage" onclick="openModal(${JSON.stringify(t).replace(/"/g,'&quot;')})">Anfragen →</button>
+    </div>
+  </div>`;
+}
+function abschnitt(titel, list, modus) {
+  return `<div class="tl-abschnitt"><div class="tl-head">${vexEsc(titel)}</div>${list.map(t => karte(t, modus)).join('')}</div>`;
+}
+
+// Leerer Zustand (Vor Ort/Beides, 0 Trainer im Umkreis): Karte mit "Benachrichtige
+// mich" (schreibt in trainer_alerts, die Tabelle, aus der die Edge Function
+// trainer-alert die Kunden benachrichtigt) und zwei Zweitknoepfen.
+function leererUmkreis(onlineVorhanden) {
+  return `<div class="leer-karte">
+    <div class="leer-title">Noch kein Trainer in deinem Umkreis</div>
+    <div class="leer-sub">Wir gewinnen gerade Trainer in deiner Region. Wir sagen dir Bescheid, sobald jemand in deiner Nähe ist.</div>
+    <button class="btn-alert" id="benBtn" onclick="benachrichtigeMich()">Benachrichtige mich</button>
+    <div class="leer-zweit">
+      <button class="btn-zweit" onclick="einstiegZurueckZuUmkreis()">Größeren Umkreis wählen</button>
+      ${onlineVorhanden ? `<button class="btn-zweit" onclick="zeigeOnlineAbschnitt()">Online-Trainer ansehen</button>` : ''}
+    </div>
+  </div>`;
+}
+function leererOnline() {
+  return `<div class="leer-karte">
+    <div class="leer-title">Noch keine Online-Trainer</div>
+    <div class="leer-sub">Aktuell ist kein Online-Trainer verfügbar. Schau später noch einmal vorbei.</div>
+  </div>`;
+}
+
+// Baut die Trefferliste aus den letzten Treffern + der aktuellen Ortswahl.
+function renderErgebnis() {
   const el = document.getElementById('trainerList');
-  if(!filtered.length) {
-    const filterAktiv = (einstiegSpez.length > 0) || !!einstiegOrt || (activeFilter !== 'alle');
-    if(list.length > 0 && filterAktiv) {
-      // Es gibt Treffer im Umkreis, aber der Filter hat alle entfernt: Hinweis
-      // und ein Knopf, der die Filter aufhebt und alle Umkreistreffer zeigt.
-      el.innerHTML = `<div class="empty-state" style="padding:48px 20px 20px">
-      <div style="font-size:40px;margin-bottom:16px">🔍</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;color:rgba(255,255,255,0.3);margin-bottom:12px">KEIN TRAINER PASST ZU DEINER AUSWAHL</div>
-      <div style="font-size:14px;color:var(--muted);line-height:1.8;font-weight:300;margin-bottom:18px">Im Umkreis gibt es ${list.length} Trainer, aber keiner deckt deine gewählten Ziele ab.</div>
-      <button class="btn-alert" onclick="filterZuruecksetzen()">Alle Treffer im Umkreis zeigen</button>
-    </div>`;
-      return;
-    }
-    const where = lastSearch ? `IN ${vexEsc(lastSearch.plz)}${lastSearch.city ? ' ' + vexEsc(lastSearch.city.toUpperCase()) : ''}` : 'IN DEINER NÄHE';
-    const alertBox = lastSearch ? `
-    <div class="alert-box" id="alertBox">
-      <div class="alert-box-title">🔔 Informiere mich sobald es einen Trainer für mich gibt</div>
-      <div class="alert-box-sub">Sobald sich ein Trainer in ${vexEsc(lastSearch.plz)} ${vexEsc(lastSearch.city || '')} registriert, bekommst du automatisch eine E-Mail mit seinen Daten.</div>
-      <button class="btn-alert" id="alertBtn" onclick="activateAlert()">Aktivieren</button>
-    </div>` : '';
-    // Warteliste: ein Klick merkt den Ort vor. PLZ, Stadt, Ziel und Umkreis sind
-    // aus dem Einstieg/der Suche schon bekannt (siehe vormerken()); nichts wird
-    // zusaetzlich abgefragt. Erscheint nur, wenn auch ohne Filter nichts gefunden
-    // wurde - diesen Zweig erreicht man nur dann.
-    const wartelisteBox = lastSearch ? `
-    <div class="alert-box" id="wartelisteBox">
-      <div class="alert-box-title">📝 Auf die Warteliste für ${vexEsc(lastSearch.city || lastSearch.plz)}</div>
-      <div class="alert-box-sub">Ein Klick genügt — deine Angaben aus der Suche sind schon bekannt. So sieht Vexfit, dass hier Bedarf ist.</div>
-      <button class="btn-alert" id="wartelisteBtn" onclick="vormerken()">Für diesen Ort vormerken</button>
-    </div>` : '';
-    el.innerHTML = `<div class="empty-state" style="padding:48px 20px 20px">
-    <div style="font-size:40px;margin-bottom:16px">📍</div>
-    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1.5px;color:rgba(255,255,255,0.3);margin-bottom:12px">KEINE TRAINER ${where} GEFUNDEN</div>
-    <div style="font-size:14px;color:var(--muted);line-height:1.8;font-weight:300">Aktuell ist hier noch kein Trainer verfügbar.</div>
-  </div>${alertBox}${wartelisteBox}`;
-    if(lastSearch) { checkAlertStatus(); checkWartelisteStatus(); }
-    return; }
-  el.innerHTML = filtered.map(t => {
-    const ini = ((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase();
-    const bild = avatarAdresse(t.avatar_url);
-    const avStyle = bild ? `background-image:url('${vexEsc(bild)}');background-size:cover;background-position:center` : '';
-    const chips = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="tc-chip">${vexEsc(s)}</span>`).join('');
-    const dist = t._online ? '<div class="tc-dist">🌐 Online</div>' : t._dist !== undefined ? `<div class="tc-dist">📍 ${t._dist} km</div>` : '';
-    const price = t.preis_stunde ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">ab €${t.preis_stunde}/Std</div>` : '';
-    return `<div class="trainer-card">
-      <div class="tc-top">
-        <div class="tc-av" style="${avStyle}">${avStyle?'':vexEsc(ini)}</div>
-        <div><div class="tc-name">${vexEsc(t.vorname||'')} ${vexEsc(t.nachname||'')}</div><div class="tc-meta">${vexEsc(t.trainingsart||'')} · ${vexEsc(t.stadt||'')}</div>${dist}</div>
-      </div>
-      ${t.bio?`<div class="tc-bio">${vexEsc(t.bio)}</div>`:''}
-      <div class="tc-chips">${chips}</div>
-      ${price}
-      <div class="tc-actions">
-        <a href="profil.html?id=${t.id}" class="btn-profil">Profil →</a>
-        <button class="btn-anfrage" onclick="openModal(${JSON.stringify(t).replace(/"/g,'&quot;')})">Anfragen →</button>
-      </div>
-    </div>`;
-  }).join('');
+  const status = document.getElementById('plzStatus');
+  const ort = (lastSearch && lastSearch.ort) || 'beides';
+  const radius = (lastSearch && Number.isFinite(lastSearch.radius)) ? lastSearch.radius : 0;
+  const stadt = (lastSearch && (lastSearch.city || lastSearch.plz)) || '';
+  const gefiltert = spezFilter(letzteTreffer);
+  const { umkreis, online, anzahlUmkreis } = window.vexEinstieg.trefferAufteilen(gefiltert, ort, radius);
+
+  if(ort === 'online') {
+    if(status) status.textContent = online.length ? `🌐 ${online.length} Online-Trainer` : '';
+    el.innerHTML = online.length ? abschnitt('Online-Trainer', online, 'online') : leererOnline();
+    return;
+  }
+
+  // Zaehlzeile nennt NUR die Trainer im Umkreis (Befund C).
+  if(status) status.textContent = '📍 ' + window.vexEinstieg.zaehlzeile(stadt, anzahlUmkreis, radius);
+
+  let html = '';
+  if(anzahlUmkreis > 0) {
+    const titel = radius ? `Im Umkreis von ${radius} km` : 'Im Umkreis';
+    html += abschnitt(titel, umkreis, 'umkreis');
+  } else {
+    html += leererUmkreis(ort === 'beides' && online.length > 0);
+  }
+  if(ort === 'beides' && online.length > 0) {
+    html += `<div id="onlineAbschnitt">${abschnitt('Online-Trainer – ortsunabhängig', online, 'online')}</div>`;
+  }
+  el.innerHTML = html;
+  if(anzahlUmkreis === 0 && lastSearch) benachrichtigungStatusPruefen();
+}
+
+// Scrollt zum Online-Abschnitt (Knopf im leeren Zustand bei "Beides").
+function zeigeOnlineAbschnitt() {
+  const a = document.getElementById('onlineAbschnitt');
+  if(a) a.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+// Zurueck zur Umkreis-Frage des Einstiegs (groesseren Umkreis waehlen).
+function einstiegZurueckZuUmkreis() {
+  document.getElementById('searchPage').classList.add('hidden');
+  document.getElementById('welcomePage').classList.add('hidden');
+  document.getElementById('einstieg').classList.remove('hidden');
+  const i = einSchritte.indexOf('umkreis');
+  einIndex = i >= 0 ? i : Math.max(0, einSchritte.length - 1);
+  einstiegZeige();
+}
+
+// Schreibt die Benachrichtigung in trainer_alerts - genau die Tabelle, aus der die
+// Edge Function trainer-alert die Kunden benachrichtigt (plz/stadt/radius). Ein
+// Klick, keine Eingabe: alles kommt aus K und der Suche.
+async function benachrichtigeMich() {
+  if(!lastSearch) return;
+  const btn = document.getElementById('benBtn');
+  if(btn) { btn.disabled = true; btn.textContent = 'Wird gespeichert...'; }
+  try {
+    const r = await fetch(`${SB}/rest/v1/trainer_alerts`, {
+      method: 'POST',
+      headers: authKopf({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({
+        kunden_email: sess.email,
+        kunden_name: K ? `${K.vorname||''} ${K.nachname||''}`.trim() : '',
+        plz: lastSearch.plz,
+        stadt: lastSearch.city || '',
+        radius: lastSearch.radius || 0,
+        aktiv: true
+      })
+    });
+    if(!r.ok) throw new Error('Status ' + r.status);
+    markBenachrichtigt();
+  } catch(e) {
+    console.error('benachrichtigeMich:', e && e.name);
+    if(btn) { btn.disabled = false; btn.textContent = 'Benachrichtige mich'; }
+  }
+}
+function markBenachrichtigt() {
+  const btn = document.getElementById('benBtn');
+  if(!btn) return;
+  btn.textContent = 'Du bist vorgemerkt ✓';
+  btn.classList.add('active');
+  btn.disabled = true;
+}
+// Zeigt den Vormerk-Zustand auch beim naechsten Besuch (solange ein aktiver
+// Eintrag fuer diese PLZ besteht); der Zeilenschutz liefert nur eigene Zeilen.
+async function benachrichtigungStatusPruefen() {
+  if(!lastSearch || !lastSearch.plz) return;
+  try {
+    const r = await fetch(`${SB}/rest/v1/trainer_alerts?kunden_email=eq.${encodeURIComponent(sess.email)}&plz=eq.${encodeURIComponent(lastSearch.plz)}&aktiv=eq.true&select=id&limit=1`, {
+      headers: authKopf()
+    });
+    if(!r.ok) return;
+    const d = await r.json();
+    if(Array.isArray(d) && d.length > 0) markBenachrichtigt();
+  } catch(e) { console.error('benachrichtigungStatusPruefen:', e && e.name); }
 }
 
 function openModal(t) {
@@ -825,7 +927,7 @@ function einstiegGespeichert() {
 }
 function einstiegChipsAufbauen() {
   const s = document.getElementById('einSpezChips');
-  if(s && !s.childElementCount) s.innerHTML = SPEZ_EINSTIEG.map(x => `<div class="ein-chip" data-v="${x}" onclick="einSpezToggle(this)">${x}</div>`).join('');
+  if(s && !s.childElementCount) s.innerHTML = SPEZ_EINSTIEG.map(x => `<div class="ein-kachel" data-v="${x}" onclick="einSpezToggle(this)">${x}</div>`).join('');
 }
 function einSpezToggle(el) {
   const v = el.getAttribute('data-v');
@@ -843,6 +945,33 @@ function einstiegZeige() {
   document.getElementById(EIN_KARTEN[aktuell]).classList.remove('hidden');
   document.getElementById('einStep').textContent = 'Frage ' + (einIndex + 1) + ' von ' + einSchritte.length;
   document.getElementById('einBack').classList.toggle('hidden', einIndex === 0);
+  // Fortschrittsbalken: Anteil der erledigten inkl. aktuellem Schritt.
+  const fill = document.getElementById('einBarFill');
+  if(fill) fill.style.width = Math.round((einIndex + 1) / einSchritte.length * 100) + '%';
+  // Umkreis-Karte: ist eine PLZ bekannt (kein PLZ-Feld noetig), Zeile
+  // "um <PLZ> <Stadt>" mit "ändern" zeigen (Befund/Schritt 2).
+  if(aktuell === 'umkreis') {
+    const zeile = document.getElementById('einOrtZeile');
+    if(zeile) {
+      if(!einPlzFeldNoetig) {
+        const plz = einAuswahl.plz || (K && K.plz) || '';
+        const stadt = (K && K.stadt) ? ' ' + K.stadt : '';
+        zeile.innerHTML = 'um ' + vexEsc(plz) + vexEsc(stadt) + ' <a onclick="einPlzAendern()">ändern</a>';
+        zeile.classList.remove('hidden');
+      } else {
+        zeile.classList.add('hidden');
+      }
+    }
+  }
+}
+// "ändern" in der Umkreis-Frage: PLZ-Feld einblenden, damit eine andere PLZ
+// eingegeben werden kann.
+function einPlzAendern() {
+  einPlzFeldNoetig = true;
+  document.getElementById('einPlzFeld').classList.remove('hidden');
+  document.getElementById('einOrtZeile').classList.add('hidden');
+  const ep = document.getElementById('einPlz');
+  if(ep) { ep.value = einAuswahl.plz || (K && K.plz) || ''; ep.focus(); }
 }
 function einstiegZurueck() { if(einIndex > 0) { einIndex--; einstiegZeige(); } }
 // Ziel-Frage (nur Altkonto): die markierten Ziele stehen in einAuswahl, weiter.
@@ -851,6 +980,8 @@ function einstiegZielWeiter() { if(einIndex < einSchritte.length - 1) { einIndex
 // 'beides' = kein Filter nach Trainingsort.
 function einOrtTipp(v) {
   einAuswahl.ort = v;
+  // Online: keine Umkreis-Frage (ortsunabhaengig) -> direkt zur Trefferliste.
+  if(!window.vexEinstieg.brauchtUmkreis(v)) { einstiegAbschluss(); return; }
   if(einIndex < einSchritte.length - 1) { einIndex++; einstiegZeige(); }
 }
 // Umkreis-Frage: ein Tipp startet die Suche. Ist das PLZ-Feld sichtbar
@@ -879,7 +1010,7 @@ function einstiegStart() {
   // Gespeicherte Ziele des Kunden (kunden.ziel) als Vorauswahl uebernehmen.
   const vorwahl = window.vexZiele.zieleAusText(K && K.ziel);
   einAuswahl = { spezialisierungen: [...vorwahl], ort: '', plz: plzGesetzt ? String(K.plz) : '', umkreis: 25 };
-  document.querySelectorAll('#einSpezChips .ein-chip').forEach(c => c.classList.toggle('on', vorwahl.indexOf(c.dataset.v) >= 0));
+  document.querySelectorAll('#einSpezChips .ein-kachel').forEach(c => c.classList.toggle('on', vorwahl.indexOf(c.dataset.v) >= 0));
   einPlzFeldNoetig = window.vexEinstieg.plzFeldNoetig({ plzGesetzt });
   document.getElementById('einPlzFeld').classList.toggle('hidden', !einPlzFeldNoetig);
   document.getElementById('einPlzHint').classList.add('hidden');
@@ -912,7 +1043,7 @@ function zeigeSuchmaske() {
 // Bildet Frage 1 auf den VORHANDENEN Filter ab: genau eine Wahl -> dieser Filter,
 // sonst 'alle'. Es wird keine neue Filterlogik gebaut.
 // Uebertraegt die im Einstieg gewaehlten Spezialisierungen auf den Trefferfilter.
-// Mehrfachauswahl wirkt in renderTrainer: Trainer mit MINDESTENS EINER davon.
+// Mehrfachauswahl wirkt in spezFilter/renderErgebnis: Trainer mit MINDESTENS EINER davon.
 // Keine Wahl -> kein Spezialisierungsfilter.
 function einstiegFilterSetzen() {
   einstiegSpez = [...einAuswahl.spezialisierungen];
@@ -1071,7 +1202,12 @@ function einstiegRouten() {
     einstiegStart();
   }
 }
-einstiegRouten();
+// Erst die eigene kunden-Zeile laden (Ziel/PLZ), DANN den Einstieg routen -
+// sonst fragt der Einstieg Ziel/PLZ erneut, obwohl beides gespeichert ist (Befund B).
+(async function start() {
+  await loadKunde();
+  einstiegRouten();
+})();
 </script>
 <div class="cookie-widerruf"><a href="rechtliches.html">Impressum</a><a href="rechtliches.html#datenschutz">Datenschutz</a><a href="#" onclick="return vexfitEinstellungenOeffnen()">Cookie-Einstellungen</a></div>
 <!-- Zustimmung fuer Marketing. Gleicher Aufbau und gleiche Gestaltung auf allen Seiten. -->

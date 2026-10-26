@@ -62,3 +62,87 @@ Deno.test("kunden-bereich.html: CSS-Fix und 2-Fragen-Umbau", async () => {
   // Befund D: szText wird aus vexEinstieg.szTextBauen gefuellt.
   assertStringIncludes(html, "vexEinstieg.szTextBauen");
 });
+
+// ===========================================================================
+// Komplettpruefung 26.10.2026: Kunden-Einstieg + Trefferliste
+// ===========================================================================
+
+Deno.test("Baustein: vollstaendiges Konto (Ziel+PLZ) bekommt keine Ziel-Frage und kein PLZ-Feld", async () => {
+  const E = await ladeVexEinstieg();
+  // Ziel/PLZ gesetzt (ziel 'Abnehmen', plz '5026', land 'AT') -> nur Ort+Umkreis.
+  assertEquals(E.einstiegSchritte({ zielGesetzt: true, plzGesetzt: true }), ["ort", "umkreis"]);
+  assertEquals(E.plzFeldNoetig({ plzGesetzt: true }), false);
+});
+
+Deno.test("Baustein: Online braucht keine Umkreis-Frage", async () => {
+  const E = await ladeVexEinstieg();
+  assertEquals(E.brauchtUmkreis("online"), false);
+  assertEquals(E.brauchtUmkreis("vor_ort"), true);
+  assertEquals(E.brauchtUmkreis("beides"), true);
+});
+
+Deno.test("Baustein C: ein Trainer in Muenchen (beides) zaehlt bei Salzburg/10km NICHT zum Umkreis", async () => {
+  const E = await ladeVexEinstieg();
+  // Claire: Muenchen, Vor Ort + Online (trainingsort 'beides'), ~140 km von Salzburg.
+  const claire = { id: "c1", trainingsort: "beides", _dist: 140 };
+  // Vor Ort, 10 km -> kein Treffer im Umkreis, Zaehlzeile 0.
+  const vorOrt = E.trefferAufteilen([claire], "vor_ort", 10);
+  assertEquals(vorOrt.anzahlUmkreis, 0);
+  assertEquals(vorOrt.umkreis.length, 0);
+  assertEquals(E.zaehlzeile("Salzburg", vorOrt.anzahlUmkreis, 10), "Salzburg · 0 Trainer im Umkreis von 10 km");
+  // Online -> Claire erscheint als Online-Trainer (ortsunabhaengig).
+  const online = E.trefferAufteilen([claire], "online", 0);
+  assertEquals(online.online.length, 1);
+  assertEquals(online.anzahlUmkreis, 0);
+});
+
+Deno.test("Baustein: Umkreis zaehlt Vor-Ort-Treffer, Online getrennt (beides)", async () => {
+  const E = await ladeVexEinstieg();
+  const nah = { id: "n", trainingsort: "vor_ort", _dist: 5 };
+  const weitOnline = { id: "o", trainingsort: "online", _dist: null };
+  const res = E.trefferAufteilen([nah, weitOnline], "beides", 10);
+  assertEquals(res.anzahlUmkreis, 1);
+  assertEquals(res.umkreis[0].id, "n");
+  assertEquals(res.online.length, 1);
+  assertEquals(res.online[0].id, "o");
+  // Zaehlzeile nennt nur den Umkreis-Treffer.
+  assertEquals(E.zaehlzeile("Zug", res.anzahlUmkreis, 10), "Zug · 1 Trainer im Umkreis von 10 km");
+});
+
+Deno.test("Baustein B: kunden-bereich laedt K per user_id und wartet darauf vor dem Einstieg", async () => {
+  const html = await lies("./kunden-bereich.html");
+  // Eigene Zeile primaer ueber user_id, Rueckfall E-Mail (ilike).
+  assertStringIncludes(html, "kunden?user_id=eq.${encodeURIComponent(sess.user_id)}");
+  assertStringIncludes(html, "kunden?email=ilike.${encodeURIComponent(sess.email)}");
+  // Erst laden, dann routen (sonst Befund B).
+  assertStringIncludes(html, "await loadKunde();");
+  assertStringIncludes(html, "einstiegRouten();");
+});
+
+Deno.test("Baustein 4: Benachrichtige-mich schreibt in trainer_alerts (Tabelle der Edge Function)", async () => {
+  const html = await lies("./kunden-bereich.html");
+  assertStringIncludes(html, "function benachrichtigeMich()");
+  assertStringIncludes(html, "/rest/v1/trainer_alerts");
+  assertStringIncludes(html, "Du bist vorgemerkt");
+  // Leerer Zustand mit genau dem geforderten Wortlaut + Zweitknoepfen.
+  assertStringIncludes(html, "Noch kein Trainer in deinem Umkreis");
+  assertStringIncludes(html, "Größeren Umkreis wählen");
+  assertStringIncludes(html, "Online-Trainer ansehen");
+});
+
+Deno.test("Baustein 6: Einstieg als zentrierte Karte mit Fortschrittsbalken und grossen Kacheln", async () => {
+  const html = await lies("./kunden-bereich.html");
+  assertStringIncludes(html, 'class="ein-karte"');
+  assertStringIncludes(html, 'id="einBarFill"');
+  assertStringIncludes(html, "min-height:64px"); // grosse Kacheln
+  assertStringIncludes(html, 'class="ein-kachel"');
+  // Umkreis-Zeile "um <PLZ> <Stadt>" mit "ändern" statt erneutem PLZ-Feld.
+  assertStringIncludes(html, "einPlzAendern()");
+  assertStringIncludes(html, 'id="einOrtZeile"');
+});
+
+Deno.test("Baustein A: registrieren.html blendet 'bereits angemeldet' auf der Erfolgsseite aus", async () => {
+  const html = await lies("./registrieren.html");
+  // In showSuccess wird der Hinweis-Kasten ausgeblendet.
+  assertStringIncludes(html, "angemeldet-hinweis'); if(hA) hA.style.display='none';");
+});
