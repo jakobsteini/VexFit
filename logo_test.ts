@@ -75,7 +75,12 @@ Deno.test("Kopf-/Fusszeilen mit Logo tragen das Inline-V und EXFIT", async () =>
   for (const f of await htmlDateien()) {
     const s = await lies("./" + f);
     if (s.includes('class="logo"') || s.includes('class="footer-logo"')) {
-      assertStringIncludes(s, 'viewBox="150 150 1300 1300"'); // das Inline-V
+      assertStringIncludes(s, 'viewBox="168 166 1265 1270"'); // das Inline-V, eng begrenzt
+      assertStringIncludes(s, "height:0.7em"); // buendig mit Bebas Neue
+      assert(
+        !s.includes('viewBox="150 150 1300 1300"'),
+        `${f} hat noch die alte Logo-viewBox`,
+      );
       assertStringIncludes(s, "EX<span>FIT</span>");
       assert(!s.includes("VEX<span>FIT</span>"), `${f} hat noch die alte Text-Wortmarke`);
       geprueft++;
