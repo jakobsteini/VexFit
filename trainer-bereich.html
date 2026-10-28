@@ -20,7 +20,7 @@
 <meta name="twitter:image" content="https://vexfit.app/marke/vexfit-vorschau-1200x630.png">
 <link rel="stylesheet" href="fonts/vexfit-fonts.css">
 <style>
-:root{--bg:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1a1a1a;--card:#161616;--muted:#555;--border:rgba(255,255,255,0.07);--green:#4ade80;--orange:#fb923c;--red:#ff6b6b}
+:root{--bg:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1a1a1a;--card:#161616;--muted:#9a9a9a;--border:rgba(255,255,255,0.07);--green:#4ade80;--orange:#fb923c;--red:#ff6b6b}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
 
@@ -67,7 +67,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:calc(56px + env(safe-
 .field textarea{resize:vertical;min-height:90px;line-height:1.6}
 .field select{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23555' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;cursor:pointer}
 .field select option{background:var(--bg);color:var(--white)}
-.field .hint{font-size:11px;color:rgba(85,85,85,0.6);margin-top:3px}
+.field .hint{font-size:12px;color:var(--muted);margin-top:3px}
+.field-fehler{font-size:12px;color:var(--orange);margin-top:6px;font-weight:600}
 
 .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}
 .chip{padding:6px 13px;border:1px solid var(--border);border-radius:100px;font-size:12px;color:var(--muted);cursor:pointer;transition:all 0.2s;user-select:none}
@@ -185,6 +186,10 @@ try {
 @media (max-width:640px){.btn-logout,.nav-link{min-height:44px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}}</style>
 <style>/* Platz fuer WhatsApp-Knopf (Fix 3) */
 @media (max-width:640px){body{padding-bottom:84px}}</style>
+<style>/* Fusszeile frei vom WhatsApp-Knopf bis 480px (Trainerbereich-Feinschliff 28.10.):
+   mehr Abstand als der Knopf hoch ist (46px + 20px vom Rand), damit alle drei
+   Fusszeilen-Links vollstaendig sichtbar und antippbar bleiben. */
+@media (max-width:480px){body{padding-bottom:120px}.cookie-widerruf{padding-bottom:24px}}</style>
 <script type="module" src="vexfit-sitzung.js"></script>
 <style>/* Tippflaechen Handy Fusszeile (Fix 2 Nachtrag) */
 @media (max-width:640px){.cookie-widerruf a{min-height:44px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}}</style>
@@ -221,7 +226,7 @@ try {
   </div>
 
   <!-- Kurzer Weiter-Hinweis direkt nach der Registrierung (?neu=1) -->
-  <div class="neu-hinweis fade fd1 hidden" id="neuHinweis"><b>Geschafft — dein Konto steht.</b> Mach jetzt gleich dein Profil fertig: Nur ein vollständiges Profil wird Kunden gezeigt und bekommt Anfragen. Es dauert nur ein paar Minuten.</div>
+  <div class="neu-hinweis fade fd1 hidden" id="neuHinweis"><b>Geschafft — dein Konto steht.</b> Mach jetzt gleich dein Profil fertig: Ein vollständiges Profil wirkt vertrauenswürdig und bekommt mehr Anfragen. Es dauert nur ein paar Minuten.</div>
 
   <!-- Klartext: was noch fehlt und was das bedeutet; dazu die Wahrheit ueber die
        Sichtbarkeit (haengt an trainers.aktiv = Freigabe, nicht an der Vollstaendigkeit).
@@ -274,6 +279,7 @@ try {
         <div class="chip" data-val="online" onclick="waehleOrt(this)">Online</div>
         <div class="chip" data-val="beides" onclick="waehleOrt(this)">Beides</div>
       </div>
+      <div class="field-fehler hidden" id="ortFehler">Bitte wähle, wo du trainierst.</div>
     </div>
   </div>
 
@@ -459,6 +465,8 @@ function toggleChip(el) {
 
 // Einfachauswahl fuer den Ort des Trainings. Erneuter Klick hebt die Wahl auf.
 function waehleOrt(el) {
+  const fehler = document.getElementById('ortFehler');
+  if(fehler) fehler.classList.add('hidden');
   const v = el.dataset.val;
   if(el.classList.contains('on')) { el.classList.remove('on'); selectedOrt = ''; }
   else {
@@ -500,7 +508,7 @@ async function loadTrainer(email) {
       loadAnfragen(T.id);
     } else {
       const el = document.getElementById('anList');
-      if(el) el.innerHTML = '<div class="empty-state">📭<br><br>Noch keine Anfragen.<br>Sobald ein Kunde dich kontaktiert erscheint es hier.</div>';
+      if(el) el.innerHTML = '<div class="empty-state">📭<br><br>Noch keine Anfragen.<br>Sobald dich ein Kunde kontaktiert, erscheint die Anfrage hier.</div>';
     }
   } catch(e) {
     console.error(e);
@@ -802,7 +810,7 @@ function renderAnfragen(data) {
     }
   }
   if(!data.length) {
-    el.innerHTML = '<div class="empty-state">📭<br><br>Noch keine Anfragen.<br>Sobald ein Kunde dich kontaktiert erscheint es hier.</div>';
+    el.innerHTML = '<div class="empty-state">📭<br><br>Noch keine Anfragen.<br>Sobald dich ein Kunde kontaktiert, erscheint die Anfrage hier.</div>';
     return;
   }
   // Fehlt die Zustands-Spalte noch (Migration nicht eingespielt), bleibt die
@@ -884,6 +892,19 @@ async function beantworteAnfrage(id, neuerStatus, el) {
 // ──── SAVE ────
 async function saveProfile() {
   const btn = document.getElementById('btnSave');
+
+  // Trainingsort gehoert zur Vollstaendigkeitsanzeige (dotTrainingsort). Ohne
+  // Auswahl nicht speichern, sondern freundlich direkt am Feld darauf hinweisen.
+  const ortFehler = document.getElementById('ortFehler');
+  if(!selectedOrt) {
+    showPage('profil');
+    if(ortFehler) ortFehler.classList.remove('hidden');
+    const w = document.getElementById('ortWrap');
+    if(w) w.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  if(ortFehler) ortFehler.classList.add('hidden');
+
   btn.disabled = true;
   btn.textContent = 'Wird gespeichert...';
 
