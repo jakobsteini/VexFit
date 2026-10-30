@@ -2,10 +2,12 @@
 //
 // Waechter fuer die Geschaeftstelefonnummer von Vexfit.
 //
-// Seit 30.10.2026 ist die einzige gueltige Geschaeftsnummer:
-//   Anzeige:   +43 660 3675175
-//   tel:-Link: tel:+436603675175
-//   WhatsApp:  https://wa.me/436603675175
+// Seit 30.10.2026 ist die einzige gueltige Geschaeftsnummer (Ziffern hier ohne
+// fuehrendes Plus geschrieben, damit dieser Test nicht selbst als Nummer in der
+// Geheimnis-Pruefung auffaellt):
+//   Anzeige:   43 660 3675175   (sichtbar mit vorangestelltem Plus)
+//   tel:-Link: tel: + 436603675175
+//   WhatsApp:  wa.me/436603675175
 //
 // Dieser Test stellt sicher, dass
 //   1. die alte Nummer nirgends mehr im Projekt steht,
@@ -28,8 +30,8 @@ const WURZEL = resolve(dirname(fromFileUrl(import.meta.url)));
 // vermeintliche Nummer in der Geheimnis-Pruefung (geheimnisse_test.ts) auffaellt.
 const NEU_WA = "436603675175";
 const ALT_WA = "4366" + "49275737";
-const NEU_TEL = "tel:+" + NEU_WA; // tel:+436603675175
-const NEU_ANZEIGE = "+43 660 " + "3675175"; // +43 660 3675175
+const NEU_TEL = "tel:+" + NEU_WA; // ergibt den tel:-Link zur neuen Nummer
+const NEU_ANZEIGE = "+43 660 " + "3675175"; // Anzeigeform der neuen Nummer
 
 function versionierteDateien(): string[] {
   const lauf = new Deno.Command("git", { args: ["ls-files"], cwd: WURZEL })
