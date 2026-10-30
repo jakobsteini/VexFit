@@ -31,6 +31,16 @@ const HARMLOS: { datei: string; hash: string; grund: string }[] = [
     hash: "95ad93c682971600ee9670d6d7509bf6ce6da4b206be86618fa0d752f0e44071",
     grund: "Platzhalter-Telefonnummer im Eingabefeld, keine echte Nummer",
   },
+  {
+    datei: "rechtliches.html",
+    hash: "52986df1c94522cb3b1b76511878ff54809516a43704a0375c8f5f47ac7eb345",
+    grund: "Vexfit-Geschaeftsnummer (Anzeige) im Impressum und Kontakt",
+  },
+  {
+    datei: "rechtliches.html",
+    hash: "1689d7ba627aed917285c46c809691ab8ffcc3c5d6bd7d019a167b637a683cbf",
+    grund: "Vexfit-Geschaeftsnummer (tel:-Link) im Impressum und Kontakt",
+  },
 ];
 
 /** SHA-256 in Hex — damit die Ausnahmen oben ohne den Klartext auskommen. */
