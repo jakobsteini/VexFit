@@ -610,6 +610,129 @@ function formBestaetigen() {
 }
 function formAbbrechen() { _formZu(); if(_formAufloesen) { _formAufloesen(null); _formAufloesen = null; } }
 
+// ──── DETAILANSICHT TRAINER (Teil 2) ────
+// Avatar wird als vollständige öffentliche Adresse gespeichert (wie in
+// suche.html/trainer-bereich.html). avatarAdresse liefert sie oder null.
+const AVATAR_PREFIX = SUPABASE_URL + '/storage/v1/object/public/avatars/';
+function avatarAdresse(u) {
+  return (typeof u === 'string' && u.indexOf(AVATAR_PREFIX) === 0) ? u : null;
+}
+const ORT_EINZEL = { studio: 'Studio', outdoor: 'Outdoor', beim_kunden: 'Beim Kunden', online: 'Online', beides: 'Studio & beim Kunden' };
+
+// Ein Feld in der Detailansicht. Fehlt der Wert, erscheint ein ruhiges „—".
+function df(label, wert, istFehlend) {
+  const leer = wert === null || wert === undefined || wert === '' || (Array.isArray(wert) && wert.length === 0);
+  const inhalt = leer
+    ? `<span class="feld-wert ${istFehlend ? 'feld-fehlt' : ''}" style="color:var(--text-muted)">${istFehlend ? 'fehlt' : '—'}</span>`
+    : `<div class="feld-wert">${wert}</div>`;
+  return `<div class="feld"><div class="feld-label">${vexEsc(label)}</div>${inhalt}</div>`;
+}
+function statusBadge(t) {
+  const b = [];
+  b.push(`<span class="badge ${t.aktiv ? 'badge-active' : 'badge-unpaid'}">${t.aktiv ? 'Aktiv (in Suche)' : 'Inaktiv'}</span>`);
+  b.push(`<span class="badge ${t.stripe_bezahlt ? 'badge-paid' : 'badge-unpaid'}">${t.stripe_bezahlt ? 'Bezahlt' : 'Nicht bezahlt'}</span>`);
+  if(t.gesperrt) b.push('<span class="badge badge-abg">Gesperrt</span>');
+  if(t.verifiziert) b.push('<span class="badge badge-paid">Zertifikat verifiziert</span>');
+  return `<div class="chiprow">${b.join('')}</div>`;
+}
+
+function trainerDetail(id) {
+  const t = (window.allTrainers || []).find(x => String(x.id) === String(id));
+  if(!t) { meldeFehler('Trainer nicht gefunden. Bitte Seite neu laden.'); return; }
+  const foto = avatarAdresse(t.avatar_url);
+  const fehlt = fehlendeProfilfelder(t);
+  const staerke = profilStaerke(t);
+  const spez = Array.isArray(t.spezialisierungen) && t.spezialisierungen.length
+    ? `<div class="chiprow">${t.spezialisierungen.map(s => `<span class="chip">${vexEsc(s)}</span>`).join('')}</div>` : '';
+  const orte = Array.isArray(t.trainingsorte) && t.trainingsorte.length
+    ? t.trainingsorte.map(o => ORT_EINZEL[o] || o).map(vexEsc).join(', ') : '';
+  const sprachen = Array.isArray(t.sprachen) ? t.sprachen.map(vexEsc).join(', ') : '';
+  const video = (typeof vexVideo !== 'undefined' && vexVideo.erkenne(t.video_url || '')) ? vexEsc(t.video_url) : (t.video_url ? vexEsc(t.video_url) : '');
+  const fotoHtml = foto
+    ? `<img src="${vexEsc(foto)}" alt="" style="width:120px;height:120px;border-radius:8px;object-fit:cover;border:1px solid var(--border)">`
+    : `<div style="width:120px;height:120px;border-radius:8px;background:var(--mid);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px;border:1px solid var(--border)">Kein Foto</div>`;
+  const vollTxt = fehlt.length === 0
+    ? '<span style="color:#4ade80;font-weight:700">vollständig (7/7)</span>'
+    : `<span style="color:#ff8a8a;font-weight:700">${7 - fehlt.length}/7</span> <span style="color:var(--text-muted)">– fehlt: ${vexEsc(fehlt.join(', '))}</span>`;
+  const zertHtml = t.zertifikat_datei
+    ? `<button class="btn-gross btn-neutral" style="padding:7px 12px" onclick="zertifikatOeffnen('${vexEsc(t.zertifikat_datei)}')">Zertifikat ansehen</button>`
+    : '';
+
+  const body = `
+    <div style="display:flex;gap:16px;align-items:center;margin-bottom:18px">
+      ${fotoHtml}
+      <div>
+        <div style="font-size:20px;font-weight:700">${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</div>
+        <div style="color:var(--text-muted);font-size:13px">${vexEsc(t.email) || '—'}</div>
+        <div style="margin-top:8px">${statusBadge(t)}</div>
+      </div>
+    </div>
+    ${df('Profil-Vollständigkeit', vollTxt)}
+    ${df('Telefon', t.telefon ? vexEsc(t.telefon) : '', fehlt.includes('Telefon'))}
+    ${df('PLZ / Stadt', [t.plz, t.stadt].filter(Boolean).map(vexEsc).join(' · '))}
+    ${df('Trainingsart', vexEsc(t.trainingsart || ''), fehlt.includes('Trainingsart'))}
+    ${df('Trainingsort', vexEsc(ORT_EINZEL[t.trainingsort] || t.trainingsort || ''), fehlt.includes('Trainingsort'))}
+    ${orte ? df('Weitere Trainingsorte', orte) : ''}
+    ${df('Preis pro Stunde', t.preis_stunde ? '€' + vexEsc(t.preis_stunde) : '', fehlt.includes('Preis pro Stunde'))}
+    ${t.preis_monat ? df('Preis pro Monat', '€' + vexEsc(t.preis_monat)) : ''}
+    ${df('Erfahrung', vexEsc(t.erfahrung || ''), fehlt.includes('Erfahrung'))}
+    ${df('Über mich', vexEsc(t.bio || ''), fehlt.includes('Über mich'))}
+    ${df('Spezialisierungen', spez, fehlt.includes('Spezialisierungen'))}
+    ${sprachen ? df('Sprachen', sprachen) : ''}
+    ${video ? df('Video', video) : ''}
+    ${t.verfuegbarkeit && t.verfuegbarkeit.length ? df('Verfügbarkeit', t.verfuegbarkeit.map(vexEsc).join(', ')) : ''}
+    ${(zertHtml || t.zertifikat_datei) ? df('Zertifikat / Upload', zertHtml) : ''}
+    ${df('Registriert am', t.created_at ? new Date(t.created_at).toLocaleString('de-AT') : '')}
+    ${df('Profilstärke (8 Punkte)', staerke + ' %')}
+    <div class="feld"><div class="feld-label">Anfragen</div><div id="detail-anfragen" class="feld-wert" style="color:var(--text-muted)">Lade Anfragen …</div></div>
+  `;
+
+  const foot = `
+    ${!t.aktiv
+      ? `<button class="btn-gross btn-ja" id="detailFreigeben" onclick="detailFreigeben('${vexEsc(t.id)}')">Freigeben</button>`
+      : `<button class="btn-gross btn-warn" onclick="detailFreigabeZurueck('${vexEsc(t.id)}')">Freigabe zurücknehmen</button>`}
+    <button class="btn-gross btn-warn" onclick="detailSperren('trainer','${vexEsc(t.id)}')">${t.gesperrt ? 'Entsperren' : 'Sperren'}</button>
+    <button class="btn-gross btn-gefahr" onclick="detailLoeschen('trainer','${vexEsc(t.id)}')">Endgültig löschen</button>
+  `;
+
+  detailOeffnen(`${t.vorname || ''} ${t.nachname || ''}`.trim() || 'Trainer', body, foot);
+  ladeDetailAnfragen(t.id);
+}
+
+// Anfragen des Trainers (offen/angenommen/abgelehnt) mit kurzer Liste.
+async function ladeDetailAnfragen(trainerId) {
+  const ziel = document.getElementById('detail-anfragen');
+  if(!ziel) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/anfragen?trainer_id=eq.${encodeURIComponent(trainerId)}&select=id,kunden_name,status,created_at,ziel&order=created_at.desc`, { headers: authKopf() });
+    if(!res.ok) { ziel.textContent = 'Anfragen konnten nicht geladen werden (' + res.status + ').'; return; }
+    const rows = await res.json();
+    if(!Array.isArray(rows) || rows.length === 0) { ziel.textContent = 'Keine Anfragen.'; return; }
+    let offen = 0, ang = 0, abg = 0;
+    for(const a of rows) { const z = anfrageZustand(a); if(z === 'angenommen') ang++; else if(z === 'abgelehnt') abg++; else offen++; }
+    const liste = rows.map(a => {
+      const z = anfrageZustand(a);
+      const farbe = z === 'angenommen' ? '#4ade80' : (z === 'abgelehnt' ? '#ff6b6b' : 'var(--accent)');
+      return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="color:${farbe};font-weight:700;text-transform:capitalize">${z}</span>
+        · ${vexEsc(a.kunden_name) || 'Kunde'} ${a.ziel ? '· ' + vexEsc(a.ziel) : ''}
+        <span style="color:var(--text-muted);font-size:11px">${a.created_at ? new Date(a.created_at).toLocaleDateString('de-AT') : ''}</span>
+      </div>`;
+    }).join('');
+    ziel.style.color = 'var(--white)';
+    ziel.innerHTML = `<div style="margin-bottom:6px">Gesamt ${rows.length} · <span style="color:var(--accent)">offen ${offen}</span> · <span style="color:#4ade80">angenommen ${ang}</span> · <span style="color:#ff6b6b">abgelehnt ${abg}</span></div>${liste}`;
+  } catch(e) {
+    console.error('ladeDetailAnfragen:', e);
+    ziel.textContent = 'Anfragen konnten nicht geladen werden.';
+  }
+}
+
+// Fußzeilen-Aktionen der Detailansicht (Freigeben: Teil 3; Sperren/Löschen: Teil 5).
+async function detailFreigeben(id) { detailSchliessen(); await activateTrainer(id); }
+async function detailFreigabeZurueck(id) { detailSchliessen(); await banTrainer(id, 'Dieser Trainer'); }
+async function detailSperren(art, id) { detailSchliessen(); if(art === 'trainer') await banTrainer(id, 'Dieser Trainer'); }
+async function detailLoeschen(art, id) { detailSchliessen(); if(art === 'trainer') { const t = (window.allTrainers||[]).find(x=>String(x.id)===String(id)); await deleteTrainer(id, t ? `${t.vorname} ${t.nachname}` : 'Trainer'); } else { const k = (window.allKunden||[]).find(x=>String(x.id)===String(id)); await deleteKunde(id, k ? `${k.vorname} ${k.nachname}` : 'Kunde'); } }
+
 function sendDailyReport() {
   if(!window.allTrainers || !window.allKunden) {
     zeigeMeldung('Bitte warte, bis die Daten geladen sind.', 'info');
@@ -772,16 +895,16 @@ async function loadData() {
     tbody.innerHTML = '<tr><td colspan="10" class="loading-text">Noch keine Trainer registriert</td></tr>';
   } else {
     tbody.innerHTML = trainers.map(t => `
-      <tr>
+      <tr class="klickbar" onclick="trainerDetail('${vexEsc(t.id)}')">
         <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
         <td>${vexEsc(t.email)}</td>
-        <td>${t.telefon ? `<a href="tel:${vexEsc(t.telefon)}" style="color:var(--accent);text-decoration:none;font-weight:600">${vexEsc(t.telefon)}</a>` : '<span style="color:var(--text-muted)">–</span>'}</td>
+        <td>${t.telefon ? `<a href="tel:${vexEsc(t.telefon)}" onclick="event.stopPropagation()" style="color:var(--accent);text-decoration:none;font-weight:600">${vexEsc(t.telefon)}</a>` : '<span style="color:var(--text-muted)">–</span>'}</td>
         <td>${vexEsc(t.stadt) || '–'}</td>
         <td>${vexEsc(t.trainingsart) || '–'}</td>
         <td>${t.preis_stunde ? '€' + vexEsc(t.preis_stunde) : '–'}</td>
         <td><span class="badge ${t.stripe_bezahlt ? 'badge-paid' : 'badge-unpaid'}">${t.stripe_bezahlt ? '✓ Bezahlt' : '✕ Ausstehend'}</span></td>
         <td><span class="badge ${t.aktiv ? 'badge-active' : 'badge-unpaid'}">${t.aktiv ? 'Aktiv' : 'Inaktiv'}</span></td>
-        <td style="display:flex;flex-direction:column;gap:5px;padding:8px 16px">
+        <td onclick="event.stopPropagation()" style="display:flex;flex-direction:column;gap:5px;padding:8px 16px">
           ${!t.aktiv ? `<button class="btn-activate" onclick="activateTrainer('${t.id}')">👁️ Profil freigeben</button>` : `<span style="color:#4ade80;font-size:11px;font-weight:600">✅ Aktiv</span>`}
           ${t.aktiv ? `<button onclick="banTrainer('${t.id}', '${vexEsc(t.vorname)} ${vexEsc(t.nachname)}')" style="background:rgba(255,165,0,0.12);border:1px solid rgba(255,165,0,0.3);color:#ffaa00;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🚫 Sperren</button>` : ''}
           <button onclick="deleteTrainer('${t.id}', '${vexEsc(t.vorname)} ${vexEsc(t.nachname)}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
@@ -868,13 +991,13 @@ function ladeFreigabe() {
     const voll = 7 - fehlt.length;
     const farbe = fehlt.length === 0 ? '#4ade80' : (voll >= 4 ? 'var(--accent)' : '#ff6b6b');
     const detail = fehlt.length === 0 ? 'vollständig' : ('fehlt: ' + fehlt.join(', '));
-    return `<tr>
+    return `<tr class="klickbar" onclick="trainerDetail('${vexEsc(t.id)}')">
       <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
       <td>${vexEsc(t.email)}</td>
       <td>${vexEsc(t.stadt) || '–'}</td>
       <td><span style="color:${farbe};font-weight:700">${voll}/7</span> <span style="color:var(--text-muted);font-size:11px">${detail}</span></td>
       <td>${t.created_at ? new Date(t.created_at).toLocaleDateString('de-AT') : '–'}</td>
-      <td><button class="btn-activate" onclick="activateTrainer('${t.id}')">👁️ Freigeben</button></td>
+      <td onclick="event.stopPropagation()"><button class="btn-activate" onclick="activateTrainer('${t.id}')">👁️ Freigeben</button></td>
     </tr>`;
   }).join('');
 }
@@ -971,7 +1094,7 @@ async function ladeTrainerOhneAnfrage() {
       tb.innerHTML = '<tr><td colspan="4" class="loading-text">Alle freigeschalteten Trainer haben mindestens eine Anfrage.</td></tr>';
       return;
     }
-    tb.innerHTML = trainer.map(t => `<tr>
+    tb.innerHTML = trainer.map(t => `<tr class="klickbar" onclick="trainerDetail('${vexEsc(t.id)}')">
       <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
       <td>${vexEsc(t.email)}</td>
       <td>${vexEsc(t.stadt) || '–'}</td>
@@ -996,7 +1119,7 @@ function ladeProfilUnvollstaendig() {
       tb.innerHTML = '<tr><td colspan="4" class="loading-text">Alle freigeschalteten Trainer haben ein vollständiges Profil.</td></tr>';
       return;
     }
-    tb.innerHTML = trainer.map(x => `<tr>
+    tb.innerHTML = trainer.map(x => `<tr class="klickbar" onclick="trainerDetail('${vexEsc(x.t.id)}')">
       <td><strong>${vexEsc(x.t.vorname)} ${vexEsc(x.t.nachname)}</strong></td>
       <td>${vexEsc(x.t.email)}</td>
       <td style="color:#ff6b6b">${x.fehlt.join(', ')}</td>
@@ -1258,7 +1381,7 @@ function renderProfilUebersicht() {
     const video = (typeof vexVideo !== 'undefined' && vexVideo.erkenne(t.video_url || '')) ? '✓' : '–';
     const spr = (t.sprachen || []).join(', ') || '–';
     const orte = (t.trainingsorte || []).map(o => ORT_TEXT[o] || o).join(', ') || '–';
-    return `<tr>
+    return `<tr class="klickbar" onclick="trainerDetail('${vexEsc(t.id)}')">
       <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
       <td>${profilStaerke(t)}%</td>
       <td>${video}</td>
@@ -1276,12 +1399,12 @@ function ladeZertifikate() {
   const mitZert = (window.allTrainers || []).filter(t => t.zertifikat_datei);
   if(!mitZert.length) { tbody.innerHTML = '<tr><td colspan="5" class="loading-text">Noch keine Zertifikate hochgeladen</td></tr>'; return; }
   tbody.innerHTML = mitZert.map(t => `
-    <tr>
+    <tr class="klickbar" onclick="trainerDetail('${vexEsc(t.id)}')">
       <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
       <td>${vexEsc(t.stadt) || '–'}</td>
-      <td><button onclick="zertifikatOeffnen('${vexEsc(t.zertifikat_datei)}')" style="background:rgba(232,255,0,0.12);border:1px solid rgba(232,255,0,0.3);color:var(--accent);padding:5px 12px;border-radius:2px;font-size:11px;font-weight:600;cursor:pointer">Ansehen</button></td>
+      <td onclick="event.stopPropagation()"><button onclick="zertifikatOeffnen('${vexEsc(t.zertifikat_datei)}')" style="background:rgba(232,255,0,0.12);border:1px solid rgba(232,255,0,0.3);color:var(--accent);padding:5px 12px;border-radius:2px;font-size:11px;font-weight:600;cursor:pointer">Ansehen</button></td>
       <td>${t.verifiziert ? '<span class="badge badge-paid">✓ Verifiziert</span>' : '<span class="badge badge-unpaid">offen</span>'}</td>
-      <td>
+      <td onclick="event.stopPropagation()">
         ${t.verifiziert
           ? `<button onclick="entverifizieren('${t.id}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 10px;border-radius:2px;font-size:11px;cursor:pointer">Zurücknehmen</button>`
           : `<button onclick="verifizieren('${t.id}')" style="background:rgba(74,222,128,0.12);border:1px solid rgba(74,222,128,0.3);color:#4ade80;padding:5px 10px;border-radius:2px;font-size:11px;cursor:pointer">Verifizieren</button>`}
