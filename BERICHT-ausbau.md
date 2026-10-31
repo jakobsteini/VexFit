@@ -2,8 +2,8 @@
 
 Stand: 31.10.2026. Alle Arbeiten liegen im Zweig **`ausbau-okt`** (von `main`
 abgezweigt). **Nichts gepusht, nichts deployt, keine Migration eingespielt.**
-Zehn Commits (einer pro Baustein; der letzte zieht den 48-Stunden-Fall von
-Baustein 4e nach).
+Elf Commits (einer pro Baustein; dazu der 48-Stunden-Fall von Baustein 4e und
+das Adresse-Bearbeiten im Admin).
 
 Prüfungen am Ende: **Typprüfung grün** (`deno check` aller Edge Functions),
 **Linter grün** (`deno lint`, keine Probleme), **alle Tests grün**. Die gesamte
@@ -116,16 +116,23 @@ Studio-Datenmodell + öffentliche Seite + Vorschau + Einladung + Zahlungsbefreiu
 - `profil-bearbeiten.html` – Raster (7 Tage × Morgen/Mittag/Abend).
 - `profil.html` – Anzeige je Wochentag. Kein Buchungskalender.
 
-### Baustein 7 – Admin-Dashboard — **erledigt** (Hinweis zu Adress-Bearbeitung unten)
+### Baustein 7 – Admin-Dashboard — **erledigt** (inkl. Adresse bearbeiten)
 - `migrations/2026-10-31-06-admin-studios.sql` (+ `-ruecknahme.sql`): vier
   Admin-Funktionen (nur `ist_vexfit_admin()`): `studios_admin_liste` (mit allen
   Schlüsseln), `studio_admin_anlegen`, `standort_admin_anlegen`,
   `studio_admin_freigabe`.
+- **Nachtrag `migrations/2026-10-31-08-studio-adresse-bearbeiten.sql`
+  (+ `-ruecknahme.sql`):** neue Admin-Funktion `standort_admin_bearbeiten`
+  (Name + Adresse eines Standorts ändern, `ist_vexfit_admin()`-geschützt, leere
+  Felder überschreiben nichts); `studios_admin_liste` gibt zusätzlich `land` aus
+  (für die Vorbelegung). Damit sind die John-Harris-Adressen („HIER EINFÜGEN")
+  **ohne SQL** pflegbar.
 - `admin.html` – drei neue Reiter: **Studios** (anlegen, Links anzeigen/kopieren,
-  Freigabe-Schalter), **Zertifikate** (ansehen über signierte Adresse,
-  verifizieren/zurücknehmen), **Profil-Übersicht** (Video/Sprachen/Trainingsorte/
-  Profilstärke/Verifiziert, filterbar).
-- `admin_studios_test.ts`.
+  Freigabe-Schalter, **je Standort „Adresse bearbeiten" + Adressanzeige**),
+  **Zertifikate** (ansehen über signierte Adresse, verifizieren/zurücknehmen),
+  **Profil-Übersicht** (Video/Sprachen/Trainingsorte/Profilstärke/Verifiziert,
+  filterbar).
+- `admin_studios_test.ts` (inkl. Migration 08 + Bearbeiten-Dialog).
 
 ### Baustein 8 – Schluss-Rundgang — **teilweise** (ohne Test-DB, siehe `rundgang/README.md`)
 Playwright ist nicht eingerichtet; ein echter Klick-Durchlauf braucht eine
@@ -150,8 +157,13 @@ in `migrations/`, jede mit passender `-ruecknahme.sql` (Notbremse).
 5. `migrations/2026-10-31-05-verfuegbarkeit.sql`
 6. `migrations/2026-10-31-06-admin-studios.sql`
 
-Sie bauen aufeinander auf (02–06 verändern u. a. die Sicht `trainers_oeffentlich`
-und setzen die Spalten aus 02/04/05 voraus) – **in dieser Reihenfolge** einspielen.
+6b. `migrations/2026-10-31-08-studio-adresse-bearbeiten.sql` – direkt nach 06
+   (hängt an dessen Admin-Funktionen). Fügt `standort_admin_bearbeiten` hinzu und
+   erweitert `studios_admin_liste` um `land`.
+
+Sie bauen aufeinander auf (02–06/08 verändern u. a. die Sicht
+`trainers_oeffentlich` bzw. die Admin-Funktionen und setzen die Spalten aus
+02/04/05 voraus) – **in dieser Reihenfolge** einspielen.
 
 7. `migrations/2026-10-31-07-unbeantwortet-zeitplan.sql` – **zuletzt und erst
    NACH dem Deploy** (§3), weil es die bereits deployte Function aufruft und das
@@ -159,10 +171,10 @@ und setzen die Spalten aus 02/04/05 voraus) – **in dieser Reihenfolge** einspi
    48-Stunden-Fall an. Enthält **kein** Geheimnis im Klartext.
 
 > **Hinweis zur Rücknahme-Ablage:** Die Aufgabe nannte `migrations/ruecknahmen/`.
-> Im Bestand liegen aber alle 15 bisherigen Rücknahmen als `…-ruecknahme.sql`
+> Im Bestand liegen aber alle bisherigen Rücknahmen als `…-ruecknahme.sql`
 > **neben** der Migration in `migrations/`. Ich habe die bestehende, einheitliche
 > Konvention weitergeführt (sicherer: ein Muster, keine Sonderfälle). Falls du den
-> Ordner bevorzugst, verschiebe die sechs `*-ruecknahme.sql` dorthin.
+> Ordner bevorzugst, verschiebe die `*-ruecknahme.sql` dorthin.
 
 ---
 
@@ -197,9 +209,9 @@ neuen Spalten `studio_standort_id`, `verifiziert`, `alternativen_gesendet` usw.)
 - **Typprüfung:** `deno check` über alle Edge-Function-Dateien – **grün**.
 - **Linter:** `deno lint` – **0 Probleme**.
 - **Gesamte Suite in einem Lauf:** `deno test --allow-read --allow-run --allow-env`
-  (vom Projektordner) – **251 bestanden, 0 fehlgeschlagen** (Seiten-/Logiktests
-  und alle Edge-Function-Tests zusammen). Darin die 5 neuen Tests für den
-  48-Stunden-Fall.
+  (vom Projektordner) – **254 bestanden, 0 fehlgeschlagen** (Seiten-/Logiktests
+  und alle Edge-Function-Tests zusammen). Darin die 5 Tests für den
+  48-Stunden-Fall und 3 für das Adresse-Bearbeiten.
 - Neue Tests je Baustein: `studios_test.ts`, `vexfit-qr_test.ts`,
   `profil_upgrade_test.ts`, `vexfit-video_test.ts`, `profilstaerke_test.ts`,
   `vertrauen_test.ts`, `vexfit-matching_test.ts`, `matching_verfuegbarkeit_test.ts`,
@@ -216,8 +228,10 @@ neuen Spalten `studio_standort_id`, `verifiziert`, `alternativen_gesendet` usw.)
    Seite.
 2. **John Harris Wien – Adresse:** Hausnummer Schillerplatz + PLZ. Ebenso Platzhalter.
 
-Nach dem Einspielen von Migration 01 füllst du beide so (die Übersicht/Seite lesen
-die Adresse aus der Tabelle):
+**Am einfachsten im Admin:** Reiter **Studios** → beim Standort auf **„Adresse
+bearbeiten"** (seit Migration 08). Dafür muss 08 eingespielt sein.
+
+Alternativ per SQL (die Übersicht/Seite lesen die Adresse aus der Tabelle):
 
 ```sql
 UPDATE public.studio_standorte SET adresse = '…', plz = '…'
@@ -225,9 +239,6 @@ UPDATE public.studio_standorte SET adresse = '…', plz = '…'
 UPDATE public.studio_standorte SET adresse = '…', plz = '…'
  WHERE slug = 'wien' AND studio_id = (SELECT id FROM public.studios WHERE slug='john-harris');
 ```
-
-(Der Admin-Reiter „Studios" kann Standorte **anlegen**; das **Bearbeiten** der
-Adresse ist noch nicht eingebaut – siehe offene Punkte.)
 
 ---
 
@@ -267,8 +278,8 @@ Alle Links baut der Admin-Reiter **Studios** fertig zusammen (mit Kopieren-Knopf
    Freigabe. **Zu entscheiden:** stündlicher Takt und 48-h-Grenze ok, oder
    anders (Takt in Migration 07, Grenze in `kern.ts`,
    `ALTERNATIVEN_NACH_STUNDEN`)?
-3. **Studio-Adressen bearbeiten im Admin:** Anlegen ja, Adresse ändern noch per
-   SQL (siehe §5). Bei Bedarf baue ich einen Bearbeiten-Dialog nach.
+3. **Studio-Adressen bearbeiten im Admin:** **erledigt** – Reiter „Studios" →
+   „Adresse bearbeiten" (Migration 08). Nur noch einspielen.
 4. **Weitere Studios:** Das Datenmodell trägt beliebig viele Studios. Die
    **Seiten** (`<slug>.html`, `-uebersicht.html`, `-aufsteller.html`) gibt es
    aber nur für John Harris. Für ein zweites Studio bräuchte es entweder Kopien
@@ -280,13 +291,13 @@ Alle Links baut der Admin-Reiter **Studios** fertig zusammen (mit Kopieren-Knopf
 ---
 
 ```
-Vexfit-Ausbau (Zweig ausbau-okt, 31.10.): B1–B7 fertig (inkl. 4e-48h), B8 teilweise (ohne Test-DB).
-10 Commits, NICHTS gepusht/deployt, KEINE Migration eingespielt.
-Migrationen 01–06 (migrations/2026-10-31-0X-*.sql) IN DIESER REIHENFOLGE, dann
+Vexfit-Ausbau (Zweig ausbau-okt, 31.10.): B1–B7 fertig (inkl. 4e-48h + Studio-Adresse-Edit), B8 teilweise (ohne Test-DB).
+11 Commits, NICHTS gepusht/deployt, KEINE Migration eingespielt.
+Migrationen 01–06 + 08 (migrations/2026-10-31-0X-*.sql) IN DIESER REIHENFOLGE, dann
 `supabase functions deploy vexfit-automation --no-verify-jwt --project-ref hbapzwxdehfgnputrfjf`.
-Danach John-Harris-Adressen (2× HIER EINFÜGEN) per SQL setzen, Schlüssel im Admin→Studios holen.
+Danach John-Harris-Adressen (2× HIER EINFÜGEN) im Admin→Studios→„Adresse bearbeiten" setzen, Schlüssel ebendort holen.
 48h-Fall aktivieren (optional): Secret VEXFIT_CRON_KEY + Vault vexfit_cron_key (gleicher Wert) setzen, dann Migration 07.
-Tests: `deno test --allow-read --allow-run --allow-env` → 251 grün, Lint+Typen grün. Rücknahmen als *-ruecknahme.sql neben der Migration.
-OFFEN: öffentliche Profile beibehalten? Studio-Adresse-Edit? weitere Studios = eigene Seiten.
+Tests: `deno test --allow-read --allow-run --allow-env` → 254 grün, Lint+Typen grün. Rücknahmen als *-ruecknahme.sql neben der Migration.
+OFFEN: öffentliche Profile beibehalten? weitere Studios = eigene Seiten.
 QR (vexfit-qr.js) echt per jsQR geprüft. Screenshots in rundgang/.
 ```

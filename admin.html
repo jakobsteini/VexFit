@@ -1123,6 +1123,8 @@ async function ladeStudios() {
     });
     if(!r.ok) throw new Error('HTTP ' + r.status);
     const studios = await r.json();
+    // Fuer den Bearbeiten-Dialog: Standortdaten merken, statt sie durch onclick zu schleusen.
+    window._adminStudios = studios || [];
     const o = location.origin.includes('localhost') ? location.origin : 'https://vexfit.app';
     let html = '';
     for(const s of (studios || [])) {
@@ -1141,7 +1143,11 @@ async function ladeStudios() {
           const kunden = `${o}/${s.slug}.html?standort=${st.slug}`;
           const aufsteller = `${o}/${s.slug}-aufsteller.html?standort=${st.slug}`;
           return `<div style="border-top:1px solid rgba(255,255,255,0.07);padding:10px 0">
-            <strong>${vexEsc(st.name)}</strong> <span style="color:var(--text-muted);font-size:12px">· ${st.trainer_anzahl} Trainer</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+              <span><strong>${vexEsc(st.name)}</strong> <span style="color:var(--text-muted);font-size:12px">· ${st.trainer_anzahl} Trainer</span></span>
+              <button onclick="standortBearbeiten('${st.id}')" style="background:rgba(232,255,0,0.1);border:1px solid rgba(232,255,0,0.3);color:var(--accent);padding:4px 10px;border-radius:3px;font-size:11px;cursor:pointer">Adresse bearbeiten</button>
+            </div>
+            <div style="font-size:12px;margin-top:4px">${studioAdresse(st)}</div>
             ${studioLink('Trainer-Einladung', einladung)}
             ${studioLink('Kunden-Link (QR)', kunden)}
             ${studioLink('Aufsteller (Druck)', aufsteller)}
@@ -1189,6 +1195,31 @@ async function standortAnlegen(studioId) {
     body: JSON.stringify({ p_studio_id: studioId, p_slug: slug, p_name: name, p_stadt: stadt, p_adresse: 'HIER EINFÜGEN', p_plz: 'HIER EINFÜGEN', p_land: 'AT' })
   });
   if(r.ok) ladeStudios(); else alert('Standort konnte nicht angelegt werden.');
+}
+// Adresszeile eines Standorts; noch leere Felder ("HIER EINFÜGEN") werden hervorgehoben.
+function studioAdresse(st) {
+  const teile = [st.adresse, st.plz, st.stadt, st.land].filter(Boolean);
+  if(!teile.length) return '<span style="color:var(--text-muted)">Noch keine Adresse</span>';
+  return teile.map(t => String(t).includes('HIER EINFÜGEN')
+    ? `<span style="color:#ffaa00;font-weight:600">${vexEsc(t)}</span>`
+    : vexEsc(t)).join(' · ');
+}
+// Bestehenden Standort bearbeiten: Name und Adresse. Leer gelassene Felder
+// bleiben unveraendert (die Funktion standort_admin_bearbeiten nutzt COALESCE).
+async function standortBearbeiten(standortId) {
+  let st = null;
+  for(const s of (window._adminStudios || [])) for(const x of (s.standorte || [])) if(x.id === standortId) st = x;
+  if(!st) return;
+  const name = prompt('Name des Standorts:', st.name || ''); if(name === null) return;
+  const stadt = prompt('Stadt:', st.stadt || ''); if(stadt === null) return;
+  const adresse = prompt('Straße und Hausnummer:', st.adresse || ''); if(adresse === null) return;
+  const plz = prompt('PLZ:', st.plz || ''); if(plz === null) return;
+  const land = prompt('Land (z. B. AT):', st.land || 'AT'); if(land === null) return;
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/standort_admin_bearbeiten`, {
+    method: 'POST', headers: authKopf({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ p_standort_id: standortId, p_name: name, p_stadt: stadt, p_adresse: adresse, p_plz: plz, p_land: land })
+  });
+  if(r.ok) ladeStudios(); else alert('Standort konnte nicht gespeichert werden.');
 }
 
 function sendStripeLink(email, name) {

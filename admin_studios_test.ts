@@ -45,3 +45,39 @@ Deno.test("admin.html: drei neue Tabs und ihre Funktionen", async () => {
   assertStringIncludes(html, "function profilStaerke(t)");
   assertStringIncludes(html, "profilFilter");
 });
+
+// --------------------------------------------------------------------------
+// Baustein 7, Nachtrag: Standort-Adresse im Admin bearbeiten (Migration 08).
+// --------------------------------------------------------------------------
+Deno.test("Migration 08: standort_admin_bearbeiten nur fuer den Admin, Liste traegt 'land'", async () => {
+  const sql = await lies("./migrations/2026-10-31-08-studio-adresse-bearbeiten.sql");
+  assertStringIncludes(sql, "FUNCTION public.standort_admin_bearbeiten");
+  // Admin-Pruefung + SECURITY DEFINER + abgeschottetes search_path.
+  assertStringIncludes(sql, "ist_vexfit_admin()");
+  assertStringIncludes(sql, "SECURITY DEFINER");
+  assertStringIncludes(sql, "SET search_path = ''");
+  // Leere Felder ueberschreiben nichts.
+  assertStringIncludes(sql, "COALESCE(NULLIF(btrim(p_adresse), ''), adresse)");
+  // anon bekommt kein EXECUTE.
+  assert(!/GRANT EXECUTE[^;]*TO anon/.test(sql), "anon darf die Bearbeiten-Funktion ausfuehren");
+  assertStringIncludes(sql, "GRANT EXECUTE ON FUNCTION public.standort_admin_bearbeiten");
+  // Die Liste gibt jetzt auch 'land' aus (fuer die Vorbelegung im Dialog).
+  assertStringIncludes(sql, "'land', st.land");
+});
+
+Deno.test("Ruecknahme 08 entfernt die Funktion und nimmt 'land' aus der Liste", async () => {
+  const sql = await lies("./migrations/2026-10-31-08-studio-adresse-bearbeiten-ruecknahme.sql");
+  assertStringIncludes(sql, "DROP FUNCTION IF EXISTS public.standort_admin_bearbeiten");
+  // Liste wieder ohne 'land'.
+  assert(!sql.includes("'land', st.land"), "Rueckbau laesst 'land' in der Liste stehen");
+});
+
+Deno.test("admin.html: Standort bearbeiten - Knopf, Dialog, RPC", async () => {
+  const html = await lies("./admin.html");
+  assertStringIncludes(html, "Adresse bearbeiten");
+  assertStringIncludes(html, "function standortBearbeiten(");
+  assertStringIncludes(html, "function studioAdresse(");
+  assertStringIncludes(html, "rpc/standort_admin_bearbeiten");
+  // Standortdaten werden gemerkt, nicht durch onclick geschleust.
+  assertStringIncludes(html, "window._adminStudios");
+});
