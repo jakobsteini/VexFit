@@ -90,6 +90,9 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:calc(56px + env(safe-
 .btn-avatar:hover{border-color:rgba(232,255,0,0.3)}
 .btn-avatar-upload{background:var(--accent);color:#000;border:1px solid var(--accent);font-weight:800;letter-spacing:1px;text-transform:uppercase}
 .btn-avatar:disabled{opacity:0.4;cursor:not-allowed}
+/* Sofort-Upload: Vorschau waehrend des Hochladens leicht abgedunkelt + Hinweis darunter */
+.avatar-preview.laedt{opacity:0.5}
+.avatar-status{font-size:12px;color:var(--muted);margin-top:8px}
 
 /* ═══ ANFRAGEN ═══ */
 .ap-title{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1.5px;margin-bottom:4px}
@@ -259,12 +262,12 @@ try {
       <div class="avatar-row">
         <div class="avatar-preview" id="avatarPreview"></div>
         <div class="avatar-btns">
-          <button type="button" class="btn-avatar" onclick="document.getElementById('fAvatar').click()">Bild auswählen</button>
-          <button type="button" class="btn-avatar btn-avatar-upload hidden" id="btnAvatarUpload" onclick="uploadAvatar()">Hochladen</button>
+          <button type="button" class="btn-avatar" id="btnAvatarWaehlen" onclick="document.getElementById('fAvatar').click()">Bild auswählen</button>
         </div>
       </div>
       <input type="file" id="fAvatar" accept="image/jpeg,image/png,image/webp" class="hidden">
-      <div class="hint">JPG, PNG oder WebP, höchstens 5 MB. Sichtbar in der Suche und auf deinem Profil.</div>
+      <div class="avatar-status hidden" id="avatarStatus">Wird hochgeladen …</div>
+      <div class="hint">JPG, PNG oder WebP, höchstens 5 MB. Wird sofort gespeichert und ist in der Suche und auf deinem Profil sichtbar.</div>
     </div>
   </div>
 
@@ -586,11 +589,12 @@ function zeigeAvatar(vorschauUrl) {
   }
 }
 
+// Sobald ein Bild gewaehlt ist: pruefen, Vorschau sofort zeigen und DIREKT
+// hochladen - kein zweiter Klick mehr. Bei ungueltiger Datei die bestehende
+// Fehlermeldung und keine Vorschau.
 document.getElementById('fAvatar').addEventListener('change', function() {
   const f = this.files && this.files[0];
-  const btn = document.getElementById('btnAvatarUpload');
   avatarDatei = null;
-  btn.classList.add('hidden');
   if(!f) { zeigeAvatar(); return; }
   const erlaubt = ['image/jpeg', 'image/png', 'image/webp'];
   if(!erlaubt.includes(f.type)) {
@@ -606,20 +610,32 @@ document.getElementById('fAvatar').addEventListener('change', function() {
     return;
   }
   avatarDatei = f;
-  zeigeAvatar(URL.createObjectURL(f));
-  btn.classList.remove('hidden');
+  zeigeAvatar(URL.createObjectURL(f));   // Vorschau sofort
+  uploadAvatar();                         // und direkt speichern
 });
+
+// Zustand waehrend des Hochladens: Vorschau abgedunkelt, Hinweis sichtbar,
+// "Bild auswählen" gesperrt. Danach immer zuruecksetzen.
+function avatarLaedtAn(an) {
+  const waehlen = document.getElementById('btnAvatarWaehlen');
+  const preview = document.getElementById('avatarPreview');
+  const status = document.getElementById('avatarStatus');
+  if(waehlen) waehlen.disabled = an;
+  if(preview) preview.classList.toggle('laedt', an);
+  if(status) status.classList.toggle('hidden', !an);
+}
 
 async function uploadAvatar() {
   if(!avatarDatei) return;
   // Der Ablagepfad braucht die Nutzer-Kennung; alte Sitzungen haben sie noch nicht.
   if(!sess.user_id) {
     showToast('Bitte melde dich einmal neu an, dann klappt der Bild-Upload.', true);
+    avatarDatei = null;
+    document.getElementById('fAvatar').value = '';
+    zeigeAvatar();
     return;
   }
-  const btn = document.getElementById('btnAvatarUpload');
-  btn.disabled = true;
-  btn.textContent = 'Wird hochgeladen...';
+  avatarLaedtAn(true);
   const endung = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[avatarDatei.type];
   const pfad = sess.user_id + '/avatar.' + endung;
   try {
@@ -648,15 +664,18 @@ async function uploadAvatar() {
     if(T) T.avatar_url = url;
     avatarDatei = null;
     document.getElementById('fAvatar').value = '';
-    btn.classList.add('hidden');
     zeigeAvatar();
-    showToast('✓ Profilbild gespeichert!');
+    showToast('✓ Profilbild gespeichert');
+    updateDots();   // Profilstaerke sofort neu berechnen (Foto zaehlt mit)
   } catch(e) {
     console.error('uploadAvatar:', e);
+    // Alte Vorschau zurueck (gespeichertes Bild oder Initialen) + bestehende Fehlermeldung.
+    avatarDatei = null;
+    document.getElementById('fAvatar').value = '';
+    zeigeAvatar();
     showToast('Das Bild konnte nicht gespeichert werden. Bitte versuche es erneut.', true);
   }
-  btn.disabled = false;
-  btn.textContent = 'Hochladen';
+  avatarLaedtAn(false);
 }
 
 function updateDots() {
