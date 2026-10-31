@@ -360,6 +360,95 @@ const anschluesse: Anschluesse = {
     return Array.isArray(zeilen) ? zeilen.length : 0;
   },
 
+  // ── Teil 5: Sperren/Entsperren/endgueltiges Loeschen (service_role) ──
+  async personUserId(tabelle, id) {
+    const zeilen = await lesen<{ user_id: string | null }>(
+      `${tabelle}?id=eq.${encodeURIComponent(id)}&select=user_id`,
+    );
+    return zeilen[0]?.user_id ?? null;
+  },
+
+  // Auth-Admin-API: ban_duration setzt/loest die Sperre. "876000h" ~ 100 Jahre
+  // (dauerhaft), "none" entsperrt. apikey/Authorization sind der geheime
+  // Schluessel aus restKopf().
+  async authSperren(userId, gesperrt) {
+    const basis = pflicht("SUPABASE_URL").replace(/\/+$/, "");
+    const a = await fetch(`${basis}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+      method: "PUT",
+      headers: restKopf(),
+      body: JSON.stringify({ ban_duration: gesperrt ? "876000h" : "none" }),
+    });
+    if (!a.ok) throw new Error(`authSperren fehlgeschlagen: HTTP ${a.status}`);
+  },
+
+  async authNutzerLoeschen(userId) {
+    const basis = pflicht("SUPABASE_URL").replace(/\/+$/, "");
+    const a = await fetch(`${basis}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+      headers: restKopf(),
+    });
+    // 404 = schon weg; alles andere ist ein Fehler.
+    if (!a.ok && a.status !== 404) throw new Error(`authNutzerLoeschen fehlgeschlagen: HTTP ${a.status}`);
+  },
+
+  async personGesperrtSetzen(tabelle, id, gesperrt) {
+    const a = await fetch(restAdresse(`${tabelle}?id=eq.${encodeURIComponent(id)}`), {
+      method: "PATCH",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify({ gesperrt }),
+    });
+    if (!a.ok) throw new Error(`personGesperrtSetzen fehlgeschlagen: HTTP ${a.status}`);
+    const zeilen = await a.json().catch(() => []);
+    return Array.isArray(zeilen) ? zeilen.length : 0;
+  },
+
+  // Erst loeschen; verhindert ein Fremdschluessel das Loeschen (HTTP 409,
+  // PostgreSQL 23503 – z. B. verknuepfte Anfragen), dann die personenbezogenen
+  // Felder anonymisieren, statt die Fremddaten (Anfragen des Kunden) zu loeschen.
+  async zeileLoeschenOderAnonymisieren(tabelle, id) {
+    const del = await fetch(restAdresse(`${tabelle}?id=eq.${encodeURIComponent(id)}`), {
+      method: "DELETE",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+    });
+    if (del.ok) {
+      const z = await del.json().catch(() => []);
+      return { geloescht: Array.isArray(z) && z.length > 0, anonymisiert: false };
+    }
+    if (del.status === 409) {
+      const felder: Record<string, unknown> = {
+        vorname: "Gelöscht",
+        nachname: "",
+        email: `geloescht+${id}@vexfit.invalid`,
+        gesperrt: true,
+      };
+      if (tabelle === "trainers") felder.aktiv = false;
+      const pa = await fetch(restAdresse(`${tabelle}?id=eq.${encodeURIComponent(id)}`), {
+        method: "PATCH",
+        headers: { ...restKopf(), Prefer: "return=representation" },
+        body: JSON.stringify(felder),
+      });
+      if (!pa.ok) throw new Error(`Anonymisieren fehlgeschlagen: HTTP ${pa.status}`);
+      const z = await pa.json().catch(() => []);
+      return { geloescht: false, anonymisiert: Array.isArray(z) && z.length > 0 };
+    }
+    throw new Error(`Loeschen fehlgeschlagen: HTTP ${del.status}`);
+  },
+
+  // Protokoll (Tabelle admin_protokoll). Best effort: ein Fehler hier soll die
+  // eigentliche Aktion nicht scheitern lassen, wird aber geloggt.
+  async protokoll(eintrag) {
+    try {
+      const a = await fetch(restAdresse("admin_protokoll"), {
+        method: "POST",
+        headers: { ...restKopf(), Prefer: "return=minimal" },
+        body: JSON.stringify(eintrag),
+      });
+      if (!a.ok) console.error("vexfit-automation: protokoll HTTP", a.status);
+    } catch (fehler) {
+      console.error("vexfit-automation: protokoll", String(fehler));
+    }
+  },
+
   // B4e: eine Anfrage mit Kundendaten (service_role).
   async anfrageNachId(id: string) {
     const zeilen = await lesen<Record<string, unknown>>(

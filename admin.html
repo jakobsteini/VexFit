@@ -739,8 +739,18 @@ async function detailFreigabeZurueck(id) {
   detailSchliessen();
   await freigabeZuruecknehmen(id, t ? `${t.vorname} ${t.nachname}` : '');
 }
-async function detailSperren(art, id) { detailSchliessen(); if(art === 'trainer') await banTrainer(id, 'Dieser Trainer'); }
-async function detailLoeschen(art, id) { detailSchliessen(); if(art === 'trainer') { const t = (window.allTrainers||[]).find(x=>String(x.id)===String(id)); await deleteTrainer(id, t ? `${t.vorname} ${t.nachname}` : 'Trainer'); } else { const k = (window.allKunden||[]).find(x=>String(x.id)===String(id)); await deleteKunde(id, k ? `${k.vorname} ${k.nachname}` : 'Kunde'); } }
+function _personName(art, id) {
+  const liste = art === 'trainer' ? (window.allTrainers || []) : (window.allKunden || []);
+  const p = liste.find(x => String(x.id) === String(id));
+  return p ? `${p.vorname || ''} ${p.nachname || ''}`.trim() : '';
+}
+function _personGesperrt(art, id) {
+  const liste = art === 'trainer' ? (window.allTrainers || []) : (window.allKunden || []);
+  const p = liste.find(x => String(x.id) === String(id));
+  return !!(p && p.gesperrt);
+}
+async function detailSperren(art, id) { detailSchliessen(); await sperrePerson(art, id, _personName(art, id), _personGesperrt(art, id)); }
+async function detailLoeschen(art, id) { detailSchliessen(); await loeschePerson(art, id, _personName(art, id)); }
 
 // ──── DETAILANSICHT KUNDE (Teil 4) ────
 // Zeigt alle gespeicherten Felder. Welche Spalten es gibt, kommt direkt aus der
@@ -985,9 +995,8 @@ async function loadData() {
         <td><span class="badge ${t.stripe_bezahlt ? 'badge-paid' : 'badge-unpaid'}">${t.stripe_bezahlt ? '✓ Bezahlt' : '✕ Ausstehend'}</span></td>
         <td><span class="badge ${t.aktiv ? 'badge-active' : 'badge-unpaid'}">${t.aktiv ? 'Aktiv' : 'Inaktiv'}</span></td>
         <td onclick="event.stopPropagation()" style="display:flex;flex-direction:column;gap:5px;padding:8px 16px">
-          ${!t.aktiv ? `<button class="btn-activate" onclick="activateTrainer('${t.id}')">👁️ Profil freigeben</button>` : `<span style="color:#4ade80;font-size:11px;font-weight:600">✅ Aktiv</span>`}
-          ${t.aktiv ? `<button onclick="banTrainer('${t.id}', '${vexEsc(t.vorname)} ${vexEsc(t.nachname)}')" style="background:rgba(255,165,0,0.12);border:1px solid rgba(255,165,0,0.3);color:#ffaa00;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🚫 Sperren</button>` : ''}
-          <button onclick="deleteTrainer('${t.id}', '${vexEsc(t.vorname)} ${vexEsc(t.nachname)}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
+          ${!t.aktiv ? `<button class="btn-activate" onclick="activateTrainer('${t.id}')">👁️ Profil freigeben</button>` : `<button onclick="freigabeZuruecknehmen('${t.id}', '${vexEsc(t.vorname)} ${vexEsc(t.nachname)}')" style="background:rgba(255,165,0,0.12);border:1px solid rgba(255,165,0,0.3);color:#ffaa00;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer">↩ Freigabe zurück</button>`}
+          <button onclick="loeschePerson('trainer','${t.id}', '${vexEsc(t.vorname)} ${vexEsc(t.nachname)}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
         </td>
         <td>${t.created_at ? new Date(t.created_at).toLocaleDateString('de-AT') : '–'}</td>
       </tr>`).join('');
@@ -1015,7 +1024,7 @@ async function loadData() {
         <td>${vexEsc(k.ziel) || '–'}</td>
         <td>${k.created_at ? new Date(k.created_at).toLocaleDateString('de-AT') : '–'}</td>
         <td onclick="event.stopPropagation()">
-          <button onclick="deleteKunde('${k.id}', '${vexEsc(k.vorname)} ${vexEsc(k.nachname)}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
+          <button onclick="loeschePerson('kunde','${k.id}', '${vexEsc(k.vorname)} ${vexEsc(k.nachname)}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
         </td>
       </tr>`).join('');
   }
@@ -1364,41 +1373,60 @@ async function setzeTrainerAktiv(id, neu) {
   return geaendert > 0;
 }
 
-// Loescht eine Zeile (trainers oder kunden) ueber /admin-aktion; liefert wahr,
-// wenn tatsaechlich eine Zeile entfernt wurde.
-async function loescheZeile(tabelle, id) {
-  const aktion = tabelle === 'trainers' ? 'trainer_loeschen'
-    : (tabelle === 'kunden' ? 'kunde_loeschen' : '');
-  if(!aktion) return false;
-  const geaendert = await adminAktion(aktion, id);
-  return geaendert > 0;
+// ──── Teil 5: Sperren / Entsperren / endgültig löschen ────
+// Alle Eingriffe laufen über die abgesicherte Edge Function /admin-aktion
+// (service_role, nur ist_vexfit_admin). adminEdge schickt einen Payload und
+// liefert die geparste Antwort oder null bei Fehler (Meldung erscheint dann).
+async function adminEdge(payload) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/vexfit-automation/admin-aktion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (sess && sess.access_token || '') },
+      body: JSON.stringify(payload)
+    });
+    if(istAbgemeldet(res)) return null;
+    const d = await res.json().catch(() => null);
+    if(!res.ok) { meldeFehler((d && d.fehler) ? d.fehler : ('Aktion fehlgeschlagen (' + res.status + ').')); return null; }
+    return d;
+  } catch(e) {
+    console.error('adminEdge:', e);
+    meldeFehler('Verbindungsfehler. Die Aktion wurde nicht ausgeführt.');
+    return null;
+  }
 }
 
-// Hinweis: banTrainer/deleteTrainer/deleteKunde werden in Teil 5 auf die
-// abgesicherte Edge Function (Auth sperren/löschen) umgestellt; hier bleibt
-// vorerst der Zeilen-Weg, aber ohne alert/confirm.
-async function banTrainer(id, name) {
-  const ok = await setzeTrainerAktiv(id, false);
-  if(!ok) { meldeFehler(`${name} konnte nicht gesperrt werden. Die Anzeige wurde nicht verändert.`); return; }
-  meldeErfolg(`${name} ist jetzt gesperrt (aus der Suche entfernt).`);
+// Anmeldung sperren/entsperren (umkehrbar). art: 'trainer' | 'kunde'.
+async function sperrePerson(art, id, name, aktuellGesperrt) {
+  const entsperren = !!aktuellGesperrt;
+  const ja = await bestaetige({
+    titel: entsperren ? 'Sperre aufheben' : 'Anmeldung sperren',
+    text: entsperren
+      ? `${name || 'Diese Person'} wieder entsperren? Anmeldung und Nutzung sind danach wieder möglich.`
+      : `${name || 'Diese Person'} sperren? Die Person kann sich nicht mehr anmelden${art === 'trainer' ? ' und verschwindet aus der Suche' : ''}. Die Daten bleiben erhalten.`,
+    okText: entsperren ? 'Entsperren' : 'Sperren', okArt: 'btn-warn'
+  });
+  if(!ja) return;
+  const d = await adminEdge({ aktion: entsperren ? 'login_entsperren' : 'login_sperren', art: art, ziel_id: id });
+  if(!d || !d.ok) return;
+  if(!d.konto) meldeErfolg((entsperren ? 'Entsperrt' : 'Gesperrt') + ' – Hinweis: zu dieser Zeile gibt es kein Anmeldekonto, nur die Markierung wurde gesetzt.');
+  else meldeErfolg(entsperren ? `${name || 'Person'} entsperrt.` : `${name || 'Person'} gesperrt – keine Anmeldung mehr möglich.`);
   loadData();
 }
 
-async function deleteTrainer(id, name) {
-  const ja = await bestaetige({ titel: 'Trainer entfernen', text: `${name} wirklich aus der Trainerliste entfernen? Das Anmeldekonto bleibt bestehen.`, okText: 'Entfernen', okArt: 'btn-gefahr' });
+// Endgültig löschen: der Name muss eingetippt werden. Löscht Auth-Konto + Zeile;
+// verhindern verknüpfte Anfragen das Löschen, bleibt die Zeile anonymisiert.
+async function loeschePerson(art, id, name) {
+  const ja = await bestaetige({
+    titel: 'Endgültig löschen',
+    text: `${name || 'Diese Person'} endgültig löschen? Das Anmeldekonto wird gelöscht. Gibt es verknüpfte Anfragen, bleibt die Zeile anonymisiert erhalten. Tippe zur Bestätigung den Namen ein:`,
+    okText: 'Endgültig löschen', okArt: 'btn-gefahr', nameZumTippen: name || ''
+  });
   if(!ja) return;
-  const ok = await loescheZeile('trainers', id);
-  if(!ok) { meldeFehler(`${name} konnte nicht entfernt werden. Die Anzeige wurde nicht verändert.`); return; }
-  meldeErfolg(`${name} entfernt.`);
-  loadData();
-}
-
-async function deleteKunde(id, name) {
-  const ja = await bestaetige({ titel: 'Kunde entfernen', text: `${name} wirklich aus der Kundenliste entfernen? Das Anmeldekonto bleibt bestehen.`, okText: 'Entfernen', okArt: 'btn-gefahr' });
-  if(!ja) return;
-  const ok = await loescheZeile('kunden', id);
-  if(!ok) { meldeFehler(`${name} konnte nicht entfernt werden. Die Anzeige wurde nicht verändert.`); return; }
-  meldeErfolg(`${name} entfernt.`);
+  const d = await adminEdge({ aktion: 'endgueltig_loeschen', art: art, ziel_id: id, bestaetigt: true });
+  if(!d || !d.ok) return;
+  if(d.anonymisiert) meldeErfolg(`${name || 'Person'}: Konto gelöscht, Zeile wegen verknüpfter Anfragen anonymisiert.`);
+  else if(d.geloescht) meldeErfolg(`${name || 'Person'} endgültig gelöscht.`);
+  else meldeFehler('Nichts gelöscht – die Zeile wurde nicht gefunden.');
   loadData();
 }
 

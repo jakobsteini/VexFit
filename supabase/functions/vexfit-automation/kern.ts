@@ -218,6 +218,25 @@ export interface Anschluesse {
   /** Optionaler Zusatz fuer die Trainer-Mail an Jakob, aus einem Secret. */
   adminHinweis?(): string | undefined;
   melden?(text: string, mehr?: unknown): void;
+
+  // ── Teil 5 (Admin): Sperren/Entsperren/endgueltiges Loeschen ──
+  /** Liefert die Auth-Benutzer-Kennung (user_id) einer trainers/kunden-Zeile,
+   *  oder null, wenn die Zeile keine hat. */
+  personUserId?(tabelle: "trainers" | "kunden", id: string): Promise<string | null>;
+  /** Sperrt (ban_duration) bzw. entsperrt einen Auth-Benutzer ueber die Supabase
+   *  Auth-Admin-API mit service_role. gesperrt=true sperrt, false entsperrt. */
+  authSperren?(userId: string, gesperrt: boolean): Promise<void>;
+  /** Loescht einen Auth-Benutzer ueber die Auth-Admin-API (service_role). */
+  authNutzerLoeschen?(userId: string): Promise<void>;
+  /** Setzt die Spalte gesperrt einer trainers/kunden-Zeile (service_role).
+   *  Gibt die Zahl geaenderter Zeilen zurueck. */
+  personGesperrtSetzen?(tabelle: "trainers" | "kunden", id: string, gesperrt: boolean): Promise<number>;
+  /** Loescht die Zeile; verhindert ein Fremdschluessel (z. B. Anfragen) das
+   *  Loeschen, werden stattdessen die personenbezogenen Felder anonymisiert
+   *  (Fremddaten bleiben erhalten). */
+  zeileLoeschenOderAnonymisieren?(tabelle: "trainers" | "kunden", id: string): Promise<{ geloescht: boolean; anonymisiert: boolean }>;
+  /** Schreibt einen Protokolleintrag (Zeitpunkt/Admin/Aktion/Ziel). Best effort. */
+  protokoll?(eintrag: { admin_id: string; aktion: string; ziel_tabelle: string; ziel_id: string }): Promise<void>;
 }
 
 // ============================================================================
@@ -908,6 +927,14 @@ async function neueAnfrage(
  *   unbekannte Aktion      -> 400
  * Jede Aktion wird protokolliert (Zeitpunkt, Admin-ID, Aktion, Ziel-ID).
  */
+/** 'trainer'/'trainers' -> "trainers", 'kunde'/'kunden' -> "kunden", sonst null. */
+function artTabelle(art: unknown): "trainers" | "kunden" | null {
+  const s = String(art ?? "");
+  if (s === "trainer" || s === "trainers") return "trainers";
+  if (s === "kunde" || s === "kunden") return "kunden";
+  return null;
+}
+
 async function adminAktion(
   r: Request,
   a: Anschluesse,
@@ -952,6 +979,39 @@ async function adminAktion(
     case "kunde_loeschen":
       geaendert = await a.adminZeileLoeschen("kunden", zielId);
       break;
+
+    // ── Teil 5: Login sperren/entsperren (umkehrbar) ──
+    case "login_sperren":
+    case "login_entsperren": {
+      const tabelle = artTabelle(body.art);
+      if (!tabelle) return antwort(400, { fehler: "art fehlt (trainer/kunde)" }, herkunft);
+      if (!a.personUserId || !a.personGesperrtSetzen || !a.authSperren) {
+        return antwort(501, { fehler: "Sperren ist in dieser Fassung nicht verfuegbar" }, herkunft);
+      }
+      const an = aktion === "login_sperren";
+      const userId = await a.personUserId(tabelle, zielId);
+      let konto = false;
+      if (userId) { await a.authSperren(userId, an); konto = true; }
+      const n = await a.personGesperrtSetzen(tabelle, zielId, an);
+      await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: tabelle, ziel_id: zielId });
+      return antwort(200, { ok: true, geaendert: n, gesperrt: an, konto }, herkunft);
+    }
+
+    // ── Teil 5: endgueltig loeschen (Auth-Benutzer + Zeile, sonst anonymisieren) ──
+    case "endgueltig_loeschen": {
+      if (body.bestaetigt !== true) return antwort(400, { fehler: "Bestaetigung fehlt" }, herkunft);
+      const tabelle = artTabelle(body.art);
+      if (!tabelle) return antwort(400, { fehler: "art fehlt (trainer/kunde)" }, herkunft);
+      if (!a.zeileLoeschenOderAnonymisieren) {
+        return antwort(501, { fehler: "Loeschen ist in dieser Fassung nicht verfuegbar" }, herkunft);
+      }
+      const userId = a.personUserId ? await a.personUserId(tabelle, zielId) : null;
+      if (userId && a.authNutzerLoeschen) await a.authNutzerLoeschen(userId);
+      const res = await a.zeileLoeschenOderAnonymisieren(tabelle, zielId);
+      await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: tabelle, ziel_id: zielId });
+      return antwort(200, { ok: true, geloescht: res.geloescht, anonymisiert: res.anonymisiert, konto: !!userId }, herkunft);
+    }
+
     default:
       return antwort(400, { fehler: "unbekannte Aktion" }, herkunft);
   }
