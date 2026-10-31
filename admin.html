@@ -280,7 +280,7 @@ try {
             </tr>
           </thead>
           <tbody id="kunden-tbody">
-            <tr><td colspan="6" class="loading-text">Lade Kunden...</td></tr>
+            <tr><td colspan="7" class="loading-text">Lade Kunden...</td></tr>
           </tbody>
         </table>
       </div>
@@ -742,6 +742,77 @@ async function detailFreigabeZurueck(id) {
 async function detailSperren(art, id) { detailSchliessen(); if(art === 'trainer') await banTrainer(id, 'Dieser Trainer'); }
 async function detailLoeschen(art, id) { detailSchliessen(); if(art === 'trainer') { const t = (window.allTrainers||[]).find(x=>String(x.id)===String(id)); await deleteTrainer(id, t ? `${t.vorname} ${t.nachname}` : 'Trainer'); } else { const k = (window.allKunden||[]).find(x=>String(x.id)===String(id)); await deleteKunde(id, k ? `${k.vorname} ${k.nachname}` : 'Kunde'); } }
 
+// ──── DETAILANSICHT KUNDE (Teil 4) ────
+// Zeigt alle gespeicherten Felder. Welche Spalten es gibt, kommt direkt aus der
+// Zeile (select=*), damit nichts erfunden wird; bekannte Felder bekommen eine
+// deutsche Beschriftung, der Rest wird darunter mit Spaltennamen gezeigt.
+const KUNDE_LABEL = {
+  telefon: 'Telefon', plz: 'PLZ', stadt: 'Stadt', ziel: 'Ziele',
+  nachricht: 'Nachricht', erwartungen: 'Antworten aus dem Einstieg',
+  land: 'Land'
+};
+const KUNDE_VERBERGEN = new Set(['id', 'user_id', 'vorname', 'nachname', 'email', 'created_at', 'gesperrt']);
+function kundeDetail(id) {
+  const k = (window.allKunden || []).find(x => String(x.id) === String(id));
+  if(!k) { meldeFehler('Kunde nicht gefunden. Bitte Seite neu laden.'); return; }
+  let body = `
+    <div style="margin-bottom:16px">
+      <div style="font-size:20px;font-weight:700">${vexEsc(k.vorname)} ${vexEsc(k.nachname)}</div>
+      <div style="color:var(--text-muted);font-size:13px">${vexEsc(k.email) || '—'}</div>
+      ${k.gesperrt ? '<div style="margin-top:8px"><span class="badge badge-abg">Gesperrt</span></div>' : ''}
+    </div>
+  `;
+  // Bekannte Felder zuerst, in sinnvoller Reihenfolge.
+  for(const key of ['telefon', 'plz', 'stadt', 'ziel', 'erwartungen', 'nachricht', 'land']) {
+    if(key in k && k[key] !== null && k[key] !== '') body += df(KUNDE_LABEL[key], vexEsc(String(k[key])));
+  }
+  // Übrige, noch nicht gezeigte, nicht leere Spalten (nichts erfinden).
+  for(const key of Object.keys(k)) {
+    if(KUNDE_VERBERGEN.has(key) || KUNDE_LABEL[key]) continue;
+    const v = k[key];
+    if(v === null || v === '' || (Array.isArray(v) && v.length === 0)) continue;
+    body += df(key, vexEsc(Array.isArray(v) ? v.join(', ') : String(v)));
+  }
+  body += df('Registriert am', k.created_at ? new Date(k.created_at).toLocaleString('de-AT') : '');
+  body += `<div class="feld"><div class="feld-label">Gestellte Anfragen</div><div id="detail-kunde-anfragen" class="feld-wert" style="color:var(--text-muted)">Lade Anfragen …</div></div>`;
+
+  const foot = `
+    <button class="btn-gross btn-warn" onclick="detailSperren('kunde','${vexEsc(k.id)}')">${k.gesperrt ? 'Entsperren' : 'Sperren (Login)'}</button>
+    <button class="btn-gross btn-gefahr" onclick="detailLoeschen('kunde','${vexEsc(k.id)}')">Endgültig löschen</button>
+  `;
+  detailOeffnen(`${k.vorname || ''} ${k.nachname || ''}`.trim() || 'Kunde', body, foot);
+  ladeKundeAnfragen(k);
+}
+
+// Anfragen dieses Kunden. Die Verknüpfung läuft über kunden_name, weil das Admin-
+// Konto die Spalte kunden_email aus anfragen nicht lesen darf (Spaltenrecht
+// entzogen, 2026-10-26-01). Gleiche Namen können deshalb zusammenfallen.
+async function ladeKundeAnfragen(k) {
+  const ziel = document.getElementById('detail-kunde-anfragen');
+  if(!ziel) return;
+  const name = `${k.vorname || ''} ${k.nachname || ''}`.trim();
+  if(!name) { ziel.textContent = 'Kein Name hinterlegt – Anfragen nicht zuordenbar.'; return; }
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/anfragen?kunden_name=eq.${encodeURIComponent(name)}&select=id,trainer_name,status,created_at,ziel&order=created_at.desc`, { headers: authKopf() });
+    if(!res.ok) { ziel.textContent = 'Anfragen konnten nicht geladen werden (' + res.status + ').'; return; }
+    const rows = await res.json();
+    if(!Array.isArray(rows) || rows.length === 0) { ziel.textContent = 'Keine Anfragen.'; return; }
+    ziel.style.color = 'var(--white)';
+    ziel.innerHTML = rows.map(a => {
+      const z = anfrageZustand(a);
+      const farbe = z === 'angenommen' ? '#4ade80' : (z === 'abgelehnt' ? '#ff6b6b' : 'var(--accent)');
+      return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="color:${farbe};font-weight:700;text-transform:capitalize">${z}</span>
+        · an ${vexEsc(a.trainer_name) || 'Trainer'} ${a.ziel ? '· ' + vexEsc(a.ziel) : ''}
+        <span style="color:var(--text-muted);font-size:11px">${a.created_at ? new Date(a.created_at).toLocaleDateString('de-AT') : ''}</span>
+      </div>`;
+    }).join('') + '<div style="font-size:11px;color:var(--text-muted);margin-top:6px">Zuordnung über den Namen (kunden_email ist für den Admin gesperrt).</div>';
+  } catch(e) {
+    console.error('ladeKundeAnfragen:', e);
+    ziel.textContent = 'Anfragen konnten nicht geladen werden.';
+  }
+}
+
 function sendDailyReport() {
   if(!window.allTrainers || !window.allKunden) {
     zeigeMeldung('Bitte warte, bis die Daten geladen sind.', 'info');
@@ -933,18 +1004,19 @@ async function loadData() {
   // Kunden table
   const ktbody = document.getElementById('kunden-tbody');
   if(kunden.length === 0) {
-    ktbody.innerHTML = '<tr><td colspan="6" class="loading-text">Noch keine Kunden registriert</td></tr>';
+    ktbody.innerHTML = '<tr><td colspan="7" class="loading-text">Noch keine Kunden registriert</td></tr>';
   } else {
     ktbody.innerHTML = kunden.map(k => `
-      <tr>
+      <tr class="klickbar" onclick="kundeDetail('${vexEsc(k.id)}')">
         <td><strong>${vexEsc(k.vorname)} ${vexEsc(k.nachname)}</strong></td>
         <td>${vexEsc(k.email)}</td>
+        <td>${k.telefon ? vexEsc(k.telefon) : '<span style="color:var(--text-muted)">–</span>'}</td>
         <td>${vexEsc(k.stadt) || '–'}</td>
         <td>${vexEsc(k.ziel) || '–'}</td>
-        <td>
+        <td>${k.created_at ? new Date(k.created_at).toLocaleDateString('de-AT') : '–'}</td>
+        <td onclick="event.stopPropagation()">
           <button onclick="deleteKunde('${k.id}', '${vexEsc(k.vorname)} ${vexEsc(k.nachname)}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
         </td>
-        <td>${k.created_at ? new Date(k.created_at).toLocaleDateString('de-AT') : '–'}</td>
       </tr>`).join('');
   }
  } catch(e) {
@@ -953,7 +1025,7 @@ async function loadData() {
   const tb = document.getElementById('trainers-tbody');
   if(tb) tb.innerHTML = '<tr><td colspan="10" class="loading-text">⚠️ Daten konnten nicht geladen werden.<br><button onclick="loadData()" style="margin-top:12px;background:var(--accent);color:#0a0a0a;border:none;padding:8px 18px;border-radius:3px;font-weight:700;cursor:pointer">Erneut versuchen</button></td></tr>';
   const kb = document.getElementById('kunden-tbody');
-  if(kb) kb.innerHTML = '<tr><td colspan="6" class="loading-text">⚠️ Daten konnten nicht geladen werden. Bitte erneut versuchen.</td></tr>';
+  if(kb) kb.innerHTML = '<tr><td colspan="7" class="loading-text">⚠️ Daten konnten nicht geladen werden. Bitte erneut versuchen.</td></tr>';
  }
 }
 
