@@ -165,7 +165,7 @@ Deno.test("Teil A: das change-Ereignis von #fAvatar ruft uploadAvatar auf", asyn
 // =========================================================================
 // TEIL C: ehrliche Werbeaussagen
 // =========================================================================
-Deno.test("Teil C: 'Monatlich kündbar' beim Trainer, 'Kein Abo' bleibt beim Kunden", async () => {
+Deno.test("Teil C: 'Danach monatlich kündbar' beim Trainer, 'Kein Abo' bleibt beim Kunden", async () => {
   const html = await lies("./registrieren.html");
   const iTrainer = html.indexOf('id="formTrainer"');
   const iClient = html.indexOf('id="formClient"');
@@ -173,7 +173,10 @@ Deno.test("Teil C: 'Monatlich kündbar' beim Trainer, 'Kein Abo' bleibt beim Kun
   const trainer = html.slice(iTrainer, iClient);
   const kunde = html.slice(iClient);
   assert(!trainer.includes("Kein Abo"), "Trainer-Abschnitt sagt noch 'Kein Abo'");
-  assertStringIncludes(trainer, "Monatlich kündbar");
+  // Seit dem Baustein "Preismodell klarstellen" steht statt des nackten
+  // "Monatlich kündbar" die praezise Fassung "Danach monatlich kündbar"
+  // (gratis bis zum ersten Kunden, danach monatlich kuendbares Abo).
+  assertStringIncludes(trainer, "Danach monatlich kündbar");
   assertStringIncludes(kunde, "Kein Abo");
 });
 
