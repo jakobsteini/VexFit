@@ -22,7 +22,11 @@ Deno.test("Fix 6: keine .html enthaelt noch das Wort Budget", async () => {
   }
 });
 
-Deno.test("Fix 6: 'verifiziert' bleibt erhalten (nicht versehentlich mitgeloescht)", async () => {
+Deno.test("index.html macht keine pauschale Verifizierungs-Aussage mehr (Teil C, vor-ads)", async () => {
   const s = await lies("./index.html");
-  assert(s.includes("verifizierte"), "index.html hat 'verifizierte' verloren");
+  // Frueher sollte "verifizierte" erhalten bleiben (nur Budget-Entfernung). Der
+  // Baustein "Letzter Schliff vor Ads-Start" (Teil C) streicht die pauschalen
+  // "verifizierte(n) Trainer" aber bewusst - das echte Abzeichen bleibt nur bei
+  // verifiziert = true an einzelnen Trainern. Deshalb jetzt umgekehrt gesichert.
+  assert(!/verifizierte/i.test(s), "index.html enthaelt noch eine pauschale Verifizierungs-Aussage");
 });

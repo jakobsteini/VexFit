@@ -42,7 +42,12 @@ Deno.test("canonical bzw. noindex je Seite wie vorgesehen", async () => {
   }
   for (const datei of noindex) {
     const s = await lies("./" + datei);
-    assertStringIncludes(s, 'content="noindex"');
+    // Ad-Seiten tragen seit Teil C (vor-ads) "noindex, nofollow", die uebrigen
+    // weiterhin "noindex" - beide Formen zaehlen als noindex.
+    assert(
+      /<meta name="robots" content="noindex(, nofollow)?">/.test(s),
+      `${datei} braucht ein robots-noindex`,
+    );
   }
   // profil.html: statisches noindex ENTFERNT (wird dynamisch nur bei Nicht-Treffer gesetzt).
   const profil = await lies("./profil.html");
