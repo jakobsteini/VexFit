@@ -314,6 +314,14 @@ async function ladeOeffentlich(fetchImpl, basisUrl, apikey) {
 let allTrainers = [];
 let activeFilter = 'alle';
 
+// Baustein 3c: Mindeststaerke eines Profils fuer die Suche.
+function mindeststaerkeErfuellt(t) {
+  const foto = typeof avatarAdresse === 'function' ? !!avatarAdresse(t.avatar_url) : !!t.avatar_url;
+  const bio = (t.bio || '').trim().length > 0;
+  const spez = Array.isArray(t.spezialisierungen) && t.spezialisierungen.length > 0;
+  return foto && bio && spez;
+}
+
 // Als Profilbild gilt nur eine Adresse aus dem eigenen Bilder-Behaelter;
 // alles andere (leer, fremde Adresse) faellt auf die Initialen zurueck.
 const AVATAR_PREFIX = SUPABASE_URL + '/storage/v1/object/public/avatars/';
@@ -486,7 +494,11 @@ async function loadTrainers() {
       // Ohne Sitzung: oeffentliche Sicht, nur freigeschaltete Trainer, keine Kontaktdaten.
       daten = await ladeOeffentlich(fetch, SUPABASE_URL, SUPABASE_KEY);
     }
-    allTrainers = daten;
+    // Baustein 3c: Mindeststaerke (Foto + Spezialisierung + Kurztext). Die
+    // oeffentliche Sicht filtert das bereits; fuer den angemeldeten Pfad (liest
+    // die Tabelle direkt) wird hier dieselbe Regel angewendet, damit unfertige
+    // Profile auch Angemeldeten nicht in der Suche erscheinen.
+    allTrainers = daten.filter(mindeststaerkeErfuellt);
     spracheOptionenAufbauen();
     renderTrainers(allTrainers);
   } catch(e) {

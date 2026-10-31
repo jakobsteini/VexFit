@@ -108,6 +108,20 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:calc(56px + env(safe-
 .profil-hinweis.offen b{color:var(--orange)}
 .profil-hinweis.fertig{background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.25);color:var(--white)}
 .profil-hinweis.fertig b{color:var(--green)}
+/* Baustein 3: Profilstaerke-Karte */
+.staerke-karte{background:var(--card,#161616);border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:22px}
+.staerke-kopf{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.staerke-titel{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px}
+.staerke-pct{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent)}
+.staerke-warnung{background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);color:var(--white);font-size:12.5px;line-height:1.5;padding:10px 12px;border-radius:4px;margin-bottom:12px}
+.staerke-liste{display:flex;flex-direction:column;gap:9px}
+.staerke-item{display:flex;align-items:flex-start;gap:9px;font-size:13px}
+.staerke-haken{flex-shrink:0;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;margin-top:1px}
+.staerke-haken.ok{background:var(--green);color:#000}
+.staerke-haken.no{background:rgba(255,255,255,0.1);color:var(--muted)}
+.staerke-text b{color:var(--white)}
+.staerke-tipp{color:var(--muted);font-size:12px;line-height:1.5}
+.staerke-tipp a{color:var(--accent);text-decoration:none}
 .ub-hinweis a{color:var(--accent);text-decoration:none}
 
 /* Mini-Banner in Anfragen */
@@ -232,6 +246,10 @@ try {
        Sichtbarkeit (haengt an trainers.aktiv = Freigabe, nicht an der Vollstaendigkeit).
        Gefuellt von updateDots(). -->
   <div class="profil-hinweis fade fd1 hidden" id="profilHinweis"></div>
+
+  <!-- Baustein 3: Profilstaerke (0-100 %) mit Checkliste und je einem Tipp.
+       Gefuellt von renderProfilstaerke(). -->
+  <div class="staerke-karte fade fd1 hidden" id="staerkeKarte"></div>
 
   <!-- Profilbild: zaehlt bewusst NICHT in die Vollstaendigkeit, deshalb ohne Punkt -->
   <div class="section fade fd2">
@@ -380,6 +398,7 @@ try {
 </a>
 
 <script src="vexfit-escape.js"></script>
+<script src="vexfit-video.js"></script>
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -712,6 +731,49 @@ function updateDots() {
   } else {
     banner.classList.remove('hidden');
   }
+
+  renderProfilstaerke();
+}
+
+// Baustein 3: Profilstaerke (0-100 %) ueber 8 Punkte mit je einem Tipp. Ergaenzt
+// die bestehende Vollstaendigkeits-Anzeige (ersetzt sie nicht). Foto, Kurztext
+// und Spezialisierung bilden die Mindeststaerke: fehlt davon etwas, erscheint das
+// Profil nicht in der Suche (so auch in der oeffentlichen Sicht abgesichert).
+const STAERKE_BEARB = 'profil-bearbeiten.html';
+function renderProfilstaerke() {
+  const karte = document.getElementById('staerkeKarte');
+  if(!karte) return;
+  const bioFeld = document.getElementById('fBio');
+  const bio = (bioFeld && bioFeld.value) || (T && T.bio) || '';
+  const foto = !!(T && typeof avatarAdresse === 'function' && avatarAdresse(T.avatar_url));
+  const spez = (Array.isArray(selectedSpez) && selectedSpez.length > 0) ||
+               (T && Array.isArray(T.spezialisierungen) && T.spezialisierungen.length > 0);
+  const video = !!(T && typeof vexVideo !== 'undefined' && vexVideo.erkenne(T.video_url || ''));
+  const hat = (arr) => T && Array.isArray(T[arr]) && T[arr].length > 0;
+  const items = [
+    { name: 'Foto', ok: foto, min: true, tipp: 'Lade ein Profilbild hoch — Profile mit Foto bekommen deutlich mehr Anfragen.', ziel: null },
+    { name: 'Kurztext', ok: bio.trim().length > 10, min: true, tipp: 'Schreib 2–3 Sätze über dich. Persönlich wirkt am besten.', ziel: null },
+    { name: 'Spezialisierungen', ok: spez, min: true, tipp: 'Wähle deine Schwerpunkte, damit Kunden dich gezielt finden.', ziel: null },
+    { name: 'Vorstellungsvideo', ok: video, min: false, tipp: 'Füge einen YouTube-, Instagram- oder TikTok-Link ein.', ziel: STAERKE_BEARB },
+    { name: 'Galerie', ok: hat('galerie'), min: false, tipp: 'Zeig mit Bildern, wie du arbeitest (bis zu 6).', ziel: STAERKE_BEARB },
+    { name: 'Sprachen', ok: hat('sprachen'), min: false, tipp: 'Gib an, welche Sprachen du sprichst.', ziel: STAERKE_BEARB },
+    { name: 'Trainingsorte', ok: hat('trainingsorte'), min: false, tipp: 'Studio, Outdoor, beim Kunden oder Online?', ziel: STAERKE_BEARB },
+    { name: 'Zertifikat', ok: !!(T && T.zertifikat_datei), min: false, tipp: 'Lade deinen Nachweis hoch — Grundlage fürs Verifiziert-Abzeichen.', ziel: STAERKE_BEARB }
+  ];
+  const done = items.filter(i => i.ok).length;
+  const pct = Math.round(done / items.length * 100);
+  const minFehlt = items.filter(i => i.min && !i.ok).map(i => i.name);
+  let html = `<div class="staerke-kopf"><div class="staerke-titel">Profilstärke</div><div class="staerke-pct">${pct}%</div></div>`;
+  if(minFehlt.length) {
+    html += `<div class="staerke-warnung"><b>Dein Profil erscheint noch nicht in der Suche.</b> Dafür brauchst du mindestens Foto, Spezialisierung und Kurztext. Es fehlt: ${vexEsc(minFehlt.join(', '))}.</div>`;
+  }
+  html += '<div class="staerke-liste">' + items.map(i => {
+    const tipp = i.ok ? '' :
+      `<div class="staerke-tipp">${vexEsc(i.tipp)}${i.ziel ? ` <a href="${i.ziel}">Jetzt ergänzen →</a>` : ''}</div>`;
+    return `<div class="staerke-item"><div class="staerke-haken ${i.ok ? 'ok' : 'no'}">${i.ok ? '✓' : ''}</div><div><div class="staerke-text"><b>${vexEsc(i.name)}</b></div>${tipp}</div></div>`;
+  }).join('') + '</div>';
+  karte.innerHTML = html;
+  karte.classList.remove('hidden');
 }
 
 // Live updates
