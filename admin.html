@@ -219,6 +219,14 @@ try {
       <button class="tab" onclick="showTab('profiluebersicht', this)">Profil-Übersicht</button>
     </div>
 
+    <!-- Teil 6: Testkonten ein-/ausblenden (löscht nichts). -->
+    <div style="margin:-6px 0 16px;font-size:13px;color:var(--text-muted)">
+      <label style="cursor:pointer;display:inline-flex;align-items:center;gap:8px">
+        <input type="checkbox" id="testsAusblenden" onchange="testsUmschalten(this.checked)" style="width:18px;height:18px;accent-color:var(--accent)">
+        Testkonten ausblenden (E-Mail mit „+" oder auf der internen Liste)
+      </label>
+    </div>
+
     <!-- NEU – WARTET AUF FREIGABE (erscheint zuerst, neueste oben) -->
     <div class="tab-content active" id="tab-freigabe">
       <div class="table-wrap">
@@ -465,6 +473,30 @@ const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
 // migrations/2026-09-20-admin-vollzugriff.sql pruefen dieselbe Kennung -
 // diese Zeile steuert nur die Anzeige, der Schutz liegt in der Datenbank.
 const ADMIN_USER_ID = 'ee744b01-0a70-4da5-a19b-6c905c8479b5';
+
+// Teil 6: Testkonten. Von Jakob gepflegte Liste (E-Mail-Adressen), beginnt leer.
+// Zusätzlich gilt jede Adresse mit „+" als Testkonto (z. B. name+1@ …).
+// Der Filter blendet solche Konten nur aus – es wird nie etwas automatisch gelöscht.
+const TEST_EMAILS = [];
+let testsAusblenden = false;
+function istTestkonto(email) {
+  if(!email) return false;
+  const e = String(email).toLowerCase();
+  if(e.includes('+')) return true;
+  return TEST_EMAILS.map(x => String(x).toLowerCase()).includes(e);
+}
+function sichtbareTrainer() {
+  const a = window.allTrainers || [];
+  return testsAusblenden ? a.filter(t => !istTestkonto(t.email)) : a;
+}
+function sichtbareKunden() {
+  const a = window.allKunden || [];
+  return testsAusblenden ? a.filter(k => !istTestkonto(k.email)) : a;
+}
+function testsUmschalten(an) {
+  testsAusblenden = !!an;
+  if(window.allTrainers) renderAllesNeu();
+}
 
 // ──── AUTH ────
 // Ohne Anmeldung zurueck zur Anmeldeseite; angemeldet, aber nicht das
@@ -733,6 +765,13 @@ async function ladeDetailAnfragen(trainerId) {
 }
 
 // Fußzeilen-Aktionen der Detailansicht (Freigeben: Teil 3; Sperren/Löschen: Teil 5).
+// Anfrage-Zeile öffnet den beteiligten Trainer (passende Detailansicht).
+function anfrageTrainerOeffnen(trainerId) {
+  const t = (window.allTrainers || []).find(x => String(x.id) === String(trainerId));
+  if(t) trainerDetail(trainerId);
+  else meldeFehler('Zu dieser Anfrage ist der Trainer nicht (mehr) in der Liste.');
+}
+
 async function detailFreigeben(id) { detailSchliessen(); await activateTrainer(id); }
 async function detailFreigabeZurueck(id) {
   const t = (window.allTrainers || []).find(x => String(x.id) === String(id));
@@ -979,12 +1018,33 @@ async function loadData() {
   document.getElementById('s-total-kunden').textContent = kunden.length;
   document.getElementById('s-umsatz').textContent = eurFormat.format(paidCount * 49.99);
 
-  // Trainers table
+  // Trainer- und Kundenliste (berücksichtigen den Testkonten-Filter).
+  renderTrainerliste();
+  ladeFreigabe();
+  ladeZertifikate();
+  renderProfilUebersicht();
+  ladeStudios();
+  renderKundenliste();
+ } catch(e) {
+  console.error('loadData:', e);
+  meldeFehler('Daten konnten nicht geladen werden: ' + (e && e.message ? e.message : e));
+  const tb = document.getElementById('trainers-tbody');
+  if(tb) tb.innerHTML = '<tr><td colspan="10" class="loading-text">⚠️ Daten konnten nicht geladen werden.<br><button onclick="loadData()" style="margin-top:12px;background:var(--accent);color:#0a0a0a;border:none;padding:8px 18px;border-radius:3px;font-weight:700;cursor:pointer">Erneut versuchen</button></td></tr>';
+  const kb = document.getElementById('kunden-tbody');
+  if(kb) kb.innerHTML = '<tr><td colspan="7" class="loading-text">⚠️ Daten konnten nicht geladen werden. Bitte erneut versuchen.</td></tr>';
+ }
+}
+
+// Trainer-Tabelle aus dem Cache rendern (gefiltert, falls Tests ausgeblendet).
+function renderTrainerliste() {
   const tbody = document.getElementById('trainers-tbody');
-  if(trainers.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" class="loading-text">Noch keine Trainer registriert</td></tr>';
-  } else {
-    tbody.innerHTML = trainers.map(t => `
+  if(!tbody) return;
+  const liste = sichtbareTrainer();
+  if(liste.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" class="loading-text">${testsAusblenden && (window.allTrainers||[]).length ? 'Alle Trainer sind ausgeblendete Testkonten.' : 'Noch keine Trainer registriert.'}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = liste.map(t => `
       <tr class="klickbar" onclick="trainerDetail('${vexEsc(t.id)}')">
         <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
         <td>${vexEsc(t.email)}</td>
@@ -993,31 +1053,27 @@ async function loadData() {
         <td>${vexEsc(t.trainingsart) || '–'}</td>
         <td>${t.preis_stunde ? '€' + vexEsc(t.preis_stunde) : '–'}</td>
         <td><span class="badge ${t.stripe_bezahlt ? 'badge-paid' : 'badge-unpaid'}">${t.stripe_bezahlt ? '✓ Bezahlt' : '✕ Ausstehend'}</span></td>
-        <td><span class="badge ${t.aktiv ? 'badge-active' : 'badge-unpaid'}">${t.aktiv ? 'Aktiv' : 'Inaktiv'}</span></td>
+        <td><span class="badge ${t.aktiv ? 'badge-active' : 'badge-unpaid'}">${t.aktiv ? 'Aktiv' : 'Inaktiv'}</span>${t.gesperrt ? ' <span class="badge badge-abg">Gesperrt</span>' : ''}</td>
         <td onclick="event.stopPropagation()" style="display:flex;flex-direction:column;gap:5px;padding:8px 16px">
           ${!t.aktiv ? `<button class="btn-activate" onclick="activateTrainer('${t.id}')">👁️ Profil freigeben</button>` : `<button onclick="freigabeZuruecknehmen('${t.id}', '${vexEsc(t.vorname)} ${vexEsc(t.nachname)}')" style="background:rgba(255,165,0,0.12);border:1px solid rgba(255,165,0,0.3);color:#ffaa00;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer">↩ Freigabe zurück</button>`}
           <button onclick="loeschePerson('trainer','${t.id}', '${vexEsc(t.vorname)} ${vexEsc(t.nachname)}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
         </td>
         <td>${t.created_at ? new Date(t.created_at).toLocaleDateString('de-AT') : '–'}</td>
       </tr>`).join('');
-  }
+}
 
-  // Neu – wartet auf Freigabe (nutzt die eben geladenen Trainer).
-  ladeFreigabe();
-
-  // Baustein 7: Zertifikate, Profil-Übersicht und Studios.
-  ladeZertifikate();
-  renderProfilUebersicht();
-  ladeStudios();
-
-  // Kunden table
+// Kunden-Tabelle aus dem Cache rendern (gefiltert, falls Tests ausgeblendet).
+function renderKundenliste() {
   const ktbody = document.getElementById('kunden-tbody');
-  if(kunden.length === 0) {
-    ktbody.innerHTML = '<tr><td colspan="7" class="loading-text">Noch keine Kunden registriert</td></tr>';
-  } else {
-    ktbody.innerHTML = kunden.map(k => `
+  if(!ktbody) return;
+  const liste = sichtbareKunden();
+  if(liste.length === 0) {
+    ktbody.innerHTML = `<tr><td colspan="7" class="loading-text">${testsAusblenden && (window.allKunden||[]).length ? 'Alle Kunden sind ausgeblendete Testkonten.' : 'Noch keine Kunden registriert.'}</td></tr>`;
+    return;
+  }
+  ktbody.innerHTML = liste.map(k => `
       <tr class="klickbar" onclick="kundeDetail('${vexEsc(k.id)}')">
-        <td><strong>${vexEsc(k.vorname)} ${vexEsc(k.nachname)}</strong></td>
+        <td><strong>${vexEsc(k.vorname)} ${vexEsc(k.nachname)}</strong>${k.gesperrt ? ' <span class="badge badge-abg">Gesperrt</span>' : ''}</td>
         <td>${vexEsc(k.email)}</td>
         <td>${k.telefon ? vexEsc(k.telefon) : '<span style="color:var(--text-muted)">–</span>'}</td>
         <td>${vexEsc(k.stadt) || '–'}</td>
@@ -1027,15 +1083,18 @@ async function loadData() {
           <button onclick="loeschePerson('kunde','${k.id}', '${vexEsc(k.vorname)} ${vexEsc(k.nachname)}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 12px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:3px">🗑 Kicken</button>
         </td>
       </tr>`).join('');
-  }
- } catch(e) {
-  console.error('loadData:', e);
-  meldeFehler('Daten konnten nicht geladen werden: ' + (e && e.message ? e.message : e));
-  const tb = document.getElementById('trainers-tbody');
-  if(tb) tb.innerHTML = '<tr><td colspan="10" class="loading-text">⚠️ Daten konnten nicht geladen werden.<br><button onclick="loadData()" style="margin-top:12px;background:var(--accent);color:#0a0a0a;border:none;padding:8px 18px;border-radius:3px;font-weight:700;cursor:pointer">Erneut versuchen</button></td></tr>';
-  const kb = document.getElementById('kunden-tbody');
-  if(kb) kb.innerHTML = '<tr><td colspan="7" class="loading-text">⚠️ Daten konnten nicht geladen werden. Bitte erneut versuchen.</td></tr>';
- }
+}
+
+// Alle aus dem Cache gespeisten Listen neu zeichnen (nach Filter-Umschaltung),
+// ohne neu zu laden. Trainer-ohne-Anfrage liest zusätzlich die Anfragen.
+function renderAllesNeu() {
+  renderTrainerliste();
+  renderKundenliste();
+  ladeFreigabe();
+  ladeProfilUnvollstaendig();
+  renderProfilUebersicht();
+  ladeZertifikate();
+  ladeTrainerOhneAnfrage();
 }
 
 // ──── PLATTFORM-ZUSTAND (nur lesend) ────
@@ -1083,7 +1142,7 @@ function sucheFehlt(t) {
 function ladeFreigabe() {
   const tb = document.getElementById('freigabe-tbody');
   if(!tb) return;
-  const neue = (window.allTrainers || []).filter(t => !t.aktiv);
+  const neue = sichtbareTrainer().filter(t => !t.aktiv);
   if(neue.length === 0) {
     tb.innerHTML = '<tr><td colspan="6" class="loading-text">Keine Trainer warten auf Freigabe.</td></tr>';
     return;
@@ -1149,7 +1208,7 @@ async function ladeAnfragenKennzahlen() {
 async function ladeAnfragenListe() {
   const tb = document.getElementById('anfragen-tbody');
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/anfragen?select=created_at,trainer_name,kunden_name,status,weitergeleitet&order=created_at.desc&limit=50`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/anfragen?select=created_at,trainer_id,trainer_name,kunden_name,status,weitergeleitet&order=created_at.desc&limit=50`, {
       headers: authKopf()
     });
     if(istAbgemeldet(res)) return;
@@ -1165,7 +1224,8 @@ async function ladeAnfragenListe() {
                    : z === 'abgelehnt' ? '<span class="badge badge-abg">Abgelehnt</span>'
                    : '<span class="badge badge-offen">Offen</span>';
       const w = a.weitergeleitet ? '<span class="badge badge-fwd">Ja</span>' : '<span class="badge badge-nofwd">Nein</span>';
-      return `<tr>
+      const klick = a.trainer_id ? ` class="klickbar" onclick="anfrageTrainerOeffnen('${vexEsc(a.trainer_id)}')"` : '';
+      return `<tr${klick}>
         <td>${a.created_at ? new Date(a.created_at).toLocaleDateString('de-AT') : '–'}</td>
         <td>${vexEsc(a.trainer_name) || '–'}</td>
         <td>${vexEsc(a.kunden_name) || '–'}</td>
@@ -1191,7 +1251,7 @@ async function ladeTrainerOhneAnfrage() {
     if(!res.ok) throw new Error('Anfragen laden fehlgeschlagen: ' + res.status);
     const rows = await res.json();
     const mitAnfrage = new Set((Array.isArray(rows) ? rows : []).map(r => r.trainer_id).filter(Boolean));
-    const trainer = (window.allTrainers || []).filter(t => t.aktiv && !mitAnfrage.has(t.id));
+    const trainer = sichtbareTrainer().filter(t => t.aktiv && !mitAnfrage.has(t.id));
     if(trainer.length === 0) {
       tb.innerHTML = '<tr><td colspan="4" class="loading-text">Alle freigeschalteten Trainer haben mindestens eine Anfrage.</td></tr>';
       return;
@@ -1213,7 +1273,7 @@ async function ladeTrainerOhneAnfrage() {
 function ladeProfilUnvollstaendig() {
   const tb = document.getElementById('unvollstaendig-tbody');
   try {
-    const trainer = (window.allTrainers || [])
+    const trainer = sichtbareTrainer()
       .filter(t => t.aktiv)
       .map(t => ({ t, fehlt: fehlendeProfilfelder(t) }))
       .filter(x => x.fehlt.length > 0);
@@ -1514,7 +1574,7 @@ function renderProfilUebersicht() {
   const tbody = document.getElementById('profiluebersicht-tbody');
   if(!tbody) return;
   const q = (document.getElementById('profilFilter').value || '').toLowerCase().trim();
-  const liste = (window.allTrainers || []).filter(t => {
+  const liste = sichtbareTrainer().filter(t => {
     if(!q) return true;
     const hay = [t.vorname, t.nachname, t.stadt, (t.sprachen||[]).join(' '), (t.trainingsorte||[]).map(o=>ORT_TEXT[o]||o).join(' ')].join(' ').toLowerCase();
     return hay.includes(q);
@@ -1539,7 +1599,7 @@ function renderProfilUebersicht() {
 function ladeZertifikate() {
   const tbody = document.getElementById('zertifikate-tbody');
   if(!tbody) return;
-  const mitZert = (window.allTrainers || []).filter(t => t.zertifikat_datei);
+  const mitZert = sichtbareTrainer().filter(t => t.zertifikat_datei);
   if(!mitZert.length) { tbody.innerHTML = '<tr><td colspan="5" class="loading-text">Noch keine Zertifikate hochgeladen</td></tr>'; return; }
   tbody.innerHTML = mitZert.map(t => `
     <tr class="klickbar" onclick="trainerDetail('${vexEsc(t.id)}')">
