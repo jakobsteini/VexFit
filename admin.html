@@ -163,6 +163,9 @@ try {
       <button class="tab" onclick="showTab('ohneanfrage', this)">Trainer o. Anfrage</button>
       <button class="tab" onclick="showTab('unvollstaendig', this)">Profil unvollständig</button>
       <button class="tab" onclick="showTab('zahlungen', this)">Zahlungen</button>
+      <button class="tab" onclick="showTab('studios', this)">Studios</button>
+      <button class="tab" onclick="showTab('zertifikate', this)">Zertifikate</button>
+      <button class="tab" onclick="showTab('profiluebersicht', this)">Profil-Übersicht</button>
     </div>
 
     <!-- NEU – WARTET AUF FREIGABE (erscheint zuerst, neueste oben) -->
@@ -308,6 +311,34 @@ try {
       </div>
     </div>
 
+    <!-- STUDIOS TAB (Baustein 7a) -->
+    <div class="tab-content" id="tab-studios">
+      <div id="studios-inhalt"><div class="loading-text">Lade Studios…</div></div>
+    </div>
+
+    <!-- ZERTIFIKATE TAB (Baustein 7b) -->
+    <div class="tab-content" id="tab-zertifikate">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Stadt</th><th>Zertifikat</th><th>Verifiziert</th><th>Aktion</th></tr></thead>
+          <tbody id="zertifikate-tbody"><tr><td colspan="5" class="loading-text">Lade…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PROFIL-ÜBERSICHT TAB (Baustein 7c) -->
+    <div class="tab-content" id="tab-profiluebersicht">
+      <div style="margin-bottom:12px">
+        <input id="profilFilter" placeholder="Filtern: Name, Stadt, Sprache, Trainingsort…" oninput="renderProfilUebersicht()" style="width:100%;max-width:420px;background:var(--card);border:1px solid rgba(255,255,255,0.12);color:var(--white);padding:10px 14px;border-radius:4px;font-family:'DM Sans',sans-serif;font-size:14px">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Stärke</th><th>Video</th><th>Sprachen</th><th>Trainingsorte</th><th>Verifiziert</th></tr></thead>
+          <tbody id="profiluebersicht-tbody"><tr><td colspan="6" class="loading-text">Lade…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- NACHFRAGE-UEBERSICHT -->
     <div class="section-title">Nachfrage je Ort</div>
     <div class="table-wrap">
@@ -344,6 +375,7 @@ try {
 </div>
 
 <script src="vexfit-escape.js"></script>
+<script src="vexfit-video.js"></script>
 <script>
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -567,6 +599,11 @@ async function loadData() {
 
   // Neu – wartet auf Freigabe (nutzt die eben geladenen Trainer).
   ladeFreigabe();
+
+  // Baustein 7: Zertifikate, Profil-Übersicht und Studios.
+  ladeZertifikate();
+  renderProfilUebersicht();
+  ladeStudios();
 
   // Kunden table
   const ktbody = document.getElementById('kunden-tbody');
@@ -982,6 +1019,176 @@ async function markAsPaid(id, email, name) {
   } else {
     alert('❌ Fehler beim Markieren!');
   }
+}
+
+// ──── Baustein 7 ────
+const ORT_TEXT = { studio: 'Studio', outdoor: 'Outdoor', beim_kunden: 'Beim Kunden', online: 'Online' };
+
+// Profilstaerke (0-100 %) aus den acht Punkten (wie im Trainerbereich).
+function profilStaerke(t) {
+  const foto = !!(t.avatar_url);
+  const video = typeof vexVideo !== 'undefined' ? !!vexVideo.erkenne(t.video_url || '') : !!t.video_url;
+  const items = [
+    foto,
+    (t.bio || '').trim().length > 10,
+    Array.isArray(t.spezialisierungen) && t.spezialisierungen.length > 0,
+    video,
+    Array.isArray(t.galerie) && t.galerie.length > 0,
+    Array.isArray(t.sprachen) && t.sprachen.length > 0,
+    Array.isArray(t.trainingsorte) && t.trainingsorte.length > 0,
+    !!t.zertifikat_datei
+  ];
+  return Math.round(items.filter(Boolean).length / items.length * 100);
+}
+
+// B7c: Profil-Übersicht mit neuen Feldern, filterbar.
+function renderProfilUebersicht() {
+  const tbody = document.getElementById('profiluebersicht-tbody');
+  if(!tbody) return;
+  const q = (document.getElementById('profilFilter').value || '').toLowerCase().trim();
+  const liste = (window.allTrainers || []).filter(t => {
+    if(!q) return true;
+    const hay = [t.vorname, t.nachname, t.stadt, (t.sprachen||[]).join(' '), (t.trainingsorte||[]).map(o=>ORT_TEXT[o]||o).join(' ')].join(' ').toLowerCase();
+    return hay.includes(q);
+  });
+  if(!liste.length) { tbody.innerHTML = '<tr><td colspan="6" class="loading-text">Keine Treffer</td></tr>'; return; }
+  tbody.innerHTML = liste.map(t => {
+    const video = (typeof vexVideo !== 'undefined' && vexVideo.erkenne(t.video_url || '')) ? '✓' : '–';
+    const spr = (t.sprachen || []).join(', ') || '–';
+    const orte = (t.trainingsorte || []).map(o => ORT_TEXT[o] || o).join(', ') || '–';
+    return `<tr>
+      <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
+      <td>${profilStaerke(t)}%</td>
+      <td>${video}</td>
+      <td>${vexEsc(spr)}</td>
+      <td>${vexEsc(orte)}</td>
+      <td>${t.verifiziert ? '<span class="badge badge-paid">✓</span>' : '–'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// B7b: Zertifikate prüfen (ansehen + verifizieren/ablehnen).
+function ladeZertifikate() {
+  const tbody = document.getElementById('zertifikate-tbody');
+  if(!tbody) return;
+  const mitZert = (window.allTrainers || []).filter(t => t.zertifikat_datei);
+  if(!mitZert.length) { tbody.innerHTML = '<tr><td colspan="5" class="loading-text">Noch keine Zertifikate hochgeladen</td></tr>'; return; }
+  tbody.innerHTML = mitZert.map(t => `
+    <tr>
+      <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
+      <td>${vexEsc(t.stadt) || '–'}</td>
+      <td><button onclick="zertifikatOeffnen('${vexEsc(t.zertifikat_datei)}')" style="background:rgba(232,255,0,0.12);border:1px solid rgba(232,255,0,0.3);color:var(--accent);padding:5px 12px;border-radius:2px;font-size:11px;font-weight:600;cursor:pointer">Ansehen</button></td>
+      <td>${t.verifiziert ? '<span class="badge badge-paid">✓ Verifiziert</span>' : '<span class="badge badge-unpaid">offen</span>'}</td>
+      <td>
+        ${t.verifiziert
+          ? `<button onclick="entverifizieren('${t.id}')" style="background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;padding:5px 10px;border-radius:2px;font-size:11px;cursor:pointer">Zurücknehmen</button>`
+          : `<button onclick="verifizieren('${t.id}')" style="background:rgba(74,222,128,0.12);border:1px solid rgba(74,222,128,0.3);color:#4ade80;padding:5px 10px;border-radius:2px;font-size:11px;cursor:pointer">Verifizieren</button>`}
+      </td>
+    </tr>`).join('');
+}
+
+// Private Zertifikatsdatei ueber eine signierte Adresse oeffnen (5 Min gueltig).
+async function zertifikatOeffnen(pfad) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/zertifikate/${pfad}`, {
+      method: 'POST',
+      headers: authKopf({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ expiresIn: 300 })
+    });
+    if(!r.ok) { alert('Zertifikat konnte nicht geöffnet werden (' + r.status + ').'); return; }
+    const d = await r.json();
+    window.open(`${SUPABASE_URL}/storage/v1${d.signedURL}`, '_blank');
+  } catch(e) { alert('Zertifikat konnte nicht geöffnet werden.'); }
+}
+
+async function verifizieren(id) {
+  const n = await adminAktion('trainer_verifizieren', id);
+  if(n > 0) loadData(); else alert('Fehler beim Verifizieren.');
+}
+async function entverifizieren(id) {
+  const n = await adminAktion('trainer_entverifizieren', id);
+  if(n > 0) loadData(); else alert('Fehler.');
+}
+
+// B7a: Studios verwalten.
+function studioKopieren(text) {
+  navigator.clipboard?.writeText(text).then(() => {}, () => {});
+}
+async function ladeStudios() {
+  const el = document.getElementById('studios-inhalt');
+  if(!el) return;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/studios_admin_liste`, {
+      method: 'POST', headers: authKopf({ 'Content-Type': 'application/json' }), body: '{}'
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const studios = await r.json();
+    const o = location.origin.includes('localhost') ? location.origin : 'https://vexfit.app';
+    let html = '';
+    for(const s of (studios || [])) {
+      const vorschau = `${o}/${s.slug}.html?vorschau=${s.vorschau_schluessel}`;
+      const uebersicht = `${o}/${s.slug}-uebersicht.html?schluessel=${s.uebersicht_schluessel}`;
+      html += `<div style="background:var(--card);border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:16px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <strong style="font-size:16px">${vexEsc(s.name)}</strong>
+          <label style="font-size:13px;color:var(--text-muted);cursor:pointer"><input type="checkbox" ${s.veroeffentlicht ? 'checked' : ''} onchange="studioFreigabe('${s.id}', this.checked)"> veröffentlicht</label>
+        </div>
+        ${studioLink('Vorschau-Link', vorschau)}
+        ${studioLink('Übersicht (nur lesen)', uebersicht)}
+        <div style="margin-top:10px;font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px">Standorte</div>
+        ${(s.standorte || []).map(st => {
+          const einladung = `${o}/registrieren.html?einladung=${st.einladungs_schluessel}`;
+          const kunden = `${o}/${s.slug}.html?standort=${st.slug}`;
+          const aufsteller = `${o}/${s.slug}-aufsteller.html?standort=${st.slug}`;
+          return `<div style="border-top:1px solid rgba(255,255,255,0.07);padding:10px 0">
+            <strong>${vexEsc(st.name)}</strong> <span style="color:var(--text-muted);font-size:12px">· ${st.trainer_anzahl} Trainer</span>
+            ${studioLink('Trainer-Einladung', einladung)}
+            ${studioLink('Kunden-Link (QR)', kunden)}
+            ${studioLink('Aufsteller (Druck)', aufsteller)}
+          </div>`;
+        }).join('')}
+        <div style="margin-top:12px"><button onclick="standortAnlegen('${s.id}')" style="background:rgba(232,255,0,0.1);border:1px solid rgba(232,255,0,0.3);color:var(--accent);padding:6px 12px;border-radius:3px;font-size:12px;cursor:pointer">+ Standort</button></div>
+      </div>`;
+    }
+    html += `<button onclick="studioAnlegen()" style="background:var(--accent);color:#000;border:none;padding:10px 18px;border-radius:3px;font-weight:700;font-size:13px;cursor:pointer">+ Neues Studio</button>`;
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = '<div class="loading-text">Studios konnten nicht geladen werden.</div>';
+  }
+}
+function studioLink(label, url) {
+  return `<div style="margin-top:8px">
+    <div style="font-size:11px;color:var(--text-muted)">${vexEsc(label)}</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input readonly value="${vexEsc(url)}" onclick="this.select()" style="flex:1;background:var(--bg,#0a0a0a);border:1px solid rgba(255,255,255,0.1);color:var(--white);padding:6px 8px;border-radius:3px;font-size:11px;font-family:monospace">
+      <button onclick="studioKopieren('${vexEsc(url)}')" style="background:rgba(255,255,255,0.08);border:none;color:var(--white);padding:6px 10px;border-radius:3px;font-size:11px;cursor:pointer">Kopieren</button>
+    </div>
+  </div>`;
+}
+async function studioFreigabe(id, an) {
+  await fetch(`${SUPABASE_URL}/rest/v1/rpc/studio_admin_freigabe`, {
+    method: 'POST', headers: authKopf({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ p_studio_id: id, p_an: an })
+  });
+}
+async function studioAnlegen() {
+  const name = prompt('Name des Studios (z. B. „Fit & Co"):'); if(!name) return;
+  const slug = prompt('Kürzel für die Adresse (nur Kleinbuchstaben, z. B. „fitco"):'); if(!slug) return;
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/studio_admin_anlegen`, {
+    method: 'POST', headers: authKopf({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ p_slug: slug, p_name: name })
+  });
+  if(r.ok) ladeStudios(); else alert('Studio konnte nicht angelegt werden.');
+}
+async function standortAnlegen(studioId) {
+  const name = prompt('Name des Standorts (z. B. „Filiale Linz"):'); if(!name) return;
+  const slug = prompt('Kürzel (z. B. „linz"):'); if(!slug) return;
+  const stadt = prompt('Stadt:') || null;
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/standort_admin_anlegen`, {
+    method: 'POST', headers: authKopf({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ p_studio_id: studioId, p_slug: slug, p_name: name, p_stadt: stadt, p_adresse: 'HIER EINFÜGEN', p_plz: 'HIER EINFÜGEN', p_land: 'AT' })
+  });
+  if(r.ok) ladeStudios(); else alert('Standort konnte nicht angelegt werden.');
 }
 
 function sendStripeLink(email, name) {
