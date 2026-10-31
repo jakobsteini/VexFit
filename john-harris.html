@@ -134,7 +134,7 @@ function trainerKarten(trainer, slug){
       ? `<a href="profil.html?id=${encodeURIComponent(t.id)}" class="btn-anmelden">Profil &amp; Anfrage</a>`
       : `<a href="registrieren.html?typ=kunde&standort=${encodeURIComponent(slug)}" class="btn-anmelden">Anmelden und anfragen</a>`;
     return `<div class="tc">
-      <div class="ci"><div class="cav">${initialen}</div><div class="cbadge">Verifiziert ✓</div></div>
+      <div class="ci"><div class="cav">${initialen}</div>${t.verifiziert === true ? '<div class="cbadge">Verifiziert ✓</div>' : ''}</div>
       <div class="cb">
         <div class="cn">${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</div>
         <div class="cl">${vexEsc(t.trainingsart||'Personal Training')}</div>
