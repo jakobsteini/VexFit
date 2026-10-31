@@ -203,6 +203,12 @@ try {
         <div id="pGalerie" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
       </div>
 
+      <!-- Baustein 6: Verfuegbarkeit -->
+      <div id="pVerfSection" style="display:none;margin-bottom:28px">
+        <div class="section-title">VERFÜGBARKEIT</div>
+        <div id="pVerf" style="font-size:13px;color:var(--text-muted);line-height:1.8"></div>
+      </div>
+
       <div id="pCertSection" style="display:none">
         <div class="section-title">ZERTIFIZIERUNGEN</div>
         <p class="about-text" id="pCert">–</p>
@@ -375,8 +381,8 @@ async function loadProfile() {
     // Sicht trainers_oeffentlich - dort gibt es keine Kontaktdaten (weder
     // E-Mail noch Telefon noch Calendly), damit nichts davon im HTML/JSON landet.
     const res = angemeldet
-      ? await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis`, { headers: authKopf() })
-      : await fetch(`${SUPABASE_URL}/rest/v1/trainers_oeffentlich?id=eq.${id}&select=id,created_at,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis`, { headers: authKopf() });
+      ? await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis,verfuegbarkeit`, { headers: authKopf() })
+      : await fetch(`${SUPABASE_URL}/rest/v1/trainers_oeffentlich?id=eq.${id}&select=id,created_at,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis,verfuegbarkeit`, { headers: authKopf() });
     if(istAbgemeldet(res)) return;
     if(!res.ok) throw new Error('Profil laden fehlgeschlagen: ' + res.status);
     const data = await res.json();
@@ -450,6 +456,22 @@ function renderProfile(t) {
     document.getElementById('pGalerieSection').style.display = 'block';
     document.getElementById('pGalerie').innerHTML = galerie.map(u =>
       `<img src="${vexEsc(u)}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px" alt="Trainingsbild" loading="lazy">`).join('');
+  }
+
+  // Baustein 6: Verfuegbarkeit als kompakte Uebersicht je Wochentag.
+  const verf = (t.verfuegbarkeit || []).filter(Boolean);
+  if(verf.length) {
+    const TAGE = [['mo','Mo'],['di','Di'],['mi','Mi'],['do','Do'],['fr','Fr'],['sa','Sa'],['so','So']];
+    const ZEIT = { morgen: 'Morgens', mittag: 'Mittags', abend: 'Abends' };
+    const zeilen = [];
+    for(const [tag, label] of TAGE) {
+      const zeiten = ['morgen','mittag','abend'].filter(z => verf.includes(tag + '_' + z)).map(z => ZEIT[z]);
+      if(zeiten.length) zeilen.push(`<b style="color:var(--white)">${label}:</b> ${vexEsc(zeiten.join(', '))}`);
+    }
+    if(zeilen.length) {
+      document.getElementById('pVerfSection').style.display = 'block';
+      document.getElementById('pVerf').innerHTML = zeilen.join('<br>');
+    }
   }
 
   // Baustein 4: Abzeichen (Verifiziert, Neu auf Vexfit, Antwortzeit).

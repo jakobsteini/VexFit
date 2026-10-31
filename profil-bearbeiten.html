@@ -268,6 +268,16 @@ try {
     </div>
   </div>
 
+  <!-- VERFÜGBARKEIT (Baustein 6) -->
+  <div class="section fade-in fade-d4">
+    <div class="section-title">VERFÜGBARKEIT</div>
+    <div class="field">
+      <label>Wann hast du grob Zeit? (kein verbindlicher Kalender)</label>
+      <div id="verfGrid" style="display:grid;grid-template-columns:auto repeat(3,1fr);gap:5px;margin-top:6px"></div>
+      <div class="hint">Tippe die Felder an, die ungefähr passen. Hilft beim Matching mit Kunden.</div>
+    </div>
+  </div>
+
   <!-- PROBETRAINING (Baustein 4a) -->
   <div class="section fade-in fade-d4">
     <div class="section-title">PROBETRAINING</div>
@@ -355,6 +365,9 @@ let galerie = [];          // Adressen der Galeriebilder
 let zertifikatDatei = '';  // Adresse der hochgeladenen Zertifikatsdatei
 let probetraining = false;        // Baustein 4a
 let probetrainingKostenlos = false;
+let verfuegbarkeit = [];          // Baustein 6: Liste aus <tag>_<zeit>
+const VERF_TAGE = [['mo','Mo'],['di','Di'],['mi','Mi'],['do','Do'],['fr','Fr'],['sa','Sa'],['so','So']];
+const VERF_ZEITEN = [['morgen','Morgen'],['mittag','Mittag'],['abend','Abend']];
 
 // AUTH
 const raw = localStorage.getItem('vexfit_session');
@@ -399,6 +412,27 @@ function initChips() {
   document.getElementById('orteWrap').innerHTML = ORTE_OPTIONS.map(o =>
     `<div class="chip" data-val="${o.val}" onclick="toggleOrt2(this)">${vexEsc(o.text)}</div>`
   ).join('');
+  verfGridAufbauen();
+}
+
+// Baustein 6: Verfuegbarkeits-Raster (Wochentag x Tageszeit).
+function verfGridAufbauen() {
+  const grid = document.getElementById('verfGrid');
+  if(!grid) return;
+  let html = '<div></div>' + VERF_ZEITEN.map(z => `<div style="font-size:11px;color:var(--muted);text-align:center;padding:2px">${z[1]}</div>`).join('');
+  for(const [tag, label] of VERF_TAGE) {
+    html += `<div style="font-size:12px;color:var(--muted);display:flex;align-items:center">${label}</div>`;
+    for(const [zeit] of VERF_ZEITEN) {
+      const key = tag + '_' + zeit;
+      html += `<div class="verf-zelle" data-key="${key}" onclick="toggleVerf(this)" style="height:30px;border:1px solid var(--border);border-radius:4px;cursor:pointer"></div>`;
+    }
+  }
+  grid.innerHTML = html;
+}
+function toggleVerf(el) {
+  const key = el.dataset.key;
+  if(verfuegbarkeit.includes(key)) { verfuegbarkeit = verfuegbarkeit.filter(k => k !== key); el.classList.remove('an'); el.style.background = ''; el.style.borderColor = 'var(--border)'; }
+  else { verfuegbarkeit.push(key); el.classList.add('an'); el.style.background = 'rgba(232,255,0,0.15)'; el.style.borderColor = 'var(--accent)'; }
 }
 
 function toggleSprache(el) {
@@ -636,6 +670,12 @@ function fillForm(t) {
   if(t.zertifikat_datei) { zertifikatDatei = t.zertifikat_datei; document.getElementById('zertStatus').textContent = '✓ Zertifikat vorhanden. Du kannst es durch ein neues ersetzen.'; }
   if(t.probetraining) { probetraining = true; document.getElementById('chipProbe').classList.add('active'); }
   if(t.probetraining_kostenlos) { probetrainingKostenlos = true; document.getElementById('chipProbeGratis').classList.add('active'); }
+  if(Array.isArray(t.verfuegbarkeit)) {
+    verfuegbarkeit = [...t.verfuegbarkeit];
+    document.querySelectorAll('#verfGrid .verf-zelle').forEach(z => {
+      if(verfuegbarkeit.includes(z.dataset.key)) { z.classList.add('an'); z.style.background = 'rgba(232,255,0,0.15)'; z.style.borderColor = 'var(--accent)'; }
+    });
+  }
   // Telefon
   if(t.telefon) document.getElementById('fTelefon').value = t.telefon;
   // Stadt und Postleitzahl: gespeicherten Stand anzeigen
@@ -818,6 +858,8 @@ async function saveProfile() {
   // Baustein 4a: Probetraining.
   body.probetraining = probetraining;
   body.probetraining_kostenlos = probetraining && probetrainingKostenlos;
+  // Baustein 6: Verfuegbarkeit.
+  body.verfuegbarkeit = verfuegbarkeit;
 
   try {
     const r = await fetch(`${SB}/rest/v1/trainers?email=ilike.${encodeURIComponent(sess.email)}`, {
