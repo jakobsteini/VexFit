@@ -419,6 +419,35 @@ const anschluesse: Anschluesse = {
     );
   },
 
+  // B4e (48-Stunden-Fall): offene, unbeantwortete Anfragen aelter als vorISO,
+  // fuer die noch keine Alternativen raus sind. beantwortet_am steht nur, wenn
+  // der Trainer angenommen/abgelehnt hat (Trigger) - das ist der echte
+  // Antwort-Nachweis. Der Status-Ausschluss faengt Altbestand ab, der noch vor
+  // dem Trigger angenommen/abgelehnt wurde (beantwortet_am dort leer);
+  // weitergeleitet=false schliesst bereits bezahlte/zugestellte Anfragen aus.
+  async offeneAnfragenVor(vorISO: string) {
+    const zeilen = await lesen<Record<string, unknown>>(
+      `anfragen?beantwortet_am=is.null&alternativen_gesendet=eq.false` +
+        `&weitergeleitet=eq.false&created_at=lt.${encodeURIComponent(vorISO)}` +
+        `&or=(status.is.null,status.not.in.(angenommen,abgelehnt))` +
+        `&select=id,trainer_id,kunden_email,kunden_name,ziel,alternativen_gesendet` +
+        `&order=created_at.asc&limit=200`,
+    );
+    return zeilen.map((z) => ({
+      id: String(z.id),
+      trainer_id: z.trainer_id as string | null,
+      kunden_email: z.kunden_email as string | null,
+      kunden_name: z.kunden_name as string | null,
+      ziel: z.ziel as string | null,
+      alternativen_gesendet: z.alternativen_gesendet as boolean | null,
+    }));
+  },
+
+  // B4e (48-Stunden-Fall): Geheimnis fuer den Zeitplan-Aufruf.
+  cronGeheimnis(): string | undefined {
+    return Deno.env.get("VEXFIT_CRON_KEY") || undefined;
+  },
+
   adminHinweis(): string | undefined {
     return Deno.env.get("ADMIN_PASSWORT_HINWEIS") || undefined;
   },

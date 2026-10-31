@@ -93,6 +93,11 @@ function bau(opt: {
   b4Original?: any;
   // deno-lint-ignore no-explicit-any
   b4Kandidaten?: any[];
+  // B4e, 48-Stunden-Fall: faellige Anfragen, die der Zeitplan findet.
+  // deno-lint-ignore no-explicit-any
+  b4Faellig?: any[];
+  /** B4e, 48-Stunden-Fall: Function-Secret (undefined = Pfad zu). */
+  cronGeheim?: string;
 } = {}): { anschluesse: Anschluesse; auf: Aufzeichnung } {
   const auf: Aufzeichnung = {
     mails: [],
@@ -204,6 +209,9 @@ function bau(opt: {
     trainerVollNachId: () => Promise.resolve(opt.b4Original ?? null),
     aktiveVerifizierteTrainer: () => Promise.resolve(opt.b4Kandidaten ?? []),
     alternativenVermerken: (id) => { auf.alternativenVermerkt.push(id); return Promise.resolve(); },
+    // B4e, 48-Stunden-Fall: Zeitplan-Pfad.
+    offeneAnfragenVor: () => Promise.resolve(opt.b4Faellig ?? []),
+    cronGeheimnis: () => opt.cronGeheim,
     adminHinweis: () => opt.adminHinweis,
     melden: () => {},
   };
@@ -1394,4 +1402,87 @@ Deno.test("B4e: /passt-nicht ohne Token -> 401", async () => {
   const { anschluesse } = bau({ nutzer: null });
   const a = await bearbeiten(anfrage("passt-nicht", { anfrage_id: "an-1" }, MIT_TOKEN), anschluesse);
   assertEquals(a.status, 401);
+});
+
+// --------------------------------------------------------------------------
+// B4e, 48-Stunden-Fall: der Zeitplan schickt dieselben Vorschlaege wie der
+// Klick-Pfad, nur zeitgesteuert. Ausweis ueber den Kopf x-vexfit-cron.
+// --------------------------------------------------------------------------
+const CRON_GEHEIM = "cron-geheim-123";
+// Der Zeitplan schickt KEINE Herkunft (wie Stripe) und den Cron-Kopf.
+const VOM_ZEITPLAN = { kopf: { "x-vexfit-cron": CRON_GEHEIM } };
+
+Deno.test("B4e-48h: faellige Anfrage -> Kunde bekommt zwei Vorschlaege, Anfrage vermerkt", async () => {
+  const { anschluesse, auf } = bau({
+    cronGeheim: CRON_GEHEIM,
+    b4Faellig: [
+      { id: "an-1", trainer_id: "t-1", kunden_email: "kundin@beispiel.at", kunden_name: "Kundin", alternativen_gesendet: false },
+    ],
+    b4Original: { id: "t-1", stadt: "Wien", spezialisierungen: ["Yoga"] },
+    b4Kandidaten: [
+      { id: "t-2", vorname: "Anna", nachname: "B", stadt: "Wien", spezialisierungen: ["Yoga"] },
+      { id: "t-3", vorname: "Max", nachname: "C", stadt: "Graz", spezialisierungen: ["Yoga"] },
+    ],
+  });
+  const a = await bearbeiten(anfrage("unbeantwortet-pruefen", {}, VOM_ZEITPLAN), anschluesse);
+  assertEquals(a.status, 200);
+  const d = await a.json();
+  assertEquals(d.geprueft, 1);
+  assertEquals(d.mails, 1);
+  assertEquals(auf.mails.length, 1);
+  assertEquals(auf.mails[0].an, "kundin@beispiel.at");
+  assertStringIncludes(auf.mails[0].text, "Anna B");
+  assertEquals(auf.alternativenVermerkt, ["an-1"]);
+});
+
+Deno.test("B4e-48h: falsches Geheimnis -> 401, keine Mail", async () => {
+  const { anschluesse, auf } = bau({
+    cronGeheim: CRON_GEHEIM,
+    b4Faellig: [{ id: "an-1", trainer_id: "t-1", kunden_email: "k@beispiel.at", alternativen_gesendet: false }],
+  });
+  const a = await bearbeiten(
+    anfrage("unbeantwortet-pruefen", {}, { kopf: { "x-vexfit-cron": "falsch" } }),
+    anschluesse,
+  );
+  assertEquals(a.status, 401);
+  assertEquals(auf.mails.length, 0);
+});
+
+Deno.test("B4e-48h: ohne gesetztes Geheimnis bleibt der Pfad zu -> 401", async () => {
+  const { anschluesse } = bau({ /* cronGeheim: undefined */ });
+  const a = await bearbeiten(
+    anfrage("unbeantwortet-pruefen", {}, { kopf: { "x-vexfit-cron": "egal" } }),
+    anschluesse,
+  );
+  assertEquals(a.status, 401);
+});
+
+Deno.test("B4e-48h: keine Alternative gefunden -> keine Mail, aber trotzdem vermerkt (kein zweiter Lauf)", async () => {
+  const { anschluesse, auf } = bau({
+    cronGeheim: CRON_GEHEIM,
+    b4Faellig: [
+      { id: "an-1", trainer_id: "t-1", kunden_email: "kundin@beispiel.at", kunden_name: "Kundin", alternativen_gesendet: false },
+    ],
+    b4Original: { id: "t-1", stadt: "Wien", spezialisierungen: ["Pilates"] },
+    b4Kandidaten: [
+      { id: "t-2", vorname: "Anna", nachname: "B", stadt: "Wien", spezialisierungen: ["Yoga"] },
+    ],
+  });
+  const a = await bearbeiten(anfrage("unbeantwortet-pruefen", {}, VOM_ZEITPLAN), anschluesse);
+  assertEquals(a.status, 200);
+  const d = await a.json();
+  assertEquals(d.mails, 0);
+  assertEquals(auf.mails.length, 0);
+  // Vermerkt, damit der naechste stuendliche Lauf dieselbe Anfrage nicht erneut anfasst.
+  assertEquals(auf.alternativenVermerkt, ["an-1"]);
+});
+
+Deno.test("B4e-48h: nichts faellig -> 200, geprueft 0, keine Mail", async () => {
+  const { anschluesse, auf } = bau({ cronGeheim: CRON_GEHEIM, b4Faellig: [] });
+  const a = await bearbeiten(anfrage("unbeantwortet-pruefen", {}, VOM_ZEITPLAN), anschluesse);
+  assertEquals(a.status, 200);
+  const d = await a.json();
+  assertEquals(d.geprueft, 0);
+  assertEquals(auf.mails.length, 0);
+  assertEquals(auf.alternativenVermerkt, []);
 });

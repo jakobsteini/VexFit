@@ -56,6 +56,11 @@ export const ADMIN_ID = "ee744b01-0a70-4da5-a19b-6c905c8479b5";
 /** Obergrenze fuer den Anfragekoerper der Browser-Pfade. */
 export const KOERPER_GRENZE = 20000;
 
+/** B4e, 48-Stunden-Fall: hat ein Trainer eine Anfrage so lange nicht
+ *  beantwortet, bekommt der Kunde automatisch dieselben zwei Vorschlaege wie
+ *  bei "Passt nicht?" - zeitgesteuert statt per Klick. */
+export const ALTERNATIVEN_NACH_STUNDEN = 48;
+
 /**
  * Fix 7b (Spam-Schutz): verstecktes Koederfeld des anonymen suche.html-Formulars.
  * Steht dieser Feldname im Koerper, ist der Aufruf das anonyme
@@ -195,6 +200,13 @@ export interface Anschluesse {
   aktiveVerifizierteTrainer?(): Promise<TrainerVoll[]>;
   /** B4e: vermerkt, dass fuer eine Anfrage Alternativen verschickt wurden. */
   alternativenVermerken?(anfrageId: string): Promise<void>;
+  /** B4e (48-Stunden-Fall): offene, noch unbeantwortete Anfragen, die vor dem
+   *  Zeitpunkt vorISO gestellt wurden und fuer die noch keine Alternativen
+   *  verschickt sind. service_role. */
+  offeneAnfragenVor?(vorISO: string): Promise<AnfrageVoll[]>;
+  /** B4e (48-Stunden-Fall): das Geheimnis, mit dem sich der Zeitplan-Aufruf
+   *  ausweist (Function-Secret VEXFIT_CRON_KEY). Fehlt es, ist der Pfad zu. */
+  cronGeheimnis?(): string | undefined;
   /** Admin-Aktion: loescht eine Zeile in trainers oder kunden (service_role).
    *  Gibt die Zahl geloeschter Zeilen zurueck. */
   adminZeileLoeschen(tabelle: string, id: string): Promise<number>;
@@ -748,6 +760,8 @@ export async function bearbeiten(
       return await adminAktion(anfrageObjekt, a, herkunft);
     case "passt-nicht":
       return await passtNicht(anfrageObjekt, a, herkunft);
+    case "unbeantwortet-pruefen":
+      return await unbeantwortetePruefen(anfrageObjekt, a, herkunft);
     case "stripe":
       return await stripe(anfrageObjekt, a);
     default:
@@ -986,6 +1000,82 @@ async function passtNicht(
   );
   if (a.alternativenVermerken) await a.alternativenVermerken(anfrageId);
   return antwort(200, { ok: true, mails: gesendet ? 1 : 0, alternativen: alternativen.length }, herkunft);
+}
+
+/**
+ * B4e, 48-Stunden-Fall: der zeitgesteuerte Gegenpart zu "Passt nicht?".
+ *
+ * Findet offene Anfragen, die der Trainer seit mehr als 48 Stunden nicht
+ * beantwortet hat, und schickt dem Kunden dieselben zwei Vorschlaege. Je
+ * Anfrage nur einmal (alternativen_gesendet wird immer gesetzt, auch wenn keine
+ * Alternative gefunden wurde - sonst liefe der Fall jede Stunde neu an).
+ *
+ * Kein Browser, kein Trainer-Token: der Zeitplan (pg_cron) ruft den Pfad auf
+ * und weist sich mit dem Kopf x-vexfit-cron aus - demselben Wert wie das
+ * Function-Secret VEXFIT_CRON_KEY. Stimmt er nicht, kommt 401, so kann ihn
+ * niemand von aussen ausloesen. Ohne gesetztes Geheimnis bleibt der Pfad zu.
+ */
+async function unbeantwortetePruefen(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const geheim = a.cronGeheimnis?.();
+  const mitgeschickt = r.headers.get("x-vexfit-cron");
+  if (!geheim || !mitgeschickt || mitgeschickt !== geheim) {
+    return antwort(401, { fehler: "nicht berechtigt" }, herkunft);
+  }
+
+  if (
+    !a.offeneAnfragenVor || !a.trainerVollNachId || !a.aktiveVerifizierteTrainer
+  ) {
+    return antwort(
+      200,
+      { ok: true, geprueft: 0, mails: 0, uebersprungen: "nicht verdrahtet" },
+      herkunft,
+    );
+  }
+
+  const grenzeISO = new Date(
+    Date.now() - ALTERNATIVEN_NACH_STUNDEN * 60 * 60 * 1000,
+  ).toISOString();
+  const faellig = await a.offeneAnfragenVor(grenzeISO);
+  if (!faellig.length) {
+    return antwort(200, { ok: true, geprueft: 0, mails: 0 }, herkunft);
+  }
+
+  // Kandidaten nur einmal laden, nicht je Anfrage.
+  const kandidaten = await a.aktiveVerifizierteTrainer();
+  let mails = 0;
+  let bearbeitet = 0;
+  for (const anfrage of faellig) {
+    // Doppelte Sicherheit gegen einen falsch gefuellten Port.
+    if (anfrage.alternativen_gesendet === true) continue;
+
+    const original = await a.trainerVollNachId(String(anfrage.trainer_id ?? ""));
+    const kundenEmail = String(anfrage.kunden_email ?? "");
+    const alternativen = original
+      ? alternativenFinden(original, kandidaten)
+      : [];
+
+    if (original && alternativen.length && adresseGueltig(kundenEmail)) {
+      const gesendet = await sendeWennAdresseTaugt(
+        a,
+        mailAlternativen(kundenEmail, anfrage.kunden_name, alternativen),
+      );
+      if (gesendet) mails++;
+    }
+    // In jedem Fall vermerken: nicht jede Stunde erneut versuchen.
+    if (a.alternativenVermerken) {
+      await a.alternativenVermerken(String(anfrage.id));
+    }
+    bearbeitet++;
+  }
+  return antwort(
+    200,
+    { ok: true, geprueft: faellig.length, bearbeitet, mails },
+    herkunft,
+  );
 }
 
 /**

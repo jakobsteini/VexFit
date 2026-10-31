@@ -66,3 +66,29 @@ Deno.test("suche.html: Kartenabzeichen richtet sich nach echter Verifizierung", 
   // Das alte, pauschale "Verifiziert ✓" fuer jede Karte ist weg.
   assert(!html.includes("? 'Online' : 'Verifiziert ✓'"), "pauschales Verifiziert-Abzeichen noch da");
 });
+
+// --------------------------------------------------------------------------
+// B4e, 48-Stunden-Fall: Zeitplan (pg_cron) ruft die Function; Geheimnis aus
+// dem Vault, nicht in der Datei; wiederholbar; Rueckbau nimmt nur den Job.
+// --------------------------------------------------------------------------
+Deno.test("Migration 07: stuendlicher Zeitplan ruft /unbeantwortet-pruefen, Geheimnis aus dem Vault", async () => {
+  const sql = await lies("./migrations/2026-10-31-07-unbeantwortet-zeitplan.sql");
+  assertStringIncludes(sql, "create extension if not exists pg_cron");
+  assertStringIncludes(sql, "create extension if not exists pg_net");
+  // Fester Jobname + vorheriges Abraeumen = wiederholbar, kein Doppeljob.
+  assertStringIncludes(sql, "'vexfit-unbeantwortet-stuendlich'");
+  assertStringIncludes(sql, "cron.unschedule('vexfit-unbeantwortet-stuendlich')");
+  // Ruft genau den neuen Function-Pfad.
+  assertStringIncludes(sql, "/functions/v1/vexfit-automation/unbeantwortet-pruefen");
+  // Ausweis ueber den Kopf x-vexfit-cron, Wert aus dem Vault - NICHT in der Datei.
+  assertStringIncludes(sql, "x-vexfit-cron");
+  assertStringIncludes(sql, "from vault.decrypted_secrets");
+  assertStringIncludes(sql, "where name = 'vexfit_cron_key'");
+  assert(!/cron[_-]?key'\s*,\s*'[A-Za-z0-9]/.test(sql), "ein Geheimnis steht im Klartext in der Datei");
+});
+
+Deno.test("Ruecknahme 07 nimmt nur den Job, laesst die Erweiterungen stehen", async () => {
+  const sql = await lies("./migrations/2026-10-31-07-unbeantwortet-zeitplan-ruecknahme.sql");
+  assertStringIncludes(sql, "cron.unschedule('vexfit-unbeantwortet-stuendlich')");
+  assert(!/drop extension/i.test(sql), "Rueckbau wirft eine Erweiterung weg, an der andere Jobs haengen");
+});
