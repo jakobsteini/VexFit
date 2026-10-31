@@ -104,6 +104,10 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:calc(56px + env(safe-
 .ub-num{font-family:'Bebas Neue',sans-serif;font-size:26px;color:var(--accent);letter-spacing:1px;display:block;line-height:1}
 .ub-label{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:4px}
 .ub-hinweis{font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:18px}
+/* Orange Zeile unter "Meine Anfragen", wenn ein Pflichtpunkt fuer die Suche fehlt */
+.ub-hinweis.suche-warnung{background:rgba(251,146,60,0.08);border:1px solid rgba(251,146,60,0.25);color:var(--white);padding:12px 16px;border-radius:4px;font-size:12.5px;line-height:1.6}
+.ub-hinweis.suche-warnung b{color:var(--orange)}
+.ub-hinweis.suche-warnung a{color:var(--accent);text-decoration:none}
 .neu-hinweis{background:rgba(232,255,0,0.08);border:1px solid rgba(232,255,0,0.25);color:var(--white);padding:14px 16px;border-radius:4px;font-size:13px;line-height:1.6;margin-bottom:20px}
 .neu-hinweis b{color:var(--accent)}
 .profil-hinweis{padding:14px 16px;border-radius:4px;font-size:13px;line-height:1.6;margin-bottom:20px}
@@ -117,6 +121,8 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:calc(56px + env(safe-
 .staerke-titel{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px}
 .staerke-pct{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent)}
 .staerke-warnung{background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);color:var(--white);font-size:12.5px;line-height:1.5;padding:10px 12px;border-radius:4px;margin-bottom:12px}
+.staerke-gruppe{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 0 8px}
+.staerke-gruppe:first-of-type{margin-top:4px}
 .staerke-liste{display:flex;flex-direction:column;gap:9px}
 .staerke-item{display:flex;align-items:flex-start;gap:9px;font-size:13px}
 .staerke-haken{flex-shrink:0;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;margin-top:1px}
@@ -430,6 +436,55 @@ let selectedSpez = [];
 let selectedOrt = '';   // Ort des Trainings: '', 'vor_ort', 'online' oder 'beides'
 let profileComplete = false;
 
+// ==KERN-ANFANG== (DOM-freie, reine Profil-Auswertung; von vor_ads_test.ts geprueft)
+// EINE Berechnung fuer ALLE Anzeigen (Uebersicht oben, Balken, Profilstaerke-
+// Karte, Nav-Punkt, Weiterleitung, Hinweise). Keine zweite, abweichende Zahl.
+//
+// Zwei Gruppen:
+//   noetig = GENAU die Bedingungen der oeffentlichen Sicht trainers_oeffentlich
+//            (migrations/2026-10-31-05-verfuegbarkeit.sql): Foto, Kurztext,
+//            mindestens eine Spezialisierung. Fehlt davon etwas, erscheint das
+//            Profil NICHT in der Suche.
+//   stark  = alle uebrigen Punkte, die das Profil staerker machen (ohne
+//            Doppelungen aus beiden bisherigen Listen).
+// Prozent = erfuellte Punkte / alle Punkte (noetig + stark).
+// Kurztext zaehlt ab 10 Zeichen ohne Rand - genau wie der Hinweis am Feld.
+function profilAuswertung(p) {
+  p = p || {};
+  const liste = (v) => Array.isArray(v) ? v : [];
+  const text = (v) => (v == null ? '' : String(v)).trim();
+  const bio = text(p.bio);
+  const noetig = [
+    { name: 'Foto', ok: !!p.foto },
+    { name: 'Kurztext', ok: bio.length >= 10 },
+    { name: 'Spezialisierungen', ok: liste(p.spezialisierungen).length > 0 }
+  ];
+  const stark = [
+    { name: 'Trainingsart', ok: !!text(p.trainingsart) },
+    { name: 'Preis pro Stunde', ok: Number(p.preis_stunde) > 0 },
+    { name: 'Erfahrung', ok: !!text(p.erfahrung) },
+    { name: 'Trainingsort', ok: !!text(p.trainingsort) },
+    { name: 'Telefon', ok: !!text(p.telefon) },
+    { name: 'Vorstellungsvideo', ok: !!p.video },
+    { name: 'Galerie', ok: liste(p.galerie).length > 0 },
+    { name: 'Sprachen', ok: liste(p.sprachen).length > 0 },
+    { name: 'Trainingsorte', ok: liste(p.trainingsorte).length > 0 },
+    { name: 'Zertifikat', ok: !!p.zertifikat }
+  ];
+  const alle = noetig.concat(stark);
+  const erfuellt = alle.filter((i) => i.ok).length;
+  const prozent = Math.round(erfuellt / alle.length * 100);
+  const noetigFehlt = noetig.filter((i) => !i.ok).map((i) => i.name);
+  return {
+    noetig: noetig, stark: stark, alle: alle,
+    erfuellt: erfuellt, gesamt: alle.length, prozent: prozent,
+    noetigFehlt: noetigFehlt,
+    inSuche: noetigFehlt.length === 0,   // alle Pflichtpunkte erfuellt
+    vollstaendig: prozent >= 100
+  };
+}
+// ==KERN-ENDE==
+
 // ──── AUTH ────
 const raw = localStorage.getItem('vexfit_session');
 if(!raw) { location.href = 'login.html'; throw new Error(); }
@@ -678,48 +733,66 @@ async function uploadAvatar() {
   avatarLaedtAn(false);
 }
 
-function updateDots() {
-  const checks = [
-    { id: 'dotTrainingsart', name: 'Trainingsart', ok: !!document.getElementById('fTrainingsart').value },
-    { id: 'dotPreis', name: 'Preis pro Stunde', ok: Number(document.getElementById('fPreis').value) > 0 },
-    { id: 'dotBio', name: 'Über mich', ok: document.getElementById('fBio').value.length > 10 },
-    { id: 'dotErfahrung', name: 'Erfahrung', ok: !!document.getElementById('fErfahrung').value },
-    { id: 'dotSpez', name: 'Spezialisierungen', ok: selectedSpez.length > 0 },
-    { id: 'dotTrainingsort', name: 'Trainingsort', ok: !!selectedOrt },
-    { id: 'dotTelefon', name: 'Telefon', ok: !!document.getElementById('fTelefon').value.trim() }
-  ];
-  let done = 0;
-  checks.forEach(c => {
-    const el = document.getElementById(c.id);
-    el.className = c.ok ? 'dot dot-ok' : 'dot dot-no';
-    if(c.ok) done++;
-  });
-  const pct = Math.round((done / checks.length) * 100);
-  document.getElementById('pctLabel').textContent = pct + '%';
-  document.getElementById('progressFill').style.width = pct + '%';
+// Baut das aktuelle Profil aus Formular + geladenem Datensatz T zusammen und
+// uebergibt es der reinen Auswertung (profilAuswertung). Foto und Video stammen
+// aus T (werden hier nicht im Formular bearbeitet).
+function aktuellesProfil() {
+  const wert = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const foto = !!(T && typeof avatarAdresse === 'function' && avatarAdresse(T.avatar_url));
+  const video = !!(T && typeof vexVideo !== 'undefined' && vexVideo && vexVideo.erkenne((T && T.video_url) || ''));
+  const spez = (Array.isArray(selectedSpez) && selectedSpez.length > 0)
+    ? selectedSpez : (T && T.spezialisierungen);
+  return {
+    foto: foto,
+    bio: wert('fBio') || (T && T.bio) || '',
+    spezialisierungen: spez,
+    trainingsart: wert('fTrainingsart') || (T && T.trainingsart) || '',
+    preis_stunde: wert('fPreis') || (T && T.preis_stunde) || '',
+    erfahrung: wert('fErfahrung') || (T && T.erfahrung) || '',
+    trainingsort: selectedOrt || (T && T.trainingsort) || '',
+    telefon: wert('fTelefon') || (T && T.telefon) || '',
+    video: video,
+    galerie: T && T.galerie,
+    sprachen: T && T.sprachen,
+    trainingsorte: T && T.trainingsorte,
+    zertifikat: !!(T && T.zertifikat_datei)
+  };
+}
 
-  // Uebersicht oben im Anfragen-Bereich: dieselbe Zahl, dieselben Felder.
-  const ubProfil = document.getElementById('ubProfil');
-  if(ubProfil) ubProfil.textContent = pct + '%';
-  const hinweis = document.getElementById('ubHinweis');
-  if(hinweis) {
-    const fehlt = checks.filter(c => !c.ok).map(c => c.name);
-    if(fehlt.length > 0) {
-      hinweis.innerHTML = `Es fehlt noch: ${fehlt.join(', ')}. <a href="#" onclick="showPage('profil',event)">Zum Profilformular →</a>`;
-      hinweis.classList.remove('hidden');
-    } else {
-      hinweis.classList.add('hidden');
-    }
+function updateDots() {
+  const a = profilAuswertung(aktuellesProfil());
+
+  // Feld-Markierungen (kleine Punkte neben den Abschnitten). Die eigentliche
+  // Checkliste steckt NUR in der Profilstaerke-Karte (renderProfilstaerke).
+  const okVon = {};
+  a.alle.forEach((i) => { okVon[i.name] = i.ok; });
+  const dots = {
+    dotTrainingsart: 'Trainingsart', dotPreis: 'Preis pro Stunde', dotBio: 'Kurztext',
+    dotErfahrung: 'Erfahrung', dotSpez: 'Spezialisierungen',
+    dotTrainingsort: 'Trainingsort', dotTelefon: 'Telefon'
+  };
+  for (const id in dots) {
+    const el = document.getElementById(id);
+    if(el) el.className = okVon[dots[id]] ? 'dot dot-ok' : 'dot dot-no';
   }
 
-  profileComplete = (pct >= 100);
+  // EINE Zahl fuer Balken, Prozent-Label und die Uebersicht oben.
+  const pct = a.prozent;
+  const pctLabel = document.getElementById('pctLabel');
+  if(pctLabel) pctLabel.textContent = pct + '%';
+  const fill = document.getElementById('progressFill');
+  if(fill) fill.style.width = pct + '%';
+  const ubProfil = document.getElementById('ubProfil');
+  if(ubProfil) ubProfil.textContent = pct + '%';
 
-  // Klartext auf dem Profilformular: was fehlt, was das bedeutet, und ob der
-  // Trainer schon fuer Kunden sichtbar ist. Sichtbarkeit haengt an T.aktiv
-  // (Admin-Freigabe), NICHT an der Vollstaendigkeit - deshalb getrennt.
+  profileComplete = a.vollstaendig;
+
+  // Klartext auf dem Profilformular: was fehlt + (davon getrennt) ob der Trainer
+  // schon freigegeben ist. Sichtbarkeit haengt an T.aktiv, NICHT an der
+  // Vollstaendigkeit - deshalb eine eigene Aussage.
   const ph = document.getElementById('profilHinweis');
   if(ph) {
-    const fehltListe = checks.filter(c => !c.ok).map(c => c.name);
+    const fehltListe = a.alle.filter((i) => !i.ok).map((i) => i.name);
     let sichtbar = '';
     if(typeof T !== 'undefined' && T) {
       sichtbar = T.aktiv
@@ -728,69 +801,82 @@ function updateDots() {
     }
     if(fehltListe.length > 0) {
       ph.className = 'profil-hinweis offen';
-      ph.innerHTML = `<b>Es fehlt noch:</b> ${fehltListe.join(', ')}. Ohne diese Angaben wirkt dein Profil unfertig und bekommt kaum Anfragen.${sichtbar}`;
+      ph.innerHTML = `<b>Es fehlt noch:</b> ${vexEsc(fehltListe.join(', '))}. Ohne diese Angaben wirkt dein Profil unfertig und bekommt kaum Anfragen.${sichtbar}`;
     } else {
       ph.className = 'profil-hinweis fertig';
       ph.innerHTML = `<b>✓ Dein Profil ist vollständig.</b>${sichtbar}`;
     }
   }
 
-  // Nav dot: orange if incomplete, hidden if complete
+  // Nav-Punkt haengt an derselben einen Zahl wie die Weiterleitung.
   const navDot = document.getElementById('navProfilDot');
-  if(profileComplete) {
-    navDot.className = 'nav-dot nav-dot-green';
-  } else {
-    navDot.className = 'nav-dot nav-dot-orange';
-  }
+  if(navDot) navDot.className = profileComplete ? 'nav-dot nav-dot-green' : 'nav-dot nav-dot-orange';
 
-  // Mini-banner in anfragen
-  const banner = document.getElementById('miniBanner');
-  if(profileComplete) {
-    banner.classList.add('hidden');
+  // Genau EINE Zeile unter "Meine Anfragen":
+  //   1. Pflichtpunkt fehlt -> orange "erscheint noch nicht in der Suche" + Liste
+  //   2. sonst < 100 %      -> gruen "Profil vervollständigen für mehr Sichtbarkeit"
+  //   3. 100 %              -> keine Zeile
+  // Der Freigabe-Hinweis (aktiv=false) steht unabhaengig davon in der Statusleiste.
+  const banner = document.getElementById('miniBanner');  // gruene Leiste
+  const ubh = document.getElementById('ubHinweis');       // orange Zeile
+  if(!a.inSuche) {
+    if(ubh) {
+      ubh.className = 'ub-hinweis suche-warnung';
+      ubh.innerHTML = `<b>Dein Profil erscheint noch nicht in der Suche.</b> Es fehlt: ${vexEsc(a.noetigFehlt.join(', '))}. <a href="#" onclick="showPage('profil',event)">Zum Profilformular →</a>`;
+    }
+    if(banner) banner.classList.add('hidden');
+  } else if(!a.vollstaendig) {
+    if(ubh) { ubh.className = 'ub-hinweis'; ubh.classList.add('hidden'); }
+    if(banner) banner.classList.remove('hidden');
   } else {
-    banner.classList.remove('hidden');
+    if(ubh) { ubh.className = 'ub-hinweis'; ubh.classList.add('hidden'); }
+    if(banner) banner.classList.add('hidden');
   }
 
   renderProfilstaerke();
 }
 
-// Baustein 3: Profilstaerke (0-100 %) ueber 8 Punkte mit je einem Tipp. Ergaenzt
-// die bestehende Vollstaendigkeits-Anzeige (ersetzt sie nicht). Foto, Kurztext
-// und Spezialisierung bilden die Mindeststaerke: fehlt davon etwas, erscheint das
-// Profil nicht in der Suche (so auch in der oeffentlichen Sicht abgesichert).
+// EINE Checkliste (Profilstaerke-Karte): dieselbe Auswertung wie updateDots,
+// gruppiert in "Nötig für die Suche" (Foto, Kurztext, Spezialisierung - die
+// Bedingungen der oeffentlichen Sicht) und "Macht dein Profil stärker". Keine
+// zweite, abweichende Liste mehr.
 const STAERKE_BEARB = 'profil-bearbeiten.html';
+const STAERKE_TIPPS = {
+  'Foto': 'Lade ein Profilbild hoch — Profile mit Foto bekommen deutlich mehr Anfragen.',
+  'Kurztext': 'Schreib 2–3 Sätze über dich. Persönlich wirkt am besten.',
+  'Spezialisierungen': 'Wähle deine Schwerpunkte, damit Kunden dich gezielt finden.',
+  'Trainingsart': 'Wähle oben aus, was du anbietest.',
+  'Preis pro Stunde': 'Trag oben deinen Stundensatz ein.',
+  'Erfahrung': 'Gib oben an, wie lange du schon trainierst.',
+  'Trainingsort': 'Wähle oben, ob du vor Ort, online oder beides anbietest.',
+  'Telefon': 'Hinterlege oben deine Nummer — nur für gebuchte Kunden sichtbar.',
+  'Vorstellungsvideo': 'Füge einen YouTube-, Instagram- oder TikTok-Link ein.',
+  'Galerie': 'Zeig mit Bildern, wie du arbeitest (bis zu 6).',
+  'Sprachen': 'Gib an, welche Sprachen du sprichst.',
+  'Trainingsorte': 'Studio, Outdoor, beim Kunden oder Online?',
+  'Zertifikat': 'Lade deinen Nachweis hoch — Grundlage fürs Verifiziert-Abzeichen.'
+};
+// Diese Punkte werden auf der getrennten Seite profil-bearbeiten.html gepflegt.
+const STAERKE_EXTERN = { 'Vorstellungsvideo': 1, 'Galerie': 1, 'Sprachen': 1, 'Trainingsorte': 1, 'Zertifikat': 1 };
+
 function renderProfilstaerke() {
   const karte = document.getElementById('staerkeKarte');
   if(!karte) return;
-  const bioFeld = document.getElementById('fBio');
-  const bio = (bioFeld && bioFeld.value) || (T && T.bio) || '';
-  const foto = !!(T && typeof avatarAdresse === 'function' && avatarAdresse(T.avatar_url));
-  const spez = (Array.isArray(selectedSpez) && selectedSpez.length > 0) ||
-               (T && Array.isArray(T.spezialisierungen) && T.spezialisierungen.length > 0);
-  const video = !!(T && typeof vexVideo !== 'undefined' && vexVideo.erkenne(T.video_url || ''));
-  const hat = (arr) => T && Array.isArray(T[arr]) && T[arr].length > 0;
-  const items = [
-    { name: 'Foto', ok: foto, min: true, tipp: 'Lade ein Profilbild hoch — Profile mit Foto bekommen deutlich mehr Anfragen.', ziel: null },
-    { name: 'Kurztext', ok: bio.trim().length > 10, min: true, tipp: 'Schreib 2–3 Sätze über dich. Persönlich wirkt am besten.', ziel: null },
-    { name: 'Spezialisierungen', ok: spez, min: true, tipp: 'Wähle deine Schwerpunkte, damit Kunden dich gezielt finden.', ziel: null },
-    { name: 'Vorstellungsvideo', ok: video, min: false, tipp: 'Füge einen YouTube-, Instagram- oder TikTok-Link ein.', ziel: STAERKE_BEARB },
-    { name: 'Galerie', ok: hat('galerie'), min: false, tipp: 'Zeig mit Bildern, wie du arbeitest (bis zu 6).', ziel: STAERKE_BEARB },
-    { name: 'Sprachen', ok: hat('sprachen'), min: false, tipp: 'Gib an, welche Sprachen du sprichst.', ziel: STAERKE_BEARB },
-    { name: 'Trainingsorte', ok: hat('trainingsorte'), min: false, tipp: 'Studio, Outdoor, beim Kunden oder Online?', ziel: STAERKE_BEARB },
-    { name: 'Zertifikat', ok: !!(T && T.zertifikat_datei), min: false, tipp: 'Lade deinen Nachweis hoch — Grundlage fürs Verifiziert-Abzeichen.', ziel: STAERKE_BEARB }
-  ];
-  const done = items.filter(i => i.ok).length;
-  const pct = Math.round(done / items.length * 100);
-  const minFehlt = items.filter(i => i.min && !i.ok).map(i => i.name);
-  let html = `<div class="staerke-kopf"><div class="staerke-titel">Profilstärke</div><div class="staerke-pct">${pct}%</div></div>`;
-  if(minFehlt.length) {
-    html += `<div class="staerke-warnung"><b>Dein Profil erscheint noch nicht in der Suche.</b> Dafür brauchst du mindestens Foto, Spezialisierung und Kurztext. Es fehlt: ${vexEsc(minFehlt.join(', '))}.</div>`;
-  }
-  html += '<div class="staerke-liste">' + items.map(i => {
-    const tipp = i.ok ? '' :
-      `<div class="staerke-tipp">${vexEsc(i.tipp)}${i.ziel ? ` <a href="${i.ziel}">Jetzt ergänzen →</a>` : ''}</div>`;
+  const a = profilAuswertung(aktuellesProfil());
+  const zeile = (i) => {
+    const tippText = STAERKE_TIPPS[i.name] || '';
+    const ziel = STAERKE_EXTERN[i.name] ? ` <a href="${STAERKE_BEARB}">Jetzt ergänzen →</a>` : '';
+    const tipp = i.ok ? '' : `<div class="staerke-tipp">${vexEsc(tippText)}${ziel}</div>`;
     return `<div class="staerke-item"><div class="staerke-haken ${i.ok ? 'ok' : 'no'}">${i.ok ? '✓' : ''}</div><div><div class="staerke-text"><b>${vexEsc(i.name)}</b></div>${tipp}</div></div>`;
-  }).join('') + '</div>';
+  };
+  let html = `<div class="staerke-kopf"><div class="staerke-titel">Profilstärke</div><div class="staerke-pct">${a.prozent}%</div></div>`;
+  if(a.noetigFehlt.length) {
+    html += `<div class="staerke-warnung"><b>Dein Profil erscheint noch nicht in der Suche.</b> Dafür brauchst du mindestens Foto, Spezialisierung und Kurztext. Es fehlt: ${vexEsc(a.noetigFehlt.join(', '))}.</div>`;
+  }
+  html += '<div class="staerke-gruppe">Nötig für die Suche</div>';
+  html += '<div class="staerke-liste">' + a.noetig.map(zeile).join('') + '</div>';
+  html += '<div class="staerke-gruppe">Macht dein Profil stärker</div>';
+  html += '<div class="staerke-liste">' + a.stark.map(zeile).join('') + '</div>';
   karte.innerHTML = html;
   karte.classList.remove('hidden');
 }
