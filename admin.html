@@ -687,11 +687,16 @@ function trainerDetail(id) {
     <div class="feld"><div class="feld-label">Anfragen</div><div id="detail-anfragen" class="feld-wert" style="color:var(--text-muted)">Lade Anfragen …</div></div>
   `;
 
+  const sf = sucheFehlt(t);
+  const freigabeKnopf = !t.aktiv
+    ? (sf.length > 0
+        ? `<button class="btn-gross btn-ja" disabled title="Es fehlt: ${vexEsc(sf.join(', '))}">Freigeben</button>
+           <div style="flex-basis:100%;font-size:12px;color:#ff8a8a">Freigeben gesperrt – es fehlt: ${vexEsc(sf.join(', '))}. Sonst erscheint der Trainer trotz Freigabe nicht in der Suche.</div>`
+        : `<button class="btn-gross btn-ja" id="detailFreigeben" onclick="detailFreigeben('${vexEsc(t.id)}')">Freigeben</button>`)
+    : `<button class="btn-gross btn-warn" onclick="detailFreigabeZurueck('${vexEsc(t.id)}')">Freigabe zurücknehmen</button>`;
   const foot = `
-    ${!t.aktiv
-      ? `<button class="btn-gross btn-ja" id="detailFreigeben" onclick="detailFreigeben('${vexEsc(t.id)}')">Freigeben</button>`
-      : `<button class="btn-gross btn-warn" onclick="detailFreigabeZurueck('${vexEsc(t.id)}')">Freigabe zurücknehmen</button>`}
-    <button class="btn-gross btn-warn" onclick="detailSperren('trainer','${vexEsc(t.id)}')">${t.gesperrt ? 'Entsperren' : 'Sperren'}</button>
+    ${freigabeKnopf}
+    <button class="btn-gross btn-warn" onclick="detailSperren('trainer','${vexEsc(t.id)}')">${t.gesperrt ? 'Entsperren' : 'Sperren (Login)'}</button>
     <button class="btn-gross btn-gefahr" onclick="detailLoeschen('trainer','${vexEsc(t.id)}')">Endgültig löschen</button>
   `;
 
@@ -729,7 +734,11 @@ async function ladeDetailAnfragen(trainerId) {
 
 // Fußzeilen-Aktionen der Detailansicht (Freigeben: Teil 3; Sperren/Löschen: Teil 5).
 async function detailFreigeben(id) { detailSchliessen(); await activateTrainer(id); }
-async function detailFreigabeZurueck(id) { detailSchliessen(); await banTrainer(id, 'Dieser Trainer'); }
+async function detailFreigabeZurueck(id) {
+  const t = (window.allTrainers || []).find(x => String(x.id) === String(id));
+  detailSchliessen();
+  await freigabeZuruecknehmen(id, t ? `${t.vorname} ${t.nachname}` : '');
+}
 async function detailSperren(art, id) { detailSchliessen(); if(art === 'trainer') await banTrainer(id, 'Dieser Trainer'); }
 async function detailLoeschen(art, id) { detailSchliessen(); if(art === 'trainer') { const t = (window.allTrainers||[]).find(x=>String(x.id)===String(id)); await deleteTrainer(id, t ? `${t.vorname} ${t.nachname}` : 'Trainer'); } else { const k = (window.allKunden||[]).find(x=>String(x.id)===String(id)); await deleteKunde(id, k ? `${k.vorname} ${k.nachname}` : 'Kunde'); } }
 
@@ -970,6 +979,18 @@ function fehlendeProfilfelder(t) {
   if(!t.erfahrung) fehlt.push('Erfahrung');
   if(!(Array.isArray(t.spezialisierungen) && t.spezialisierungen.length > 0)) fehlt.push('Spezialisierungen');
   if(!(t.telefon && String(t.telefon).trim())) fehlt.push('Telefon');
+  return fehlt;
+}
+
+// Felder, die die öffentliche Sicht trainers_oeffentlich verlangt (aktiv=true
+// AND avatar_url gesetzt AND bio nicht leer AND >= 1 Spezialisierung). Fehlt
+// eines davon, erscheint der Trainer trotz Freigabe NICHT in der Suche – darum
+// ist „Freigeben" dann gesperrt. Gibt die fehlenden Felder als Liste zurück.
+function sucheFehlt(t) {
+  const fehlt = [];
+  if(!avatarAdresse(t.avatar_url)) fehlt.push('Foto');
+  if(!(t.bio && String(t.bio).trim())) fehlt.push('Über mich');
+  if(!(Array.isArray(t.spezialisierungen) && t.spezialisierungen.length > 0)) fehlt.push('Spezialisierung');
   return fehlt;
 }
 
@@ -1310,11 +1331,22 @@ async function deleteKunde(id, name) {
 }
 
 async function activateTrainer(id) {
+  const t = (window.allTrainers || []).find(x => String(x.id) === String(id));
+  // Freigabe-Sperre (Teil 3): ohne Foto, Über mich oder Spezialisierung bliebe
+  // der Trainer trotz aktiv=true unsichtbar (trainers_oeffentlich). Dann gar
+  // nicht erst freigeben, sondern klar sagen, was fehlt.
+  if(t) {
+    const fehlt = sucheFehlt(t);
+    if(fehlt.length > 0) {
+      meldeFehler('Freigeben nicht möglich – es fehlt: ' + fehlt.join(', ') + '. Sonst erscheint der Trainer trotz Freigabe nicht in der Suche.');
+      return;
+    }
+  }
   const ok = await setzeTrainerAktiv(id, true);
   if(!ok) { meldeFehler('Der Trainer konnte nicht freigegeben werden. Die Anzeige wurde nicht verändert.'); return; }
+  meldeErfolg('Freigegeben – jetzt in der Suche sichtbar.');
 
   // Open email to Jakob with Stripe link
-  const t = (window.allTrainers || []).find(x => x.id === id);
   if(t) {
     const subject = encodeURIComponent(`✅ Trainer aktiviert: ${t.vorname} ${t.nachname} – Stripe Link schicken?`);
     const body = encodeURIComponent(`Hi Jakob,
@@ -1334,6 +1366,17 @@ Admin: https://vexfit.app/admin.html`);
     window.open(`mailto:vexfit.info@gmail.com?subject=${subject}&body=${body}`);
   }
   loadData();
+}
+
+// Freigabe zurücknehmen (Teil 3): aktiv=false. Der Trainer verschwindet aus der
+// Suche und wandert zurück in „Neu – wartet auf Freigabe". Anmelden kann er sich
+// weiterhin (das wäre „Sperren", Teil 5).
+async function freigabeZuruecknehmen(id, name) {
+  const ja = await bestaetige({ titel: 'Freigabe zurücknehmen', text: `Freigabe von ${name || 'diesem Trainer'} zurücknehmen? Das Profil verschwindet aus der Suche, das Konto bleibt bestehen.`, okText: 'Zurücknehmen', okArt: 'btn-warn' });
+  if(!ja) return;
+  const geaendert = await adminAktion('trainer_sperren', id);
+  if(geaendert > 0) { meldeErfolg('Freigabe zurückgenommen – nicht mehr in der Suche.'); loadData(); }
+  else meldeFehler('Zurücknehmen fehlgeschlagen. Die Anzeige wurde nicht verändert.');
 }
 
 async function markAsPaid(id, email, name) {
