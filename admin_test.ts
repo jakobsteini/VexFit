@@ -38,19 +38,17 @@ function kern() {
   const quelle = [
     holeFunktion(html, "avatarAdresse"),
     holeFunktion(html, "fehlendeProfilfelder"),
-    holeFunktion(html, "sucheFehlt"),
     holeFunktion(html, "istTestkonto"),
     holeFunktion(html, "anfrageZustand"),
     holeFunktion(html, "profilStaerke"),
   ].join("\n");
   const bauen = new Function(
     "SUPABASE_URL", "AVATAR_PREFIX", "TEST_EMAILS", "vexVideo",
-    quelle + "\nreturn { avatarAdresse, fehlendeProfilfelder, sucheFehlt, istTestkonto, anfrageZustand, profilStaerke };",
+    quelle + "\nreturn { avatarAdresse, fehlendeProfilfelder, istTestkonto, anfrageZustand, profilStaerke };",
   );
   return bauen(SUPABASE_URL, AVATAR_PREFIX, TEST_EMAILS, vexVideo) as {
     avatarAdresse: (u: unknown) => string | null;
     fehlendeProfilfelder: (t: Record<string, unknown>) => string[];
-    sucheFehlt: (t: Record<string, unknown>) => string[];
     istTestkonto: (e: unknown) => boolean;
     anfrageZustand: (a: Record<string, unknown>) => string;
     profilStaerke: (t: Record<string, unknown>) => number;
@@ -61,38 +59,31 @@ function vollerTrainer() {
   return {
     avatar_url: AVATAR, bio: "Ein ausreichend langer Text über mich.", spezialisierungen: ["Muskelaufbau"],
     trainingsart: "Personal Training", trainingsort: "studio", preis_stunde: 60, erfahrung: "3-5 Jahre",
-    telefon: "+43 660 1234567", video_url: "https://youtu.be/x", galerie: ["g"], sprachen: ["Deutsch"],
+    telefon: "telefon vorhanden", video_url: "https://youtu.be/x", galerie: ["g"], sprachen: ["Deutsch"],
     trainingsorte: ["studio"], zertifikat_datei: "z.pdf",
   } as Record<string, unknown>;
 }
 
-// ── A) Freigeben gesperrt/erfolgreich (reine Logik sucheFehlt) ──────────────
-Deno.test("Freigeben gesperrt: leeres Profil, es fehlen Foto, Über mich und Spezialisierung", () => {
-  const { sucheFehlt } = kern();
-  assertEquals(sucheFehlt({}).sort(), ["Foto", "Spezialisierung", "Über mich"]);
-});
-
-Deno.test("Freigeben gesperrt: einzeln fehlendes Foto / Über mich / Spezialisierung", () => {
-  const { sucheFehlt } = kern();
-  const t1 = vollerTrainer(); t1.avatar_url = null;
-  assertEquals(sucheFehlt(t1), ["Foto"]);
-  const t2 = vollerTrainer(); t2.bio = "   ";
-  assertEquals(sucheFehlt(t2), ["Über mich"]);
-  const t3 = vollerTrainer(); t3.spezialisierungen = [];
-  assertEquals(sucheFehlt(t3), ["Spezialisierung"]);
-});
-
-Deno.test("Freigeben erfolgreich: vollständiges Profil, nichts fehlt", () => {
-  const { sucheFehlt } = kern();
-  assertEquals(sucheFehlt(vollerTrainer()), []);
-});
-
-// ── A) Profil-Vollständigkeit, Testkonten, Anfragezustand, Profilstärke ─────
-Deno.test("fehlendeProfilfelder nennt die sieben Pflichtfelder bei leerem Profil", () => {
+// ── A) Vollständigkeit zählt das Foto; 8 Felder; Liste = Detail ─────────────
+Deno.test("Vollständigkeit: leeres Profil 0/8 (acht fehlen, inkl. Foto)", () => {
   const { fehlendeProfilfelder } = kern();
-  assertEquals(fehlendeProfilfelder({}).length, 7);
+  const fehlt = fehlendeProfilfelder({});
+  assertEquals(fehlt.length, 8);
+  assert(fehlt.includes("Foto"), "Foto muss als Vollständigkeitsfeld zählen");
+});
+
+Deno.test("Vollständigkeit: volles Profil 8/8 (nichts fehlt)", () => {
+  const { fehlendeProfilfelder } = kern();
   assertEquals(fehlendeProfilfelder(vollerTrainer()), []);
 });
+
+Deno.test("Vollständigkeit: fehlendes Foto wird als einziges Feld gezählt (6/7-Bug behoben)", () => {
+  const { fehlendeProfilfelder } = kern();
+  const t = vollerTrainer(); t.avatar_url = null;
+  assertEquals(fehlendeProfilfelder(t), ["Foto"]);
+});
+
+// ── A) Testkonten, Anfragezustand, Profilstärke ─────────────────────────────
 
 Deno.test("istTestkonto: E-Mail mit + ist Test, normale nicht", () => {
   const { istTestkonto } = kern();
@@ -157,11 +148,30 @@ Deno.test("Detailansicht Kunde zeigt Felder und gestellte Anfragen", () => {
   assertStringIncludes(html, 'onclick="kundeDetail(');
 });
 
-Deno.test("Freigabe-Sperre ist verdrahtet (Hinweis + sucheFehlt)", () => {
-  assertStringIncludes(html, "function sucheFehlt(");
-  assertStringIncludes(html, "Freigeben gesperrt");
-  // activateTrainer bricht ab, wenn Suchfelder fehlen.
-  assertStringIncludes(html, "const fehlt = sucheFehlt(t);");
+Deno.test("kein Freigabe-Gate mehr: Freigeben ist bei jedem Profil möglich", () => {
+  // Die alte Sperre ist weg.
+  assert(!html.includes("function sucheFehlt("), "sucheFehlt (Gate) noch vorhanden");
+  assert(!html.includes("Freigeben gesperrt"), "Text 'Freigeben gesperrt' noch vorhanden");
+  assert(!html.includes("Freigeben nicht möglich"), "Freigabe wird noch blockiert");
+  // Stattdessen ein neutraler Hinweis in der Detailansicht.
+  assertStringIncludes(html, "Freigeben ist trotzdem möglich");
+  // activateTrainer gibt bei unvollständigem Profil nicht mehr früh zurück.
+  assertStringIncludes(html, "Der Admin entscheidet allein");
+});
+
+Deno.test("Vollständigkeit: EINE gemeinsame Zahl (PROFIL_FELDER_GESAMT) in Liste und Detail", () => {
+  assertStringIncludes(html, "const PROFIL_FELDER_GESAMT = 8;");
+  // Detailansicht und Freigabe-Liste rechnen mit derselben Konstante.
+  assertStringIncludes(html, "PROFIL_FELDER_GESAMT - fehlt.length");
+  assertStringIncludes(html, "${voll}/${PROFIL_FELDER_GESAMT}");
+  // Keine fest verdrahtete 7 mehr bei der Vollständigkeit.
+  assert(!/\$\{7 - fehlt\.length\}\/7/.test(html), "alte 7er-Vollständigkeit noch vorhanden");
+});
+
+Deno.test("Löschen entfernt die Person sofort aus dem Cache (ohne Neuladen)", () => {
+  assertStringIncludes(html, "window.allTrainers = (window.allTrainers || []).filter(x => String(x.id) !== String(id));");
+  assertStringIncludes(html, "window.allKunden = (window.allKunden || []).filter(x => String(x.id) !== String(id));");
+  assertStringIncludes(html, "renderAllesNeu();");
 });
 
 Deno.test("Sperren/Löschen laufen über die abgesicherte Edge Function", () => {
@@ -186,4 +196,16 @@ Deno.test("endgültig Löschen verlangt den eingetippten Namen", () => {
 Deno.test("Darstellung: Seite ohne Querscroll, Detail am Handy Vollbild", () => {
   assertStringIncludes(html, "body{overflow-x:hidden}");
   assertStringIncludes(html, ".panel{max-width:100%}");
+});
+
+Deno.test("Suche zeigt Trainer ohne Foto mit Initialen (kein Fehler, kein undefined)", async () => {
+  const suche = await Deno.readTextFile(new URL("./suche.html", import.meta.url));
+  // Ohne Foto wird eine Initialen-Kachel gezeigt (avatarAdresse liefert null →
+  // bgColors + initials), nicht ein kaputtes Bild.
+  assertStringIncludes(suche, "avatarAdresse(t.avatar_url)");
+  assertStringIncludes(suche, "(t.vorname||'?')[0]");
+  assertStringIncludes(suche, "bild ? '' :");
+  // Spezialisierungen/Preis tolerieren leere Werte (kein undefined).
+  assertStringIncludes(suche, "(t.spezialisierungen||[])");
+  assertStringIncludes(suche, "t.preis_stunde ?");
 });

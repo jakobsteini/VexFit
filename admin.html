@@ -684,8 +684,8 @@ function trainerDetail(id) {
     ? `<img src="${vexEsc(foto)}" alt="" style="width:120px;height:120px;border-radius:8px;object-fit:cover;border:1px solid var(--border)">`
     : `<div style="width:120px;height:120px;border-radius:8px;background:var(--mid);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px;border:1px solid var(--border)">Kein Foto</div>`;
   const vollTxt = fehlt.length === 0
-    ? '<span style="color:#4ade80;font-weight:700">vollständig (7/7)</span>'
-    : `<span style="color:#ff8a8a;font-weight:700">${7 - fehlt.length}/7</span> <span style="color:var(--text-muted)">– fehlt: ${vexEsc(fehlt.join(', '))}</span>`;
+    ? `<span style="color:#4ade80;font-weight:700">vollständig (${PROFIL_FELDER_GESAMT}/${PROFIL_FELDER_GESAMT})</span>`
+    : `<span style="color:#ff8a8a;font-weight:700">${PROFIL_FELDER_GESAMT - fehlt.length}/${PROFIL_FELDER_GESAMT}</span> <span style="color:var(--text-muted)">– fehlt: ${vexEsc(fehlt.join(', '))}</span>`;
   const zertHtml = t.zertifikat_datei
     ? `<button class="btn-gross btn-neutral" style="padding:7px 12px" onclick="zertifikatOeffnen('${vexEsc(t.zertifikat_datei)}')">Zertifikat ansehen</button>`
     : '';
@@ -719,15 +719,17 @@ function trainerDetail(id) {
     <div class="feld"><div class="feld-label">Anfragen</div><div id="detail-anfragen" class="feld-wert" style="color:var(--text-muted)">Lade Anfragen …</div></div>
   `;
 
-  const sf = sucheFehlt(t);
+  // Freigeben ist IMMER möglich – der Admin entscheidet allein. Fehlende Felder
+  // sind nur ein neutraler Hinweis und blockieren nichts.
   const freigabeKnopf = !t.aktiv
-    ? (sf.length > 0
-        ? `<button class="btn-gross btn-ja" disabled title="Es fehlt: ${vexEsc(sf.join(', '))}">Freigeben</button>
-           <div style="flex-basis:100%;font-size:12px;color:#ff8a8a">Freigeben gesperrt – es fehlt: ${vexEsc(sf.join(', '))}. Sonst erscheint der Trainer trotz Freigabe nicht in der Suche.</div>`
-        : `<button class="btn-gross btn-ja" id="detailFreigeben" onclick="detailFreigeben('${vexEsc(t.id)}')">Freigeben</button>`)
+    ? `<button class="btn-gross btn-ja" id="detailFreigeben" onclick="detailFreigeben('${vexEsc(t.id)}')">Freigeben</button>`
     : `<button class="btn-gross btn-warn" onclick="detailFreigabeZurueck('${vexEsc(t.id)}')">Freigabe zurücknehmen</button>`;
+  const hinweis = (!t.aktiv && fehlt.length > 0)
+    ? `<div style="flex-basis:100%;font-size:12px;color:var(--text-muted)">Hinweis: unvollständiges Profil (es fehlt: ${vexEsc(fehlt.join(', '))}). Freigeben ist trotzdem möglich – du entscheidest.</div>`
+    : '';
   const foot = `
     ${freigabeKnopf}
+    ${hinweis}
     <button class="btn-gross btn-warn" onclick="detailSperren('trainer','${vexEsc(t.id)}')">${t.gesperrt ? 'Entsperren' : 'Sperren (Login)'}</button>
     <button class="btn-gross btn-gefahr" onclick="detailLoeschen('trainer','${vexEsc(t.id)}')">Endgültig löschen</button>
   `;
@@ -1107,11 +1109,14 @@ function anfrageZustand(a) {
   return (s === 'angenommen' || s === 'abgelehnt') ? s : 'offen';
 }
 
-// Profilvollstaendigkeit - dieselben sieben Felder wie die Anzeige im
-// Trainerbereich (trainer-bereich.html: updateDots). Das Profilbild zaehlt
-// dort bewusst NICHT mit. Keine eigene Gewichtung.
+// Profilvollstaendigkeit: ACHT Felder inkl. Foto (avatar_url). EINE gemeinsame
+// Berechnung für Liste, Detailansicht und den Reiter „Profil unvollständig",
+// damit nie zwei verschiedene Zahlen erscheinen. Reine Anzeige – die Freigabe
+// hängt NICHT davon ab (der Admin entscheidet allein).
+const PROFIL_FELDER_GESAMT = 8;
 function fehlendeProfilfelder(t) {
   const fehlt = [];
+  if(!avatarAdresse(t.avatar_url)) fehlt.push('Foto');
   if(!t.trainingsart) fehlt.push('Trainingsart');
   if(!t.trainingsort) fehlt.push('Trainingsort');
   if(!(Number(t.preis_stunde) > 0)) fehlt.push('Preis pro Stunde');
@@ -1119,18 +1124,6 @@ function fehlendeProfilfelder(t) {
   if(!t.erfahrung) fehlt.push('Erfahrung');
   if(!(Array.isArray(t.spezialisierungen) && t.spezialisierungen.length > 0)) fehlt.push('Spezialisierungen');
   if(!(t.telefon && String(t.telefon).trim())) fehlt.push('Telefon');
-  return fehlt;
-}
-
-// Felder, die die öffentliche Sicht trainers_oeffentlich verlangt (aktiv=true
-// AND avatar_url gesetzt AND bio nicht leer AND >= 1 Spezialisierung). Fehlt
-// eines davon, erscheint der Trainer trotz Freigabe NICHT in der Suche – darum
-// ist „Freigeben" dann gesperrt. Gibt die fehlenden Felder als Liste zurück.
-function sucheFehlt(t) {
-  const fehlt = [];
-  if(!avatarAdresse(t.avatar_url)) fehlt.push('Foto');
-  if(!(t.bio && String(t.bio).trim())) fehlt.push('Über mich');
-  if(!(Array.isArray(t.spezialisierungen) && t.spezialisierungen.length > 0)) fehlt.push('Spezialisierung');
   return fehlt;
 }
 
@@ -1149,14 +1142,14 @@ function ladeFreigabe() {
   }
   tb.innerHTML = neue.map(t => {
     const fehlt = fehlendeProfilfelder(t);
-    const voll = 7 - fehlt.length;
+    const voll = PROFIL_FELDER_GESAMT - fehlt.length;
     const farbe = fehlt.length === 0 ? '#4ade80' : (voll >= 4 ? 'var(--accent)' : '#ff6b6b');
     const detail = fehlt.length === 0 ? 'vollständig' : ('fehlt: ' + fehlt.join(', '));
     return `<tr class="klickbar" onclick="trainerDetail('${vexEsc(t.id)}')">
       <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
       <td>${vexEsc(t.email)}</td>
       <td>${vexEsc(t.stadt) || '–'}</td>
-      <td><span style="color:${farbe};font-weight:700">${voll}/7</span> <span style="color:var(--text-muted);font-size:11px">${detail}</span></td>
+      <td><span style="color:${farbe};font-weight:700">${voll}/${PROFIL_FELDER_GESAMT}</span> <span style="color:var(--text-muted);font-size:11px">${detail}</span></td>
       <td>${t.created_at ? new Date(t.created_at).toLocaleDateString('de-AT') : '–'}</td>
       <td onclick="event.stopPropagation()"><button class="btn-activate" onclick="activateTrainer('${t.id}')">👁️ Freigeben</button></td>
     </tr>`;
@@ -1484,24 +1477,27 @@ async function loeschePerson(art, id, name) {
   if(!ja) return;
   const d = await adminEdge({ aktion: 'endgueltig_loeschen', art: art, ziel_id: id, bestaetigt: true });
   if(!d || !d.ok) return;
-  if(d.anonymisiert) meldeErfolg(`${name || 'Person'}: Konto gelöscht, Zeile wegen verknüpfter Anfragen anonymisiert.`);
-  else if(d.geloescht) meldeErfolg(`${name || 'Person'} endgültig gelöscht.`);
-  else meldeFehler('Nichts gelöscht – die Zeile wurde nicht gefunden.');
+  // Sofort aus allen Reitern entfernen (ohne auf das Neuladen zu warten): aus
+  // dem Cache nehmen und neu zeichnen. Bei Anonymisierung bleibt die Zeile
+  // (verknüpfte Anfragen) – dann nur neu laden, nicht aus dem Cache nehmen.
+  detailSchliessen();
+  if(d.geloescht) {
+    if(art === 'trainer') window.allTrainers = (window.allTrainers || []).filter(x => String(x.id) !== String(id));
+    else window.allKunden = (window.allKunden || []).filter(x => String(x.id) !== String(id));
+    renderAllesNeu();
+    meldeErfolg(`${name || 'Person'} endgültig gelöscht.`);
+  } else if(d.anonymisiert) {
+    meldeErfolg(`${name || 'Person'}: Konto gelöscht, Zeile wegen verknüpfter Anfragen anonymisiert.`);
+  } else {
+    meldeFehler('Nichts gelöscht – die Zeile wurde nicht gefunden.');
+  }
   loadData();
 }
 
 async function activateTrainer(id) {
   const t = (window.allTrainers || []).find(x => String(x.id) === String(id));
-  // Freigabe-Sperre (Teil 3): ohne Foto, Über mich oder Spezialisierung bliebe
-  // der Trainer trotz aktiv=true unsichtbar (trainers_oeffentlich). Dann gar
-  // nicht erst freigeben, sondern klar sagen, was fehlt.
-  if(t) {
-    const fehlt = sucheFehlt(t);
-    if(fehlt.length > 0) {
-      meldeFehler('Freigeben nicht möglich – es fehlt: ' + fehlt.join(', ') + '. Sonst erscheint der Trainer trotz Freigabe nicht in der Suche.');
-      return;
-    }
-  }
+  // Der Admin entscheidet allein: Freigeben ist bei JEDEM Profil möglich (auch
+  // 0/8). Sichtbarkeit in der Suche = aktiv = true UND nicht gesperrt.
   const ok = await setzeTrainerAktiv(id, true);
   if(!ok) { meldeFehler('Der Trainer konnte nicht freigegeben werden. Die Anzeige wurde nicht verändert.'); return; }
   meldeErfolg('Freigegeben – jetzt in der Suche sichtbar.');
