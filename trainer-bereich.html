@@ -976,7 +976,7 @@ function renderAnfragen(data) {
     } else if(istStudio) {
       sb.innerHTML = '<div class="status-bar aktiv">✅ Profil aktiv · Studio-Trainer — für dich kostenlos, keine Gebühren. Kontaktdaten siehst du bei jeder Anfrage direkt.</div>';
     } else if(!T.stripe_bezahlt) {
-      sb.innerHTML = '<div class="status-bar aktiv">✓ Profil aktiv · Kostenlose Phase — sobald du deinen ersten Kunden gewinnst schicken wir dir den Zahlungslink.</div>';
+      sb.innerHTML = '<div class="status-bar aktiv">✓ Profil aktiv · Kostenlose Phase — sobald du deine erste Kundenanfrage über Vexfit annimmst, schicken wir dir den Zahlungslink.</div>';
     } else {
       sb.innerHTML = '<div class="status-bar aktiv">✅ Profil aktiv · Abo läuft</div>';
     }
