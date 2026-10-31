@@ -1,0 +1,251 @@
+# Bericht – Ausbau Vexfit (Zweig `ausbau-okt`)
+
+Stand: 31.10.2026. Alle Arbeiten liegen im Zweig **`ausbau-okt`** (von `main`
+abgezweigt). **Nichts gepusht, nichts deployt, keine Migration eingespielt.**
+Acht Commits, einer pro Baustein.
+
+Prüfungen am Ende: **Typprüfung grün** (`deno check` aller Edge Functions),
+**Linter grün** (`deno lint`, 49 Dateien, keine Probleme), **alle Tests grün:
+244 Seiten-/Logiktests + 101 Edge-Function-Tests = 345**.
+
+---
+
+## 1. Je Baustein
+
+### Baustein 1 – Unternehmensseite John Harris — **erledigt**
+Studio-Datenmodell + öffentliche Seite + Vorschau + Einladung + Zahlungsbefreiung
++ Kunden-QR + „schon Mitglied?" + Beispielprofile + Übersicht + Druck-Aufsteller
++ SQL-Auswertung.
+- `migrations/2026-10-31-01-studios.sql` (+ `-ruecknahme.sql`): Tabellen
+  `studios`, `studio_standorte`; Spalte `trainers.studio_standort_id` (nur
+  service_role/Funktion setzt sie → kein Selbst-Zuordnen, keine
+  Zahlungsumgehung); `anfragen.studio_standort_id` + `studio_mitglied`;
+  Funktionen `studio_einladung_einloesen`, `studio_anzeigen`, `studio_uebersicht`
+  (alle SECURITY DEFINER, gegen Freigabe/Schlüssel geprüft); Seed John Harris +
+  2 Standorte.
+- `john-harris.html` – öffentliche Seite (noindex, Vorschau-Schalter,
+  Beispielprofile nur in der Vorschau).
+- `john-harris-aufsteller.html` – A5-Druck mit selbst erzeugtem QR.
+- `john-harris-uebersicht.html` – nur lesbare Studio-Übersicht (keine Kundendaten).
+- `vexfit-qr.js` (+ `vexfit-qr_test.ts`) – eigener QR-Erzeuger ohne externen Dienst,
+  gegen Norm-Konstanten, Reed-Solomon und jsQR-Rückdekodierung geprüft.
+- `auswertungen/john-harris-3-monats-bilanz.sql` – Auswertung je Standort (nicht ausführen).
+- `registrieren.html` – Einladungslink löst `studio_einladung_einloesen` ein.
+- `trainer-bereich.html` – Studio-Trainer sehen keinen Zahlungslink.
+- `profil.html` – Studio-Anfragen fragen „schon Mitglied?" (Pflicht) + Standort.
+- `supabase/functions/vexfit-automation/kern.ts`, `index.ts`, `kern_test.ts` –
+  `/neue-anfrage` behandelt Studio-Trainer kostenlos (Kontaktdaten direkt per
+  Mail, keine Zahlung); normaler Zweig unverändert, mit Tests abgesichert.
+- `studios_test.ts`.
+
+### Baustein 2 – Profil-Upgrade — **erledigt**
+- `migrations/2026-10-31-02-profil-upgrade.sql` (+ `-ruecknahme.sql`): Spalten
+  `video_url`, `sprachen[]`, `trainingsorte[]`, `galerie[]`, `zertifikat_datei`;
+  Storage-Behälter `galerie` (öffentlich, eigener Ordner) und `zertifikate`
+  (privat, Eigentümer **oder** Admin); Sicht erweitert (zertifikat_datei bleibt privat).
+- `vexfit-video.js` (+ `vexfit-video_test.ts`) – YouTube/Instagram/TikTok erkennen
+  und einbetten; ungültige Links werden abgelehnt.
+- `profil-bearbeiten.html` – Video (Vorschau + Prüfung), Sprachen- und
+  Trainingsorte-Mehrfachauswahl, erweiterte Spezialisierungen, Galerie (bis 6
+  Bilder, Verkleinerung < 400 KB), Zertifikat-Upload.
+- `profil.html` – Video eingebettet, Sprachen/Trainingsorte/Galerie angezeigt.
+- `suche.html` – Filter nach Sprache und Trainingsort.
+- `profil_upgrade_test.ts`.
+- **Speicher-Hinweis:** Supabase-Gratisrahmen ist **1 GB**. Die Galerie
+  verkleinert jedes Bild auf max. 1600 px / unter 400 KB; ~2.600 Galeriebilder
+  passen grob in 1 GB. Zertifikate zählen zusätzlich.
+
+### Baustein 3 – Blitz-Registrierung und Profilstärke — **erledigt**
+- `trainer-bereich.html` – Profilstärke-Karte (0–100 %) mit Checkliste und je
+  einem Tipp (Foto, Kurztext, Spezialisierungen, Video, Galerie, Sprachen,
+  Trainingsorte, Zertifikat); ergänzt die bestehende Anzeige.
+- `migrations/2026-10-31-03-mindeststaerke.sql` (+ `-ruecknahme.sql`): die
+  öffentliche Sicht zeigt nur Profile mit Foto + Kurztext + Spezialisierung.
+- `suche.html` – angemeldeter Suchpfad filtert nach derselben Mindeststärke.
+- `profilstaerke_test.ts`.
+- **3a** (Blitz-Registrierung): das Trainerformular verlangt **schon jetzt** nur
+  Vorname, Nachname, E-Mail, Passwort, PLZ und führt danach ins Profilformular –
+  es war bereits „blitzschnell", deshalb nur Prüfung ergänzt, keine Änderung.
+
+### Baustein 4 – Vertrauen und mehr Anfragen — **erledigt** (4e größtenteils, siehe OFFEN)
+- `migrations/2026-10-31-04-vertrauen.sql` (+ `-ruecknahme.sql`):
+  `trainers.verifiziert` (nur service_role/Admin), `probetraining(_kostenlos)`
+  (Trainer), `antwort_stunden`/`antwort_basis` (nur serverseitig berechnet);
+  `anfragen.beantwortet_am` (per Trigger, nicht fälschbar) + `alternativen_gesendet`;
+  Funktion `antwortzeit_aktualisieren`; Sicht erweitert.
+- Edge Function: Admin-Aktionen `trainer_verifizieren`/`trainer_entverifizieren`;
+  neuer Pfad `/passt-nicht` (B4e): nach einer Absage zwei passende Trainer per
+  Mail an den Kunden.
+- `profil.html` – Abzeichen Verifiziert / „Neu auf Vexfit" (30 Tage) / Antwortzeit
+  (ab 3 Anfragen); Probetraining-Knopf (4a).
+- `profil-bearbeiten.html` – Probetraining-Umschalter.
+- `trainer-bereich.html` – nach Antwort Antwortzeit neu berechnen; bei Absage
+  Alternativen anstoßen.
+- `suche.html` – Kartenabzeichen nach echter Verifizierung.
+- `vertrauen_test.ts`, erweiterte `kern_test.ts`.
+
+### Baustein 5 – Kunden-Matching in 4 Fragen — **erledigt**
+- `vexfit-matching.js` (+ `vexfit-matching_test.ts`) – reine Bewertung/Sortierung
+  (Ziel am stärksten; Zeit gegen die Verfügbarkeit aus Baustein 6).
+- `suche.html` – Panel „Passenden Trainer in 4 Fragen finden"; die 3 passendsten
+  zuerst, danach die normale Liste. Grundsatz: Kontakt nur für angemeldete Kunden.
+- `matching_verfuegbarkeit_test.ts`.
+
+### Baustein 6 – Verfügbarkeit — **erledigt**
+- `migrations/2026-10-31-05-verfuegbarkeit.sql` (+ `-ruecknahme.sql`):
+  `trainers.verfuegbarkeit text[]`; Sicht erweitert.
+- `profil-bearbeiten.html` – Raster (7 Tage × Morgen/Mittag/Abend).
+- `profil.html` – Anzeige je Wochentag. Kein Buchungskalender.
+
+### Baustein 7 – Admin-Dashboard — **erledigt** (Hinweis zu Adress-Bearbeitung unten)
+- `migrations/2026-10-31-06-admin-studios.sql` (+ `-ruecknahme.sql`): vier
+  Admin-Funktionen (nur `ist_vexfit_admin()`): `studios_admin_liste` (mit allen
+  Schlüsseln), `studio_admin_anlegen`, `standort_admin_anlegen`,
+  `studio_admin_freigabe`.
+- `admin.html` – drei neue Reiter: **Studios** (anlegen, Links anzeigen/kopieren,
+  Freigabe-Schalter), **Zertifikate** (ansehen über signierte Adresse,
+  verifizieren/zurücknehmen), **Profil-Übersicht** (Video/Sprachen/Trainingsorte/
+  Profilstärke/Verifiziert, filterbar).
+- `admin_studios_test.ts`.
+
+### Baustein 8 – Schluss-Rundgang — **teilweise** (ohne Test-DB, siehe `rundgang/README.md`)
+Playwright ist nicht eingerichtet; ein echter Klick-Durchlauf braucht eine
+Datenbank mit den neuen Spalten (Migrationen absichtlich nicht eingespielt, Live-DB
+tabu). Deshalb Rundgang **im eingebauten Browser gegen die lokalen Seiten mit
+gemockten Supabase-Antworten**. Geprüft und als Screenshot in `rundgang/`:
+Suche+Matching (1440), Matching-Ergebnis mit echten Abzeichen, Profil mit
+Abzeichen, John-Harris-Aufsteller, John-Harris-Vorschau (1440 + mobil 390). Der
+QR-Code wurde echt per jsQR rück-dekodiert. Was NICHT live geklickt wurde
+(Registrierung, Speichern, Anfrage, Upload, Admin) steht in `rundgang/README.md`.
+
+---
+
+## 2. Migrationen – Reihenfolge zum Einspielen
+Immer: **SQL einspielen → kurz testen → pushen → nächster Baustein.** Alle liegen
+in `migrations/`, jede mit passender `-ruecknahme.sql` (Notbremse).
+
+1. `migrations/2026-10-31-01-studios.sql`
+2. `migrations/2026-10-31-02-profil-upgrade.sql`
+3. `migrations/2026-10-31-03-mindeststaerke.sql`
+4. `migrations/2026-10-31-04-vertrauen.sql`
+5. `migrations/2026-10-31-05-verfuegbarkeit.sql`
+6. `migrations/2026-10-31-06-admin-studios.sql`
+
+Sie bauen aufeinander auf (02–06 verändern u. a. die Sicht `trainers_oeffentlich`
+und setzen die Spalten aus 02/04/05 voraus) – **in dieser Reihenfolge** einspielen.
+
+> **Hinweis zur Rücknahme-Ablage:** Die Aufgabe nannte `migrations/ruecknahmen/`.
+> Im Bestand liegen aber alle 15 bisherigen Rücknahmen als `…-ruecknahme.sql`
+> **neben** der Migration in `migrations/`. Ich habe die bestehende, einheitliche
+> Konvention weitergeführt (sicherer: ein Muster, keine Sonderfälle). Falls du den
+> Ordner bevorzugst, verschiebe die sechs `*-ruecknahme.sql` dorthin.
+
+---
+
+## 3. Edge Functions zum Deployen
+Geändert: **`vexfit-automation`** (`kern.ts` + `index.ts`). Fertiger Befehl:
+
+```bash
+supabase functions deploy vexfit-automation --no-verify-jwt --project-ref hbapzwxdehfgnputrfjf
+```
+
+Erst **nach** dem Einspielen der Migrationen deployen (die Function liest die neuen
+Spalten `studio_standort_id`, `verifiziert`, `alternativen_gesendet` usw.).
+`trainer-alert` wurde nicht geändert.
+
+---
+
+## 4. Typprüfung, Linter, Tests
+- **Typprüfung:** `deno check` über alle Edge-Function-Dateien – **grün**.
+- **Linter:** `deno lint` – **49 Dateien, 0 Probleme**.
+- **Tests Seiten/Logik:** `deno test --allow-read --allow-run --allow-env` –
+  **244 bestanden, 0 fehlgeschlagen**.
+- **Tests Edge Functions:** `deno test --allow-run --allow-read --allow-env supabase/functions/` –
+  **101 bestanden, 0 fehlgeschlagen**.
+- Neue Tests je Baustein: `studios_test.ts`, `vexfit-qr_test.ts`,
+  `profil_upgrade_test.ts`, `vexfit-video_test.ts`, `profilstaerke_test.ts`,
+  `vertrauen_test.ts`, `vexfit-matching_test.ts`, `matching_verfuegbarkeit_test.ts`,
+  `admin_studios_test.ts` + erweiterte `kern_test.ts`. Sie prüfen Verhalten
+  (nicht nur Wortvorkommen), z. B. dass Studio-Trainer keinen Zahlungslink
+  bekommen, der QR echt dekodiert, die Matching-Sortierung stimmt.
+- Nicht automatisiert prüfbar ohne Test-DB: die echten Schreibabläufe (siehe B8).
+
+---
+
+## 5. „HIER EINFÜGEN"-Lücken (nichts erfunden)
+1. **John Harris Salzburg – Adresse:** Hausnummer der Innsbrucker Bundesstraße
+   (Medicent) + PLZ. Steht als Platzhalter im Seed (Migration 01) und auf der
+   Seite.
+2. **John Harris Wien – Adresse:** Hausnummer Schillerplatz + PLZ. Ebenso Platzhalter.
+
+Nach dem Einspielen von Migration 01 füllst du beide so (die Übersicht/Seite lesen
+die Adresse aus der Tabelle):
+
+```sql
+UPDATE public.studio_standorte SET adresse = '…', plz = '…'
+ WHERE slug = 'salzburg' AND studio_id = (SELECT id FROM public.studios WHERE slug='john-harris');
+UPDATE public.studio_standorte SET adresse = '…', plz = '…'
+ WHERE slug = 'wien' AND studio_id = (SELECT id FROM public.studios WHERE slug='john-harris');
+```
+
+(Der Admin-Reiter „Studios" kann Standorte **anlegen**; das **Bearbeiten** der
+Adresse ist noch nicht eingebaut – siehe offene Punkte.)
+
+---
+
+## 6. Was du dir selbst ansehen solltest
+Lokal (nur Darstellung, Supabase-Aufrufe schlagen ohne eingespielte DB fehl):
+```bash
+cd /Users/js/Projekte/Vexfit/app/vexfit && python3 -m http.server 8799
+```
+Dann im Browser `http://localhost:8799/…`. **Mit echten Daten** sichtbar erst,
+nachdem die Migrationen in einer DB stehen; die geheimen Schlüssel findest du
+danach im Admin unter **Studios** (oder per SQL in `studios`/`studio_standorte`).
+
+- **John-Harris-Vorschau:** `…/john-harris.html?vorschau=<VORSCHAU_SCHLUESSEL>`
+- **Studio-Übersicht (nur lesen):** `…/john-harris-uebersicht.html?schluessel=<UEBERSICHT_SCHLUESSEL>`
+- **Druck-Aufsteller Salzburg:** `…/john-harris-aufsteller.html?standort=salzburg`
+- **Druck-Aufsteller Wien:** `…/john-harris-aufsteller.html?standort=wien`
+- **Trainer-Einladung (je Standort):** `…/registrieren.html?einladung=<EINLADUNGS_SCHLUESSEL>`
+- **Kunden-Link/QR (je Standort):** `…/john-harris.html?standort=salzburg` bzw. `=wien`
+
+Alle Links baut der Admin-Reiter **Studios** fertig zusammen (mit Kopieren-Knopf).
+
+---
+
+## 7. Offene Entscheidungen für dich
+1. **Grundsatz „Profile erst nach Registrierung sichtbar":** Die Aufgabe nennt
+   das zweimal, aber der **aktuelle Stand zeigt Trainerprofile öffentlich** (seit
+   26.10., `trainers_oeffentlich`); nur die **Kontaktaufnahme** verlangt eine
+   Anmeldung. Ich habe diesen Stand **nicht** zurückgebaut (wäre ein Rückschritt
+   einer bewusst gebauten Funktion) und die neue John-Harris-Seite daran
+   ausgerichtet. **Entscheidung:** öffentliche Profile beibehalten, oder Suche +
+   Profil wieder komplett hinter die Anmeldung legen? (Das wäre ein eigener Umbau.)
+2. **Baustein 4e, 48-Stunden-Fall:** Der **Absage-Fall** ist fertig (Kunde bekommt
+   zwei Alternativen). Der **„48 h keine Antwort"-Fall** braucht einen geplanten
+   Lauf (pg_cron) mit einem service_role-Pfad (die Function dürfte dann ohne
+   Trainer-Token senden). Bewusst nicht gebaut, damit kein ungeprüfter
+   Automatik-Mailversand entsteht. Soll ich das als eigenen Baustein nachziehen?
+3. **Studio-Adressen bearbeiten im Admin:** Anlegen ja, Adresse ändern noch per
+   SQL (siehe §5). Bei Bedarf baue ich einen Bearbeiten-Dialog nach.
+4. **Weitere Studios:** Das Datenmodell trägt beliebig viele Studios. Die
+   **Seiten** (`<slug>.html`, `-uebersicht.html`, `-aufsteller.html`) gibt es
+   aber nur für John Harris. Für ein zweites Studio bräuchte es entweder Kopien
+   dieser Seiten mit anderem `slug` oder eine generische Studio-Seite.
+5. **Beispielprofile vs. echte Trainer:** Erscheinen Beispielprofile nur in der
+   Vorschau; die öffentliche (freigegebene) Seite zeigt echte Trainer bzw. einen
+   Registrierungs-Hinweis. Passt das so für Christians Freigabe-Entwurf?
+
+---
+
+```
+Vexfit-Ausbau (Zweig ausbau-okt, 31.10.): B1–B7 fertig, B8 teilweise (ohne Test-DB).
+8 Commits, NICHTS gepusht/deployt, KEINE Migration eingespielt.
+Reihenfolge je Baustein: SQL einspielen → testen → pushen → nächster.
+Migrationen 01–06 (migrations/2026-10-31-0X-*.sql) IN DIESER REIHENFOLGE, dann
+`supabase functions deploy vexfit-automation --no-verify-jwt --project-ref hbapzwxdehfgnputrfjf`.
+Danach John-Harris-Adressen (2× HIER EINFÜGEN) per SQL setzen, Schlüssel im Admin→Studios holen.
+Tests: 244 Seiten + 101 Edge grün, Lint+Typen grün. Rücknahmen als *-ruecknahme.sql neben der Migration.
+OFFEN: öffentliche Profile beibehalten? 4e-48h-Cron? Studio-Adresse-Edit? weitere Studios = eigene Seiten.
+QR (vexfit-qr.js) echt per jsQR geprüft. Screenshots in rundgang/.
+```
