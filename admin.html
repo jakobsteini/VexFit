@@ -81,6 +81,57 @@ tr:hover td{background:var(--card)}
   .stats-grid{grid-template-columns:repeat(4,1fr)}
   .content{padding:32px 40px}
 }
+
+/* ── MELDUNGEN (Teil 1): sichtbare Hinweise statt stiller Konsole/alert ── */
+#meldungen{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:12000;display:flex;flex-direction:column;gap:8px;width:calc(100% - 24px);max-width:520px;pointer-events:none}
+.meldung{pointer-events:auto;padding:12px 16px;border-radius:4px;font-size:13px;line-height:1.5;box-shadow:0 8px 28px rgba(0,0,0,0.45);display:flex;gap:10px;align-items:flex-start;animation:vxFade 0.25s ease both}
+.meldung-ok{background:#143d22;border:1px solid rgba(74,222,128,0.5);color:#d6ffe4}
+.meldung-fehler{background:#3d1414;border:1px solid rgba(255,80,80,0.5);color:#ffd9d9}
+.meldung-info{background:#1e1e1e;border:1px solid rgba(255,255,255,0.18);color:var(--white)}
+.meldung button{margin-left:auto;background:transparent;border:none;color:inherit;font-size:16px;line-height:1;cursor:pointer;opacity:0.7}
+@keyframes vxFade{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── DETAILANSICHT (Teil 2/4): Seitenfenster rechts, am Handy Vollbild ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:11000;display:none}
+.overlay.show{display:block}
+.panel{position:fixed;top:0;right:0;height:100%;width:100%;max-width:520px;background:var(--gray);border-left:1px solid var(--border);z-index:11001;display:none;flex-direction:column;animation:vxSlide 0.25s ease both}
+.panel.show{display:flex}
+@keyframes vxSlide{from{transform:translateX(100%)}to{transform:translateX(0)}}
+.panel-kopf{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--gray)}
+.panel-titel{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px}
+.panel-zu{background:transparent;border:1px solid var(--border);color:var(--text-muted);width:36px;height:36px;border-radius:4px;font-size:18px;cursor:pointer}
+.panel-body{padding:20px;overflow-y:auto;flex:1}
+.panel-foot{padding:16px 20px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px}
+.feld{margin-bottom:14px}
+.feld-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px}
+.feld-wert{font-size:14px;color:var(--white);word-break:break-word;white-space:pre-wrap}
+.feld-fehlt{color:#ff8a8a}
+.chiprow{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--mid);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px}
+.btn-gross{padding:11px 18px;border-radius:4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;border:1px solid transparent}
+.btn-ja{background:var(--accent);color:var(--black)}
+.btn-ja:disabled{opacity:0.4;cursor:not-allowed}
+.btn-warn{background:rgba(255,165,0,0.12);border-color:rgba(255,165,0,0.4);color:#ffaa00}
+.btn-gefahr{background:rgba(255,80,80,0.12);border-color:rgba(255,80,80,0.4);color:#ff6b6b}
+.btn-neutral{background:rgba(255,255,255,0.06);border-color:var(--border);color:var(--white)}
+.klickbar{cursor:pointer}
+.klickbar:hover td{background:var(--card)}
+
+/* ── BESTÄTIGUNG (Teil 1/5): eigenes Fenster statt confirm()/prompt() ── */
+.dialog-box{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:11002;width:calc(100% - 32px);max-width:440px;background:var(--gray);border:1px solid var(--border);border-radius:6px;padding:24px;display:none}
+.dialog-box.show{display:block}
+.dialog-titel{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;margin-bottom:10px}
+.dialog-text{font-size:14px;color:rgba(245,245,240,0.85);line-height:1.6;margin-bottom:16px}
+.dialog-box input{width:100%;background:var(--black);border:1px solid rgba(255,255,255,0.15);color:var(--white);padding:11px 14px;border-radius:4px;font-size:14px;margin-bottom:16px;font-family:'DM Sans',sans-serif}
+.dialog-aktionen{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+
+/* ── Tabellen am Handy: nur INNERHALB der Tabelle scrollen, Seite nicht ── */
+body{overflow-x:hidden}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media(max-width:640px){
+  .panel{max-width:100%}
+  th,td{white-space:nowrap}
+}
 </style>
 <!-- Meta Pixel Code -->
 <!-- Laedt NICHT beim Seitenaufruf. Nur wenn eine Zustimmung fuer Marketing vorliegt. -->
@@ -374,6 +425,37 @@ try {
   </div>
 </div>
 
+<!-- Teil 1: Meldungen, Detailansicht und Bestätigungsfenster (kein alert/confirm/prompt) -->
+<div id="meldungen" aria-live="polite"></div>
+<div class="overlay" id="detailOverlay" onclick="detailSchliessen()"></div>
+<aside class="panel" id="detailPanel" role="dialog" aria-modal="true" aria-labelledby="detailTitel">
+  <div class="panel-kopf">
+    <div class="panel-titel" id="detailTitel">Details</div>
+    <button class="panel-zu" onclick="detailSchliessen()" aria-label="Schließen">✕</button>
+  </div>
+  <div class="panel-body" id="detailBody"></div>
+  <div class="panel-foot" id="detailFoot"></div>
+</aside>
+<div class="overlay" id="dialogOverlay" onclick="dialogAbbrechen()"></div>
+<div class="dialog-box" id="dialogBox" role="dialog" aria-modal="true" aria-labelledby="dialogTitel">
+  <div class="dialog-titel" id="dialogTitel"></div>
+  <div class="dialog-text" id="dialogText"></div>
+  <input id="dialogEingabe" style="display:none" autocomplete="off">
+  <div class="dialog-aktionen">
+    <button class="btn-gross btn-neutral" onclick="dialogAbbrechen()">Abbrechen</button>
+    <button class="btn-gross" id="dialogOk" onclick="dialogBestaetigen()">OK</button>
+  </div>
+</div>
+<div class="overlay" id="formOverlay" onclick="formAbbrechen()"></div>
+<div class="dialog-box" id="formBox" role="dialog" aria-modal="true" aria-labelledby="formTitel">
+  <div class="dialog-titel" id="formTitel"></div>
+  <div id="formFelder"></div>
+  <div class="dialog-aktionen">
+    <button class="btn-gross btn-neutral" onclick="formAbbrechen()">Abbrechen</button>
+    <button class="btn-gross btn-ja" id="formOk" onclick="formBestaetigen()">Speichern</button>
+  </div>
+</div>
+
 <script src="vexfit-escape.js"></script>
 <script src="vexfit-video.js"></script>
 <script>
@@ -409,17 +491,128 @@ function authKopf(weitere) {
 // Ohne gueltiges Token ist der Bereich nicht benutzbar: abmelden und zurueck.
 function sitzungAbgelaufen() {
   try { localStorage.removeItem('vexfit_session'); } catch(e) {}
-  alert('Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.');
-  location.href = 'login.html';
+  zeigeMeldung('Deine Sitzung ist abgelaufen. Du wirst zur Anmeldung weitergeleitet …', 'fehler');
+  setTimeout(() => { location.href = 'login.html'; }, 1400);
 }
 function istAbgemeldet(r) {
   if(r.status === 401 || r.status === 403) { sitzungAbgelaufen(); return true; }
   return false;
 }
 
+// ──── MELDUNGEN (Teil 1) ────
+// Gut lesbarer Hinweis oben auf der Seite. art: 'ok' | 'fehler' | 'info'.
+// Fehler bleiben stehen, bis man sie schliesst; Erfolg/Info verschwinden selbst.
+function zeigeMeldung(text, art) {
+  const wrap = document.getElementById('meldungen');
+  if(!wrap) return;
+  art = art || 'info';
+  const el = document.createElement('div');
+  el.className = 'meldung meldung-' + art;
+  const span = document.createElement('span');
+  span.textContent = text;
+  const zu = document.createElement('button');
+  zu.setAttribute('aria-label', 'Schließen');
+  zu.textContent = '✕';
+  zu.onclick = () => el.remove();
+  el.appendChild(span);
+  el.appendChild(zu);
+  wrap.appendChild(el);
+  if(art !== 'fehler') setTimeout(() => el.remove(), 4500);
+}
+function meldeFehler(text) { zeigeMeldung(text, 'fehler'); }
+function meldeErfolg(text) { zeigeMeldung(text, 'ok'); }
+
+// ──── DETAILANSICHT (Teil 2/4) ────
+function detailOeffnen(titel, bodyHtml, footHtml) {
+  document.getElementById('detailTitel').textContent = titel;
+  document.getElementById('detailBody').innerHTML = bodyHtml;
+  document.getElementById('detailFoot').innerHTML = footHtml || '';
+  document.getElementById('detailOverlay').classList.add('show');
+  document.getElementById('detailPanel').classList.add('show');
+}
+function detailSchliessen() {
+  document.getElementById('detailOverlay').classList.remove('show');
+  document.getElementById('detailPanel').classList.remove('show');
+}
+
+// ──── BESTÄTIGUNG (Teil 1/5) ────
+// Eigenes Fenster statt confirm()/prompt(). Gibt ein Promise<boolean> zurueck.
+// Mit opt.nameZumTippen wird der OK-Knopf erst frei, wenn der Name exakt
+// eingetippt ist (fuer das endgueltige Loeschen).
+let _dialogAufloesen = null;
+function bestaetige(opt) {
+  opt = opt || {};
+  const box = document.getElementById('dialogBox');
+  const eingabe = document.getElementById('dialogEingabe');
+  const ok = document.getElementById('dialogOk');
+  document.getElementById('dialogTitel').textContent = opt.titel || 'Bestätigen';
+  document.getElementById('dialogText').textContent = opt.text || '';
+  ok.textContent = opt.okText || 'Bestätigen';
+  ok.className = 'btn-gross ' + (opt.okArt || 'btn-ja');
+  if(opt.nameZumTippen) {
+    eingabe.style.display = 'block';
+    eingabe.value = '';
+    eingabe.placeholder = opt.nameZumTippen;
+    ok.disabled = true;
+    eingabe.oninput = () => { ok.disabled = eingabe.value.trim() !== opt.nameZumTippen.trim(); };
+  } else {
+    eingabe.style.display = 'none';
+    eingabe.oninput = null;
+    ok.disabled = false;
+  }
+  document.getElementById('dialogOverlay').classList.add('show');
+  box.classList.add('show');
+  if(opt.nameZumTippen) setTimeout(() => eingabe.focus(), 50);
+  return new Promise(res => { _dialogAufloesen = res; });
+}
+function _dialogZu() {
+  document.getElementById('dialogOverlay').classList.remove('show');
+  document.getElementById('dialogBox').classList.remove('show');
+}
+function dialogBestaetigen() { _dialogZu(); if(_dialogAufloesen) { _dialogAufloesen(true); _dialogAufloesen = null; } }
+function dialogAbbrechen() { _dialogZu(); if(_dialogAufloesen) { _dialogAufloesen(false); _dialogAufloesen = null; } }
+
+// Mehrfeld-Eingabe als eigenes Fenster statt prompt(). felder: [{key,label,wert,pflicht}].
+// Gibt ein Promise auf ein Objekt {key:wert,…} zurueck, oder null bei Abbruch.
+let _formAufloesen = null;
+function frageFormular(titel, felder) {
+  const box = document.getElementById('formFelder');
+  document.getElementById('formTitel').textContent = titel;
+  box.innerHTML = '';
+  for(const f of felder) {
+    const w = document.createElement('div');
+    w.className = 'feld';
+    const l = document.createElement('div');
+    l.className = 'feld-label';
+    l.textContent = f.label + (f.pflicht ? ' *' : '');
+    const i = document.createElement('input');
+    i.value = f.wert || '';
+    i.dataset.key = f.key;
+    if(f.platzhalter) i.placeholder = f.platzhalter;
+    w.appendChild(l); w.appendChild(i);
+    box.appendChild(w);
+  }
+  document.getElementById('formOverlay').classList.add('show');
+  document.getElementById('formBox').classList.add('show');
+  const erstes = box.querySelector('input');
+  if(erstes) setTimeout(() => erstes.focus(), 50);
+  return new Promise(res => { _formAufloesen = res; });
+}
+function _formZu() {
+  document.getElementById('formOverlay').classList.remove('show');
+  document.getElementById('formBox').classList.remove('show');
+}
+function formBestaetigen() {
+  const box = document.getElementById('formFelder');
+  const werte = {};
+  box.querySelectorAll('input').forEach(i => { werte[i.dataset.key] = i.value.trim(); });
+  _formZu(); if(_formAufloesen) { _formAufloesen(werte); _formAufloesen = null; }
+}
+function formAbbrechen() { _formZu(); if(_formAufloesen) { _formAufloesen(null); _formAufloesen = null; } }
+
 function sendDailyReport() {
   if(!window.allTrainers || !window.allKunden) {
-    alert('Bitte warte bis die Daten geladen sind!');
+    zeigeMeldung('Bitte warte, bis die Daten geladen sind.', 'info');
     return;
   }
 
@@ -624,6 +817,7 @@ async function loadData() {
   }
  } catch(e) {
   console.error('loadData:', e);
+  meldeFehler('Daten konnten nicht geladen werden: ' + (e && e.message ? e.message : e));
   const tb = document.getElementById('trainers-tbody');
   if(tb) tb.innerHTML = '<tr><td colspan="10" class="loading-text">⚠️ Daten konnten nicht geladen werden.<br><button onclick="loadData()" style="margin-top:12px;background:var(--accent);color:#0a0a0a;border:none;padding:8px 18px;border-radius:3px;font-weight:700;cursor:pointer">Erneut versuchen</button></td></tr>';
   const kb = document.getElementById('kunden-tbody');
@@ -964,29 +1158,37 @@ async function loescheZeile(tabelle, id) {
   return geaendert > 0;
 }
 
+// Hinweis: banTrainer/deleteTrainer/deleteKunde werden in Teil 5 auf die
+// abgesicherte Edge Function (Auth sperren/löschen) umgestellt; hier bleibt
+// vorerst der Zeilen-Weg, aber ohne alert/confirm.
 async function banTrainer(id, name) {
   const ok = await setzeTrainerAktiv(id, false);
-  if(!ok) { alert(`${name} konnte nicht gesperrt werden. Die Anzeige wurde nicht veraendert. Bitte versuche es erneut.`); return; }
+  if(!ok) { meldeFehler(`${name} konnte nicht gesperrt werden. Die Anzeige wurde nicht verändert.`); return; }
+  meldeErfolg(`${name} ist jetzt gesperrt (aus der Suche entfernt).`);
   loadData();
 }
 
 async function deleteTrainer(id, name) {
-  if(!confirm(`${name} wirklich entfernen? Die Zeile wird aus der Trainerliste geloescht, das Anmeldekonto bleibt bestehen.`)) return;
+  const ja = await bestaetige({ titel: 'Trainer entfernen', text: `${name} wirklich aus der Trainerliste entfernen? Das Anmeldekonto bleibt bestehen.`, okText: 'Entfernen', okArt: 'btn-gefahr' });
+  if(!ja) return;
   const ok = await loescheZeile('trainers', id);
-  if(!ok) { alert(`${name} konnte nicht entfernt werden. Die Anzeige wurde nicht veraendert. Bitte versuche es erneut.`); return; }
+  if(!ok) { meldeFehler(`${name} konnte nicht entfernt werden. Die Anzeige wurde nicht verändert.`); return; }
+  meldeErfolg(`${name} entfernt.`);
   loadData();
 }
 
 async function deleteKunde(id, name) {
-  if(!confirm(`${name} wirklich entfernen? Die Zeile wird aus der Kundenliste geloescht, das Anmeldekonto bleibt bestehen.`)) return;
+  const ja = await bestaetige({ titel: 'Kunde entfernen', text: `${name} wirklich aus der Kundenliste entfernen? Das Anmeldekonto bleibt bestehen.`, okText: 'Entfernen', okArt: 'btn-gefahr' });
+  if(!ja) return;
   const ok = await loescheZeile('kunden', id);
-  if(!ok) { alert(`${name} konnte nicht entfernt werden. Die Anzeige wurde nicht veraendert. Bitte versuche es erneut.`); return; }
+  if(!ok) { meldeFehler(`${name} konnte nicht entfernt werden. Die Anzeige wurde nicht verändert.`); return; }
+  meldeErfolg(`${name} entfernt.`);
   loadData();
 }
 
 async function activateTrainer(id) {
   const ok = await setzeTrainerAktiv(id, true);
-  if(!ok) { alert('Der Trainer konnte nicht freigegeben werden. Die Anzeige wurde nicht veraendert. Bitte versuche es erneut.'); return; }
+  if(!ok) { meldeFehler('Der Trainer konnte nicht freigegeben werden. Die Anzeige wurde nicht verändert.'); return; }
 
   // Open email to Jakob with Stripe link
   const t = (window.allTrainers || []).find(x => x.id === id);
@@ -1014,10 +1216,10 @@ Admin: https://vexfit.app/admin.html`);
 async function markAsPaid(id, email, name) {
   const geaendert = await adminAktion('trainer_bezahlt', id);
   if(geaendert > 0) {
-    alert('✅ Als bezahlt markiert!');
+    meldeErfolg('Als bezahlt markiert.');
     loadData();
   } else {
-    alert('❌ Fehler beim Markieren!');
+    meldeFehler('Markieren fehlgeschlagen. Die Anzeige wurde nicht verändert.');
   }
 }
 
@@ -1095,19 +1297,19 @@ async function zertifikatOeffnen(pfad) {
       headers: authKopf({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ expiresIn: 300 })
     });
-    if(!r.ok) { alert('Zertifikat konnte nicht geöffnet werden (' + r.status + ').'); return; }
+    if(!r.ok) { meldeFehler('Zertifikat konnte nicht geöffnet werden (' + r.status + ').'); return; }
     const d = await r.json();
     window.open(`${SUPABASE_URL}/storage/v1${d.signedURL}`, '_blank');
-  } catch(e) { alert('Zertifikat konnte nicht geöffnet werden.'); }
+  } catch(e) { meldeFehler('Zertifikat konnte nicht geöffnet werden.'); }
 }
 
 async function verifizieren(id) {
   const n = await adminAktion('trainer_verifizieren', id);
-  if(n > 0) loadData(); else alert('Fehler beim Verifizieren.');
+  if(n > 0) { meldeErfolg('Zertifikat verifiziert.'); loadData(); } else meldeFehler('Verifizieren fehlgeschlagen. Die Anzeige wurde nicht verändert.');
 }
 async function entverifizieren(id) {
   const n = await adminAktion('trainer_entverifizieren', id);
-  if(n > 0) loadData(); else alert('Fehler.');
+  if(n > 0) { meldeErfolg('Verifizierung zurückgenommen.'); loadData(); } else meldeFehler('Zurücknehmen fehlgeschlagen. Die Anzeige wurde nicht verändert.');
 }
 
 // B7a: Studios verwalten.
@@ -1159,7 +1361,9 @@ async function ladeStudios() {
     html += `<button onclick="studioAnlegen()" style="background:var(--accent);color:#000;border:none;padding:10px 18px;border-radius:3px;font-weight:700;font-size:13px;cursor:pointer">+ Neues Studio</button>`;
     el.innerHTML = html;
   } catch(e) {
+    console.error('ladeStudios:', e);
     el.innerHTML = '<div class="loading-text">Studios konnten nicht geladen werden.</div>';
+    meldeFehler('Studios konnten nicht geladen werden.');
   }
 }
 function studioLink(label, url) {
@@ -1178,23 +1382,29 @@ async function studioFreigabe(id, an) {
   });
 }
 async function studioAnlegen() {
-  const name = prompt('Name des Studios (z. B. „Fit & Co"):'); if(!name) return;
-  const slug = prompt('Kürzel für die Adresse (nur Kleinbuchstaben, z. B. „fitco"):'); if(!slug) return;
+  const w = await frageFormular('Neues Studio', [
+    { key: 'name', label: 'Name des Studios (z. B. „Fit & Co")', pflicht: true },
+    { key: 'slug', label: 'Kürzel für die Adresse (nur Kleinbuchstaben, z. B. „fitco")', pflicht: true }
+  ]);
+  if(!w || !w.name || !w.slug) return;
   const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/studio_admin_anlegen`, {
     method: 'POST', headers: authKopf({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ p_slug: slug, p_name: name })
+    body: JSON.stringify({ p_slug: w.slug, p_name: w.name })
   });
-  if(r.ok) ladeStudios(); else alert('Studio konnte nicht angelegt werden.');
+  if(r.ok) { meldeErfolg('Studio angelegt.'); ladeStudios(); } else meldeFehler('Studio konnte nicht angelegt werden (' + r.status + ').');
 }
 async function standortAnlegen(studioId) {
-  const name = prompt('Name des Standorts (z. B. „Filiale Linz"):'); if(!name) return;
-  const slug = prompt('Kürzel (z. B. „linz"):'); if(!slug) return;
-  const stadt = prompt('Stadt:') || null;
+  const w = await frageFormular('Neuer Standort', [
+    { key: 'name', label: 'Name des Standorts (z. B. „Filiale Linz")', pflicht: true },
+    { key: 'slug', label: 'Kürzel (z. B. „linz")', pflicht: true },
+    { key: 'stadt', label: 'Stadt' }
+  ]);
+  if(!w || !w.name || !w.slug) return;
   const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/standort_admin_anlegen`, {
     method: 'POST', headers: authKopf({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ p_studio_id: studioId, p_slug: slug, p_name: name, p_stadt: stadt, p_adresse: 'HIER EINFÜGEN', p_plz: 'HIER EINFÜGEN', p_land: 'AT' })
+    body: JSON.stringify({ p_studio_id: studioId, p_slug: w.slug, p_name: w.name, p_stadt: w.stadt || null, p_adresse: 'HIER EINFÜGEN', p_plz: 'HIER EINFÜGEN', p_land: 'AT' })
   });
-  if(r.ok) ladeStudios(); else alert('Standort konnte nicht angelegt werden.');
+  if(r.ok) { meldeErfolg('Standort angelegt.'); ladeStudios(); } else meldeFehler('Standort konnte nicht angelegt werden (' + r.status + ').');
 }
 // Adresszeile eines Standorts; noch leere Felder ("HIER EINFÜGEN") werden hervorgehoben.
 function studioAdresse(st) {
@@ -1210,16 +1420,19 @@ async function standortBearbeiten(standortId) {
   let st = null;
   for(const s of (window._adminStudios || [])) for(const x of (s.standorte || [])) if(x.id === standortId) st = x;
   if(!st) return;
-  const name = prompt('Name des Standorts:', st.name || ''); if(name === null) return;
-  const stadt = prompt('Stadt:', st.stadt || ''); if(stadt === null) return;
-  const adresse = prompt('Straße und Hausnummer:', st.adresse || ''); if(adresse === null) return;
-  const plz = prompt('PLZ:', st.plz || ''); if(plz === null) return;
-  const land = prompt('Land (z. B. AT):', st.land || 'AT'); if(land === null) return;
+  const w = await frageFormular('Standort bearbeiten', [
+    { key: 'name', label: 'Name des Standorts', wert: st.name || '' },
+    { key: 'stadt', label: 'Stadt', wert: st.stadt || '' },
+    { key: 'adresse', label: 'Straße und Hausnummer', wert: st.adresse || '' },
+    { key: 'plz', label: 'PLZ', wert: st.plz || '' },
+    { key: 'land', label: 'Land (z. B. AT)', wert: st.land || 'AT' }
+  ]);
+  if(!w) return;
   const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/standort_admin_bearbeiten`, {
     method: 'POST', headers: authKopf({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ p_standort_id: standortId, p_name: name, p_stadt: stadt, p_adresse: adresse, p_plz: plz, p_land: land })
+    body: JSON.stringify({ p_standort_id: standortId, p_name: w.name, p_stadt: w.stadt, p_adresse: w.adresse, p_plz: w.plz, p_land: w.land })
   });
-  if(r.ok) ladeStudios(); else alert('Standort konnte nicht gespeichert werden.');
+  if(r.ok) { meldeErfolg('Standort gespeichert.'); ladeStudios(); } else meldeFehler('Standort konnte nicht gespeichert werden (' + r.status + ').');
 }
 
 function sendStripeLink(email, name) {
