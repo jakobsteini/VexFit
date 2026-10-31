@@ -360,6 +360,65 @@ const anschluesse: Anschluesse = {
     return Array.isArray(zeilen) ? zeilen.length : 0;
   },
 
+  // B4e: eine Anfrage mit Kundendaten (service_role).
+  async anfrageNachId(id: string) {
+    const zeilen = await lesen<Record<string, unknown>>(
+      `anfragen?id=eq.${encodeURIComponent(id)}` +
+        `&select=id,trainer_id,kunden_email,kunden_name,ziel,alternativen_gesendet`,
+    );
+    const z = zeilen[0];
+    return z
+      ? {
+        id: String(z.id),
+        trainer_id: z.trainer_id as string | null,
+        kunden_email: z.kunden_email as string | null,
+        kunden_name: z.kunden_name as string | null,
+        ziel: z.ziel as string | null,
+        alternativen_gesendet: z.alternativen_gesendet as boolean | null,
+      }
+      : null;
+  },
+
+  // B4e: ein Trainer mit den Feldern fuer die Zuordnung.
+  async trainerVollNachId(id: string) {
+    const zeilen = await lesen<Record<string, unknown>>(
+      `trainers?id=eq.${encodeURIComponent(id)}` +
+        `&select=id,vorname,nachname,stadt,spezialisierungen`,
+    );
+    const z = zeilen[0];
+    return z
+      ? {
+        id: String(z.id),
+        vorname: z.vorname as string | null,
+        nachname: z.nachname as string | null,
+        stadt: z.stadt as string | null,
+        spezialisierungen: z.spezialisierungen as string[] | null,
+      }
+      : null;
+  },
+
+  // B4e: freigeschaltete, verifizierte Trainer als Kandidaten.
+  async aktiveVerifizierteTrainer() {
+    return await lesen<{
+      id: string;
+      vorname?: string | null;
+      nachname?: string | null;
+      stadt?: string | null;
+      spezialisierungen?: string[] | null;
+    }>(
+      `trainers?aktiv=eq.true&verifiziert=eq.true` +
+        `&select=id,vorname,nachname,stadt,spezialisierungen`,
+    );
+  },
+
+  // B4e: vermerkt, dass Alternativen verschickt wurden (einmal je Anfrage).
+  alternativenVermerken(anfrageId: string) {
+    return schreiben(
+      `anfragen?id=eq.${encodeURIComponent(anfrageId)}`,
+      { alternativen_gesendet: true },
+    );
+  },
+
   adminHinweis(): string | undefined {
     return Deno.env.get("ADMIN_PASSWORT_HINWEIS") || undefined;
   },

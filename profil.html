@@ -160,7 +160,7 @@ try {
     <div class="profile-top">
       <div class="profile-avatar" id="pAvatar">MK</div>
       <div class="profile-info">
-        <div class="profile-badge">✓ Verifiziert</div>
+        <div id="pBadges" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"></div>
         <div class="profile-name" id="pName">–</div>
         <div class="profile-meta">
           <div class="meta-item" id="pLocation">–</div>
@@ -229,6 +229,11 @@ try {
           </div>
           <div class="contact-title">TRAINER ANFRAGEN</div>
           <p class="contact-sub">Sende eine Anfrage – wir vermitteln den Kontakt für dich</p>
+          <!-- Baustein 4a: Probetraining-Angebot -->
+          <div id="pProbetraining" style="display:none;background:rgba(232,255,0,0.07);border:1px solid rgba(232,255,0,0.25);border-radius:4px;padding:12px 14px;margin-bottom:14px">
+            <div class="pt-text" style="font-size:13px;color:var(--white);margin-bottom:8px"></div>
+            <button type="button" onclick="probetrainingAnfragen()" style="background:var(--accent);color:#000;border:none;padding:9px 16px;border-radius:3px;font-weight:700;font-size:12px;letter-spacing:0.5px;cursor:pointer">Probetraining anfragen →</button>
+          </div>
           <div class="alert-error" id="contactError"></div>
           <div class="field"><label>Dein Name</label><input type="text" placeholder="Anna Muster" id="c-name" autocomplete="name"></div>
           <div class="field"><label>Dein Ziel</label><input type="text" placeholder="z.B. Abnehmen, Muskelaufbau..." id="c-goal"></div>
@@ -370,8 +375,8 @@ async function loadProfile() {
     // Sicht trainers_oeffentlich - dort gibt es keine Kontaktdaten (weder
     // E-Mail noch Telefon noch Calendly), damit nichts davon im HTML/JSON landet.
     const res = angemeldet
-      ? await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,video_url,sprachen,trainingsorte,galerie`, { headers: authKopf() })
-      : await fetch(`${SUPABASE_URL}/rest/v1/trainers_oeffentlich?id=eq.${id}&select=id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,video_url,sprachen,trainingsorte,galerie`, { headers: authKopf() });
+      ? await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis`, { headers: authKopf() })
+      : await fetch(`${SUPABASE_URL}/rest/v1/trainers_oeffentlich?id=eq.${id}&select=id,created_at,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis`, { headers: authKopf() });
     if(istAbgemeldet(res)) return;
     if(!res.ok) throw new Error('Profil laden fehlgeschlagen: ' + res.status);
     const data = await res.json();
@@ -445,6 +450,29 @@ function renderProfile(t) {
     document.getElementById('pGalerieSection').style.display = 'block';
     document.getElementById('pGalerie').innerHTML = galerie.map(u =>
       `<img src="${vexEsc(u)}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px" alt="Trainingsbild" loading="lazy">`).join('');
+  }
+
+  // Baustein 4: Abzeichen (Verifiziert, Neu auf Vexfit, Antwortzeit).
+  const badges = [];
+  if(t.verifiziert === true) badges.push('<span style="background:rgba(232,255,0,0.12);border:1px solid rgba(232,255,0,0.4);color:var(--accent);padding:4px 11px;border-radius:100px;font-size:11px;font-weight:700;letter-spacing:0.5px">✓ Verifiziert</span>');
+  if(t.created_at) {
+    const tage = (Date.now() - new Date(t.created_at).getTime()) / 86400000;
+    if(tage >= 0 && tage <= 30) badges.push('<span style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:var(--white);padding:4px 11px;border-radius:100px;font-size:11px;font-weight:600">✨ Neu auf Vexfit</span>');
+  }
+  if(t.antwort_basis >= 3 && t.antwort_stunden) {
+    badges.push(`<span style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:var(--white);padding:4px 11px;border-radius:100px;font-size:11px;font-weight:600">⚡ Antwortet meist in ${vexEsc(t.antwort_stunden)} Std</span>`);
+  }
+  document.getElementById('pBadges').innerHTML = badges.join('');
+
+  // Baustein 4a: Probetraining-Angebot.
+  if(t.probetraining === true) {
+    const box = document.getElementById('pProbetraining');
+    if(box) {
+      box.style.display = 'block';
+      box.querySelector('.pt-text').textContent = t.probetraining_kostenlos
+        ? 'Dieser Trainer bietet ein kostenloses Probetraining an.'
+        : 'Dieser Trainer bietet ein Probetraining an.';
+    }
   }
 
   // Certs
@@ -533,6 +561,19 @@ function waehleMitglied(el){
   if(label && studioKontext.studio) label.textContent = 'Bist du schon Mitglied bei ' + studioKontext.studio + '?';
   if(feld) feld.style.display = 'block';
 })();
+
+// Baustein 4a: Probetraining-Anfrage - laeuft ueber den normalen Anfrage-Ablauf,
+// fuellt nur die Nachricht vor und springt zum Formular.
+function probetrainingAnfragen() {
+  const msg = document.getElementById('c-message');
+  if(msg && !msg.value.trim()) {
+    msg.value = 'Hallo, ich interessiere mich für ein Probetraining. Wann würde es dir passen?';
+  }
+  const goal = document.getElementById('c-goal');
+  if(goal && !goal.value.trim()) goal.value = 'Probetraining';
+  if(msg) msg.focus();
+  if(msg) msg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 
 // Verhindert doppeltes Absenden (Mehrfachklick), auch falls der Knopf-Status
 // mal nicht greift.

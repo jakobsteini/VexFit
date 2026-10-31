@@ -19,6 +19,7 @@ import {
   bearbeiten,
   BETREIBER,
   eingabePruefen,
+  alternativenFinden,
   ERLAUBTE_HERKUNFT,
   kundenAngaben,
   LINK_ERSTE,
@@ -47,6 +48,7 @@ interface Aufzeichnung {
   vermerkt: string[];
   adminTrainer: { id: string; felder: Record<string, unknown> }[];
   adminLoeschen: { tabelle: string; id: string }[];
+  alternativenVermerkt: string[];
   // Fix 7b: vorgemerkte anonyme Formular-Eintraege (fuer die Spam-Grenze).
   spamEintraege: { email: string; ip: string; zeit: number }[];
 }
@@ -84,6 +86,13 @@ function bau(opt: {
   spamEmailVorlauf?: number;
   /** Fix 7b: schon vorhandene Eintraege je IP (zusaetzlich zu den im Lauf gemerkten). */
   spamIpVorlauf?: number;
+  // B4e: "Passt nicht"-Pfad.
+  // deno-lint-ignore no-explicit-any
+  b4Anfrage?: any;
+  // deno-lint-ignore no-explicit-any
+  b4Original?: any;
+  // deno-lint-ignore no-explicit-any
+  b4Kandidaten?: any[];
 } = {}): { anschluesse: Anschluesse; auf: Aufzeichnung } {
   const auf: Aufzeichnung = {
     mails: [],
@@ -92,6 +101,7 @@ function bau(opt: {
     vermerkt: [],
     adminTrainer: [],
     adminLoeschen: [],
+    alternativenVermerkt: [],
     spamEintraege: [],
   };
   const schon = opt.schonVerarbeitet ?? new Set<string>();
@@ -189,6 +199,11 @@ function bau(opt: {
       auf.adminLoeschen.push({ tabelle, id });
       return Promise.resolve(1);
     },
+    // B4e: Ports fuer den "Passt nicht"-Pfad (aus opt gespeist).
+    anfrageNachId: (id) => Promise.resolve(opt.b4Anfrage ?? (id ? null : null)),
+    trainerVollNachId: () => Promise.resolve(opt.b4Original ?? null),
+    aktiveVerifizierteTrainer: () => Promise.resolve(opt.b4Kandidaten ?? []),
+    alternativenVermerken: (id) => { auf.alternativenVermerkt.push(id); return Promise.resolve(); },
     adminHinweis: () => opt.adminHinweis,
     melden: () => {},
   };
@@ -1318,4 +1333,65 @@ Deno.test("/admin-aktion: Admin kann Trainer und Kunde loeschen", async () => {
     { tabelle: "trainers", id: "t-1" },
     { tabelle: "kunden", id: "k-1" },
   ]);
+});
+
+// ---------------------------------------------------------------------------
+// Baustein 4
+// ---------------------------------------------------------------------------
+Deno.test("B4c: Admin kann verifizieren und entverifizieren", async () => {
+  const { anschluesse, auf } = bau({ nutzer: ADMIN });
+  await bearbeiten(anfrage("admin-aktion", { aktion: "trainer_verifizieren", ziel_id: "t-9" }, MIT_TOKEN), anschluesse);
+  await bearbeiten(anfrage("admin-aktion", { aktion: "trainer_entverifizieren", ziel_id: "t-9" }, MIT_TOKEN), anschluesse);
+  assertEquals(auf.adminTrainer, [
+    { id: "t-9", felder: { verifiziert: true } },
+    { id: "t-9", felder: { verifiziert: false } },
+  ]);
+});
+
+Deno.test("B4e: alternativenFinden - gleiche Spezialisierung, gleiche Stadt zuerst, ohne Original", () => {
+  const original = { id: "o", stadt: "Wien", spezialisierungen: ["Yoga", "Pilates"] };
+  const kandidaten = [
+    { id: "o", stadt: "Wien", spezialisierungen: ["Yoga"] }, // = Original, raus
+    { id: "a", stadt: "Graz", spezialisierungen: ["Yoga"] }, // passt, andere Stadt
+    { id: "b", stadt: "Wien", spezialisierungen: ["Pilates"] }, // passt, gleiche Stadt
+    { id: "c", stadt: "Wien", spezialisierungen: ["Boxen"] }, // keine gemeinsame Spez
+  ];
+  const r = alternativenFinden(original, kandidaten);
+  assertEquals(r.map((t) => t.id), ["b", "a"]); // b (gleiche Stadt) vor a
+});
+
+Deno.test("B4e: /passt-nicht - beteiligter Trainer loest aus, Kunde bekommt zwei Vorschlaege", async () => {
+  const { anschluesse, auf } = bau({
+    nutzer: { id: "u-1", email: "trainer@beispiel.at" },
+    trainer: { ...T_STANDARD, id: "t-1" }, // trainerNachEmail liefert t-1
+    b4Anfrage: { id: "an-1", trainer_id: "t-1", kunden_email: "kundin@beispiel.at", kunden_name: "Kundin", alternativen_gesendet: false },
+    b4Original: { id: "t-1", stadt: "Wien", spezialisierungen: ["Yoga"] },
+    b4Kandidaten: [
+      { id: "t-2", vorname: "Anna", nachname: "B", stadt: "Wien", spezialisierungen: ["Yoga"] },
+      { id: "t-3", vorname: "Max", nachname: "C", stadt: "Graz", spezialisierungen: ["Yoga"] },
+    ],
+  });
+  const a = await bearbeiten(anfrage("passt-nicht", { anfrage_id: "an-1" }, MIT_TOKEN), anschluesse);
+  assertEquals(a.status, 200);
+  assertEquals(auf.mails.length, 1);
+  assertEquals(auf.mails[0].an, "kundin@beispiel.at");
+  assertStringIncludes(auf.mails[0].text, "Anna B");
+  assertEquals(auf.alternativenVermerkt, ["an-1"]);
+});
+
+Deno.test("B4e: /passt-nicht - fremder Trainer -> 403, keine Mail", async () => {
+  const { anschluesse, auf } = bau({
+    nutzer: { id: "u-9", email: "fremd@beispiel.at" },
+    trainer: { ...T_STANDARD, id: "t-99" }, // fremder Trainer, nicht t-1
+    b4Anfrage: { id: "an-1", trainer_id: "t-1", kunden_email: "kundin@beispiel.at", alternativen_gesendet: false },
+  });
+  const a = await bearbeiten(anfrage("passt-nicht", { anfrage_id: "an-1" }, MIT_TOKEN), anschluesse);
+  assertEquals(a.status, 403);
+  assertEquals(auf.mails.length, 0);
+});
+
+Deno.test("B4e: /passt-nicht ohne Token -> 401", async () => {
+  const { anschluesse } = bau({ nutzer: null });
+  const a = await bearbeiten(anfrage("passt-nicht", { anfrage_id: "an-1" }, MIT_TOKEN), anschluesse);
+  assertEquals(a.status, 401);
 });

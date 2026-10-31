@@ -268,6 +268,18 @@ try {
     </div>
   </div>
 
+  <!-- PROBETRAINING (Baustein 4a) -->
+  <div class="section fade-in fade-d4">
+    <div class="section-title">PROBETRAINING</div>
+    <div class="field">
+      <div class="chips-wrap">
+        <div class="chip" id="chipProbe" onclick="toggleProbe()">Ich biete ein Probetraining an</div>
+        <div class="chip" id="chipProbeGratis" onclick="toggleProbeGratis()">Kostenlos</div>
+      </div>
+      <div class="hint">Kunden sehen einen eigenen „Probetraining anfragen"-Knopf auf deinem Profil.</div>
+    </div>
+  </div>
+
   <!-- TELEFON -->
   <div class="section fade-in fade-d4">
     <div class="section-title"><span class="dot dot-missing" id="dotTelefon"></span>TELEFON</div>
@@ -341,6 +353,8 @@ let selectedSprachen = [];
 let selectedOrte = [];     // Trainingsorte (Mehrfach, Baustein 2)
 let galerie = [];          // Adressen der Galeriebilder
 let zertifikatDatei = '';  // Adresse der hochgeladenen Zertifikatsdatei
+let probetraining = false;        // Baustein 4a
+let probetrainingKostenlos = false;
 
 // AUTH
 const raw = localStorage.getItem('vexfit_session');
@@ -398,6 +412,19 @@ function toggleOrt2(el) {
   if(el.classList.contains('active')) { el.classList.remove('active'); selectedOrte = selectedOrte.filter(s => s !== v); }
   else { el.classList.add('active'); selectedOrte.push(v); }
   updateDots();
+}
+
+// Baustein 4a: Probetraining-Umschalter. "Kostenlos" gilt nur, wenn ueberhaupt
+// ein Probetraining angeboten wird.
+function toggleProbe() {
+  probetraining = !probetraining;
+  document.getElementById('chipProbe').classList.toggle('active', probetraining);
+  if(!probetraining) { probetrainingKostenlos = false; document.getElementById('chipProbeGratis').classList.remove('active'); }
+}
+function toggleProbeGratis() {
+  if(!probetraining) { probetraining = true; document.getElementById('chipProbe').classList.add('active'); }
+  probetrainingKostenlos = !probetrainingKostenlos;
+  document.getElementById('chipProbeGratis').classList.toggle('active', probetrainingKostenlos);
 }
 
 // Baustein 2: Video-Link pruefen und Vorschau zeigen. Ungueltige Links werden
@@ -607,6 +634,8 @@ function fillForm(t) {
   }
   if(Array.isArray(t.galerie)) { galerie = [...t.galerie]; renderGalerie(); }
   if(t.zertifikat_datei) { zertifikatDatei = t.zertifikat_datei; document.getElementById('zertStatus').textContent = '✓ Zertifikat vorhanden. Du kannst es durch ein neues ersetzen.'; }
+  if(t.probetraining) { probetraining = true; document.getElementById('chipProbe').classList.add('active'); }
+  if(t.probetraining_kostenlos) { probetrainingKostenlos = true; document.getElementById('chipProbeGratis').classList.add('active'); }
   // Telefon
   if(t.telefon) document.getElementById('fTelefon').value = t.telefon;
   // Stadt und Postleitzahl: gespeicherten Stand anzeigen
@@ -786,6 +815,9 @@ async function saveProfile() {
   body.trainingsorte = selectedOrte;
   body.galerie = galerie;
   if(zertifikatDatei) body.zertifikat_datei = zertifikatDatei;
+  // Baustein 4a: Probetraining.
+  body.probetraining = probetraining;
+  body.probetraining_kostenlos = probetraining && probetrainingKostenlos;
 
   try {
     const r = await fetch(`${SB}/rest/v1/trainers?email=ilike.${encodeURIComponent(sess.email)}`, {

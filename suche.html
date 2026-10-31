@@ -288,7 +288,7 @@ function istAbgemeldet(r) {
 // Die Spalten der oeffentlichen Sicht trainers_oeffentlich. Bewusst OHNE
 // email, telefon, user_id, created_at. Eine Spalte "preis" gibt es nicht; die
 // realen, bereits oeffentlichen Preisspalten sind preis_stunde und preis_monat.
-const OEFFENTLICHE_SPALTEN = 'id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,sprachen,trainingsorte';
+const OEFFENTLICHE_SPALTEN = 'id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,sprachen,trainingsorte,verifiziert,created_at';
 
 // Knopf fuer die Kontaktaufnahme in einer Trainerkarte.
 // Nicht angemeldet: fuehrt zur Kundenregistrierung ("Anmelden und anfragen").
@@ -464,7 +464,7 @@ function renderTrainersWithDistance(trainers) {
     return `<div class="tc" onclick="window.location='profil.html?id=${t.id}'">
       <div class="ci" style="${ciStyle}">
         ${bild ? '' : `<div class="cav">${initials}</div>`}
-        <div class="cbadge ${t._online?'online':''}">Verifiziert ✓</div>
+        ${kartenAbzeichen(t, t._online)}
       </div>
       <div class="cb">
         <div class="cn">${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</div>
@@ -483,7 +483,7 @@ async function loadTrainers() {
     let daten;
     if(angemeldet) {
       // Fuer Angemeldete unveraendert: die Tabelle trainers mit Nutzer-Token.
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,sprachen,trainingsorte&order=created_at.desc`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,sprachen,trainingsorte,verifiziert&order=created_at.desc`, {
         headers: authKopf()
       });
       if(istAbgemeldet(res)) return;
@@ -509,6 +509,17 @@ async function loadTrainers() {
     if(grid) grid.innerHTML = '<div class="empty-state show" style="display:block">⚠️<br><br>Die Trainerliste konnte gerade nicht geladen werden.<br>Bitte lade die Seite neu.</div>';
   }
   document.getElementById('loading').classList.remove('show');
+}
+
+// Baustein 4: Kartenabzeichen - echte Verifizierung, sonst "Neu" (erste 30 Tage).
+function kartenAbzeichen(t, isOnline) {
+  if(t.verifiziert === true) return '<div class="cbadge">Verifiziert ✓</div>';
+  if(isOnline) return '<div class="cbadge online">Online</div>';
+  if(t.created_at) {
+    const tage = (Date.now() - new Date(t.created_at).getTime()) / 86400000;
+    if(tage >= 0 && tage <= 30) return '<div class="cbadge online">Neu</div>';
+  }
+  return '';
 }
 
 function renderTrainers(trainers) {
@@ -539,9 +550,7 @@ function renderTrainers(trainers) {
       <div class="tc" onclick="window.location='profil.html?id=${t.id}'">
         <div class="ci" style="${ciStyle}">
           ${bild ? '' : `<div class="cav">${initials}</div>`}
-          <div class="cbadge ${isOnline ? 'online' : ''}">
-            ${isOnline ? 'Online' : 'Verifiziert ✓'}
-          </div>
+          ${kartenAbzeichen(t, isOnline)}
         </div>
         <div class="cb">
           <div class="cn">${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</div>

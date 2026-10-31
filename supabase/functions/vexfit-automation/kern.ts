@@ -116,6 +116,25 @@ export interface Anfrage {
   status?: string | null;
 }
 
+/** B4e: eine Anfrage mit den Feldern, die der "Passt nicht"-Pfad braucht. */
+export interface AnfrageVoll {
+  id: string;
+  trainer_id?: string | null;
+  kunden_email?: string | null;
+  kunden_name?: string | null;
+  ziel?: string | null;
+  alternativen_gesendet?: boolean | null;
+}
+
+/** B4e: ein Trainer mit den Feldern fuer die Alternativen-Zuordnung. */
+export interface TrainerVoll {
+  id: string;
+  vorname?: string | null;
+  nachname?: string | null;
+  stadt?: string | null;
+  spezialisierungen?: string[] | null;
+}
+
 export interface Mail {
   an: string;
   betreff: string;
@@ -168,6 +187,14 @@ export interface Anschluesse {
   /** Admin-Aktion: setzt feste Felder (aktiv/stripe_bezahlt) einer Trainerzeile
    *  mit service_role. Gibt die Zahl geaenderter Zeilen zurueck. */
   adminTrainerSetzen(id: string, felder: Record<string, unknown>): Promise<number>;
+  /** B4e: eine Anfrage per Kennung (mit Kundendaten, service_role). */
+  anfrageNachId?(id: string): Promise<AnfrageVoll | null>;
+  /** B4e: ein Trainer mit den fuer die Zuordnung noetigen Feldern. */
+  trainerVollNachId?(id: string): Promise<TrainerVoll | null>;
+  /** B4e: alle freigeschalteten, verifizierten Trainer (Kandidaten). */
+  aktiveVerifizierteTrainer?(): Promise<TrainerVoll[]>;
+  /** B4e: vermerkt, dass fuer eine Anfrage Alternativen verschickt wurden. */
+  alternativenVermerken?(anfrageId: string): Promise<void>;
   /** Admin-Aktion: loescht eine Zeile in trainers oder kunden (service_role).
    *  Gibt die Zahl geloeschter Zeilen zurueck. */
   adminZeileLoeschen(tabelle: string, id: string): Promise<number>;
@@ -497,6 +524,66 @@ export function mailKeinTrainer(
 }
 
 // ============================================================================
+// B4e - "Passt nicht?": zwei passende Alternativen
+// ============================================================================
+
+/** Profiladresse eines Trainers (die einzige Adresse in der Alternativen-Mail). */
+function profilAdresse(id: string): string {
+  return `${ERLAUBTE_HERKUNFT}/profil.html?id=${encodeURIComponent(id)}`;
+}
+
+/**
+ * Waehlt bis zu zwei Alternativen zu einer Anfrage: andere Trainer mit
+ * mindestens einer gemeinsamen Spezialisierung. Gleiche Stadt zuerst, der Rest
+ * danach. Der urspruengliche Trainer wird ausgeschlossen. Reine Funktion (die
+ * Kandidatenliste kommt von aussen), damit ohne Netz pruefbar.
+ */
+export function alternativenFinden(
+  original: TrainerVoll,
+  kandidaten: TrainerVoll[],
+): TrainerVoll[] {
+  const spez = new Set((original.spezialisierungen ?? []).map((s) => s.toLowerCase()));
+  const stadt = (original.stadt ?? "").trim().toLowerCase();
+  const passend = kandidaten.filter((t) =>
+    t.id !== original.id &&
+    (t.spezialisierungen ?? []).some((s) => spez.has(s.toLowerCase()))
+  );
+  passend.sort((a, b) => {
+    const aStadt = (a.stadt ?? "").trim().toLowerCase() === stadt ? 0 : 1;
+    const bStadt = (b.stadt ?? "").trim().toLowerCase() === stadt ? 0 : 1;
+    return aStadt - bStadt;
+  });
+  return passend.slice(0, 2);
+}
+
+/** Mail an den Kunden mit zwei vorgeschlagenen Trainern. */
+export function mailAlternativen(
+  kundenEmail: string,
+  kundenName: string | null | undefined,
+  alternativen: TrainerVoll[],
+): Mail {
+  const anrede = kundenName ? `Hallo ${kundenName}, ` : "Hallo, ";
+  return baueMail(kundenEmail, "Passende Trainer für dich auf Vexfit", {
+    ueberschrift: "Zwei passende Trainer für dich",
+    absatz:
+      `${anrede}deine letzte Anfrage hat leider nicht geklappt. Damit du ` +
+      "trotzdem schnell weiterkommst, haben wir zwei passende Trainer für dich herausgesucht.",
+    datenZeilen: alternativen.map((t, i) => ({
+      beschriftung: `Vorschlag ${i + 1}`,
+      wert: `${w(t.vorname)} ${w(t.nachname)}`.trim() +
+        (t.stadt ? ` (${w(t.stadt)})` : ""),
+    })),
+    knopfText: alternativen[0] ? "Erstes Profil ansehen" : undefined,
+    knopfLink: alternativen[0] ? profilAdresse(alternativen[0].id) : undefined,
+    bioAbsatz: alternativen[1]
+      ? `Zweiter Vorschlag: ${profilAdresse(alternativen[1].id)}`
+      : "",
+    grundZeile:
+      "Du erhältst diese E-Mail, weil deine Anfrage auf Vexfit nicht angenommen wurde.",
+  });
+}
+
+// ============================================================================
 // Antworten und CORS
 // ============================================================================
 
@@ -659,6 +746,8 @@ export async function bearbeiten(
       return await neueAnfrage(anfrageObjekt, a, herkunft);
     case "admin-aktion":
       return await adminAktion(anfrageObjekt, a, herkunft);
+    case "passt-nicht":
+      return await passtNicht(anfrageObjekt, a, herkunft);
     case "stripe":
       return await stripe(anfrageObjekt, a);
     default:
@@ -818,6 +907,12 @@ async function adminAktion(
     case "trainer_bezahlt":
       geaendert = await a.adminTrainerSetzen(zielId, { stripe_bezahlt: true });
       break;
+    case "trainer_verifizieren":
+      geaendert = await a.adminTrainerSetzen(zielId, { verifiziert: true });
+      break;
+    case "trainer_entverifizieren":
+      geaendert = await a.adminTrainerSetzen(zielId, { verifiziert: false });
+      break;
     case "trainer_loeschen":
       geaendert = await a.adminZeileLoeschen("trainers", zielId);
       break;
@@ -828,6 +923,69 @@ async function adminAktion(
       return antwort(400, { fehler: "unbekannte Aktion" }, herkunft);
   }
   return antwort(200, { ok: true, geaendert }, herkunft);
+}
+
+/**
+ * B4e "Passt nicht?": nach einer Absage bekommt der Kunde per Mail zwei passende
+ * andere Trainer vorgeschlagen (gleiche Spezialisierung, gleiche Stadt zuerst).
+ *
+ * Nur der an der Anfrage beteiligte Trainer darf das ausloesen (Token noetig,
+ * sein Trainer muss der trainer_id der Anfrage entsprechen). Je Anfrage nur
+ * einmal (alternativen_gesendet). Findet sich keine Alternative, geht keine Mail
+ * hinaus - nach aussen trotzdem Erfolg.
+ */
+async function passtNicht(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const token = bearerToken(r);
+  const nutzer = token ? await a.benutzerAusToken(token) : null;
+  if (!nutzer) return antwort(401, { fehler: "Anmeldung erforderlich" }, herkunft);
+
+  const body = await koerperLesen(r);
+  if (!body) return antwort(400, { fehler: "Die Anfrage war nicht lesbar." }, herkunft);
+  const anfrageId = String(body.anfrage_id ?? "");
+  if (!anfrageId) return antwort(400, { fehler: "anfrage_id fehlt" }, herkunft);
+
+  if (!a.anfrageNachId || !a.trainerVollNachId || !a.aktiveVerifizierteTrainer) {
+    return antwort(200, { ok: true, mails: 0, uebersprungen: "nicht verdrahtet" }, herkunft);
+  }
+
+  const anfrage = await a.anfrageNachId(anfrageId);
+  if (!anfrage) return antwort(200, { ok: true, mails: 0 }, herkunft);
+  if (anfrage.alternativen_gesendet === true) {
+    return antwort(200, { ok: true, mails: 0, uebersprungen: "schon gesendet" }, herkunft);
+  }
+
+  // Nur der beteiligte Trainer darf ausloesen: sein Profil (ueber die E-Mail des
+  // Kontos) muss der trainer_id der Anfrage entsprechen.
+  const eigen = nutzer.email ? await a.trainerNachEmail(nutzer.email) : null;
+  if (!eigen || eigen.id !== String(anfrage.trainer_id ?? "")) {
+    return antwort(403, { fehler: "nicht berechtigt" }, herkunft);
+  }
+
+  const kundenEmail = String(anfrage.kunden_email ?? "");
+  if (!adresseGueltig(kundenEmail)) {
+    return antwort(200, { ok: true, mails: 0, uebersprungen: "keine Kundenadresse" }, herkunft);
+  }
+
+  const original = await a.trainerVollNachId(String(anfrage.trainer_id ?? ""));
+  if (!original) return antwort(200, { ok: true, mails: 0 }, herkunft);
+
+  const kandidaten = await a.aktiveVerifizierteTrainer();
+  const alternativen = alternativenFinden(original, kandidaten);
+  if (!alternativen.length) {
+    if (a.alternativenVermerken) await a.alternativenVermerken(anfrageId);
+    return antwort(200, { ok: true, mails: 0, uebersprungen: "keine Alternative" }, herkunft);
+  }
+
+  const gesendet = await sendeWennAdresseTaugt(
+    a,
+    mailAlternativen(kundenEmail, anfrage.kunden_name, alternativen),
+  );
+  if (a.alternativenVermerken) await a.alternativenVermerken(anfrageId);
+  return antwort(200, { ok: true, mails: gesendet ? 1 : 0, alternativen: alternativen.length }, herkunft);
 }
 
 /**

@@ -954,6 +954,24 @@ async function beantworteAnfrage(id, neuerStatus, el) {
     if(a) a.status = neuerStatus;
     renderAnfragen(anfragenDaten);
     showToast(neuerStatus === 'angenommen' ? '✓ Anfrage angenommen' : 'Anfrage abgelehnt');
+
+    // Baustein 4b: Antwortzeit aus echten Daten neu berechnen (serverseitig,
+    // nicht faelschbar). Fehlschlag ist unkritisch.
+    fetch(`${SB}/rest/v1/rpc/antwortzeit_aktualisieren`, {
+      method: 'POST',
+      headers: authKopf({ 'Content-Type': 'application/json' }),
+      body: '{}'
+    }).catch(() => {});
+
+    // Baustein 4e: Bei einer Absage bekommt der Kunde automatisch zwei passende
+    // Alternativen per E-Mail (ueber die Edge Function). Fehlschlag ist unkritisch.
+    if(neuerStatus === 'abgelehnt') {
+      fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/passt-nicht', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (sess && sess.access_token || '') },
+        body: JSON.stringify({ anfrage_id: id })
+      }).catch(() => {});
+    }
   } catch(e) {
     console.error('beantworteAnfrage:', e);
     showToast('Der Zustand konnte nicht gespeichert werden. Bitte versuche es erneut.', true);
