@@ -98,6 +98,9 @@ export interface Trainer {
   nachname?: string | null;
   email?: string | null;
   stripe_bezahlt?: boolean | null;
+  /** Baustein 1: gesetzt = Studio-Trainer (angestellt), zahlt nichts. NULL =
+   *  normaler Trainer, dann gilt die unveraenderte Zahlungslogik. */
+  studio_standort_id?: string | null;
 }
 
 export interface Anfrage {
@@ -377,6 +380,35 @@ export function mailWeitereAnfrage(
       "9,99 € einmalig. Die Kontaktdaten erhältst du unmittelbar nach der Zahlung.",
     grundZeile:
       "Du erhältst diese E-Mail, weil du ein Trainerprofil auf Vexfit angelegt hast.",
+  });
+}
+
+/**
+ * Baustein 1 (Studio-Trainer): eine Anfrage an einen angestellten Studio-Trainer.
+ * Er zahlt NICHTS, deshalb kein Zahlungslink: die Kontaktdaten stehen direkt in
+ * der Mail (wie mailKundenDaten nach einer Zahlung). Quelle der Daten ist der
+ * Anfrage-Rumpf (kundenAngaben + kunden_email), der bei /neue-anfrage vorliegt.
+ */
+export function mailStudioAnfrage(
+  trainer: Trainer,
+  body: Record<string, unknown>,
+): Mail {
+  const kunde = kundenAngaben(body);
+  const kundenEmail = String(body.kunden_email ?? body.kunde_email ?? "");
+  return baueMail(w(trainer.email), "Neue Kundenanfrage auf Vexfit", {
+    ueberschrift: "Neue Kundenanfrage",
+    absatz:
+      `Hallo ${w(trainer.vorname)}, du hast über Vexfit eine neue Anfrage ` +
+      "erhalten. Als Studio-Trainer siehst du die Kontaktdaten sofort - ohne " +
+      "Zusatzkosten. Melde dich am besten noch heute.",
+    datenZeilen: [
+      { beschriftung: "Name", wert: w(kunde.name) },
+      { beschriftung: "E-Mail", wert: kundenEmail },
+      { beschriftung: "Ziel", wert: w(kunde.ziel) },
+      { beschriftung: "Nachricht", wert: w(kunde.nachricht) },
+    ],
+    grundZeile:
+      "Du erhältst diese E-Mail, weil du als Studio-Trainer auf Vexfit gelistet bist.",
   });
 }
 
@@ -716,6 +748,25 @@ async function neueAnfrage(
       trainer_id: body.trainer_id,
     });
     return antwort(200, { ok: true, mails: 0 }, herkunft);
+  }
+
+  // Baustein 1: Studio-Trainer (angestellt) zahlen nichts. Erkennung allein an
+  // trainers.studio_standort_id. Dann KEIN Zahlungslink: Kontaktdaten direkt in
+  // die Mail, und die aelteste offene Anfrage wird freigeschaltet, damit sie
+  // auch im Trainerbereich ohne Zahlung sichtbar ist (weitergeleitet = true).
+  // Der Zweig fuer normale Trainer darunter bleibt unveraendert.
+  if (trainer.studio_standort_id) {
+    const gingStudio = await sendeWennAdresseTaugt(
+      a,
+      mailStudioAnfrage(trainer, body),
+    );
+    const offene = await a.aeltesteOffeneAnfrage(trainer.id);
+    if (offene) await a.anfrageWeitergeleitetMarkieren(offene.id);
+    return antwort(
+      200,
+      { ok: true, mails: gingStudio ? 1 : 0, studio: true },
+      herkunft,
+    );
   }
 
   const mail = trainer.stripe_bezahlt === true

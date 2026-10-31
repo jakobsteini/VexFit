@@ -128,7 +128,7 @@ const anschluesse: Anschluesse = {
     const zeilen = await lesen<Trainer>(
       `trainers?id=eq.${
         encodeURIComponent(id)
-      }&select=id,vorname,nachname,email,stripe_bezahlt`,
+      }&select=id,vorname,nachname,email,stripe_bezahlt,studio_standort_id`,
     );
     return zeilen[0] ?? null;
   },

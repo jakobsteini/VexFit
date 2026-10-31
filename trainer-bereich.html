@@ -800,9 +800,14 @@ function renderAnfragen(data) {
   renderUebersichtZahlen(data);
   const el = document.getElementById('anList');
   const sb = document.getElementById('statusBarEl');
+  // Baustein 1: Studio-Trainer (angestellt) zahlen nichts - fuer sie nie ein
+  // Zahlungshinweis.
+  const istStudio = !!(T && T.studio_standort_id);
   if(T) {
     if(!T.aktiv) {
       sb.innerHTML = '<div class="status-bar">⏳ Dein Profil wird noch geprüft. Wir melden uns per E-Mail sobald du aktiviert wirst.</div>';
+    } else if(istStudio) {
+      sb.innerHTML = '<div class="status-bar aktiv">✅ Profil aktiv · Studio-Trainer — für dich kostenlos, keine Gebühren. Kontaktdaten siehst du bei jeder Anfrage direkt.</div>';
     } else if(!T.stripe_bezahlt) {
       sb.innerHTML = '<div class="status-bar aktiv">✓ Profil aktiv · Kostenlose Phase — sobald du deinen ersten Kunden gewinnst schicken wir dir den Zahlungslink.</div>';
     } else {
@@ -823,6 +828,11 @@ function renderAnfragen(data) {
       // Freigeschaltet (bezahlt): Kontaktdaten zeigen - dieselben Felder wie
       // mailKundenDaten nach der Zahlung (Name + E-Mail).
       contactHTML = `<div class="contact-box"><strong style="font-size:11px;color:var(--green);letter-spacing:1px;text-transform:uppercase">✅ Kontaktdaten freigegeben</strong><br>👤 ${vexEsc(a.kunden_name||'–')}<br>📧 <a href="mailto:${vexEsc(a.kunden_email||'')}">${vexEsc(a.kunden_email||'–')}</a></div>`;
+    } else if(istStudio) {
+      // Baustein 1: Studio-Trainer zahlen nie. Falls eine Anfrage (noch) nicht
+      // freigeschaltet ist, kein Zahlungslink - die Kontaktdaten kommen per
+      // E-Mail und werden gleich freigeschaltet.
+      contactHTML = `<div class="locked-box"><div style="font-size:12px;color:var(--muted)">📧 Als Studio-Trainer bekommst du die Kontaktdaten direkt per E-Mail – ohne Kosten. Lade die Seite kurz neu, falls sie hier noch nicht erscheinen.</div></div>`;
     } else {
       // Nicht freigeschaltet: Hinweis + Zahlungslink. Welcher Link gilt, ist WORTGLEICH
       // wie in der Edge Function (kern.ts:549): stripe_bezahlt === true -> WEITERE (9,99),

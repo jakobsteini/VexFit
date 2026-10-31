@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" sizes="32x32" href="marke/favicon-32.png">
+<link rel="apple-touch-icon" href="marke/favicon-180.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Aufsteller – John Harris × Vexfit</title>
+<link rel="stylesheet" href="fonts/vexfit-fonts.css">
+<style>
+:root{--black:#0a0a0a;--accent:#e8ff00}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#333;font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;align-items:center;padding:20px;gap:14px}
+/* A5-Blatt (148 x 210 mm) im Hochformat, schwarzer Grund, neongelbe Akzente. */
+.blatt{width:148mm;height:210mm;background:var(--black);color:#f5f5f0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:16mm 12mm;position:relative}
+.kopf{text-align:center}
+.v{font-family:'Bebas Neue',sans-serif;font-size:60mm;line-height:0.8;color:var(--accent);font-weight:400}
+.partner{margin-top:4mm;font-size:4mm;letter-spacing:2px;text-transform:uppercase;color:#999}
+.partner b{color:#f5f5f0}
+.titel{font-family:'Bebas Neue',sans-serif;font-size:11mm;line-height:1.0;letter-spacing:1px;text-align:center;margin:6mm 0}
+.standort{font-size:5mm;color:var(--accent);text-align:center;margin-bottom:5mm;letter-spacing:1px;text-transform:uppercase;font-weight:700}
+.qr{background:#fff;padding:5mm;border-radius:3mm}
+.qr svg{display:block;width:62mm;height:62mm}
+.hinweis{text-align:center;font-size:4mm;color:#bbb;line-height:1.5;margin-top:5mm}
+.link{font-size:3.4mm;color:#888;word-break:break-all;margin-top:2mm}
+.fuss{font-size:3.2mm;color:#777;text-align:center}
+.drucken{background:var(--accent);color:var(--black);border:none;padding:12px 24px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;font-size:13px}
+@media print{
+  body{background:#fff;padding:0;gap:0}
+  .drucken,.werkzeug{display:none}
+  .blatt{width:148mm;height:210mm}
+  @page{size:A5 portrait;margin:0}
+}
+.werkzeug{color:#ccc;font-size:13px;text-align:center;max-width:148mm}
+.werkzeug input{padding:8px;border-radius:4px;border:1px solid #666;background:#222;color:#eee}
+</style>
+<script src="vexfit-qr.js"></script>
+</head>
+<body>
+<div class="werkzeug">
+  Standort: <input id="slugFeld" placeholder="salzburg oder wien" />
+  <button class="drucken" onclick="neuLaden()">Anzeigen</button>
+  <button class="drucken" onclick="window.print()">Drucken</button>
+  <div style="margin-top:6px;font-size:12px;color:#999">Aufruf z. B.: john-harris-aufsteller.html?standort=salzburg</div>
+</div>
+
+<div class="blatt" id="blatt">
+  <div class="kopf">
+    <div class="v">V</div>
+    <div class="partner">Partner von <b>John Harris</b></div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center">
+    <div class="titel">FINDE EINEN<br>PERSONAL TRAINER<br>IN DEINER NÄHE</div>
+    <div class="standort" id="standortName"></div>
+    <div class="qr" id="qr"></div>
+    <div class="hinweis">Scanne den Code mit deiner Handy-Kamera<br>und finde deinen Trainer – kostenlos.</div>
+    <div class="link" id="linkText"></div>
+  </div>
+  <div class="fuss">vexfit.app · Personal Training für die DACH-Region</div>
+</div>
+
+<script>
+const BASIS = 'https://vexfit.app/john-harris.html';
+const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
+
+function paramStandort(){ return new URLSearchParams(location.search).get('standort') || ''; }
+function vorschau(){ return new URLSearchParams(location.search).get('vorschau') || ''; }
+
+function neuLaden(){
+  const slug = document.getElementById('slugFeld').value.trim() || paramStandort();
+  const url = new URL(location.href);
+  url.searchParams.set('standort', slug);
+  location.href = url.toString();
+}
+
+async function standortName(slug){
+  // Nur fuer die Ueberschrift; schlaegt der Abruf fehl (z. B. noch nicht
+  // freigeschaltet), wird der Kuerzel gross geschrieben verwendet.
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/rpc/studio_anzeigen', {
+      method:'POST',
+      headers:{apikey:SUPABASE_KEY, Authorization:'Bearer '+SUPABASE_KEY, 'Content-Type':'application/json'},
+      body: JSON.stringify({ p_slug:'john-harris', p_vorschau: vorschau() })
+    });
+    if(res.ok){
+      const studio = await res.json();
+      if(studio && studio.standorte){
+        const t = studio.standorte.find(s=>s.slug===slug);
+        if(t) return t.name;
+      }
+    }
+  } catch(e){}
+  return slug ? ('John Harris ' + slug.charAt(0).toUpperCase() + slug.slice(1)) : '';
+}
+
+async function aufbauen(){
+  const slug = paramStandort();
+  const name = await standortName(slug);
+  document.getElementById('standortName').textContent = name;
+  document.getElementById('slugFeld').value = slug;
+  const kundenLink = BASIS + (slug ? ('?standort=' + encodeURIComponent(slug)) : '');
+  document.getElementById('linkText').textContent = kundenLink;
+  // QR ohne externen Dienst (vexfit-qr.js), schwarz auf weiss fuer den Druck.
+  document.getElementById('qr').innerHTML = vexQR.svg(kundenLink, { groesse: 620, rand: 4 });
+}
+aufbauen();
+</script>
+</body>
+</html>

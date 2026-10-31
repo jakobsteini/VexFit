@@ -522,6 +522,63 @@ Deno.test("/neue-anfrage: schon bezahlt → WEITERE Anfrage mit 9,99-Link", asyn
   assert(!m.text.includes(LINK_ERSTE), "falscher Zahlungslink in der Mail");
 });
 
+// Baustein 1: Studio-Trainer (angestellt) zahlen nichts.
+Deno.test("/neue-anfrage: Studio-Trainer → Kontaktdaten direkt, KEIN Zahlungslink, Anfrage freigeschaltet", async () => {
+  const { anschluesse, auf } = bau({
+    // stripe_bezahlt bewusst false: trotzdem KEIN 49,99-Link, weil Studio-Trainer.
+    trainer: { ...T_STANDARD, stripe_bezahlt: false, studio_standort_id: "st-1" },
+  });
+  const a = await bearbeiten(
+    anfrage("neue-anfrage", {
+      trainer_id: "t-1",
+      kunden_name: "Studiokundin",
+      kunden_email: "kundin@beispiel.at",
+      ziel: "Muskelaufbau",
+      nachricht: "Servus!",
+    }, MIT_TOKEN),
+    anschluesse,
+  );
+  assertEquals(a.status, 200);
+  assertEquals((await a.json()).studio, true);
+  assertEquals(auf.mails.length, 1);
+  const m = auf.mails[0];
+  assertEquals(m.an, "trainer@beispiel.at");
+  assertEquals(m.betreff, "Neue Kundenanfrage auf Vexfit");
+  // Kontaktdaten stehen sofort in der Mail (keine Zahlung noetig).
+  assertStringIncludes(m.text, "Studiokundin");
+  assertStringIncludes(m.text, "kundin@beispiel.at");
+  assertStringIncludes(m.text, "Muskelaufbau");
+  // KEIN Zahlungslink, weder 49,99 noch 9,99.
+  assert(!m.text.includes(LINK_ERSTE), "Studio-Mail enthaelt den 49,99-Link");
+  assert(!m.text.includes(LINK_WEITERE), "Studio-Mail enthaelt den 9,99-Link");
+  assert(!m.html.includes(LINK_ERSTE), "Studio-HTML enthaelt den 49,99-Link");
+  assert(!m.html.includes(LINK_WEITERE), "Studio-HTML enthaelt den 9,99-Link");
+  // Die Anfrage wird freigeschaltet (im Trainerbereich ohne Zahlung sichtbar).
+  assertEquals(auf.weitergeleitetMarkiert, ["a-1"]);
+});
+
+Deno.test("/neue-anfrage: normaler Trainer unveraendert, auch wenn Studio-Feld leer gesetzt ist", async () => {
+  // Absicherung: ein ausdruecklich NULL gesetztes Studio-Feld aendert nichts;
+  // es gilt die unveraenderte Erste-Anfrage-Logik mit 49,99-Link.
+  const { anschluesse, auf } = bau({
+    trainer: { ...T_STANDARD, stripe_bezahlt: false, studio_standort_id: null },
+  });
+  await bearbeiten(
+    anfrage("neue-anfrage", {
+      trainer_id: "t-1",
+      kunden_name: "K",
+      kunden_email: "kundin@beispiel.at",
+      ziel: "Z",
+      nachricht: "N",
+    }, MIT_TOKEN),
+    anschluesse,
+  );
+  const m = auf.mails[0];
+  assertEquals(m.betreff, "Deine erste Kundenanfrage auf Vexfit");
+  assertStringIncludes(m.text, "Abo aktivieren: " + LINK_ERSTE);
+  assertEquals(auf.weitergeleitetMarkiert, []);
+});
+
 Deno.test("/neue-anfrage: ohne trainer_id → 400, unbekannte Kennung → 200 ohne Mail", async () => {
   const ohne = bau();
   const a1 = await bearbeiten(

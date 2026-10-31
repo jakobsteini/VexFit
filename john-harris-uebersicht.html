@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" sizes="32x32" href="marke/favicon-32.png">
+<link rel="apple-touch-icon" href="marke/favicon-180.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Studio-Übersicht – Vexfit</title>
+<link rel="stylesheet" href="fonts/vexfit-fonts.css">
+<style>
+:root{--black:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--card:#161616;--text-muted:#8a8a8a;--border:rgba(255,255,255,0.08)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;padding:24px 16px 60px}
+.wrap{max-width:760px;margin:0 auto}
+h1{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:2px;margin-bottom:4px}
+h1 span{color:var(--accent)}
+.sub{color:var(--text-muted);font-size:13px;margin-bottom:28px}
+.standort{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:20px;margin-bottom:16px}
+.standort h2{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;margin-bottom:14px}
+.kacheln{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.kachel{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:4px;padding:14px;text-align:center}
+.zahl{font-family:'Bebas Neue',sans-serif;font-size:34px;color:var(--accent);line-height:1}
+.beschr{font-size:11px;color:var(--text-muted);margin-top:6px;letter-spacing:0.5px}
+.trainer-titel{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:8px}
+.trainer-liste{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:rgba(232,255,0,0.08);border:1px solid rgba(232,255,0,0.25);color:var(--accent);padding:5px 12px;border-radius:100px;font-size:13px}
+.leer{color:var(--text-muted);font-size:13px}
+.fehler{text-align:center;padding:70px 20px;color:var(--text-muted)}
+.hinweis{color:var(--text-muted);font-size:12px;margin-top:20px;line-height:1.6}
+@media(max-width:480px){.kacheln{grid-template-columns:1fr 1fr 1fr}.zahl{font-size:26px}}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <div class="leer">Lädt…</div>
+</div>
+<script>
+const SUPABASE_URL='https://hbapzwxdehfgnputrfjf.supabase.co';
+const SUPABASE_KEY='sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
+const schluessel = new URLSearchParams(location.search).get('schluessel') || '';
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+async function laden(){
+  const wrap = document.getElementById('wrap');
+  if(!schluessel){
+    wrap.innerHTML='<div class="fehler">Kein Zugangsschlüssel. Bitte den vollständigen Link verwenden.</div>';
+    return;
+  }
+  try{
+    const res = await fetch(SUPABASE_URL+'/rest/v1/rpc/studio_uebersicht',{
+      method:'POST',
+      headers:{apikey:SUPABASE_KEY, Authorization:'Bearer '+SUPABASE_KEY, 'Content-Type':'application/json'},
+      body: JSON.stringify({ p_schluessel: schluessel })
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const d = await res.json();
+    if(!d){ wrap.innerHTML='<div class="fehler">Dieser Link ist ungültig.</div>'; return; }
+    let html = `<h1>${esc(d.name)} <span>· Übersicht</span></h1><div class="sub">Nur Lesezugriff · keine Kundendaten</div>`;
+    for(const s of (d.standorte||[])){
+      const tr = (s.trainer||[]);
+      html += `<div class="standort">
+        <h2>${esc(s.name)}</h2>
+        <div class="kacheln">
+          <div class="kachel"><div class="zahl">${s.anfragen_gesamt||0}</div><div class="beschr">Anfragen gesamt</div></div>
+          <div class="kachel"><div class="zahl">${s.anfragen_nicht_mitglieder||0}</div><div class="beschr">davon Neukunden</div></div>
+          <div class="kachel"><div class="zahl">${s.anfragen_angenommen||0}</div><div class="beschr">angenommen</div></div>
+        </div>
+        <div class="trainer-titel">Eingetragene Trainer (${tr.length})</div>
+        <div class="trainer-liste">${tr.length ? tr.map(n=>`<span class="chip">${esc(n)}</span>`).join('') : '<span class="leer">Noch keine Trainer eingetragen.</span>'}</div>
+      </div>`;
+    }
+    html += '<div class="hinweis">„Neukunden" zählt die Anfragen, bei denen angegeben wurde, noch kein John-Harris-Mitglied zu sein. Angenommen = der Trainer hat die Anfrage angenommen.</div>';
+    wrap.innerHTML = html;
+  }catch(e){
+    console.error(e);
+    wrap.innerHTML='<div class="fehler">Die Übersicht konnte gerade nicht geladen werden. Bitte später erneut.</div>';
+  }
+}
+laden();
+</script>
+</body>
+</html>
