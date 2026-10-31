@@ -38,7 +38,7 @@ Deno.test("7.2 mailText erzeugt keine Zeile mit Leerzeichen am Ende", () => {
   assertStringIncludes(txt, "Name: Mara");
 });
 
-// ── 7.3 Kontaktadresse office@vexfit.app, interne Mails bleiben vexfit.info ──
+// ── 7.3 Kontaktadresse und interner Empfaenger sind office@vexfit.app ────────
 Deno.test("7.3 sichtbare Kontaktadresse ist office@vexfit.app", async () => {
   const index = await lies("./index.html");
   assertStringIncludes(index, "mailto:office@vexfit.app");
@@ -46,9 +46,11 @@ Deno.test("7.3 sichtbare Kontaktadresse ist office@vexfit.app", async () => {
   const recht = await lies("./rechtliches.html");
   assertStringIncludes(recht, "office@vexfit.app");
   assert(!recht.includes("vexfit.info@gmail.com"), "rechtliches.html darf vexfit.info nicht mehr fuehren");
-  // Interne Benachrichtigungen an Jakob bleiben unveraendert.
+  // Absender bleibt das Gmail-Konto (dort haengt GMAIL_PASSWORT); die internen
+  // Benachrichtigungen an Jakob gehen jetzt ebenfalls an das ueberwachte
+  // Postfach office@vexfit.app (Baustein "Registrierungs-Benachrichtigung").
   assertEquals(ABSENDER, "vexfit.info@gmail.com");
-  assertEquals(BETREIBER, "vexfit.info@gmail.com");
+  assertEquals(BETREIBER, "office@vexfit.app");
 });
 
 // ── 7.8 Gemeinsame Passwortregel ────────────────────────────────────────────

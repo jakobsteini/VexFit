@@ -32,8 +32,13 @@ import {
 /** Absender aller sechs Mail-Nodes. */
 export const ABSENDER = "vexfit.info@gmail.com";
 
-/** Empfaenger der drei Benachrichtigungen an Jakob. */
-export const BETREIBER = "vexfit.info@gmail.com";
+/** Empfaenger der drei internen Benachrichtigungen an Jakob (neuer Trainer,
+ *  neuer Kunde, Zahlung). Das aktiv ueberwachte Postfach ist office@vexfit.app
+ *  (Google Workspace). Frueher ging die Mail an vexfit.info@gmail.com — genau
+ *  dort lag die Registrierungs-Benachrichtigung, die Jakob in office@vexfit.app
+ *  nie gesehen hat. vexfit.info@gmail.com bleibt nur noch ABSENDER (dort haengt
+ *  das GMAIL_PASSWORT). Absender und Empfaenger sind also bewusst verschieden. */
+export const BETREIBER = "office@vexfit.app";
 
 /** Zahlungslink aus "Email Trainer - ERSTE Anfrage 49,99€". */
 export const LINK_ERSTE = "https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00";
@@ -649,7 +654,21 @@ async function sendeWennAdresseTaugt(
     a.melden?.("Empfaengeradresse abgelehnt", { betreff: mail.betreff });
     return false;
   }
-  await a.mailSenden(mail);
+  try {
+    await a.mailSenden(mail);
+  } catch (fehler) {
+    // Nicht still verschlucken: ein fehlgeschlagener Versand (SMTP-Fehler,
+    // fehlendes GMAIL_PASSWORT, gesperrter Port) wird ausdruecklich gemeldet und
+    // dann erneut geworfen. So liefert der Endpunkt 500 und der Fehler steht in
+    // den Function-Logs, statt dass eine Registrierung lautlos ohne
+    // Benachrichtigung durchlaeuft.
+    a.melden?.("Mailversand fehlgeschlagen", {
+      an: mail.an,
+      betreff: mail.betreff,
+      fehler: String(fehler),
+    });
+    throw fehler;
+  }
   return true;
 }
 

@@ -255,8 +255,10 @@ const MIT_TOKEN = {
 // Grundlagen
 // ===========================================================================
 Deno.test("Festwerte stehen unveraendert wie im Workflow", () => {
+  // Absender bleibt das Gmail-Konto (dort haengt GMAIL_PASSWORT); die internen
+  // Benachrichtigungen gehen jetzt an das ueberwachte Postfach office@vexfit.app.
   assertEquals(ABSENDER, "vexfit.info@gmail.com");
-  assertEquals(BETREIBER, "vexfit.info@gmail.com");
+  assertEquals(BETREIBER, "office@vexfit.app");
   assertEquals(LINK_ERSTE, "https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00");
   assertEquals(LINK_WEITERE, "https://buy.stripe.com/7sYbJ1fkl8sX8jxfxM2oE01");
   assertEquals(ERLAUBTE_HERKUNFT, "https://vexfit.app");
@@ -287,7 +289,7 @@ Deno.test("/neuer-trainer: gueltige Eingabe → genau eine Mail an Jakob, Wortla
   assertEquals(a.status, 200);
   assertEquals(auf.mails.length, 1);
   const m = auf.mails[0];
-  assertEquals(m.an, "vexfit.info@gmail.com");
+  assertEquals(m.an, "office@vexfit.app");
   assertEquals(m.betreff, "Neuer Trainer: Eva Muster");
   assertEquals(
     m.text,
@@ -374,7 +376,7 @@ Deno.test("/neuer-kunde: gueltige Eingabe → genau eine Mail an Jakob, Wortlaut
   );
   assertEquals(a.status, 200);
   assertEquals(auf.mails.length, 1);
-  assertEquals(auf.mails[0].an, "vexfit.info@gmail.com");
+  assertEquals(auf.mails[0].an, "office@vexfit.app");
   assertEquals(auf.mails[0].betreff, "Neuer Kunde: Eva Muster");
   assertEquals(
     auf.mails[0].text,
@@ -926,7 +928,7 @@ Deno.test("Stripe: gueltige Signatur → markieren, weiterleiten, zwei Mails wie
   assertStringIncludes(anTrainer.text, "Nachricht: Ich moechte starten.");
 
   const anJakob = auf.mails[1];
-  assertEquals(anJakob.an, "vexfit.info@gmail.com");
+  assertEquals(anJakob.an, "office@vexfit.app");
   assertEquals(anJakob.betreff, "Zahlung: trainer@beispiel.at");
   assertStringIncludes(anJakob.text, "Trainer: Testvorname Testnachname");
   assertStringIncludes(anJakob.text, "Betrag: 49.99 €");
@@ -1025,7 +1027,7 @@ Deno.test("Stripe: kein Trainer (Kennung/E-Mail) → Mail an Jakob, Ereignis NIC
   // Teil 5: Ereignis bleibt offen (Stripe stellt erneut zu), Jakob wird gewarnt.
   assertEquals(auf.vermerkt, []);
   assertEquals(auf.mails.length, 1);
-  assertEquals(auf.mails[0].an, "vexfit.info@gmail.com");
+  assertEquals(auf.mails[0].an, "office@vexfit.app");
   assertStringIncludes(auf.mails[0].betreff, "ohne passenden Trainer");
   assertStringIncludes(auf.mails[0].text, "evt_ohne_trainer");
 });
@@ -1087,7 +1089,7 @@ Deno.test("E1 — Zahlung ohne offene Anfrage: verbucht, keine Trainer-Mail, Ver
 
   // genau eine Mail, und zwar die an Jakob
   assertEquals(auf.mails.length, 1);
-  assertEquals(auf.mails[0].an, "vexfit.info@gmail.com");
+  assertEquals(auf.mails[0].an, "office@vexfit.app");
   assertEquals(auf.mails[0].betreff, "Zahlung: trainer@beispiel.at");
   assertStringIncludes(auf.mails[0].text, "Status: keine offene Anfrage");
   assert(
