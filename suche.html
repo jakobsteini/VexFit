@@ -175,6 +175,19 @@ try {
     <div class="ftag" onclick="setFilter('Online', this)">Online</div>
     <div class="ftag" onclick="setFilter('Bodybuilding', this)">Bodybuilding</div>
   </div>
+  <!-- Baustein 2: Filter nach Sprache und Trainingsort -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+    <select class="s-input" id="spracheFilter" style="max-width:200px;cursor:pointer" onchange="filterZusatz()">
+      <option value="">Alle Sprachen</option>
+    </select>
+    <select class="s-input" id="ortFilter" style="max-width:200px;cursor:pointer" onchange="filterZusatz()">
+      <option value="">Alle Trainingsorte</option>
+      <option value="studio">Studio</option>
+      <option value="outdoor">Outdoor</option>
+      <option value="beim_kunden">Beim Kunden zuhause</option>
+      <option value="online">Online</option>
+    </select>
+  </div>
 </div>
 
 <div class="main-content">
@@ -275,7 +288,7 @@ function istAbgemeldet(r) {
 // Die Spalten der oeffentlichen Sicht trainers_oeffentlich. Bewusst OHNE
 // email, telefon, user_id, created_at. Eine Spalte "preis" gibt es nicht; die
 // realen, bereits oeffentlichen Preisspalten sind preis_stunde und preis_monat.
-const OEFFENTLICHE_SPALTEN = 'id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url';
+const OEFFENTLICHE_SPALTEN = 'id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,sprachen,trainingsorte';
 
 // Knopf fuer die Kontaktaufnahme in einer Trainerkarte.
 // Nicht angemeldet: fuehrt zur Kundenregistrierung ("Anmelden und anfragen").
@@ -462,7 +475,7 @@ async function loadTrainers() {
     let daten;
     if(angemeldet) {
       // Fuer Angemeldete unveraendert: die Tabelle trainers mit Nutzer-Token.
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv&order=created_at.desc`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,sprachen,trainingsorte&order=created_at.desc`, {
         headers: authKopf()
       });
       if(istAbgemeldet(res)) return;
@@ -474,6 +487,7 @@ async function loadTrainers() {
       daten = await ladeOeffentlich(fetch, SUPABASE_URL, SUPABASE_KEY);
     }
     allTrainers = daten;
+    spracheOptionenAufbauen();
     renderTrainers(allTrainers);
   } catch(e) {
     console.error(e);
@@ -577,7 +591,38 @@ function setFilter(filter, el) {
   document.querySelectorAll('.ftag').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   activeFilter = filter;
-  filterTrainers();
+  anwendenFilter();
+}
+
+// Baustein 2: kombinierter Filter (Spezialisierung + Sprache + Trainingsort).
+function anwendenFilter() {
+  let list = allTrainers.slice();
+  if(activeFilter !== 'alle') {
+    const q = activeFilter.toLowerCase();
+    list = list.filter(t =>
+      (t.spezialisierungen || []).some(s => s.toLowerCase().includes(q)) ||
+      (t.trainingsart || '').toLowerCase().includes(q)
+    );
+  }
+  const spr = (document.getElementById('spracheFilter') || {}).value || '';
+  if(spr) list = list.filter(t => (t.sprachen || []).includes(spr));
+  const ort = (document.getElementById('ortFilter') || {}).value || '';
+  if(ort) list = list.filter(t => (t.trainingsorte || []).includes(ort));
+  renderTrainers(list);
+}
+function filterZusatz() { anwendenFilter(); }
+
+// Befuellt den Sprachen-Filter mit den tatsaechlich vorkommenden Sprachen.
+function spracheOptionenAufbauen() {
+  const sel = document.getElementById('spracheFilter');
+  if(!sel) return;
+  const alle = new Set();
+  for(const t of allTrainers) for(const s of (t.sprachen || [])) if(s) alle.add(s);
+  for(const s of [...alle].sort()) {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    sel.appendChild(o);
+  }
 }
 
 function showEmpty() {

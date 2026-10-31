@@ -213,6 +213,61 @@ try {
     </div>
   </div>
 
+  <!-- VORSTELLUNGSVIDEO (Baustein 2) -->
+  <div class="section fade-in fade-d4">
+    <div class="section-title"><span class="dot dot-missing" id="dotVideo"></span>VORSTELLUNGSVIDEO</div>
+    <div class="field">
+      <label>Link zu YouTube, Instagram oder TikTok</label>
+      <input type="url" id="fVideo" placeholder="https://youtu.be/..." oninput="videoGeaendert()">
+      <div class="hint" id="videoHint">Kein Hochladen – füge einfach den Link zu deinem Video ein. Es wird auf deinem Profil eingebettet.</div>
+      <div id="videoVorschau" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- SPRACHEN (Baustein 2) -->
+  <div class="section fade-in fade-d4">
+    <div class="section-title"><span class="dot dot-missing" id="dotSprachen"></span>SPRACHEN</div>
+    <div class="field">
+      <label>Welche Sprachen sprichst du?</label>
+      <div class="chips-wrap" id="sprachenWrap"></div>
+      <div class="hint">Mehrfachauswahl. Wird im Profil angezeigt und als Suchfilter genutzt.</div>
+    </div>
+  </div>
+
+  <!-- TRAININGSORTE (Baustein 2, Mehrfach) -->
+  <div class="section fade-in fade-d4">
+    <div class="section-title"><span class="dot dot-missing" id="dotOrte"></span>TRAININGSORTE</div>
+    <div class="field">
+      <label>Wo trainierst du mit deinen Kunden?</label>
+      <div class="chips-wrap" id="orteWrap"></div>
+      <div class="hint">Mehrfachauswahl möglich (Studio, Outdoor, beim Kunden, Online).</div>
+    </div>
+  </div>
+
+  <!-- GALERIE (Baustein 2) -->
+  <div class="section fade-in fade-d4">
+    <div class="section-title"><span class="dot dot-missing" id="dotGalerie"></span>GALERIE</div>
+    <div class="field">
+      <label>Bis zu 6 Bilder (werden beim Hochladen verkleinert)</label>
+      <div id="galerieGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px"></div>
+      <input type="file" id="fGalerie" accept="image/*" multiple style="display:none" onchange="galerieHochladen(this.files)">
+      <button type="button" class="btn-cancel" style="width:100%" onclick="document.getElementById('fGalerie').click()" id="galerieBtn">+ Bilder hinzufügen</button>
+      <div class="hint" id="galerieHint">Max. 6 Bilder. Große Bilder werden automatisch auf unter 400 KB verkleinert.</div>
+    </div>
+  </div>
+
+  <!-- ZERTIFIKAT (Baustein 2) -->
+  <div class="section fade-in fade-d4">
+    <div class="section-title"><span class="dot dot-missing" id="dotZert"></span>ZERTIFIKAT</div>
+    <div class="field">
+      <label>Ausbildungsnachweis (Bild oder PDF)</label>
+      <div id="zertStatus" style="font-size:13px;color:var(--muted);margin-bottom:8px">Noch kein Zertifikat hochgeladen.</div>
+      <input type="file" id="fZert" accept="image/*,application/pdf" style="display:none" onchange="zertHochladen(this.files)">
+      <button type="button" class="btn-cancel" style="width:100%" onclick="document.getElementById('fZert').click()" id="zertBtn">Zertifikat hochladen</button>
+      <div class="hint">Nur für das Vexfit-Team sichtbar – Grundlage für dein „Verifiziert"-Abzeichen. Nicht öffentlich.</div>
+    </div>
+  </div>
+
   <!-- TELEFON -->
   <div class="section fade-in fade-d4">
     <div class="section-title"><span class="dot dot-missing" id="dotTelefon"></span>TELEFON</div>
@@ -250,6 +305,7 @@ try {
 
 <script src="vexfit-escape.js"></script>
 <script src="vexfit-plz.js"></script>
+<script src="vexfit-video.js"></script>
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -258,12 +314,33 @@ const SPEZ_OPTIONS = [
   'Muskelaufbau','Abnehmen','Krafttraining','Ausdauer','HIIT',
   'Functional Training','Mobility','Bodybuilding','Calisthenics',
   'Schwangerschaft','Senioren','Rücken & Haltung','Ernährungsplanung',
-  'Wettkampfvorbereitung','Stressabbau','Flexibilität'
+  'Wettkampfvorbereitung','Stressabbau','Flexibilität',
+  // Baustein 2: neue Spezialisierungen (bestehende bleiben unveraendert).
+  'Schwimmen','Yoga','Pilates','Boxen und Kampfsport','Laufen',
+  'Rückentraining','Schwangerschaft und Rückbildung','Kinder und Jugendliche'
 ];
+
+// Baustein 2: Sprachen (Mehrfachauswahl) und Trainingsorte (Mehrfachauswahl).
+const SPRACHEN_OPTIONS = [
+  'Deutsch','Englisch','Arabisch','Türkisch','Bosnisch/Kroatisch/Serbisch',
+  'Italienisch','Französisch','Spanisch','Russisch','Polnisch','Ungarisch',
+  'Rumänisch','Albanisch','Ukrainisch','Andere'
+];
+const ORTE_OPTIONS = [
+  { val: 'studio', text: 'Studio' },
+  { val: 'outdoor', text: 'Outdoor' },
+  { val: 'beim_kunden', text: 'Beim Kunden zuhause' },
+  { val: 'online', text: 'Online' }
+];
+const GALERIE_MAX = 6;
 
 let T = null;
 let selectedSpez = [];
 let selectedOrt = '';   // Ort des Trainings: '', 'vor_ort', 'online' oder 'beides'
+let selectedSprachen = [];
+let selectedOrte = [];     // Trainingsorte (Mehrfach, Baustein 2)
+let galerie = [];          // Adressen der Galeriebilder
+let zertifikatDatei = '';  // Adresse der hochgeladenen Zertifikatsdatei
 
 // AUTH
 const raw = localStorage.getItem('vexfit_session');
@@ -299,8 +376,150 @@ loadProfile(sess.email);
 function initChips() {
   const wrap = document.getElementById('chipWrap');
   wrap.innerHTML = SPEZ_OPTIONS.map(s =>
-    `<div class="chip" data-val="${s}" onclick="toggleChip(this)">${s}</div>`
+    `<div class="chip" data-val="${vexEsc(s)}" onclick="toggleChip(this)">${vexEsc(s)}</div>`
   ).join('');
+  // Baustein 2: Sprachen- und Trainingsorte-Chips.
+  document.getElementById('sprachenWrap').innerHTML = SPRACHEN_OPTIONS.map(s =>
+    `<div class="chip" data-val="${vexEsc(s)}" onclick="toggleSprache(this)">${vexEsc(s)}</div>`
+  ).join('');
+  document.getElementById('orteWrap').innerHTML = ORTE_OPTIONS.map(o =>
+    `<div class="chip" data-val="${o.val}" onclick="toggleOrt2(this)">${vexEsc(o.text)}</div>`
+  ).join('');
+}
+
+function toggleSprache(el) {
+  const v = el.dataset.val;
+  if(el.classList.contains('active')) { el.classList.remove('active'); selectedSprachen = selectedSprachen.filter(s => s !== v); }
+  else { el.classList.add('active'); selectedSprachen.push(v); }
+  updateDots();
+}
+function toggleOrt2(el) {
+  const v = el.dataset.val;
+  if(el.classList.contains('active')) { el.classList.remove('active'); selectedOrte = selectedOrte.filter(s => s !== v); }
+  else { el.classList.add('active'); selectedOrte.push(v); }
+  updateDots();
+}
+
+// Baustein 2: Video-Link pruefen und Vorschau zeigen. Ungueltige Links werden
+// freundlich abgelehnt (kein Speichern).
+let videoErkannt = null;
+function videoGeaendert() {
+  const wert = document.getElementById('fVideo').value.trim();
+  const hint = document.getElementById('videoHint');
+  const vor = document.getElementById('videoVorschau');
+  if(!wert) { videoErkannt = null; hint.style.color = ''; hint.textContent = 'Kein Hochladen – füge einfach den Link zu deinem Video ein. Es wird auf deinem Profil eingebettet.'; vor.innerHTML = ''; updateDots(); return; }
+  const r = vexVideo.erkenne(wert);
+  if(r) {
+    videoErkannt = r;
+    hint.style.color = 'var(--green)';
+    hint.textContent = '✓ ' + ({youtube:'YouTube',instagram:'Instagram',tiktok:'TikTok'}[r.plattform]||'Video') + '-Video erkannt.';
+    vor.innerHTML = `<iframe src="${vexEsc(r.embed)}" style="width:100%;aspect-ratio:16/9;border:0;border-radius:6px" allowfullscreen loading="lazy"></iframe>`;
+  } else {
+    videoErkannt = null;
+    hint.style.color = 'var(--red)';
+    hint.textContent = '⚠️ Das sieht nicht nach einem YouTube-, Instagram- oder TikTok-Link aus. Bitte prüfe die Adresse.';
+    vor.innerHTML = '';
+  }
+  updateDots();
+}
+
+// Baustein 2: Galerie. Verkleinert jedes Bild auf max. 1600 px Kante und unter
+// 400 KB, laedt es in den eigenen Ordner <user_id>/... des Behaelters galerie.
+async function galerieHochladen(files) {
+  if(!files || !files.length) return;
+  const btn = document.getElementById('galerieBtn');
+  btn.disabled = true;
+  for(const f of files) {
+    if(galerie.length >= GALERIE_MAX) { showToast('Maximal 6 Bilder.', true); break; }
+    if(!f.type.startsWith('image/')) continue;
+    try {
+      const blob = await bildVerkleinern(f, 1600, 400 * 1024);
+      const name = sess.user_id + '/' + Date.now() + '-' + Math.random().toString(36).slice(2,8) + '.jpg';
+      const r = await fetch(`${SB}/storage/v1/object/galerie/${name}`, {
+        method: 'POST',
+        headers: { apikey: KEY, Authorization: 'Bearer ' + sess.access_token, 'Content-Type': 'image/jpeg' },
+        body: blob
+      });
+      if(!r.ok) { showToast('Bild konnte nicht hochgeladen werden.', true); continue; }
+      galerie.push(`${SB}/storage/v1/object/public/galerie/${name}`);
+    } catch(e) { console.error(e); showToast('Bild konnte nicht verarbeitet werden.', true); }
+  }
+  document.getElementById('fGalerie').value = '';
+  renderGalerie();
+  btn.disabled = false;
+  updateDots();
+}
+
+// Verkleinert ein Bild ueber ein Canvas. Reduziert die Qualitaet, bis die Datei
+// unter maxBytes liegt. Rueckgabe: ein JPEG-Blob.
+function bildVerkleinern(file, maxKante, maxBytes) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width: w, height: h } = img;
+      if(Math.max(w, h) > maxKante) {
+        const f = maxKante / Math.max(w, h);
+        w = Math.round(w * f); h = Math.round(h * f);
+      }
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      const versuch = (q) => cv.toBlob((b) => {
+        if(!b) { rej(new Error('toBlob')); return; }
+        if(b.size <= maxBytes || q <= 0.4) res(b);
+        else versuch(q - 0.1);
+      }, 'image/jpeg', q);
+      versuch(0.85);
+    };
+    img.onerror = rej;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+function renderGalerie() {
+  const grid = document.getElementById('galerieGrid');
+  grid.innerHTML = galerie.map((u, i) =>
+    `<div style="position:relative;aspect-ratio:1;border-radius:6px;overflow:hidden;background:var(--card)">
+       <img src="${vexEsc(u)}" style="width:100%;height:100%;object-fit:cover" alt="Galeriebild">
+       <button type="button" onclick="galerieEntfernen(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.7);color:#fff;border:none;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:14px">×</button>
+     </div>`
+  ).join('');
+  document.getElementById('galerieBtn').style.display = galerie.length >= GALERIE_MAX ? 'none' : 'block';
+}
+function galerieEntfernen(i) {
+  // Entfernt nur aus der Liste (die Datei im Storage bleibt - sie wird beim
+  // naechsten Speichern nicht mehr verlinkt). Kein Loeschen im Storage noetig.
+  galerie.splice(i, 1);
+  renderGalerie();
+  updateDots();
+}
+
+// Baustein 2: Zertifikat in den privaten Behaelter zertifikate hochladen.
+async function zertHochladen(files) {
+  if(!files || !files.length) return;
+  const f = files[0];
+  const btn = document.getElementById('zertBtn');
+  btn.disabled = true;
+  document.getElementById('zertStatus').textContent = 'Wird hochgeladen…';
+  try {
+    const endung = f.type === 'application/pdf' ? 'pdf' : (f.name.split('.').pop() || 'dat').toLowerCase().slice(0,5);
+    const name = sess.user_id + '/zertifikat-' + Date.now() + '.' + endung;
+    const r = await fetch(`${SB}/storage/v1/object/zertifikate/${name}`, {
+      method: 'POST',
+      headers: { apikey: KEY, Authorization: 'Bearer ' + sess.access_token, 'Content-Type': f.type || 'application/octet-stream' },
+      body: f
+    });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    zertifikatDatei = name;
+    document.getElementById('zertStatus').textContent = '✓ Zertifikat hochgeladen. Es wird vom Team geprüft.';
+  } catch(e) {
+    console.error(e);
+    document.getElementById('zertStatus').textContent = 'Upload fehlgeschlagen. Bitte erneut versuchen.';
+    showToast('Zertifikat konnte nicht hochgeladen werden.', true);
+  }
+  document.getElementById('fZert').value = '';
+  btn.disabled = false;
+  updateDots();
 }
 
 function toggleChip(el) {
@@ -376,6 +595,18 @@ function fillForm(t) {
       if(c.dataset.val === t.trainingsort) c.classList.add('active');
     });
   }
+  // Baustein 2: Video, Sprachen, Trainingsorte, Galerie, Zertifikat
+  if(t.video_url) { document.getElementById('fVideo').value = t.video_url; videoGeaendert(); }
+  if(Array.isArray(t.sprachen)) {
+    selectedSprachen = [...t.sprachen];
+    document.querySelectorAll('#sprachenWrap .chip').forEach(c => { if(selectedSprachen.includes(c.dataset.val)) c.classList.add('active'); });
+  }
+  if(Array.isArray(t.trainingsorte)) {
+    selectedOrte = [...t.trainingsorte];
+    document.querySelectorAll('#orteWrap .chip').forEach(c => { if(selectedOrte.includes(c.dataset.val)) c.classList.add('active'); });
+  }
+  if(Array.isArray(t.galerie)) { galerie = [...t.galerie]; renderGalerie(); }
+  if(t.zertifikat_datei) { zertifikatDatei = t.zertifikat_datei; document.getElementById('zertStatus').textContent = '✓ Zertifikat vorhanden. Du kannst es durch ein neues ersetzen.'; }
   // Telefon
   if(t.telefon) document.getElementById('fTelefon').value = t.telefon;
   // Stadt und Postleitzahl: gespeicherten Stand anzeigen
@@ -402,6 +633,11 @@ function updateDots() {
     { dot: 'dotErfahrung', done: !!erfahrung },
     { dot: 'dotSpez', done: selectedSpez.length > 0 },
     { dot: 'dotTrainingsort', done: !!selectedOrt },
+    { dot: 'dotVideo', done: !!videoErkannt },
+    { dot: 'dotSprachen', done: selectedSprachen.length > 0 },
+    { dot: 'dotOrte', done: selectedOrte.length > 0 },
+    { dot: 'dotGalerie', done: galerie.length > 0 },
+    { dot: 'dotZert', done: !!zertifikatDatei },
     { dot: 'dotTelefon', done: !!telefon },
     { dot: 'dotStandort', done: !!document.getElementById('fPlz').value.trim() }
   ];
@@ -507,6 +743,14 @@ async function saveProfile() {
     landNeu = plzStand.land;
   }
 
+  // Baustein 2: Ein eingegebener, aber ungueltiger Video-Link blockiert das
+  // Speichern (freundliche Ablehnung).
+  const videoWert = document.getElementById('fVideo').value.trim();
+  if(videoWert && !videoErkannt) {
+    showToast('Der Video-Link ist ungültig. Bitte prüfe ihn oder lösche ihn.', true);
+    return;
+  }
+
   btn.disabled = true;
   btn.textContent = 'Wird gespeichert...';
 
@@ -517,7 +761,8 @@ async function saveProfile() {
   const telefon = document.getElementById('fTelefon').value.trim();
 
   // Validation
-  if(!trainingsart && !preis && !bio && !erfahrung && selectedSpez.length === 0 && !selectedOrt && !telefon && !plzWert) {
+  if(!trainingsart && !preis && !bio && !erfahrung && selectedSpez.length === 0 && !selectedOrt && !telefon && !plzWert
+     && !videoWert && selectedSprachen.length === 0 && selectedOrte.length === 0 && galerie.length === 0 && !zertifikatDatei) {
     showToast('Fülle mindestens ein Feld aus', true);
     btn.disabled = false;
     btn.textContent = 'Profil speichern';
@@ -534,6 +779,13 @@ async function saveProfile() {
   if(telefon) body.telefon = telefon;
   if(plzWert && stadtNeu) { body.plz = plzWert; body.stadt = stadtNeu; }
   if(landNeu) body.land = landNeu;
+  // Baustein 2: neue Felder. Leere Auswahl wird mitgespeichert (Array leeren
+  // bzw. Video loeschen), damit Entfernen auch wirkt.
+  body.video_url = videoWert || null;
+  body.sprachen = selectedSprachen;
+  body.trainingsorte = selectedOrte;
+  body.galerie = galerie;
+  if(zertifikatDatei) body.zertifikat_datei = zertifikatDatei;
 
   try {
     const r = await fetch(`${SB}/rest/v1/trainers?email=ilike.${encodeURIComponent(sess.email)}`, {

@@ -185,6 +185,24 @@ try {
       <div class="section-title">SPEZIALISIERUNGEN</div>
       <div class="profile-tags" id="pTagsDetail" style="margin-bottom:28px"></div>
 
+      <!-- Baustein 2: Video, Sprachen, Trainingsorte, Galerie -->
+      <div id="pVideoSection" style="display:none;margin-bottom:28px">
+        <div class="section-title">VORSTELLUNG</div>
+        <div id="pVideo"></div>
+      </div>
+      <div id="pSprachenSection" style="display:none;margin-bottom:28px">
+        <div class="section-title">SPRACHEN</div>
+        <div class="profile-tags" id="pSprachen"></div>
+      </div>
+      <div id="pOrteSection" style="display:none;margin-bottom:28px">
+        <div class="section-title">TRAININGSORTE</div>
+        <div class="profile-tags" id="pOrte"></div>
+      </div>
+      <div id="pGalerieSection" style="display:none;margin-bottom:28px">
+        <div class="section-title">GALERIE</div>
+        <div id="pGalerie" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
+      </div>
+
       <div id="pCertSection" style="display:none">
         <div class="section-title">ZERTIFIZIERUNGEN</div>
         <p class="about-text" id="pCert">–</p>
@@ -253,6 +271,7 @@ try {
 </footer>
 
 <script src="vexfit-escape.js"></script>
+<script src="vexfit-video.js"></script>
 <script>
 // ──── ZUGANG ────
 // Trainerprofile sind OHNE Anmeldung sichtbar (Geschaeftsmodell): das Profil
@@ -351,8 +370,8 @@ async function loadProfile() {
     // Sicht trainers_oeffentlich - dort gibt es keine Kontaktdaten (weder
     // E-Mail noch Telefon noch Calendly), damit nichts davon im HTML/JSON landet.
     const res = angemeldet
-      ? await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv`, { headers: authKopf() })
-      : await fetch(`${SUPABASE_URL}/rest/v1/trainers_oeffentlich?id=eq.${id}&select=id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url`, { headers: authKopf() });
+      ? await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,video_url,sprachen,trainingsorte,galerie`, { headers: authKopf() })
+      : await fetch(`${SUPABASE_URL}/rest/v1/trainers_oeffentlich?id=eq.${id}&select=id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,video_url,sprachen,trainingsorte,galerie`, { headers: authKopf() });
     if(istAbgemeldet(res)) return;
     if(!res.ok) throw new Error('Profil laden fehlgeschlagen: ' + res.status);
     const data = await res.json();
@@ -400,6 +419,33 @@ function renderProfile(t) {
   const tagsHTML = tags.map(tag => `<span class="profile-tag">${vexEsc(tag)}</span>`).join('');
   document.getElementById('pTags').innerHTML = tagsHTML;
   document.getElementById('pTagsDetail').innerHTML = tagsHTML;
+
+  // Baustein 2: Video, Sprachen, Trainingsorte, Galerie
+  const video = vexVideo.erkenne(t.video_url || '');
+  if(video) {
+    document.getElementById('pVideoSection').style.display = 'block';
+    document.getElementById('pVideo').innerHTML =
+      `<iframe src="${vexEsc(video.embed)}" style="width:100%;aspect-ratio:16/9;border:0;border-radius:8px" allowfullscreen loading="lazy" title="Vorstellungsvideo"></iframe>`;
+  }
+  const sprachen = (t.sprachen || []).filter(Boolean);
+  if(sprachen.length) {
+    document.getElementById('pSprachenSection').style.display = 'block';
+    document.getElementById('pSprachen').innerHTML = sprachen.map(s => `<span class="profile-tag">${vexEsc(s)}</span>`).join('');
+  }
+  const ORTE_TEXT = { studio: 'Studio', outdoor: 'Outdoor', beim_kunden: 'Beim Kunden zuhause', online: 'Online' };
+  const orte = (t.trainingsorte || []).filter(Boolean);
+  if(orte.length) {
+    document.getElementById('pOrteSection').style.display = 'block';
+    document.getElementById('pOrte').innerHTML = orte.map(o => `<span class="profile-tag">${vexEsc(ORTE_TEXT[o] || o)}</span>`).join('');
+  }
+  // Galerie: nur Adressen aus dem eigenen oeffentlichen Behaelter zulassen.
+  const GALERIE_PREFIX = SUPABASE_URL + '/storage/v1/object/public/galerie/';
+  const galerie = (t.galerie || []).filter(u => typeof u === 'string' && u.indexOf(GALERIE_PREFIX) === 0).slice(0, 6);
+  if(galerie.length) {
+    document.getElementById('pGalerieSection').style.display = 'block';
+    document.getElementById('pGalerie').innerHTML = galerie.map(u =>
+      `<img src="${vexEsc(u)}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px" alt="Trainingsbild" loading="lazy">`).join('');
+  }
 
   // Certs
   if(t.zertifikate) {
