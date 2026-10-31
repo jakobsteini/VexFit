@@ -188,12 +188,38 @@ try {
       <option value="online">Online</option>
     </select>
   </div>
+  <!-- Baustein 5: Matching in 4 Fragen -->
+  <div style="margin-top:12px">
+    <button class="ftag" style="border-color:var(--accent);color:var(--accent)" onclick="matchingToggle()" id="matchBtn">✨ Passenden Trainer in 4 Fragen finden</button>
+  </div>
+  <div id="matchPanel" style="display:none;margin-top:14px;background:var(--card);border:1px solid var(--border-input);border-radius:6px;padding:16px">
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">1. Dein Ziel</div>
+    <div class="filter-tags" id="matchZiel" style="margin-bottom:12px"></div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">2. Wo möchtest du trainieren?</div>
+    <div class="filter-tags" id="matchOrt" style="margin-bottom:12px">
+      <div class="ftag" data-val="studio" onclick="matchPick(this,'ort')">Studio</div>
+      <div class="ftag" data-val="outdoor" onclick="matchPick(this,'ort')">Outdoor</div>
+      <div class="ftag" data-val="beim_kunden" onclick="matchPick(this,'ort')">Beim Kunden</div>
+      <div class="ftag" data-val="online" onclick="matchPick(this,'ort')">Online</div>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">3. Sprache</div>
+    <select class="s-input" id="matchSprache" style="max-width:220px;margin-bottom:12px"><option value="">Egal</option></select>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">4. Wann möchtest du trainieren?</div>
+    <div class="filter-tags" id="matchZeit" style="margin-bottom:14px">
+      <div class="ftag" data-val="morgen" onclick="matchPick(this,'zeit')">Morgens</div>
+      <div class="ftag" data-val="mittag" onclick="matchPick(this,'zeit')">Mittags</div>
+      <div class="ftag" data-val="abend" onclick="matchPick(this,'zeit')">Abends</div>
+      <div class="ftag" data-val="wochenende" onclick="matchPick(this,'zeit')">Wochenende</div>
+    </div>
+    <button class="s-btn" style="width:auto" onclick="matchingStarten()">Passende Trainer zeigen →</button>
+  </div>
 </div>
 
 <div class="main-content">
   <div class="results-header">
     <div class="rc"><strong id="trainerCount">0 Trainer</strong> verfügbar</div>
   </div>
+  <div id="matchHinweis" style="display:none;background:rgba(232,255,0,0.07);border:1px solid rgba(232,255,0,0.25);border-radius:4px;padding:10px 14px;font-size:13px;color:var(--white);margin-bottom:16px"></div>
 
   <!-- LOADING -->
   <div class="loading" id="loading">
@@ -244,6 +270,8 @@ try {
 
 <script src="vexfit-escape.js"></script>
 <script src="vexfit-plz.js"></script>
+<script src="vexfit-ziele.js"></script>
+<script src="vexfit-matching.js"></script>
 <script>
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -288,7 +316,7 @@ function istAbgemeldet(r) {
 // Die Spalten der oeffentlichen Sicht trainers_oeffentlich. Bewusst OHNE
 // email, telefon, user_id, created_at. Eine Spalte "preis" gibt es nicht; die
 // realen, bereits oeffentlichen Preisspalten sind preis_stunde und preis_monat.
-const OEFFENTLICHE_SPALTEN = 'id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,sprachen,trainingsorte,verifiziert,created_at';
+const OEFFENTLICHE_SPALTEN = 'id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,sprachen,trainingsorte,verifiziert,created_at,verfuegbarkeit';
 
 // Knopf fuer die Kontaktaufnahme in einer Trainerkarte.
 // Nicht angemeldet: fuehrt zur Kundenregistrierung ("Anmelden und anfragen").
@@ -483,7 +511,7 @@ async function loadTrainers() {
     let daten;
     if(angemeldet) {
       // Fuer Angemeldete unveraendert: die Tabelle trainers mit Nutzer-Token.
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,sprachen,trainingsorte,verifiziert&order=created_at.desc`, {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,sprachen,trainingsorte,verifiziert,verfuegbarkeit&order=created_at.desc`, {
         headers: authKopf()
       });
       if(istAbgemeldet(res)) return;
@@ -632,6 +660,50 @@ function anwendenFilter() {
   renderTrainers(list);
 }
 function filterZusatz() { anwendenFilter(); }
+
+// ──── Baustein 5: Matching in 4 Fragen ────
+const matchState = { ziel: [], ort: '', sprache: '', zeit: '' };
+let matchAufgebaut = false;
+function matchingToggle() {
+  const p = document.getElementById('matchPanel');
+  const auf = p.style.display === 'none';
+  p.style.display = auf ? 'block' : 'none';
+  if(auf && !matchAufgebaut) {
+    // Ziel-Knoepfe aus der gemeinsamen Liste (wie im Einstieg/der Registrierung).
+    const ziele = (window.SPEZ_EINSTIEG || ['Muskelaufbau','Abnehmen','Krafttraining','Ausdauer']);
+    document.getElementById('matchZiel').innerHTML = ziele.map(z =>
+      `<div class="ftag" data-val="${vexEsc(z)}" onclick="matchPickZiel(this)">${vexEsc(z)}</div>`).join('');
+    // Sprachen aus den vorhandenen Trainern.
+    const sel = document.getElementById('matchSprache');
+    const alle = new Set();
+    for(const t of allTrainers) for(const s of (t.sprachen || [])) if(s) alle.add(s);
+    for(const s of [...alle].sort()) { const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o); }
+    matchAufgebaut = true;
+  }
+}
+function matchPickZiel(el) {
+  const v = el.dataset.val;
+  if(matchState.ziel.includes(v)) { matchState.ziel = matchState.ziel.filter(x => x !== v); el.classList.remove('active'); }
+  else { matchState.ziel.push(v); el.classList.add('active'); }
+}
+function matchPick(el, dim) {
+  const box = el.parentElement;
+  box.querySelectorAll('.ftag').forEach(c => c.classList.remove('active'));
+  if(matchState[dim] === el.dataset.val) { matchState[dim] = ''; }
+  else { matchState[dim] = el.dataset.val; el.classList.add('active'); }
+}
+function matchingStarten() {
+  matchState.sprache = document.getElementById('matchSprache').value || '';
+  const antworten = { ziel: matchState.ziel, ort: matchState.ort, sprache: matchState.sprache, zeit: matchState.zeit };
+  // Die 3 passendsten zuerst, danach die normale Liste (stabil sortiert).
+  const sortiert = vexMatch.sortiere(allTrainers, antworten);
+  const hinweis = document.getElementById('matchHinweis');
+  hinweis.style.display = 'block';
+  hinweis.textContent = '✨ Deine passendsten Trainer stehen oben.';
+  renderTrainers(sortiert);
+  document.getElementById('matchPanel').style.display = 'none';
+  document.querySelector('.main-content').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 // Befuellt den Sprachen-Filter mit den tatsaechlich vorkommenden Sprachen.
 function spracheOptionenAufbauen() {
