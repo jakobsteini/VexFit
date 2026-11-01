@@ -15,6 +15,7 @@ import {
   istTestkonto,
   kundenFiltern,
   profilStaerke,
+  qrAlsDatenUri,
   SITZUNG_SCHLUESSEL,
   sichtbar,
   sitzungGueltig,
@@ -152,4 +153,49 @@ Deno.test("admin.html leitet nur noch auf die Startseite (kein Dashboard, kein g
 Deno.test("login.html leitet nie auf den Admin", async () => {
   const html = await lies("./login.html");
   assert(!/admin\.html|verwaltung-/.test(html), "login.html darf nicht auf den Admin verweisen");
+});
+
+// ── QR-Code im zweiten Faktor ──
+Deno.test("CSP erlaubt data: bei img-src (für den MFA-QR-Code)", async () => {
+  const html = await lies(SEITE);
+  const csp = (html.match(/Content-Security-Policy"\s+content="([^"]+)"/) || [])[1] || "";
+  const img = (csp.match(/img-src([^;]+)/) || [])[1] || "";
+  assert(img.includes("data:"), "img-src muss data: erlauben, sonst bleibt der QR-Code leer");
+});
+
+Deno.test("qrAlsDatenUri: rohes SVG (Supabase utf-8) wird prozentkodiert", () => {
+  // So liefert es Supabase: data:-Vorsatz mit rohem SVG, '#' in der Füllfarbe.
+  const roh = 'data:image/svg+xml;utf-8,<svg xmlns="http://www.w3.org/2000/svg"><rect fill="#000000" width="2" height="2"/></svg>';
+  const uri = qrAlsDatenUri(roh);
+  assertStringIncludes(uri, "data:image/svg+xml;charset=utf-8,");
+  assert(!uri.includes("<svg"), "rohes SVG darf nicht unkodiert in der Adresse stehen");
+  assert(!uri.includes('#000000'), "'#' muss kodiert sein (sonst Abschnitt als Fragment)");
+  assertStringIncludes(uri, "%23000000"); // '#' -> %23
+  // Dekodiert ergibt sich wieder das SVG.
+  assertStringIncludes(decodeURIComponent(uri.split(",")[1]), "<svg");
+});
+
+Deno.test("qrAlsDatenUri: nackter <svg>-String bekommt den data:-Vorsatz", () => {
+  const uri = qrAlsDatenUri('<svg xmlns="http://www.w3.org/2000/svg"><rect fill="#000"/></svg>');
+  assertStringIncludes(uri, "data:image/svg+xml;charset=utf-8,%3Csvg");
+});
+
+Deno.test("qrAlsDatenUri: base64-/PNG-Adresse bleibt unverändert", () => {
+  const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA";
+  assertEquals(qrAlsDatenUri(png), png);
+  const svgB64 = "data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=";
+  assertEquals(qrAlsDatenUri(svgB64), svgB64);
+});
+
+Deno.test("qrAlsDatenUri: schon prozentkodiertes SVG wird nicht doppelt kodiert", () => {
+  const schon = "data:image/svg+xml;charset=utf-8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+  const uri = qrAlsDatenUri(schon);
+  assertStringIncludes(decodeURIComponent(uri.split(",")[1]), "<svg");
+  assert(!uri.includes("%253C"), "darf nicht doppelt kodiert sein (%25 = kodiertes %)");
+});
+
+Deno.test("qrAlsDatenUri: leerer/ungültiger Wert ergibt leeren String", () => {
+  assertEquals(qrAlsDatenUri(""), "");
+  assertEquals(qrAlsDatenUri(null as unknown as string), "");
+  assertEquals(qrAlsDatenUri(undefined as unknown as string), "");
 });

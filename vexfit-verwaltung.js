@@ -47,6 +47,33 @@ export function escapeHtml(wert) {
     .replace(/'/g, "&#39;");
 }
 
+/** Supabase liefert den TOTP-QR-Code als SVG. Je nach Version kommt er als
+ *  `data:image/svg+xml;utf-8,<svg …>` mit ROHEM, nicht prozentkodiertem SVG –
+ *  oder als nackter <svg>-String. Rohes SVG enthält Zeichen, die eine data:-
+ *  Adresse zerstören: vor allem '#' (in Füllfarben wie fill="#000"), das den
+ *  Fragmentteil startet und die Bilddaten abschneidet, außerdem '<', '>', '"'.
+ *  Als <img>-Quelle ergibt das ein kaputtes Bild (die beobachtete Ursache; die
+ *  CSP erlaubt data: bereits). Wir bauen daraus eine sauber prozentkodierte
+ *  data:-Adresse. Base64-/PNG-Adressen bleiben unverändert. Bewusst weiter als
+ *  <img> (nicht per innerHTML): ein data:-Bild führt keinen fremden Code aus –
+ *  das ist die sichere Variante gegenüber dem Einhängen von fremdem SVG ins DOM. */
+export function qrAlsDatenUri(roh) {
+  if (typeof roh !== "string") return "";
+  const s = roh.trim();
+  if (!s) return "";
+  if (/^data:image\/[a-z.+-]+;base64,/i.test(s)) return s; // schon base64 (z. B. PNG)
+  let svg = s;
+  const m = s.match(/^data:image\/svg\+xml[^,]*,(.*)$/is);
+  if (m) svg = m[1];
+  // Falls bereits prozentkodiert (kein literales <svg), erst dekodieren, damit
+  // nicht doppelt kodiert wird.
+  if (!svg.includes("<svg") && /%[0-9a-f]{2}/i.test(svg)) {
+    try { svg = decodeURIComponent(svg); } catch { /* roh lassen */ }
+  }
+  if (!svg.includes("<svg")) return s; // kein SVG erkennbar: Original zurückgeben
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+}
+
 /** base64url -> String (für das Auslesen von JWT-Nutzdaten). */
 function b64urlDecode(teil) {
   let b64 = String(teil).replace(/-/g, "+").replace(/_/g, "/");
@@ -380,7 +407,7 @@ function starteVerwaltung() {
     const { ok, d } = await authMit("factors", { factor_type: "totp", friendly_name: "Vexfit Verwaltung" });
     if (!ok || !d.id || !d.totp) { fehler("Einrichtung des zweiten Faktors fehlgeschlagen."); return; }
     auth.factorId = d.id;
-    $("mfa-qr").src = d.totp.qr_code;
+    $("mfa-qr").src = qrAlsDatenUri(d.totp.qr_code);
     $("mfa-secret").textContent = d.totp.secret || "";
     zeigeAnsicht("ansicht-mfa-setup");
     setTimeout(() => $("mfa-setup-code").focus(), 60);
