@@ -153,6 +153,20 @@ export function fehlendeProfilfelder(t) {
   return fehlt;
 }
 
+/** Freischalt-Mail: aus trainers.freischalt_mail_gesendet ablesen, ob (und wann)
+ *  die Mail „Dein Profil ist freigeschaltet" an den Trainer ging. Ein Zeitstempel
+ *  (String) oder true = gesendet. Fehlt die Spalte (Migration nicht eingespielt),
+ *  ist der Wert undefined -> noch nicht gesendet. */
+export function freischaltMailStatus(t) {
+  const v = t && t.freischalt_mail_gesendet;
+  if (v === true) return { gesendet: true, datum: null };
+  if (typeof v === "string" && v.trim() !== "") {
+    const d = new Date(v);
+    return { gesendet: true, datum: isNaN(d.getTime()) ? null : d };
+  }
+  return { gesendet: false, datum: null };
+}
+
 /** Profilstärke 0–100 % aus acht Ausbaupunkten. */
 export function profilStaerke(t) {
   const hatVideo = !!(t.video_url && /youtu\.?be|vimeo|\.mp4/i.test(String(t.video_url)));
@@ -273,17 +287,27 @@ function starteVerwaltung() {
   }
 
   // ── Meldungen ──
-  function meldung(text, art = "info") {
+  function meldung(text, art = "info", aktion) {
     const wrap = $("meldungen");
     const el = document.createElement("div");
     el.className = "meldung meldung-" + art;
     const span = document.createElement("span");
     span.textContent = text;
+    el.append(span);
+    // Optionaler Aktionsknopf in der Meldung (z. B. "Mail erneut senden").
+    if (aktion && aktion.text && typeof aktion.fn === "function") {
+      const akt = document.createElement("button");
+      akt.className = "btn-klein";
+      akt.style.marginLeft = "4px";
+      akt.textContent = aktion.text;
+      akt.addEventListener("click", () => { el.remove(); aktion.fn(); });
+      el.append(akt);
+    }
     const zu = document.createElement("button");
     zu.setAttribute("aria-label", "Schließen");
     zu.textContent = "✕";
     zu.addEventListener("click", () => el.remove());
-    el.append(span, zu);
+    el.append(zu);
     wrap.appendChild(el);
     if (art !== "fehler") setTimeout(() => el.remove(), 4500);
   }
@@ -731,6 +755,7 @@ function starteVerwaltung() {
     if (!t) { fehler("Trainer nicht gefunden. Bitte neu laden."); return; }
     const foto = avatarVorhanden(t.avatar_url) ? t.avatar_url : null;
     const fehlt = fehlendeProfilfelder(t);
+    const mailStatus = freischaltMailStatus(t);
     const spez = Array.isArray(t.spezialisierungen) && t.spezialisierungen.length
       ? `<div class="chiprow">${t.spezialisierungen.map((s) => `<span class="chip">${escapeHtml(s)}</span>`).join("")}</div>` : "";
     const orte = Array.isArray(t.trainingsorte) ? t.trainingsorte.map((o) => ORT_TEXT[o] || o).map(escapeHtml).join(", ") : "";
@@ -768,6 +793,9 @@ function starteVerwaltung() {
       ${Array.isArray(t.verfuegbarkeit) && t.verfuegbarkeit.length ? df("Verfügbarkeit", t.verfuegbarkeit.map(escapeHtml).join(", ")) : ""}
       ${t.zertifikat_datei ? df("Zertifikat", `<button class="btn-gross btn-neutral" style="padding:7px 12px" data-aktion="zertifikat" data-pfad="${escapeHtml(t.zertifikat_datei)}">Zertifikat ansehen</button>`) : ""}
       ${df("Profilstärke", profilStaerke(t) + " %")}
+      ${df("Freischalt-Mail", mailStatus.gesendet
+        ? (mailStatus.datum ? "gesendet am " + mailStatus.datum.toLocaleString("de-AT") : "gesendet")
+        : '<span style="color:var(--text-muted)">noch nicht gesendet</span>')}
       ${df("Registriert am", t.created_at ? new Date(t.created_at).toLocaleString("de-AT") : "")}
       <div class="feld"><div class="feld-label">Anfragen</div><div id="detail-anfragen" class="feld-wert" style="color:var(--text-muted)">Lade …</div></div>`;
     const freigabe = !t.aktiv
@@ -775,7 +803,9 @@ function starteVerwaltung() {
       : `<button class="btn-gross btn-warn" data-aktion="freigabe-zurueck" data-id="${escapeHtml(t.id)}">Freigabe zurücknehmen</button>`;
     const hinweis = (!t.aktiv && fehlt.length > 0)
       ? `<div style="flex-basis:100%;font-size:12px;color:var(--text-muted)">Hinweis: unvollständiges Profil – Freigeben ist trotzdem möglich, du entscheidest.</div>` : "";
-    const foot = `${freigabe}${hinweis}
+    const freischaltKnopf = (t.aktiv && !mailStatus.gesendet)
+      ? `<button class="btn-gross btn-neutral" data-aktion="freischalt-mail" data-id="${escapeHtml(t.id)}">Freischalt-Mail senden</button>` : "";
+    const foot = `${freigabe}${hinweis}${freischaltKnopf}
       ${t.verifiziert ? `<button class="btn-gross btn-neutral" data-aktion="entverifizieren" data-id="${escapeHtml(t.id)}">Verifizierung zurück</button>` : `<button class="btn-gross btn-neutral" data-aktion="verifizieren" data-id="${escapeHtml(t.id)}">Verifizieren</button>`}
       <button class="btn-gross btn-warn" data-aktion="sperren" data-art="trainer" data-id="${escapeHtml(t.id)}">${t.gesperrt ? "Entsperren" : "Sperren (Login)"}</button>
       <button class="btn-gross btn-gefahr" data-aktion="kicken" data-art="trainer" data-id="${escapeHtml(t.id)}">Kicken</button>`;
@@ -889,8 +919,46 @@ function starteVerwaltung() {
     const t = daten.trainers.find((x) => String(x.id) === String(id));
     const d = await adminEdge({ aktion: "trainer_aktivieren", ziel_id: id });
     if (!d || !(d.geaendert > 0)) { fehler("Freigeben fehlgeschlagen."); return; }
-    erfolg("Freigegeben – jetzt in der Suche sichtbar.");
-    if (t) t.aktiv = true;
+    if (t) { t.aktiv = true; if (d.mail && d.mail.datum) t.freischalt_mail_gesendet = d.mail.datum; }
+    freischaltMailMelden(id, d.mail, true);
+    neuZeichnen(); ladeDaten();
+  }
+
+  // Meldung nach einem Versuch, die Freischalt-Mail zu senden. `beiFreigabe`
+  // unterscheidet die Freigabe (Mailfehler ist kein Freigabe-Fehler) vom reinen
+  // Senden. Bei einem Fehler bietet die Meldung "Mail erneut senden" an.
+  function freischaltMailMelden(id, mail, beiFreigabe) {
+    const m = mail || { gesendet: false, grund: "keine Rückmeldung" };
+    const vorn = beiFreigabe ? "Freigegeben – " : "";
+    if (m.gesendet) {
+      erfolg(vorn + "E-Mail an den Trainer gesendet." + (m.sperre_fehlt ? " (Hinweis: Einmal-Sperre fehlt – Migration 2026-11-01-04 nicht eingespielt, erneutes Freigeben sendet erneut.)" : ""));
+    } else if (m.schon) {
+      erfolg(vorn + "E-Mail war bereits gesendet – kein zweiter Versand.");
+    } else {
+      meldung(vorn + "Mail konnte nicht gesendet werden: " + (m.grund || "unbekannter Grund"), "fehler",
+        { text: "Mail erneut senden", fn: () => freischaltMailSenden(id) });
+    }
+  }
+
+  // Einzelner Versand über den Knopf beim Trainer – mit einer Bestätigung.
+  async function freischaltMailBestaetigen(id) {
+    const t = daten.trainers.find((x) => String(x.id) === String(id));
+    const name = t ? `${t.vorname || ""} ${t.nachname || ""}`.trim() : "";
+    const ja = await bestaetige({
+      titel: "Freischalt-Mail senden",
+      text: `Die Mail „Dein Vexfit-Profil ist freigeschaltet" an ${name || "diesen Trainer"} (${t ? (t.email || "") : ""}) senden?`,
+      okText: "Senden", okArt: "btn-ja",
+    });
+    if (!ja) return;
+    await freischaltMailSenden(id);
+  }
+
+  async function freischaltMailSenden(id) {
+    const d = await adminEdge({ aktion: "trainer_freischalt_mail", ziel_id: id });
+    if (!d) return;
+    const t = daten.trainers.find((x) => String(x.id) === String(id));
+    if (t && d.mail && d.mail.datum) t.freischalt_mail_gesendet = d.mail.datum;
+    freischaltMailMelden(id, d.mail, false);
     neuZeichnen(); ladeDaten();
   }
   async function freigabeZurueck(id) {
@@ -1079,6 +1147,7 @@ function starteVerwaltung() {
       if (akt === "stat") { zeigeTab(a.dataset.tab); if (a.dataset.filter) { const f = $("trainer-filter"); if (f) { f.value = a.dataset.filter; renderTrainer(); } } return; }
       if (akt === "detail") { art === "kunde" ? kundeDetail(id) : trainerDetail(id); return; }
       if (akt === "freigeben") { freigeben(id); return; }
+      if (akt === "freischalt-mail") { freischaltMailBestaetigen(id); return; }
       if (akt === "freigabe-zurueck") { freigabeZurueck(id); return; }
       if (akt === "verifizieren") { verifizieren(id, true); return; }
       if (akt === "entverifizieren") { verifizieren(id, false); return; }

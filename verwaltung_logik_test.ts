@@ -12,6 +12,7 @@ import {
   csvZelle,
   escapeHtml,
   fehlendeProfilfelder,
+  freischaltMailStatus,
   istTestkonto,
   kundenFiltern,
   profilStaerke,
@@ -192,6 +193,33 @@ Deno.test("qrAlsDatenUri: schon prozentkodiertes SVG wird nicht doppelt kodiert"
   const uri = qrAlsDatenUri(schon);
   assertStringIncludes(decodeURIComponent(uri.split(",")[1]), "<svg");
   assert(!uri.includes("%253C"), "darf nicht doppelt kodiert sein (%25 = kodiertes %)");
+});
+
+// ── Freischalt-Mail: Status-Anzeige ──
+Deno.test("freischaltMailStatus: Zeitstempel -> gesendet am (Date)", () => {
+  const s = freischaltMailStatus({ freischalt_mail_gesendet: "2026-11-01T11:00:00.000Z" } as unknown as Record<string, unknown>);
+  assertEquals(s.gesendet, true);
+  assert(s.datum instanceof Date && !isNaN(s.datum.getTime()));
+});
+
+Deno.test("freischaltMailStatus: true ohne Datum -> gesendet, datum null", () => {
+  const s = freischaltMailStatus({ freischalt_mail_gesendet: true } as unknown as Record<string, unknown>);
+  assertEquals(s.gesendet, true);
+  assertEquals(s.datum, null);
+});
+
+Deno.test("freischaltMailStatus: fehlend/leer -> noch nicht gesendet", () => {
+  assertEquals(freischaltMailStatus({} as unknown as Record<string, unknown>).gesendet, false);
+  assertEquals(freischaltMailStatus({ freischalt_mail_gesendet: null } as unknown as Record<string, unknown>).gesendet, false);
+  assertEquals(freischaltMailStatus({ freischalt_mail_gesendet: "" } as unknown as Record<string, unknown>).gesendet, false);
+});
+
+Deno.test("Modul: Freischalt-Mail-Aktionen sind verdrahtet", async () => {
+  const js = await lies("./vexfit-verwaltung.js");
+  assertStringIncludes(js, "trainer_freischalt_mail");
+  assertStringIncludes(js, "Freischalt-Mail senden");
+  assertStringIncludes(js, "Mail erneut senden");
+  assertStringIncludes(js, "gesendet am ");
 });
 
 Deno.test("qrAlsDatenUri: leerer/ungültiger Wert ergibt leeren String", () => {

@@ -167,6 +167,10 @@ export interface TrainerProfil {
   /** Migration 2026-11-01-01: einmalige Freigabe-Bitte schon verschickt?
    *  Fehlt die Spalte (Migration nicht eingespielt), ist das Feld undefined. */
   freigabe_mail_gesendet?: boolean | null;
+  /** Migration 2026-11-01-04: Zeitpunkt der Freischalt-Mail an den Trainer
+   *  (timestamptz, kommt als ISO-String). NULL/undefined = noch nicht gesendet;
+   *  undefined zugleich, wenn die Spalte fehlt (Migration nicht eingespielt). */
+  freischalt_mail_gesendet?: string | boolean | null;
 }
 
 export interface Mail {
@@ -232,6 +236,10 @@ export interface Anschluesse {
   aktiveVerifizierteTrainer?(): Promise<TrainerVoll[]>;
   /** Teil 4: Trainer mit allen Profilfeldern per E-Mail (service_role). */
   trainerProfilNachEmail?(email: string): Promise<TrainerProfil | null>;
+  /** Freischalt-Mail: Trainer mit allen Profilfeldern per Kennung (service_role).
+   *  select=* – fehlt die Spalte freischalt_mail_gesendet (Migration nicht
+   *  eingespielt), fehlt der Schluessel im Ergebnis einfach. */
+  trainerProfilNachId?(id: string): Promise<TrainerProfil | null>;
   /** Teil 7: ein Ereignis an die Meta Conversions API senden. Holt den Schluessel
    *  aus META_CAPI_TOKEN; fehlt er, passiert nichts (gesendet=false, einmal
    *  geloggt). Wirft nicht – die Registrierung laeuft immer weiter. */
@@ -1135,6 +1143,80 @@ export function istKickenMigrationFehlt(fehler: unknown): boolean {
 const KICKEN_MIGRATION_HINWEIS =
   "Die Lösch-Funktion fehlt noch (Migration 2026-11-01-02-admin-neu.sql nicht eingespielt). Bitte im Supabase-SQL-Editor einspielen, dann erneut versuchen.";
 
+/** Kurztext aus einem Fehler (message oder String), fuer die Rueckmeldung an die
+ *  Verwaltung. Ohne Zeilenumbrueche, begrenzt. */
+function fehlerText(fehler: unknown): string {
+  const s = String((fehler as { message?: string })?.message ?? fehler ?? "");
+  return s.replace(/\s+/g, " ").trim().slice(0, 200) || "unbekannter Fehler";
+}
+
+/** Freischalt-Mail: ist der Versand laut Profil schon vermerkt? Ein gesetzter
+ *  Zeitstempel (String) oder true zaehlen als „gesendet". Fehlt die Spalte
+ *  (undefined), gilt: noch nicht gesendet (dann laesst sich nicht entdoppeln). */
+export function freischaltMailSchonGesendet(t: TrainerProfil): boolean {
+  const v = t.freischalt_mail_gesendet;
+  return v === true || (typeof v === "string" && v.trim() !== "");
+}
+
+/** Freischalt-Mail: fehlt die Spalte (Migration 2026-11-01-04 nicht eingespielt)?
+ *  Dann steht der Schluessel gar nicht im select=*-Ergebnis. */
+function freischaltSpalteFehlt(t: TrainerProfil): boolean {
+  return !("freischalt_mail_gesendet" in t);
+}
+
+export interface FreischaltMailErgebnis {
+  gesendet: boolean;
+  grund?: string;
+  /** true, wenn die Mail schon einmal gesendet war (kein erneuter Versand). */
+  schon?: boolean;
+  /** true, wenn die Einmal-Sperre fehlt (Spalte/Migration nicht da). */
+  sperre_fehlt?: boolean;
+  /** Zeitpunkt des Versands (ISO), wenn gerade gesendet. */
+  datum?: string;
+}
+
+/**
+ * Schickt die Freischalt-Mail an den Trainer und vermerkt den Versand (Einmal-
+ * Sperre). „Genau einmal": ist der Zeitstempel schon gesetzt, passiert nichts
+ * (schon=true). Scheitert der Versand, bleibt die Freigabe bestehen (der Aufrufer
+ * hat aktiv schon gesetzt) und der Grund geht zurueck – nie geworfen. Fehlt die
+ * Spalte, wird trotzdem gesendet (sperre_fehlt=true), nur ohne Entdopplung.
+ */
+async function freischaltMailAbwickeln(
+  a: Anschluesse,
+  zielId: string,
+): Promise<FreischaltMailErgebnis> {
+  if (!a.trainerProfilNachId) return { gesendet: false, grund: "in dieser Fassung nicht verfuegbar" };
+  let t: TrainerProfil | null = null;
+  try {
+    t = await a.trainerProfilNachId(zielId);
+  } catch (fehler) {
+    return { gesendet: false, grund: fehlerText(fehler) };
+  }
+  if (!t) return { gesendet: false, grund: "Trainer nicht gefunden" };
+  if (freischaltMailSchonGesendet(t)) return { gesendet: false, schon: true, grund: "schon gesendet" };
+  const sperreFehlt = freischaltSpalteFehlt(t);
+  try {
+    const ok = await sendeWennAdresseTaugt(a, mailFreischaltung(t));
+    if (!ok) return { gesendet: false, grund: "E-Mail-Adresse des Trainers ist ungueltig" };
+  } catch (fehler) {
+    return { gesendet: false, grund: fehlerText(fehler) };
+  }
+  const datum = new Date().toISOString();
+  // Versand vermerken. Mail ist raus; schlaegt NUR der Vermerk fehl, gilt die
+  // Mail trotzdem als gesendet (sonst wuerde die Verwaltung „erneut senden"
+  // anbieten und doppelt senden) – wir melden dann die fehlende Sperre.
+  if (!sperreFehlt) {
+    try {
+      await a.adminTrainerSetzen(zielId, { freischalt_mail_gesendet: datum });
+    } catch (fehler) {
+      if (!istMigrationFehlt(fehler)) a.melden?.("freischalt-mail: Vermerk nicht gesetzt", String(fehler));
+      return { gesendet: true, datum, sperre_fehlt: true };
+    }
+  }
+  return { gesendet: true, datum, sperre_fehlt: sperreFehlt };
+}
+
 async function adminAktion(
   r: Request,
   a: Anschluesse,
@@ -1172,9 +1254,37 @@ async function adminAktion(
 
   let geaendert = 0;
   switch (aktion) {
-    case "trainer_aktivieren":
-      geaendert = await a.adminTrainerSetzen(zielId, { aktiv: true });
-      break;
+    case "trainer_aktivieren": {
+      // Freigeben: aktiv setzen, dann EINMALIG die Freischalt-Mail an den Trainer.
+      // Scheitert die Mail, bleibt die Freigabe bestehen (aktiv ist schon gesetzt);
+      // der Grund geht an die Verwaltung, die „erneut senden" anbietet.
+      const n = await a.adminTrainerSetzen(zielId, { aktiv: true });
+      const mail: FreischaltMailErgebnis = n > 0
+        ? await freischaltMailAbwickeln(a, zielId)
+        : { gesendet: false, grund: "keine Zeile geaendert" };
+      await a.protokoll?.({
+        admin_id: nutzer.id,
+        aktion,
+        ziel_tabelle: "trainers",
+        ziel_id: zielId,
+        ergebnis: `geaendert=${n} mail=${mail.gesendet}${mail.grund ? " (" + mail.grund + ")" : ""}`,
+      });
+      return antwort(200, { ok: true, geaendert: n, mail }, herkunft);
+    }
+
+    // Freischalt-Mail einzeln senden / nach einem Fehler erneut senden
+    // (Verwaltung: Knopf beim Trainer). Dieselbe Einmal-Sperre wie beim Freigeben.
+    case "trainer_freischalt_mail": {
+      const mail = await freischaltMailAbwickeln(a, zielId);
+      await a.protokoll?.({
+        admin_id: nutzer.id,
+        aktion,
+        ziel_tabelle: "trainers",
+        ziel_id: zielId,
+        ergebnis: `mail=${mail.gesendet}${mail.grund ? " (" + mail.grund + ")" : ""}`,
+      });
+      return antwort(200, { ok: true, mail }, herkunft);
+    }
     case "trainer_sperren":
       geaendert = await a.adminTrainerSetzen(zielId, { aktiv: false });
       break;
@@ -1387,6 +1497,53 @@ export function mailProfilVollstaendig(t: TrainerProfil): Mail {
       grundZeile: "Dieser Trainer hat erstmals alle Profilfelder ausgefüllt.",
     },
   );
+}
+
+/** Baustein Freischalt-Mail: dieselben acht Vollstaendigkeitspunkte wie im
+ *  Frontend (vexfit-verwaltung.js fehlendeProfilfelder), als deutsche
+ *  Beschriftungen und in derselben Reihenfolge. Rein (ohne Netz pruefbar). */
+export function freischaltFehlendeFelder(t: TrainerProfil): string[] {
+  const hatText = (v: unknown, minLen = 1) =>
+    typeof v === "string" && v.trim().length >= minLen;
+  const fehlt: string[] = [];
+  if (!hatText(t.avatar_url)) fehlt.push("Foto");
+  if (!hatText(t.trainingsart)) fehlt.push("Trainingsart");
+  if (!hatText(t.trainingsort)) fehlt.push("Trainingsort");
+  if (!(Number(t.preis_stunde) > 0)) fehlt.push("Preis pro Stunde");
+  if (!hatText(t.bio, 11)) fehlt.push("Über mich");
+  if (!hatText(t.erfahrung)) fehlt.push("Erfahrung");
+  if (!(Array.isArray(t.spezialisierungen) && t.spezialisierungen.length > 0)) fehlt.push("Spezialisierungen");
+  if (!hatText(t.telefon)) fehlt.push("Telefon");
+  return fehlt;
+}
+
+const LOGIN_LINK = "https://vexfit.app/login.html";
+
+/**
+ * Baustein Freischalt-Mail (an den TRAINER): „Dein Vexfit-Profil ist
+ * freigeschaltet". Du-Form, Wortlaut nach Jakobs Handmail. Der Profil-Hinweis
+ * nennt die konkret fehlenden Punkte (mit Knopf/Link in den eigenen Bereich)
+ * oder bestaetigt die Vollstaendigkeit. KEINE genaue Adresse in der Mail.
+ */
+export function mailFreischaltung(t: TrainerProfil): Mail {
+  const fehlt = freischaltFehlendeFelder(t);
+  const hinweis = fehlt.length === 0
+    ? "Dein Profil ist vollständig – perfekt."
+    : `Für noch mehr Anfragen fehlen in deinem Profil noch: ${fehlt.join(", ")} – die kannst du jederzeit in deinem Bereich ergänzen.`;
+  const absatz =
+    `Hallo ${w(t.vorname)}, gute Nachrichten: Dein Profil auf Vexfit ist ab sofort ` +
+    "freigeschaltet und für Kundinnen und Kunden in deiner Nähe sichtbar. Wir suchen " +
+    `jetzt Kunden für dich in deiner Region. ${hinweis} Sobald jemand anfragt, ` +
+    "bekommst du eine Mail – du entscheidest selbst, ob du annimmst. Bis zu deinem " +
+    "ersten Kunden bleibt alles kostenlos. Bei Fragen einfach auf diese Mail " +
+    "antworten. Liebe Grüße, Jakob – Vexfit · office@vexfit.app · +43 660 3675175";
+  return baueMail(w(t.email), "Dein Vexfit-Profil ist freigeschaltet", {
+    ueberschrift: "Dein Profil ist freigeschaltet",
+    absatz,
+    datenZeilen: [],
+    ...(fehlt.length > 0 ? { knopfText: "Profil vervollständigen", knopfLink: LOGIN_LINK } : {}),
+    grundZeile: "Du erhältst diese E-Mail, weil dein Trainerprofil auf Vexfit freigeschaltet wurde.",
+  });
 }
 
 /**

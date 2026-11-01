@@ -165,6 +165,16 @@ const anschluesse: Anschluesse = {
     return zeilen[0] ?? null;
   },
 
+  // Freischalt-Mail: vollstaendige Profilzeile per Kennung. select=* – fehlt die
+  // Spalte freischalt_mail_gesendet (Migration 2026-11-01-04 nicht eingespielt),
+  // fehlt der Schluessel im Ergebnis; kern.ts erkennt das (sperre_fehlt).
+  async trainerProfilNachId(id: string): Promise<TrainerProfil | null> {
+    const zeilen = await lesen<TrainerProfil>(
+      `trainers?id=eq.${encodeURIComponent(id)}&select=*`,
+    );
+    return zeilen[0] ?? null;
+  },
+
   // Teil 7: ein Ereignis an die Meta Conversions API senden. Der Zugriffsschluessel
   // kommt NUR aus META_CAPI_TOKEN. Fehlt er, macht die Funktion nichts und loggt
   // genau einen Hinweis (kein Fehler) – die Registrierung laeuft weiter.
