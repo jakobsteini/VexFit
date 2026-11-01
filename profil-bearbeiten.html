@@ -400,6 +400,15 @@ function istAbgemeldet(r) {
 initChips();
 loadProfile(sess.email);
 
+// Teil 5c: vom Dashboard („PLZ eintragen") direkt ans PLZ-Feld – scrollen und
+// hineinsetzen, sobald die Seite steht.
+if(location.hash === '#fPlz') {
+  setTimeout(() => {
+    const f = document.getElementById('fPlz');
+    if(f) { try { f.scrollIntoView({ block: 'center' }); } catch(e) { f.scrollIntoView(); } f.focus(); }
+  }, 300);
+}
+
 function initChips() {
   const wrap = document.getElementById('chipWrap');
   wrap.innerHTML = SPEZ_OPTIONS.map(s =>

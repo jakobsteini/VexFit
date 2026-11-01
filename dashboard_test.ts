@@ -140,6 +140,67 @@ Deno.test("D7: profil.html zählt genau einmal pro Aufruf und schickt keine Kenn
   assert(!/user_agent|navigator\.|p_ip|ip:/i.test(block), "Zähl-Aufruf schickt Kennzeichen");
 });
 
+// ── Feinschliff Teil 5 ───────────────────────────────────────────────────────
+
+Deno.test("Teil 5a: Kachel zeigt 'Kostenlos' statt '0 €'", async () => {
+  const html = await lies("./trainer-bereich.html");
+  const i = html.indexOf("let kostenNum, kostenLabel;");
+  const block = html.slice(i, i + 400);
+  assert(block.includes("'Kostenlos'"), "Kachel nennt nicht 'Kostenlos'");
+  assert(!block.includes("'0 €'"), "Kachel zeigt noch '0 €' (liest sich wie Umsatz)");
+  assert(block.includes("bis zu deinem 1. Kunden"), "Erklärungstext fehlt");
+});
+
+Deno.test("Teil 5b: Ring hat sichtbare Hintergrundspur + sanfte Animation (reduced-motion beachtet)", async () => {
+  const html = await lies("./trainer-bereich.html");
+  assert(html.includes("--ring-spur"), "keine sichtbare Ring-Spur definiert");
+  assert(/@property\s+--dash-p/.test(html), "@property --dash-p (Füll-Animation) fehlt");
+  assert(html.includes("prefers-reduced-motion"), "Animation ignoriert prefers-reduced-motion");
+  // Der Ring bekommt die Spur über conic-gradient mit var(--ring-spur).
+  assert(/\.dash-ring\{[^}]*conic-gradient[^}]*var\(--ring-spur\)/.test(html), "Ring nutzt die Spur nicht");
+  // JS setzt nur den Füllstand (keine Inline-Hintergrundfarbe mehr).
+  const i = html.indexOf("function renderDashStaerke(");
+  const block = html.slice(i, i + 500);
+  assert(block.includes("setProperty('--dash-p'"), "Ring-Füllstand wird nicht über --dash-p gesetzt");
+  assert(!block.includes("style.background ="), "Ring setzt noch eine Inline-Hintergrundfarbe (bricht die Animation)");
+});
+
+Deno.test("Teil 5c: 'PLZ eintragen' führt direkt ans PLZ-Feld; Profil-Seite fokussiert es", async () => {
+  const html = await lies("./trainer-bereich.html");
+  assert(html.includes('href="profil-bearbeiten.html#fPlz">PLZ eintragen'), "Nachfrage-Knopf zeigt nicht aufs PLZ-Feld");
+  assert(html.includes("schritt === 'PLZ' ? 'profil-bearbeiten.html#fPlz'"), "Nächster-Schritt-Knopf für PLZ zeigt nicht aufs Feld");
+  const edit = await lies("./profil-bearbeiten.html");
+  assert(edit.includes("location.hash === '#fPlz'"), "Profilseite reagiert nicht auf #fPlz");
+  assert(/getElementById\('fPlz'\)[\s\S]{0,120}focus\(\)/.test(edit), "PLZ-Feld wird nicht fokussiert");
+});
+
+Deno.test("Teil 5d: Handy-Reihenfolge Kopf→nächster Schritt→Anfragen→Kacheln→Vorschau→Nachfrage", async () => {
+  const html = await lies("./trainer-bereich.html");
+  // Marker-Klassen an den vier Blöcken.
+  for (const k of ["db-staerke", "db-anfragen", "db-vorschau", "db-nachfrage"]) {
+    assert(html.includes(k), `Marker-Klasse ${k} fehlt`);
+  }
+  // Ordnungsblock unter dem Zwei-Spalten-Umbruch.
+  const i = html.indexOf("@media(max-width:899px)");
+  assert(i !== -1, "Handy-Ordnungsblock (max-width:899px) fehlt");
+  const block = html.slice(i, i + 700);
+  const reihenfolge = [
+    [".dash-kopf", "order:1"], [".db-staerke", "order:2"], [".db-anfragen", "order:3"],
+    [".dash-kacheln", "order:4"], [".db-vorschau", "order:5"], [".db-nachfrage", "order:6"],
+  ];
+  for (const [sel, ord] of reihenfolge) {
+    assert(block.includes(sel) && block.includes(ord), `${sel} ${ord} fehlt in der Handy-Reihenfolge`);
+  }
+  assert(block.includes("display:contents"), "Spalten-Container lösen sich am Handy nicht auf");
+});
+
+Deno.test("Teil 3 (Dashboard): Namen laufen durch vexName (Anzeige) und vexfit-namen.js ist eingebunden", async () => {
+  const html = await lies("./trainer-bereich.html");
+  assert(html.includes('src="vexfit-namen.js"'), "vexfit-namen.js nicht eingebunden");
+  assert(html.includes("const vn = vexName("), "Begrüßung nutzt vexName nicht");
+  assert(html.includes("vexEsc(vexName(a.kunden_name)"), "Anfrage-Name nicht formatiert");
+});
+
 Deno.test("D7/D8: Migration speichert keine Kennzeichen; Nachfrage-Funktion gibt nur eine Zahl", async () => {
   const sql = await lies("./migrations/2026-11-01-05-dashboard-admin-push.sql");
   // Tabelle profilaufrufe hat genau drei Datenspalten: trainer_id, tag, anzahl.

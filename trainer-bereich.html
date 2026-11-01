@@ -20,7 +20,7 @@
 <meta name="twitter:image" content="https://vexfit.app/marke/vexfit-vorschau-1200x630.png">
 <link rel="stylesheet" href="fonts/vexfit-fonts.css">
 <style>
-:root{--bg:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1a1a1a;--card:#161616;--muted:#9a9a9a;--border:rgba(255,255,255,0.07);--green:#4ade80;--orange:#fb923c;--red:#ff6b6b}
+:root{--bg:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1a1a1a;--card:#161616;--muted:#9a9a9a;--border:rgba(255,255,255,0.07);--green:#4ade80;--orange:#fb923c;--red:#ff6b6b;--ring-spur:rgba(255,255,255,0.14)}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
 
@@ -238,7 +238,12 @@ try {
 .dash-leer{color:var(--muted);font-size:13px;text-align:center;padding:16px 8px;line-height:1.5}
 .dash-knopf-sek{display:block;text-align:center;margin-top:12px;background:var(--mid);border:1px solid var(--border);color:var(--white);padding:11px;border-radius:4px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;text-decoration:none}
 .dash-ring-wrap{position:relative;width:132px;height:132px;margin:0 auto 16px}
-.dash-ring{width:132px;height:132px;border-radius:50%;background:conic-gradient(var(--accent) 0%, var(--mid) 0)}
+/* Teil 5b: sichtbare graue Hintergrundspur (--mid war fast wie --card -> unsichtbar
+   bei 0 %) und eine sanfte Füll-Animation über die registrierte Eigenschaft
+   --dash-p (0-100). prefers-reduced-motion schaltet die Animation ab. */
+@property --dash-p{syntax:'<number>';inherits:false;initial-value:0}
+.dash-ring{--dash-p:0;width:132px;height:132px;border-radius:50%;background:conic-gradient(var(--accent) calc(var(--dash-p)*1%), var(--ring-spur) 0);transition:--dash-p .8s ease}
+@media (prefers-reduced-motion: reduce){.dash-ring{transition:none}}
 .dash-ring-text{position:absolute;inset:14px;background:var(--card);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .dash-ring-text span{font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--accent);line-height:1}
 .dash-ring-text small{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
@@ -272,6 +277,23 @@ try {
 @media(min-width:900px){
   .dash-spalten{grid-template-columns:1.25fr 1fr;gap:18px;align-items:start}
   .dash-kacheln{grid-template-columns:repeat(4,1fr)}
+}
+/* Teil 5d: Handy-Reihenfolge – Kopf → nächster Schritt (Profilstärke) →
+   Anfragen → Kacheln (2×2) → Vorschau → Nachfrage. Die Spalten-Container lösen
+   sich auf (display:contents), damit alle Blöcke als eine Spalte fließen und
+   per order sortiert werden. Nur unter dem Zwei-Spalten-Umbruch. */
+@media(max-width:899px){
+  #dashboardPage{display:flex;flex-direction:column}
+  #dashboardPage .dash-spalten,
+  #dashboardPage .dash-links,
+  #dashboardPage .dash-rechts{display:contents}
+  #dashboardPage .dash-willkommen{order:0}
+  #dashboardPage .dash-kopf{order:1}
+  #dashboardPage .db-staerke{order:2}
+  #dashboardPage .db-anfragen{order:3}
+  #dashboardPage .dash-kacheln{order:4}
+  #dashboardPage .db-vorschau{order:5}
+  #dashboardPage .db-nachfrage{order:6}
 }
 </style>
 <style>/* Tippflaechen Handy Fusszeile (Fix 2 Nachtrag) */
@@ -319,11 +341,11 @@ try {
   <div class="dash-spalten">
     <!-- Links: Anfragen + Vorschau -->
     <div class="dash-links">
-      <div class="dash-block fade fd2">
+      <div class="dash-block db-anfragen fade fd2">
         <div class="dash-block-kopf"><span>Neueste Anfragen</span><a href="#" onclick="showPage('anfragen',event)">Alle Anfragen →</a></div>
         <div id="dashAnfragen"><div class="dash-leer">Wird geladen …</div></div>
       </div>
-      <div class="dash-block fade fd2">
+      <div class="dash-block db-vorschau fade fd2">
         <div class="dash-block-kopf"><span>So sehen dich Kunden</span></div>
         <div id="dashVorschau"></div>
         <a href="profil-bearbeiten.html" class="dash-knopf-sek">Profil bearbeiten</a>
@@ -332,7 +354,7 @@ try {
 
     <!-- Rechts: Profilstärke + Nachfrage -->
     <div class="dash-rechts">
-      <div class="dash-block fade fd2">
+      <div class="dash-block db-staerke fade fd2">
         <div class="dash-ring-wrap">
           <div class="dash-ring" id="dashRing"></div>
           <div class="dash-ring-text"><span id="dashRingPct">0%</span><small>Profilstärke</small></div>
@@ -341,7 +363,7 @@ try {
         <button class="dash-next-mehr" id="dashNextMehr" onclick="dashMehrUmschalten()">Alle Punkte anzeigen</button>
         <div class="dash-next-liste hidden" id="dashNextListe"></div>
       </div>
-      <div class="dash-block fade fd2">
+      <div class="dash-block db-nachfrage fade fd2">
         <div class="dash-block-kopf"><span>Nachfrage in deiner Region</span></div>
         <div id="dashNachfrage"><div class="dash-leer">–</div></div>
       </div>
@@ -521,6 +543,7 @@ try {
 </a>
 
 <script src="vexfit-escape.js"></script>
+<script src="vexfit-namen.js"></script>
 <script src="vexfit-video.js"></script>
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
@@ -1073,7 +1096,7 @@ function dashStatusInfo() {
 
 function renderDashboard() {
   if(!document.getElementById('dashboardPage')) return;
-  const vn = (T && (T.vorname || '').trim()) || '';
+  const vn = vexName((T && (T.vorname || '').trim()) || '');
   const hallo = document.getElementById('dashHallo');
   if(hallo) hallo.textContent = vn ? ('Hallo ' + vn) : 'Hallo';
   const info = dashStatusInfo();
@@ -1087,10 +1110,12 @@ function renderDashboard() {
   const angenommen = anfragenDaten.filter(a => anfrageZustand(a) === 'angenommen').length;
   const aufrufe = (dashAufrufe == null) ? '–' : dashAufrufe;
   const istStudio = !!(T && T.studio_standort_id);
+  // Teil 5a: Kein „0 €" (las sich wie Umsatz) – groß „Kostenlos", darunter die
+  // Erklärung. Nach dem 1. Kunden wie bisher der echte Abo-Status.
   let kostenNum, kostenLabel;
-  if(istStudio) { kostenNum = '0 €'; kostenLabel = 'Studio-Trainer – kostenlos'; }
+  if(istStudio) { kostenNum = 'Kostenlos'; kostenLabel = 'Studio-Trainer'; }
   else if(T && T.stripe_bezahlt) { kostenNum = 'Aktiv'; kostenLabel = 'Abo läuft'; }
-  else { kostenNum = '0 €'; kostenLabel = 'bis zu deinem 1. Kunden'; }
+  else { kostenNum = 'Kostenlos'; kostenLabel = 'bis zu deinem 1. Kunden'; }
   const kacheln = [
     { num: offen, label: 'Offene Anfragen' },
     { num: angenommen, label: 'Angenommene Kunden' },
@@ -1131,7 +1156,7 @@ function renderDashAnfragen() {
         <button class="btn-ablehnen" onclick="beantworteAnfrage('${a.id}','abgelehnt',this)">Ablehnen</button></div>`;
     }
     return `<div class="dash-anfrage anfrage-card">
-      <div class="dash-anfrage-kopf"><span class="dash-anfrage-name">${vexEsc(a.kunden_name || 'Unbekannt')}</span><span class="dash-anfrage-datum">${datum}</span></div>
+      <div class="dash-anfrage-kopf"><span class="dash-anfrage-name">${vexEsc(vexName(a.kunden_name) || 'Unbekannt')}</span><span class="dash-anfrage-datum">${datum}</span></div>
       <div class="dash-anfrage-ziel">🎯 ${vexEsc(a.ziel || '–')}</div>
       ${akt}
     </div>`;
@@ -1150,7 +1175,7 @@ function renderDashVorschau() {
   const ort = [T.stadt, T.trainingsart].filter(Boolean).map(vexEsc).join(' · ') || 'Ort & Trainingsart ergänzen';
   el.innerHTML = `<div class="dash-vorschau">
     <div class="dash-vorschau-foto" style="${fotoStil}">${bild ? '' : vexEsc(initialen)}</div>
-    <div><div class="dash-vorschau-name">${vexEsc(((T.vorname || '') + ' ' + (T.nachname || '')).trim() || 'Dein Name')}</div>
+    <div><div class="dash-vorschau-name">${vexEsc(vexName(((T.vorname || '') + ' ' + (T.nachname || '')).trim()) || 'Dein Name')}</div>
       <div class="dash-vorschau-meta">${ort}</div>
       <div class="dash-vorschau-tags">${tags}</div></div>
   </div>`;
@@ -1160,8 +1185,10 @@ function renderDashVorschau() {
 // fehlende Schritt; die übrigen Punkte eingeklappt.
 function renderDashStaerke() {
   const a = profilAuswertung(aktuellesProfil());
+  // Teil 5b: nur den Füllstand setzen – Spur + Animation stecken im CSS (keine
+  // Inline-Hintergrundfarbe mehr, sonst liefe die Animation nicht).
   const ring = document.getElementById('dashRing');
-  if(ring) ring.style.background = `conic-gradient(var(--accent) ${a.prozent}%, var(--mid) 0)`;
+  if(ring) ring.style.setProperty('--dash-p', a.prozent);
   const pct = document.getElementById('dashRingPct');
   if(pct) pct.textContent = a.prozent + '%';
 
@@ -1173,8 +1200,9 @@ function renderDashStaerke() {
       next.innerHTML = '<div class="dash-next"><div class="dash-next-titel">✓ Dein Profil ist vollständig.</div><div class="dash-next-tipp">Stark — so wirkst du vertrauenswürdig.</div></div>';
     } else {
       const tipp = DASH_TIPPS[schritt] || '';
+      const ziel = schritt === 'PLZ' ? 'profil-bearbeiten.html#fPlz' : 'profil-bearbeiten.html';
       const knopf = DASH_EXTERN[schritt]
-        ? '<a class="dash-next-knopf" href="profil-bearbeiten.html">Jetzt ergänzen →</a>'
+        ? `<a class="dash-next-knopf" href="${ziel}">Jetzt ergänzen →</a>`
         : `<a class="dash-next-knopf" href="#" onclick="showPage('profil',event)">Jetzt ausfüllen →</a>`;
       next.innerHTML = `<div class="dash-next"><div class="dash-next-titel">Nächster Schritt: ${vexEsc(schritt)}</div><div class="dash-next-tipp">${vexEsc(tipp)}</div>${knopf}</div>`;
     }
@@ -1202,7 +1230,7 @@ function renderDashNachfrage() {
   if(!el) return;
   const hatPlz = !!(T && String(T.plz || '').trim());
   if(!hatPlz) {
-    el.innerHTML = '<div class="dash-nachfrage-text">Trag deine PLZ ein, dann siehst du die Nachfrage in deiner Nähe.</div><a class="dash-nachfrage-knopf" href="profil-bearbeiten.html">PLZ eintragen</a>';
+    el.innerHTML = '<div class="dash-nachfrage-text">Trag deine PLZ ein, dann siehst du die Nachfrage in deiner Nähe.</div><a class="dash-nachfrage-knopf" href="profil-bearbeiten.html#fPlz">PLZ eintragen</a>';
     return;
   }
   if(dashNachfrage === undefined) { el.innerHTML = '<div class="dash-leer">Wird geladen …</div>'; return; }
@@ -1368,7 +1396,7 @@ function renderAnfragen(data) {
       }
     }
     return `<div class="anfrage-card">
-      <div class="anf-head"><div class="anf-name">${vexEsc(a.kunden_name||'Unbekannt')}</div><div class="anf-date">${date}</div></div>
+      <div class="anf-head"><div class="anf-name">${vexEsc(vexName(a.kunden_name) || 'Unbekannt')}</div><div class="anf-date">${date}</div></div>
       <div class="anf-ziel">🎯 ${vexEsc(a.ziel||'–')}</div>
       ${a.nachricht?`<div class="msg-box">"${vexEsc(a.nachricht)}"</div>`:''}
       ${contactHTML}
