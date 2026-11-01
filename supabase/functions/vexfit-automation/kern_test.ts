@@ -805,9 +805,11 @@ Deno.test("Name mit HTML: Textfassung roh, HTML-Fassung maskiert", async () => {
   );
   const m = auf.mails[0];
   // Textfassung bleibt roh (keine Maskierung), HTML-Fassung ist maskiert.
-  assertStringIncludes(m.text, "Name: <b>Eva</b> A & B");
-  assertStringIncludes(m.html, "&lt;b&gt;Eva&lt;/b&gt; A &amp; B");
-  assert(!m.html.includes("<b>Eva</b>"), "Name steht roh im HTML");
+  // Teil 3: der Name läuft jetzt durch nameFormatieren (nur Anzeige); die
+  // Maskierung bleibt davon unberührt – genau das prüft dieser Test.
+  assertStringIncludes(m.text, "Name: <b>eva</b> A & B");
+  assertStringIncludes(m.html, "&lt;b&gt;eva&lt;/b&gt; A &amp; B");
+  assert(!m.html.includes("<b>Eva</b>") && !m.html.includes("<b>eva</b>"), "Name steht roh im HTML");
   // Jede Mail traegt jetzt beide Fassungen.
   assertEquals(Object.keys(m).sort(), ["an", "betreff", "html", "text"]);
 });
@@ -827,7 +829,8 @@ Deno.test("Zeilenumbruch im Namen kommt nicht in den Betreff", async () => {
     !b.includes("\n") && !b.includes("\r"),
     `Betreff mit Umbruch: ${JSON.stringify(b)}`,
   );
-  assertEquals(b, "🟡 Neuer Trainer: Eva Bcc: fremd@beispiel.invalid M");
+  // Teil 3/4: Name formatiert (jedes Wort groß), Betreff ohne Zeilenumbruch.
+  assertEquals(b, "🟡 Neuer Trainer: Eva Bcc: Fremd@beispiel.invalid M");
 });
 
 Deno.test("Zeilenumbruch in der Empfaengeradresse → kein Versand", async () => {

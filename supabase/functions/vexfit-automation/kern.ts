@@ -414,6 +414,38 @@ function w(wert: unknown): string {
   return wert === null || wert === undefined ? "" : String(wert);
 }
 
+// Feinschliff Teil 3: Namen schön anzeigen (Mail-Betreff/-Text + Push). NUR
+// Anzeige – der gespeicherte Wert bleibt. Wortgleich zu vexfit-namen.js
+// (window.vexName) und vexfit-verwaltung.js (nameFormatieren), abgesichert durch
+// namen_test.ts.
+const NAME_PARTIKEL = new Set([
+  "von", "van", "de", "der", "den", "del", "della", "di", "da", "dos", "du",
+  "la", "le", "ter", "ten", "zu", "zum", "zur", "of", "and",
+]);
+function nameGewollteMischung(s: string): boolean {
+  return /[a-zäöüéèàçñ][A-ZÄÖÜ]/.test(s);
+}
+function nameTeilGross(seg: string): string {
+  if (!seg) return seg;
+  if (nameGewollteMischung(seg)) return seg;
+  const klein = seg.toLowerCase();
+  return klein.charAt(0).toUpperCase() + klein.slice(1);
+}
+export function nameFormatieren(roh: unknown): string {
+  if (roh === null || roh === undefined) return "";
+  const s = String(roh).replace(/\s+/g, " ").trim();
+  if (!s) return "";
+  return s.split(" ").map((wort, i) => {
+    const klein = wort.toLowerCase();
+    if (i > 0 && NAME_PARTIKEL.has(klein) && !nameGewollteMischung(wort)) {
+      return klein;
+    }
+    return wort.split(/(['’-])/).map((seg) =>
+      (seg === "-" || seg === "'" || seg === "’") ? seg : nameTeilGross(seg)
+    ).join("");
+  }).join(" ");
+}
+
 // ============================================================================
 // Mails — Wortlaut, Zeilenumbrueche und Reihenfolge 1:1 aus dem Workflow
 // ============================================================================
@@ -484,7 +516,7 @@ export function mailNeuerTrainer(
   profil?: Record<string, unknown> | null,
 ): Mail {
   const p = profil || {};
-  const name = `${w(body.vorname) || w(p.vorname)} ${w(body.nachname) || w(p.nachname)}`.trim();
+  const name = nameFormatieren(`${w(body.vorname) || w(p.vorname)} ${w(body.nachname) || w(p.nachname)}`.trim());
   const ort = w(p.stadt) || w(body.stadt);
   const plz = w(p.plz) || w(body.plz);
   const ortPlz = [ort, plz].filter((x) => x).join(" · ");
@@ -521,7 +553,7 @@ export function mailNeuerKunde(
   profil?: Record<string, unknown> | null,
 ): Mail {
   const p = profil || {};
-  const name = `${w(body.vorname) || w(p.vorname)} ${w(body.nachname) || w(p.nachname)}`.trim();
+  const name = nameFormatieren(`${w(body.vorname) || w(p.vorname)} ${w(body.nachname) || w(p.nachname)}`.trim());
   const ort = w(p.stadt) || w(body.stadt);
   const plz = w(p.plz) || w(body.plz);
   const ortPlz = [ort, plz].filter((x) => x).join(" · ");
@@ -550,8 +582,8 @@ export function mailNeueAnfrageIntern(
   body: Record<string, unknown>,
   anfrageId?: string | null,
 ): Mail {
-  const kunde = w(body.kunden_name) || w(body.kunden_email) || "Kunde";
-  const trainerName = w(body.trainer_name) || "Trainer";
+  const kunde = nameFormatieren(w(body.kunden_name)) || w(body.kunden_email) || "Kunde";
+  const trainerName = nameFormatieren(w(body.trainer_name)) || "Trainer";
   const anker = w(anfrageId) ? `anfrage-${w(anfrageId)}` : "anfragen";
   const k = kundenAngaben(body);
   return baueMail(BETREIBER, `Neue Anfrage: ${kunde} → ${trainerName}`, {
@@ -576,39 +608,41 @@ export function pushNeuerTrainer(
   profil?: Record<string, unknown> | null,
 ): PushNachricht {
   const p = profil || {};
-  const name = `${w(body.vorname) || w(p.vorname)} ${w(body.nachname) || w(p.nachname)}`.trim() || "Trainer";
-  const ort = w(p.stadt) || w(body.stadt);
+  const name = nameFormatieren(`${w(body.vorname) || w(p.vorname)} ${w(body.nachname) || w(p.nachname)}`.trim()) || "Trainer";
+  const ort = nameFormatieren(w(p.stadt) || w(body.stadt));
   const id = w(p.id);
   return {
-    titel: "Neuer Trainer",
-    text: `${name}${ort ? `, ${ort}` : ""}`,
+    // Teil 4: gelber Punkt im Titel, Name formatiert, Ort mit „ · " und nur wenn
+    // vorhanden. Keine E-Mail/Telefon im Push.
+    titel: "🟡 Neuer Trainer",
+    text: `${name}${ort ? ` · ${ort}` : ""}`,
     url: verwaltungLink(id ? `trainer-${id}` : ""),
   };
 }
 
-/** Push-Mitteilung „Neuer Kunde: <Name>, <Ort>". */
+/** Push-Mitteilung „Neuer Kunde: <Name> · <Ort>" (Teil 4). */
 export function pushNeuerKunde(
   body: Record<string, unknown>,
   profil?: Record<string, unknown> | null,
 ): PushNachricht {
   const p = profil || {};
-  const name = `${w(body.vorname) || w(p.vorname)} ${w(body.nachname) || w(p.nachname)}`.trim() || "Kunde";
-  const ort = w(p.stadt) || w(body.stadt);
+  const name = nameFormatieren(`${w(body.vorname) || w(p.vorname)} ${w(body.nachname) || w(p.nachname)}`.trim()) || "Kunde";
+  const ort = nameFormatieren(w(p.stadt) || w(body.stadt));
   const id = w(p.id);
   return {
     titel: "Neuer Kunde",
-    text: `${name}${ort ? `, ${ort}` : ""}`,
+    text: `${name}${ort ? ` · ${ort}` : ""}`,
     url: verwaltungLink(id ? `kunde-${id}` : ""),
   };
 }
 
-/** Push-Mitteilung „Neue Anfrage: <Kunde> → <Trainer>". */
+/** Push-Mitteilung „Neue Anfrage: <Kunde> → <Trainer>" (Teil 4, Namen formatiert). */
 export function pushNeueAnfrage(
   body: Record<string, unknown>,
   anfrageId?: string | null,
 ): PushNachricht {
-  const kunde = w(body.kunden_name) || "Kunde";
-  const trainerName = w(body.trainer_name) || "Trainer";
+  const kunde = nameFormatieren(w(body.kunden_name)) || "Kunde";
+  const trainerName = nameFormatieren(w(body.trainer_name)) || "Trainer";
   return {
     titel: "Neue Anfrage",
     text: `${kunde} → ${trainerName}`,
@@ -701,7 +735,7 @@ export function mailErsteAnfrage(
   return baueMail(w(trainer.email), "Deine erste Kundenanfrage auf Vexfit", {
     ueberschrift: "Deine erste Kundenanfrage",
     absatz:
-      `Hallo ${w(trainer.vorname)}, über Vexfit hat dich jemand angefragt. ` +
+      `Hallo ${nameFormatieren(w(trainer.vorname))}, über Vexfit hat dich jemand angefragt. ` +
       "Um Name und E-Mail-Adresse zu sehen, aktiviere dein Abo.",
     datenZeilen: [
       { beschriftung: "Ziel", wert: w(kunde.ziel) },
@@ -725,7 +759,7 @@ export function mailWeitereAnfrage(
   const kunde = kundenAngaben(body);
   return baueMail(w(trainer.email), "Neue Kundenanfrage auf Vexfit", {
     ueberschrift: "Neue Kundenanfrage",
-    absatz: `Hallo ${w(trainer.vorname)}, du hast eine neue Anfrage erhalten.`,
+    absatz: `Hallo ${nameFormatieren(w(trainer.vorname))}, du hast eine neue Anfrage erhalten.`,
     datenZeilen: [
       { beschriftung: "Ziel", wert: w(kunde.ziel) },
       { beschriftung: "Nachricht", wert: w(kunde.nachricht) },
@@ -754,7 +788,7 @@ export function mailStudioAnfrage(
   return baueMail(w(trainer.email), "Neue Kundenanfrage auf Vexfit", {
     ueberschrift: "Neue Kundenanfrage",
     absatz:
-      `Hallo ${w(trainer.vorname)}, du hast über Vexfit eine neue Anfrage ` +
+      `Hallo ${nameFormatieren(w(trainer.vorname))}, du hast über Vexfit eine neue Anfrage ` +
       "erhalten. Als Studio-Trainer siehst du die Kontaktdaten sofort - ohne " +
       "Zusatzkosten. Melde dich am besten noch heute.",
     datenZeilen: [
@@ -777,7 +811,7 @@ export function mailKundenDaten(
   return baueMail(zahlerEmail, "Deine Kundendaten", {
     ueberschrift: "Zahlung bestätigt",
     absatz:
-      `Hallo ${w(trainer.vorname)}, hier sind die Kontaktdaten. Melde dich am ` +
+      `Hallo ${nameFormatieren(w(trainer.vorname))}, hier sind die Kontaktdaten. Melde dich am ` +
       "besten noch heute - Anfragen werden kalt, wenn man wartet.",
     datenZeilen: [
       { beschriftung: "Name", wert: w(anfrage.kunden_name) },
@@ -810,7 +844,7 @@ export function mailZahlungAnJakob(
     datenZeilen: [
       {
         beschriftung: "Trainer",
-        wert: `${w(trainer.vorname)} ${w(trainer.nachname)}`.trim(),
+        wert: nameFormatieren(`${w(trainer.vorname)} ${w(trainer.nachname)}`.trim()),
       },
       { beschriftung: "E-Mail", wert: zahlerEmail },
       { beschriftung: "Betrag", wert: betrag ? `${betrag} €` : "" },
@@ -891,7 +925,7 @@ export function mailAlternativen(
   kundenName: string | null | undefined,
   alternativen: TrainerVoll[],
 ): Mail {
-  const anrede = kundenName ? `Hallo ${kundenName}, ` : "Hallo, ";
+  const anrede = kundenName ? `Hallo ${nameFormatieren(kundenName)}, ` : "Hallo, ";
   return baueMail(kundenEmail, "Passende Trainer für dich auf Vexfit", {
     ueberschrift: "Zwei passende Trainer für dich",
     absatz:
@@ -899,7 +933,7 @@ export function mailAlternativen(
       "trotzdem schnell weiterkommst, haben wir zwei passende Trainer für dich herausgesucht.",
     datenZeilen: alternativen.map((t, i) => ({
       beschriftung: `Vorschlag ${i + 1}`,
-      wert: `${w(t.vorname)} ${w(t.nachname)}`.trim() +
+      wert: nameFormatieren(`${w(t.vorname)} ${w(t.nachname)}`.trim()) +
         (t.stadt ? ` (${w(t.stadt)})` : ""),
     })),
     knopfText: alternativen[0] ? "Erstes Profil ansehen" : undefined,
@@ -1796,7 +1830,7 @@ export function profilVollstaendig(t: TrainerProfil): boolean {
 
 /** Teil 4 (intern an BETREIBER): Profil ist vollstaendig – bitte freigeben. */
 export function mailProfilVollstaendig(t: TrainerProfil): Mail {
-  const name = `${w(t.vorname)} ${w(t.nachname)}`.trim();
+  const name = nameFormatieren(`${w(t.vorname)} ${w(t.nachname)}`.trim());
   const spez = Array.isArray(t.spezialisierungen) ? t.spezialisierungen.join(", ") : "";
   return baueMail(
     BETREIBER,
@@ -1848,7 +1882,7 @@ export function mailFreischaltung(t: TrainerProfil): Mail {
     ? "Dein Profil ist vollständig – perfekt."
     : `Für noch mehr Anfragen fehlen in deinem Profil noch: ${fehlt.join(", ")} – die kannst du jederzeit in deinem Bereich ergänzen.`;
   const absatz =
-    `Hallo ${w(t.vorname)}, gute Nachrichten: Dein Profil auf Vexfit ist ab sofort ` +
+    `Hallo ${nameFormatieren(w(t.vorname))}, gute Nachrichten: Dein Profil auf Vexfit ist ab sofort ` +
     "freigeschaltet und für Kundinnen und Kunden in deiner Nähe sichtbar. Wir suchen " +
     `jetzt Kunden für dich in deiner Region. ${hinweis} Sobald jemand anfragt, ` +
     "bekommst du eine Mail – du entscheidest selbst, ob du annimmst. Bis zu deinem " +

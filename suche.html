@@ -269,6 +269,7 @@ try {
 </footer>
 
 <script src="vexfit-escape.js"></script>
+<script src="vexfit-namen.js"></script>
 <script src="vexfit-plz.js"></script>
 <script src="vexfit-ziele.js"></script>
 <script src="vexfit-matching.js"></script>
@@ -495,7 +496,7 @@ function renderTrainersWithDistance(trainers) {
         ${kartenAbzeichen(t, t._online)}
       </div>
       <div class="cb">
-        <div class="cn">${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</div>
+        <div class="cn">${vexEsc(vexName((t.vorname||"") + " " + (t.nachname||"")))}</div>
         <div class="cl">${vexEsc(t.trainingsart)} · ${vexEsc(t.stadt)}</div>
         <div class="ctags">${tags}</div>
         <div class="cf"><div class="cp">${preis}</div>${distLabel}</div>
@@ -583,7 +584,7 @@ function renderTrainers(trainers) {
           ${kartenAbzeichen(t, isOnline)}
         </div>
         <div class="cb">
-          <div class="cn">${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</div>
+          <div class="cn">${vexEsc(vexName((t.vorname||"") + " " + (t.nachname||"")))}</div>
           <div class="cl">${isOnline ? '🌐 Online · DACH-weit' : '📍 ' + vexEsc(t.stadt) + ' · ' + vexEsc(t.trainingsart)}</div>
           <div class="ctags">${tags.map(tag => `<span class="ctag">${vexEsc(tag)}</span>`).join('')}</div>
           <div class="cf">

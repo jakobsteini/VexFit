@@ -50,6 +50,40 @@ export function escapeHtml(wert) {
     .replace(/'/g, "&#39;");
 }
 
+// Feinschliff Teil 3: Namen schön anzeigen (NUR Anzeige, gespeicherte Daten
+// bleiben). Wortgleich zu vexfit-namen.js (window.vexName) und kern.ts
+// (nameFormatieren) – per namen_test.ts abgesichert.
+const NAME_PARTIKEL = new Set([
+  "von", "van", "de", "der", "den", "del", "della", "di", "da", "dos", "du",
+  "la", "le", "ter", "ten", "zu", "zum", "zur", "of", "and",
+]);
+function nameGewollteMischung(s) {
+  return /[a-zäöüéèàçñ][A-ZÄÖÜ]/.test(s);
+}
+function nameTeilGross(seg) {
+  if (!seg) return seg;
+  if (nameGewollteMischung(seg)) return seg;
+  const klein = seg.toLowerCase();
+  return klein.charAt(0).toUpperCase() + klein.slice(1);
+}
+export function nameFormatieren(roh) {
+  if (roh === null || roh === undefined) return "";
+  const s = String(roh).replace(/\s+/g, " ").trim();
+  if (!s) return "";
+  return s.split(" ").map((wort, i) => {
+    const klein = wort.toLowerCase();
+    if (i > 0 && NAME_PARTIKEL.has(klein) && !nameGewollteMischung(wort)) return klein;
+    return wort.split(/(['’-])/).map((seg) =>
+      (seg === "-" || seg === "'" || seg === "’") ? seg : nameTeilGross(seg)
+    ).join("");
+  }).join(" ");
+}
+/** Vor- und Nachname zusammen, schön formatiert und maskiert – der Normalfall in
+ *  der Verwaltung. Leere Teile fallen weg. */
+export function namePaarHtml(vorname, nachname) {
+  return escapeHtml(nameFormatieren(`${vorname || ""} ${nachname || ""}`.trim()));
+}
+
 /** Supabase liefert den TOTP-QR-Code als SVG. Je nach Version kommt er als
  *  `data:image/svg+xml;utf-8,<svg …>` mit ROHEM, nicht prozentkodiertem SVG –
  *  oder als nackter <svg>-String. Rohes SVG enthält Zeichen, die eine data:-

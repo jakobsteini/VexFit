@@ -282,6 +282,7 @@ try {
 </footer>
 
 <script src="vexfit-escape.js"></script>
+<script src="vexfit-namen.js"></script>
 <script src="vexfit-video.js"></script>
 <script>
 // ──── ZUGANG ────
@@ -423,8 +424,10 @@ async function loadProfile() {
 }
 
 function renderProfile(t) {
-  document.title = `Vexfit – ${t.vorname} ${t.nachname}`;
-  const initials = (t.vorname[0] + t.nachname[0]).toUpperCase();
+  // Teil 3: Name nur für die Anzeige schön formatieren (gespeicherte Daten bleiben).
+  const anzeigeName = vexName(((t.vorname || '') + ' ' + (t.nachname || '')).trim());
+  document.title = `Vexfit – ${anzeigeName}`;
+  const initials = ((t.vorname||'?')[0] + (t.nachname||'?')[0]).toUpperCase();
   const avatarEl = document.getElementById('pAvatar');
   const bild = avatarAdresse(t.avatar_url);
   if(bild) {
@@ -434,12 +437,12 @@ function renderProfile(t) {
     avatarEl.textContent = '';
     // Profilbild ist ein Hintergrundbild (kein <img>): alt-Text ueber role/aria-label.
     avatarEl.setAttribute('role', 'img');
-    avatarEl.setAttribute('aria-label', 'Personal Trainer ' + t.vorname + ' ' + t.nachname + (t.stadt ? ' in ' + t.stadt : ''));
+    avatarEl.setAttribute('aria-label', 'Personal Trainer ' + anzeigeName + (t.stadt ? ' in ' + t.stadt : ''));
   } else {
     avatarEl.style.backgroundImage = '';
     avatarEl.textContent = initials;
   }
-  document.getElementById('pName').textContent = t.vorname + ' ' + t.nachname;
+  document.getElementById('pName').textContent = anzeigeName;
   const isOnline = t.trainingsart === 'Online';
   document.getElementById('pLocation').textContent = isOnline ? '🌐 Online · DACH-weit' : '📍 ' + t.stadt + ' · ' + t.trainingsart;
   document.getElementById('pExp').textContent = '💪 ' + (t.erfahrung || 'Erfahrener Trainer');
