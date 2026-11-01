@@ -1463,6 +1463,12 @@ async function sperrePerson(art, id, name, aktuellGesperrt) {
   if(!d || !d.ok) return;
   if(!d.konto) meldeErfolg((entsperren ? 'Entsperrt' : 'Gesperrt') + ' – Hinweis: zu dieser Zeile gibt es kein Anmeldekonto, nur die Markierung wurde gesetzt.');
   else meldeErfolg(entsperren ? `${name || 'Person'} entsperrt.` : `${name || 'Person'} gesperrt – keine Anmeldung mehr möglich.`);
+  // Sofortige Aktualisierung ohne Neuladen: Markierung im Cache setzen und neu
+  // zeichnen; loadData() holt danach den verbindlichen Stand nach.
+  const liste = art === 'trainer' ? (window.allTrainers || []) : (window.allKunden || []);
+  const p = liste.find(x => String(x.id) === String(id));
+  if(p) p.gesperrt = !entsperren;
+  renderAllesNeu();
   loadData();
 }
 
@@ -1501,6 +1507,9 @@ async function activateTrainer(id) {
   const ok = await setzeTrainerAktiv(id, true);
   if(!ok) { meldeFehler('Der Trainer konnte nicht freigegeben werden. Die Anzeige wurde nicht verändert.'); return; }
   meldeErfolg('Freigegeben – jetzt in der Suche sichtbar.');
+  // Sofortige Aktualisierung ohne Neuladen (loadData() zieht danach nach).
+  if(t) t.aktiv = true;
+  renderAllesNeu();
 
   // Open email to Jakob with Stripe link
   if(t) {
