@@ -212,6 +212,7 @@ try {
       <button class="tab" onclick="showTab('kunden', this)">Kunden</button>
       <button class="tab" onclick="showTab('anfragen', this)">Anfragen</button>
       <button class="tab" onclick="showTab('ohneanfrage', this)">Trainer o. Anfrage</button>
+      <button class="tab" onclick="showTab('zahlungslink', this)">Zahlungslink offen</button>
       <button class="tab" onclick="showTab('unvollstaendig', this)">Profil unvollständig</button>
       <button class="tab" onclick="showTab('zahlungen', this)">Zahlungen</button>
       <button class="tab" onclick="showTab('studios', this)">Studios</button>
@@ -327,6 +328,26 @@ try {
             </tr>
           </thead>
           <tbody id="ohneanfrage-tbody">
+            <tr><td colspan="4" class="loading-text">Lade Trainer...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ZAHLUNGSLINK OFFEN TAB (Teil 8): erste Anfrage angenommen, noch nicht bezahlt -->
+    <div class="tab-content" id="tab-zahlungslink">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Freigeschaltete Trainer mit mindestens einer angenommenen Anfrage, die noch nicht bezahlt haben – diesen ist der Stripe-Zahlungslink zu schicken.</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>E-Mail</th>
+              <th>Stadt</th>
+              <th>Zahlung</th>
+            </tr>
+          </thead>
+          <tbody id="zahlungslink-tbody">
             <tr><td colspan="4" class="loading-text">Lade Trainer...</td></tr>
           </tbody>
         </table>
@@ -1097,6 +1118,7 @@ function renderAllesNeu() {
   renderProfilUebersicht();
   ladeZertifikate();
   ladeTrainerOhneAnfrage();
+  ladeZahlungslinkOffen();
 }
 
 // ──── PLATTFORM-ZUSTAND (nur lesend) ────
@@ -1261,6 +1283,37 @@ async function ladeTrainerOhneAnfrage() {
   }
 }
 
+// Teil 8: "Erste Anfrage angenommen – Zahlungslink offen". Freigeschaltete
+// Trainer mit mindestens einer angenommenen Anfrage, die noch nicht bezahlt
+// haben. Nur lesend; dieselbe Verknuepfung ueber anfragen.trainer_id wie oben.
+async function ladeZahlungslinkOffen() {
+  const tb = document.getElementById('zahlungslink-tbody');
+  if(!tb) return;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/anfragen?status=eq.angenommen&select=trainer_id`, {
+      headers: authKopf()
+    });
+    if(istAbgemeldet(res)) return;
+    if(!res.ok) throw new Error('Anfragen laden fehlgeschlagen: ' + res.status);
+    const rows = await res.json();
+    const mitAngenommen = new Set((Array.isArray(rows) ? rows : []).map(r => r.trainer_id).filter(Boolean));
+    const trainer = sichtbareTrainer().filter(t => t.aktiv && !t.stripe_bezahlt && mitAngenommen.has(t.id));
+    if(trainer.length === 0) {
+      tb.innerHTML = '<tr><td colspan="4" class="loading-text">Kein offener Zahlungslink – alle mit angenommener Anfrage haben bezahlt.</td></tr>';
+      return;
+    }
+    tb.innerHTML = trainer.map(t => `<tr class="klickbar" onclick="trainerDetail('${vexEsc(t.id)}')">
+      <td><strong>${vexEsc(t.vorname)} ${vexEsc(t.nachname)}</strong></td>
+      <td>${vexEsc(t.email)}</td>
+      <td>${vexEsc(t.stadt) || '–'}</td>
+      <td><span class="badge badge-unpaid">✕ Ausstehend</span></td>
+    </tr>`).join('');
+  } catch(e) {
+    console.error('ladeZahlungslinkOffen:', e);
+    tb.innerHTML = '<tr><td colspan="4" class="loading-text">⚠️ Konnte nicht geladen werden.</td></tr>';
+  }
+}
+
 // Profil unvollstaendig: freigeschaltete Trainer, bei denen mindestens eines
 // der sechs Vollstaendigkeitsfelder fehlt. Nutzt window.allTrainers aus loadData.
 function ladeProfilUnvollstaendig() {
@@ -1390,6 +1443,7 @@ function loadPlattform() {
   ladeAnfragenKennzahlen();
   ladeAnfragenListe();
   ladeTrainerOhneAnfrage();
+  ladeZahlungslinkOffen();
   ladeProfilUnvollstaendig();
   ladeZahlungen();
   ladeNachfrage();
