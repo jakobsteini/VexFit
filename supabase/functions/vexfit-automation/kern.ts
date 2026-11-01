@@ -657,7 +657,14 @@ export function corsKopf(herkunft: string | null): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": ERLAUBTE_HERKUNFT,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "content-type",
+    // Teil 0 (Sofort-Fix): admin.html schickt bei /admin-aktion einen
+    // Authorization-Kopf (Bearer-Token). Zuvor stand hier nur "content-type" —
+    // der Browser-Preflight (OPTIONS) scheiterte deshalb, und JEDE Admin-Aktion
+    // endete im Browser mit "Failed to fetch" / "Verbindungsfehler". authorization
+    // (und die von supabase-js ueblichen apikey, x-client-info) werden jetzt
+    // erlaubt. Die Herkunft bleibt streng auf ERLAUBTE_HERKUNFT begrenzt: fuer
+    // jede fremde Herkunft gibt corsKopf weiter {} zurueck (kein CORS-Kopf).
+    "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
   };
