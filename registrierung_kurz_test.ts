@@ -37,11 +37,11 @@ Deno.test("Meldung sofort: neuer-trainer/neuer-kunde werden direkt nach dem Erst
   assertStringIncludes(html, "get('utm_campaign')");
 });
 
-Deno.test("kern.ts: neuer-Trainer-Mail nennt Kampagne und Zeitpunkt, wenn vorhanden", async () => {
+Deno.test("kern.ts: neuer-Trainer-Mail nennt Herkunft und Registrierzeit (Teil M)", async () => {
   const kern = await lies("./supabase/functions/vexfit-automation/kern.ts");
   const mail = kern.slice(kern.indexOf("function mailNeuerTrainer"), kern.indexOf("function mailNeuerKunde"));
-  assertStringIncludes(mail, '"Kampagne"');
-  assertStringIncludes(mail, '"Zeitpunkt"');
+  assertStringIncludes(mail, '"Herkunft"');
+  assertStringIncludes(mail, '"Registriert"');
 });
 
 Deno.test("Kein gelber In-App-Balken mehr; kein WhatsApp-Knopf auf registrieren/login", async () => {

@@ -469,6 +469,7 @@ async function submitTrainer(){
   const td={vorname:fn,nachname:ln,email,telefon:'',stadt:'',plz:'',trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
   // Herkunft der Anzeige (für die sofortige Meldung an office@vexfit.app).
   const utm=new URLSearchParams(location.search).get('utm_campaign')||'';
+  const utmSrc=new URLSearchParams(location.search).get('utm_source')||'';
   try{
     const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
     const ad=await ar.json();
@@ -490,7 +491,7 @@ async function submitTrainer(){
     try { zugestimmt = localStorage.getItem('vexfit_consent') === 'zugestimmt'; } catch(e) {}
     // Fix 7b: angemeldeter Pfad - Zugangs-Token mitschicken (die Function verlangt
     // es fuer nicht-anonyme Aufrufe). Ohne Sitzung wird keine interne Mail ausgeloest.
-    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-trainer',{method:'POST',headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...td, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_campaign: utm, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
+    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-trainer',{method:'POST',headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...td, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_source: utmSrc, utm_campaign: utm, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
     if(typeof fbq==='function')fbq('track','CompleteRegistration',{content_name:'Trainer',value:0,currency:'EUR'},{eventID:capiEventId});
     // Ohne Sitzung (E-Mail-Bestaetigung aktiv) kann der Trainerbereich nicht
     // geoeffnet werden - dann Hinweis statt Weiterleitung.
@@ -532,6 +533,7 @@ async function submitClient(){
   const btn=document.getElementById('c-submit-btn');imVersand.c=true;btn.disabled=true;btn.textContent='Wird gespeichert...';
   const cd={vorname:fn,nachname:ln,email,stadt:'',plz:'',ziel:'',erwartungen:''};
   const utm=new URLSearchParams(location.search).get('utm_campaign')||'';
+  const utmSrc=new URLSearchParams(location.search).get('utm_source')||'';
   try{
     const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
     const ad=await ar.json();
@@ -544,7 +546,7 @@ async function submitClient(){
     if(!ir.ok){console.error('Insert fail:',ir.status);showError('c-error','Profil konnte nicht gespeichert werden. Bitte erneut versuchen.');imVersand.c=false;btn.disabled=false;btn.textContent='Trainer finden →';return}
     // Fix 7b: angemeldeter Pfad - Zugangs-Token mitschicken (die Function verlangt
     // es fuer nicht-anonyme Aufrufe). Ohne Sitzung wird keine interne Mail ausgeloest.
-    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-kunde',{method:'POST',headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...cd, utm_campaign: utm, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
+    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-kunde',{method:'POST',headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...cd, utm_source: utmSrc, utm_campaign: utm, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
     if(ad.access_token){try{localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,refresh_token:ad.refresh_token||null,user_id:userId,email,role:'kunde'}));}catch(e){console.warn('localStorage blockiert:',e);}}
     if(typeof fbq==='function')fbq('track','Lead',{content_name:'Kunde',value:0,currency:'EUR'});
     if(ad.access_token){ showSuccess('successClient'); }

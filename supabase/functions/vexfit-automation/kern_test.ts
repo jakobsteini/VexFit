@@ -290,13 +290,12 @@ Deno.test("/neuer-trainer: gueltige Eingabe → genau eine Mail an Jakob, Wortla
   assertEquals(auf.mails.length, 1);
   const m = auf.mails[0];
   assertEquals(m.an, "office@vexfit.app");
-  assertEquals(m.betreff, "Neuer Trainer: Eva Muster");
+  assertEquals(m.betreff, "🟡 Neuer Trainer: Eva Muster (Wien)");
   assertEquals(
     m.text,
     "Neuer Trainer registriert\n\n" +
-      "Name: Eva Muster\nE-Mail: eva@beispiel.at\nStadt: Wien\n" +
-      "Trainingsart: Im Fitnessstudio\n\n" +
-      "Im Admin öffnen: https://vexfit.app/admin.html\n\n" +
+      "Name: Eva Muster\nOrt / PLZ: Wien\nE-Mail: eva@beispiel.at\n\n" +
+      "Im Admin öffnen: https://vexfit.app/verwaltung-88fd2cb35d54e09c68c8e60199d97b66.html\n\n" +
       "Interne Benachrichtigung.\nJakob Steinbacher, 5330 Fuschl am See, Österreich",
   );
   assertStringIncludes(m.html, "Neuer Trainer registriert");
@@ -377,12 +376,12 @@ Deno.test("/neuer-kunde: gueltige Eingabe → genau eine Mail an Jakob, Wortlaut
   assertEquals(a.status, 200);
   assertEquals(auf.mails.length, 1);
   assertEquals(auf.mails[0].an, "office@vexfit.app");
-  assertEquals(auf.mails[0].betreff, "Neuer Kunde: Eva Muster");
+  assertEquals(auf.mails[0].betreff, "Neuer Kunde: Eva Muster (Wien)");
   assertEquals(
     auf.mails[0].text,
     "Neuer Kunde registriert\n\n" +
-      "Name: Eva Muster\nE-Mail: eva@beispiel.at\nStadt: Wien\nZiel: Abnehmen\n\n" +
-      "Im Admin öffnen: https://vexfit.app/admin.html\n\n" +
+      "Name: Eva Muster\nOrt / PLZ: Wien\nE-Mail: eva@beispiel.at\nZiel: Abnehmen\n\n" +
+      "Im Admin öffnen: https://vexfit.app/verwaltung-88fd2cb35d54e09c68c8e60199d97b66.html\n\n" +
       "Interne Benachrichtigung.\nJakob Steinbacher, 5330 Fuschl am See, Österreich",
   );
   assertStringIncludes(auf.mails[0].html, "Neuer Kunde registriert");
@@ -501,7 +500,11 @@ Deno.test("/neue-anfrage: noch nicht bezahlt → ERSTE Anfrage mit 49,99-Link an
     anschluesse,
   );
   assertEquals(a.status, 200);
-  assertEquals(auf.mails.length, 1);
+  // Teil M: zusätzlich zur Trainer-Mail (mails[0]) geht die interne
+  // Benachrichtigung an Jakob (mails[1], office@vexfit.app).
+  assertEquals(auf.mails.length, 2);
+  assertEquals(auf.mails[1].an, "office@vexfit.app");
+  assertStringIncludes(auf.mails[1].betreff, "Neue Anfrage:");
   const m = auf.mails[0];
   assertEquals(m.an, "trainer@beispiel.at");
   assertEquals(m.betreff, "Deine erste Kundenanfrage auf Vexfit");
@@ -565,7 +568,10 @@ Deno.test("/neue-anfrage: Studio-Trainer → Kontaktdaten direkt, KEIN Zahlungsl
   );
   assertEquals(a.status, 200);
   assertEquals((await a.json()).studio, true);
-  assertEquals(auf.mails.length, 1);
+  // Teil M: Studio-Mail an den Trainer (mails[0]) + interne Benachrichtigung an
+  // Jakob (mails[1]).
+  assertEquals(auf.mails.length, 2);
+  assertEquals(auf.mails[1].an, "office@vexfit.app");
   const m = auf.mails[0];
   assertEquals(m.an, "trainer@beispiel.at");
   assertEquals(m.betreff, "Neue Kundenanfrage auf Vexfit");
@@ -821,7 +827,7 @@ Deno.test("Zeilenumbruch im Namen kommt nicht in den Betreff", async () => {
     !b.includes("\n") && !b.includes("\r"),
     `Betreff mit Umbruch: ${JSON.stringify(b)}`,
   );
-  assertEquals(b, "Neuer Trainer: Eva Bcc: fremd@beispiel.invalid M");
+  assertEquals(b, "🟡 Neuer Trainer: Eva Bcc: fremd@beispiel.invalid M");
 });
 
 Deno.test("Zeilenumbruch in der Empfaengeradresse → kein Versand", async () => {
@@ -839,7 +845,12 @@ Deno.test("Zeilenumbruch in der Empfaengeradresse → kein Versand", async () =>
     anschluesse,
   );
   assertEquals(a.status, 200);
-  assertEquals(auf.mails, [], "es wurde an eine Adresse mit Umbruch gesendet");
+  // Teil M: an die fehlerhafte Traineradresse geht nichts; die interne
+  // Benachrichtigung an BETREIBER (office@vexfit.app) ist davon unberührt.
+  assert(
+    auf.mails.every((m) => m.an === "office@vexfit.app"),
+    "es wurde an eine Adresse mit Umbruch gesendet",
+  );
 });
 
 Deno.test("unbrauchbare Traineradresse → kein Versand", async () => {
@@ -854,9 +865,8 @@ Deno.test("unbrauchbare Traineradresse → kein Versand", async () => {
       }, MIT_TOKEN),
       anschluesse,
     );
-    assertEquals(
-      auf.mails,
-      [],
+    assert(
+      auf.mails.every((m) => m.an === "office@vexfit.app"),
       `Adresse ${JSON.stringify(adresse)} wurde nicht abgelehnt`,
     );
   }
@@ -1248,8 +1258,10 @@ Deno.test("alle sechs Mails: kein Emoji im Betreff, Fusszeile im HTML, Text saub
     mailZahlungAnJakob(trainer, "trainer@beispiel.at", 4999, true),
   ];
   for (const m of mails) {
+    // Teil M: einzige erlaubte Ausnahme ist der gelbe Punkt vorn in der
+    // Neuer-Trainer-Benachrichtigung an den Betreiber; sonst kein Emoji.
     assert(
-      !/\p{Extended_Pictographic}/u.test(m.betreff),
+      !/\p{Extended_Pictographic}/u.test(m.betreff.replace(/^🟡 /, "")),
       `Betreff enthaelt ein Emoji: ${m.betreff}`,
     );
     assertStringIncludes(m.html, "Jakob Steinbacher, 5330 Fuschl am See, Österreich");

@@ -165,6 +165,15 @@ const anschluesse: Anschluesse = {
     return zeilen[0] ?? null;
   },
 
+  // Teil M: Kundenzeile per E-Mail (select=*), fuer den Deep-Link #kunde-<id> und
+  // die Inhalte der Betreiber-Mail. Fehlt die Zeile, null – dann ohne Deep-Link.
+  async kundeProfilNachEmail(email: string): Promise<Record<string, unknown> | null> {
+    const zeilen = await lesen<Record<string, unknown>>(
+      `kunden?email=ilike.${encodeURIComponent(email)}&select=*`,
+    );
+    return zeilen[0] ?? null;
+  },
+
   // Freischalt-Mail: vollstaendige Profilzeile per Kennung. select=* – fehlt die
   // Spalte freischalt_mail_gesendet (Migration 2026-11-01-04 nicht eingespielt),
   // fehlt der Schluessel im Ergebnis; kern.ts erkennt das (sperre_fehlt).

@@ -278,6 +278,7 @@ function starteVerwaltung() {
   let inaktivTimer = null;
   let _dialogAufloesen = null;
   let _formAufloesen = null;
+  let hashSprungGemacht = false; // Teil M: Deep-Link nur einmal nach dem ersten Laden anspringen
 
   // ── Ansichten ──
   function zeigeAnsicht(id) {
@@ -501,6 +502,9 @@ function starteVerwaltung() {
       ladeStudios();
       ladeNachfrage();
       ladeProtokoll();
+      // Teil M: Deep-Link aus der Benachrichtigungs-Mail (#trainer-/#kunde-/
+      // #anfrage-<id>) nach dem ersten Laden genau einmal anspringen.
+      if (!hashSprungGemacht) { hashSprungGemacht = true; springeZuHash(); }
     } catch (e) {
       if (String(e && e.message) !== "abgemeldet") fehler("Daten konnten nicht geladen werden: " + (e && e.message ? e.message : e));
     }
@@ -1101,6 +1105,20 @@ function starteVerwaltung() {
     for (const el of document.querySelectorAll(".tab")) el.classList.remove("active");
     const inhalt = $("tab-" + name); if (inhalt) inhalt.classList.add("active");
     const knopf = document.querySelector(`.tab[data-tab="${name}"]`); if (knopf) knopf.classList.add("active");
+  }
+
+  // Teil M: Deep-Link aus der Mail anspringen. #trainer-<id> / #kunde-<id>
+  // öffnen den passenden Reiter und die Detailansicht des Datensatzes;
+  // #anfrage-<id> bzw. #anfragen öffnen den Anfragen-Reiter.
+  function springeZuHash() {
+    const h = (location.hash || "").replace(/^#/, "");
+    if (!h) return;
+    const i = h.indexOf("-");
+    const art = i >= 0 ? h.slice(0, i) : h;
+    const id = i >= 0 ? h.slice(i + 1) : "";
+    if (art === "trainer" && id) { zeigeTab("trainer"); trainerDetail(id); }
+    else if ((art === "kunde" || art === "kunden") && id) { zeigeTab("kunden"); kundeDetail(id); }
+    else if (art === "anfrage" || art === "anfragen") { zeigeTab("anfragen"); }
   }
 
   // ── Ereignis-Delegation ──

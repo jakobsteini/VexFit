@@ -59,6 +59,6 @@ Deno.test("Interne Benachrichtigungen gehen an office@vexfit.app (BETREIBER)", (
   // Neue-Trainer- und Neue-Kunde-Mail adressieren BETREIBER.
   const trainerMail = kern.slice(kern.indexOf("function mailNeuerTrainer"), kern.indexOf("function mailNeuerKunde"));
   assertStringIncludes(trainerMail, "BETREIBER");
-  const kundeMail = kern.slice(kern.indexOf("function mailNeuerKunde"), kern.indexOf("function mailNeuerKunde") + 400);
+  const kundeMail = kern.slice(kern.indexOf("function mailNeuerKunde"), kern.indexOf("function mailNeueAnfrageIntern"));
   assertStringIncludes(kundeMail, "BETREIBER");
 });

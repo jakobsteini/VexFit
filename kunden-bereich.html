@@ -787,9 +787,12 @@ async function sendAnfrage() {
     weitergeleitet: false
   };
   try {
+    // return=representation, damit wir die Kennung der neuen Anfrage haben – sie
+    // wandert als anfrage_id in die Benachrichtigung an Jakob (Deep-Link
+    // #anfrage-<id> in der Verwaltung, Teil M).
     const r = await fetch(`${SB}/rest/v1/anfragen`, {
       method:'POST',
-      headers: authKopf({'Content-Type':'application/json', Prefer:'return=minimal'}),
+      headers: authKopf({'Content-Type':'application/json', Prefer:'return=representation'}),
       body: JSON.stringify(body)
     });
     if(istAbgemeldet(r)) return;
@@ -797,7 +800,9 @@ async function sendAnfrage() {
       console.error('Anfrage speichern fehlgeschlagen:', r.status);
       throw new Error('Anfrage konnte nicht gespeichert werden');
     }
-    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neue-anfrage',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(sess&&sess.access_token||'')},body:JSON.stringify(body)}).catch(()=>{});
+    let anfrageId = '';
+    try { const neu = await r.json(); if(Array.isArray(neu) && neu[0] && neu[0].id) anfrageId = neu[0].id; } catch(e) {}
+    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neue-anfrage',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(sess&&sess.access_token||'')},body:JSON.stringify({...body, anfrage_id: anfrageId})}).catch(()=>{});
     document.getElementById('overlay').classList.remove('open');
     selT = null;
     document.getElementById('welcomePage').classList.remove('hidden');

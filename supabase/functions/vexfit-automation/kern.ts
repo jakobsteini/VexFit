@@ -236,6 +236,9 @@ export interface Anschluesse {
   aktiveVerifizierteTrainer?(): Promise<TrainerVoll[]>;
   /** Teil 4: Trainer mit allen Profilfeldern per E-Mail (service_role). */
   trainerProfilNachEmail?(email: string): Promise<TrainerProfil | null>;
+  /** Teil M: Kundenzeile per E-Mail (service_role) für Deep-Link #kunde-<id> und
+   *  die Inhalte der Betreiber-Mail. Fehlt sie, wird ohne Deep-Link gebaut. */
+  kundeProfilNachEmail?(email: string): Promise<Record<string, unknown> | null>;
   /** Freischalt-Mail: Trainer mit allen Profilfeldern per Kennung (service_role).
    *  select=* – fehlt die Spalte freischalt_mail_gesendet (Migration nicht
    *  eingespielt), fehlt der Schluessel im Ergebnis einfach. */
@@ -391,58 +394,144 @@ function baueMail(an: string, betreff: string, angaben: MailAngaben): Mail {
   };
 }
 
+// admin.html ist stillgelegt; die Freigabe-Bitte (Teil 4) verweist weiter darauf
+// (unveraendert, eigene Mail). Die drei Betreiber-Benachrichtigungen (Teil M)
+// verlinken dagegen in die geschuetzte Verwaltung (verwaltungLink).
 const ADMIN_LINK = "https://vexfit.app/admin.html";
 
-/** Mail 5 (intern an BETREIBER): neuer Trainer. */
-export function mailNeuerTrainer(body: Record<string, unknown>): Mail {
+// Teil M: Deep-Link in die geschuetzte Verwaltung. Der geheime Pfad steht NUR in
+// diesen internen Mails an den Betreiber (office@vexfit.app), nie auf einer
+// oeffentlichen Seite. Der Anker springt nach Login + zweitem Faktor direkt zum
+// Datensatz (#trainer-/#kunde-/#anfrage-<id>).
+export const VERWALTUNG_URL =
+  "https://vexfit.app/verwaltung-88fd2cb35d54e09c68c8e60199d97b66.html";
+export function verwaltungLink(anker?: string | null): string {
+  const a = w(anker).trim();
+  return a ? `${VERWALTUNG_URL}#${a}` : VERWALTUNG_URL;
+}
+
+/** Herkunft als ein Text: "utm_source – utm_campaign" (oder nur eines, oder leer). */
+function herkunftText(body: Record<string, unknown>): string {
+  const src = w(body.utm_source);
+  const camp = w(body.utm_campaign);
+  if (src && camp) return `${src} – ${camp}`;
+  return camp || src || "";
+}
+
+/** Profil-Vollstaendigkeit x/8 aus einer Trainer-Profilzeile – dieselben acht
+ *  Felder wie in der Verwaltung (fehlendeProfilfelder): Foto, Trainingsart,
+ *  Trainingsort, Preis pro Stunde, Ueber mich (>10 Zeichen), Erfahrung,
+ *  Spezialisierungen, Telefon. */
+export function profilVollstaendigkeitAcht(
+  t: Record<string, unknown>,
+): { erfuellt: number; gesamt: number } {
+  const txt = (v: unknown) => (v == null ? "" : String(v)).trim();
+  const liste = (v: unknown) => (Array.isArray(v) ? v : []);
+  const felder = [
+    txt(t.avatar_url).includes("/avatars/"),
+    txt(t.trainingsart) !== "",
+    txt(t.trainingsort) !== "",
+    Number(t.preis_stunde) > 0,
+    txt(t.bio).length > 10,
+    txt(t.erfahrung) !== "",
+    liste(t.spezialisierungen).length > 0,
+    txt(t.telefon) !== "",
+  ];
+  return { erfuellt: felder.filter(Boolean).length, gesamt: 8 };
+}
+
+/** Mail 5 (intern an BETREIBER): neuer Trainer. Teil M: schöner Betreff mit
+ *  gelbem Punkt, Deep-Link in die Verwaltung (#trainer-<id>), Inhalt inkl.
+ *  Ort/PLZ, Telefon, Registrierzeit, Herkunft und Profil-Vollständigkeit x/8.
+ *  `profil` ist die (per E-Mail nachgeschlagene) Trainerzeile; fehlt sie, wird
+ *  mit den Formularwerten gebaut und auf den Deep-Link verzichtet. */
+export function mailNeuerTrainer(
+  body: Record<string, unknown>,
+  profil?: Record<string, unknown> | null,
+): Mail {
+  const p = profil || {};
+  const name = `${w(body.vorname) || w(p.vorname)} ${w(body.nachname) || w(p.nachname)}`.trim();
+  const ort = w(p.stadt) || w(body.stadt);
+  const plz = w(p.plz) || w(body.plz);
+  const ortPlz = [ort, plz].filter((x) => x).join(" · ");
+  const id = w(p.id);
+  const vollst = profil ? profilVollstaendigkeitAcht(p) : null;
   return baueMail(
     BETREIBER,
-    `Neuer Trainer: ${w(body.vorname)} ${w(body.nachname)}`,
+    `🟡 Neuer Trainer: ${name}${ort ? ` (${ort})` : ""}`,
     {
       ueberschrift: "Neuer Trainer registriert",
-      // Teil R: die Meldung geht jetzt SOFORT nach dem kurzen Erstformular raus –
-      // Name, E-Mail, Zeitpunkt und Herkunft (utm_campaign). Stadt/Trainingsart
-      // sind zu diesem Zeitpunkt meist noch leer (werden im Trainer-Bereich
-      // ergaenzt) und werden nur gezeigt, wenn schon vorhanden.
       datenZeilen: [
-        {
-          beschriftung: "Name",
-          wert: `${w(body.vorname)} ${w(body.nachname)}`.trim(),
-        },
-        { beschriftung: "E-Mail", wert: w(body.email) },
-        ...(w(body.utm_campaign) ? [{ beschriftung: "Kampagne", wert: w(body.utm_campaign) }] : []),
-        ...(w(body.zeitpunkt) ? [{ beschriftung: "Zeitpunkt", wert: w(body.zeitpunkt) }] : []),
-        ...(w(body.stadt) ? [{ beschriftung: "Stadt", wert: w(body.stadt) }] : []),
-        ...(w(body.trainingsart) ? [{ beschriftung: "Trainingsart", wert: w(body.trainingsart) }] : []),
+        { beschriftung: "Name", wert: name },
+        { beschriftung: "Ort / PLZ", wert: ortPlz },
+        { beschriftung: "E-Mail", wert: w(body.email) || w(p.email) },
+        { beschriftung: "Telefon", wert: w(p.telefon) || w(body.telefon) },
+        { beschriftung: "Registriert", wert: w(body.zeitpunkt) },
+        { beschriftung: "Herkunft", wert: herkunftText(body) },
+        ...(vollst ? [{ beschriftung: "Profil-Vollständigkeit", wert: `${vollst.erfuellt}/${vollst.gesamt}` }] : []),
       ],
       knopfText: "Im Admin öffnen",
-      knopfLink: ADMIN_LINK,
+      knopfLink: verwaltungLink(id ? `trainer-${id}` : ""),
+      hinweis: id
+        ? "„Freigeben“ findest du dort direkt beim Trainer – aus Sicherheitsgründen keine Aktion per Mail."
+        : undefined,
       grundZeile: "Interne Benachrichtigung.",
     },
   );
 }
 
-/** Mail 6 (intern an BETREIBER): neuer Kunde. */
-export function mailNeuerKunde(body: Record<string, unknown>): Mail {
-  return baueMail(
-    BETREIBER,
-    `Neuer Kunde: ${w(body.vorname)} ${w(body.nachname)}`,
-    {
-      ueberschrift: "Neuer Kunde registriert",
-      datenZeilen: [
-        {
-          beschriftung: "Name",
-          wert: `${w(body.vorname)} ${w(body.nachname)}`.trim(),
-        },
-        { beschriftung: "E-Mail", wert: w(body.email) },
-        { beschriftung: "Stadt", wert: w(body.stadt) },
-        { beschriftung: "Ziel", wert: w(body.ziel) },
-      ],
-      knopfText: "Im Admin öffnen",
-      knopfLink: ADMIN_LINK,
-      grundZeile: "Interne Benachrichtigung.",
-    },
-  );
+/** Mail 6 (intern an BETREIBER): neuer Kunde. Teil M: Deep-Link #kunde-<id>,
+ *  Inhalt mit Ort/PLZ, Telefon, Registrierzeit, Herkunft und Ziel. */
+export function mailNeuerKunde(
+  body: Record<string, unknown>,
+  profil?: Record<string, unknown> | null,
+): Mail {
+  const p = profil || {};
+  const name = `${w(body.vorname) || w(p.vorname)} ${w(body.nachname) || w(p.nachname)}`.trim();
+  const ort = w(p.stadt) || w(body.stadt);
+  const plz = w(p.plz) || w(body.plz);
+  const ortPlz = [ort, plz].filter((x) => x).join(" · ");
+  const id = w(p.id);
+  return baueMail(BETREIBER, `Neuer Kunde: ${name}${ort ? ` (${ort})` : ""}`, {
+    ueberschrift: "Neuer Kunde registriert",
+    datenZeilen: [
+      { beschriftung: "Name", wert: name },
+      { beschriftung: "Ort / PLZ", wert: ortPlz },
+      { beschriftung: "E-Mail", wert: w(body.email) || w(p.email) },
+      { beschriftung: "Telefon", wert: w(p.telefon) || w(body.telefon) },
+      { beschriftung: "Registriert", wert: w(body.zeitpunkt) },
+      { beschriftung: "Herkunft", wert: herkunftText(body) },
+      { beschriftung: "Ziel", wert: w(p.ziel) || w(body.ziel) },
+    ],
+    knopfText: "Im Admin öffnen",
+    knopfLink: verwaltungLink(id ? `kunde-${id}` : ""),
+    grundZeile: "Interne Benachrichtigung.",
+  });
+}
+
+/** Mail (intern an BETREIBER): neue Anfrage. Teil M: Betreff "Neue Anfrage:
+ *  <Kunde> → <Trainer>", Deep-Link #anfrage-<id> (sonst #anfragen). Keine Aktion
+ *  aus der Mail – nur der Weg in die Verwaltung. */
+export function mailNeueAnfrageIntern(
+  body: Record<string, unknown>,
+  anfrageId?: string | null,
+): Mail {
+  const kunde = w(body.kunden_name) || w(body.kunden_email) || "Kunde";
+  const trainerName = w(body.trainer_name) || "Trainer";
+  const anker = w(anfrageId) ? `anfrage-${w(anfrageId)}` : "anfragen";
+  const k = kundenAngaben(body);
+  return baueMail(BETREIBER, `Neue Anfrage: ${kunde} → ${trainerName}`, {
+    ueberschrift: "Neue Anfrage",
+    datenZeilen: [
+      { beschriftung: "Kunde", wert: kunde },
+      { beschriftung: "Trainer", wert: trainerName },
+      { beschriftung: "Ziel", wert: w(k.ziel) },
+      { beschriftung: "Nachricht", wert: w(k.nachricht) },
+    ],
+    knopfText: "Im Admin öffnen",
+    knopfLink: verwaltungLink(anker),
+    grundZeile: "Interne Benachrichtigung.",
+  });
 }
 
 /**
@@ -1005,7 +1094,18 @@ async function neuerTrainer(
   // Die fruehere Passwort-Zeile des alten Workflows faellt mit dem neuen,
   // exakt vorgegebenen Wortlaut der Trainer-Mail weg; a.adminHinweis bleibt im
   // Anschluss, wird aber nicht mehr verwendet.
-  const gesendet = await sendeWennAdresseTaugt(a, mailNeuerTrainer(body));
+  // Teil M: die (gerade angelegte) Trainerzeile nachschlagen – für den Deep-Link
+  // #trainer-<id> und die Profil-Vollständigkeit x/8. Best effort: schlägt das
+  // fehl, geht die Mail mit den Formularwerten (ohne Deep-Link) raus.
+  let profil: Record<string, unknown> | null = null;
+  try {
+    profil = a.trainerProfilNachEmail
+      ? ((await a.trainerProfilNachEmail(String(body.email))) as Record<string, unknown> | null)
+      : null;
+  } catch (fehler) {
+    a.melden?.("neuer-trainer: Profil-Nachschlag fehlgeschlagen", String(fehler));
+  }
+  const gesendet = await sendeWennAdresseTaugt(a, mailNeuerTrainer(body, profil));
   // Teil 7: CompleteRegistration zusaetzlich serverseitig an die Meta Conversions
   // API (nur bei Zustimmung, mit event_id zum Entdoppeln). Best effort: ein
   // Fehler oder ein fehlendes Secret bremst die Registrierung nicht.
@@ -1027,7 +1127,14 @@ async function neuerKunde(
   const geprueft = eingabePruefen(body, ["email"]);
   if (!geprueft.ok) return antwort(400, { fehler: geprueft.grund }, herkunft);
 
-  const gesendet = await sendeWennAdresseTaugt(a, mailNeuerKunde(body));
+  // Teil M: Kundenzeile nachschlagen (Deep-Link #kunde-<id> + Inhalte). Best effort.
+  let profil: Record<string, unknown> | null = null;
+  try {
+    profil = a.kundeProfilNachEmail ? await a.kundeProfilNachEmail(String(body.email)) : null;
+  } catch (fehler) {
+    a.melden?.("neuer-kunde: Profil-Nachschlag fehlgeschlagen", String(fehler));
+  }
+  const gesendet = await sendeWennAdresseTaugt(a, mailNeuerKunde(body, profil));
   return antwort(200, { ok: true, mails: gesendet ? 1 : 0 }, herkunft);
 }
 
@@ -1081,25 +1188,32 @@ async function neueAnfrage(
   // die Mail, und die aelteste offene Anfrage wird freigeschaltet, damit sie
   // auch im Trainerbereich ohne Zahlung sichtbar ist (weitergeleitet = true).
   // Der Zweig fuer normale Trainer darunter bleibt unveraendert.
+  // Trainer-spezifische Mail zuerst (bleibt mails[0]): Studio-Trainer bekommen die
+  // Kontaktdaten direkt, normale Trainer die erste/weitere Anfrage mit Zahlungslink.
+  let trainerMail = false;
   if (trainer.studio_standort_id) {
-    const gingStudio = await sendeWennAdresseTaugt(
-      a,
-      mailStudioAnfrage(trainer, body),
-    );
+    trainerMail = await sendeWennAdresseTaugt(a, mailStudioAnfrage(trainer, body));
     const offene = await a.aeltesteOffeneAnfrage(trainer.id);
     if (offene) await a.anfrageWeitergeleitetMarkieren(offene.id);
-    return antwort(
-      200,
-      { ok: true, mails: gingStudio ? 1 : 0, studio: true },
-      herkunft,
-    );
+  } else {
+    const mail = trainer.stripe_bezahlt === true
+      ? mailWeitereAnfrage(trainer, body)
+      : mailErsteAnfrage(trainer, body);
+    trainerMail = await sendeWennAdresseTaugt(a, mail);
   }
-
-  const mail = trainer.stripe_bezahlt === true
-    ? mailWeitereAnfrage(trainer, body)
-    : mailErsteAnfrage(trainer, body);
-  const gesendet = await sendeWennAdresseTaugt(a, mail);
-  return antwort(200, { ok: true, mails: gesendet ? 1 : 0 }, herkunft);
+  // Teil M: zusätzlich die interne Benachrichtigung an Jakob (Deep-Link
+  // #anfrage-<id>, falls der Browser die Anfrage-Kennung mitschickt, sonst
+  // #anfragen). BETREIBER ist immer gültig – daher in der Regel +1 Mail.
+  const anJakob = await sendeWennAdresseTaugt(
+    a,
+    mailNeueAnfrageIntern(body, w(body.anfrage_id) || null),
+  );
+  const mails = (trainerMail ? 1 : 0) + (anJakob ? 1 : 0);
+  return antwort(
+    200,
+    { ok: true, mails, ...(trainer.studio_standort_id ? { studio: true } : {}) },
+    herkunft,
+  );
 }
 
 /**
