@@ -44,10 +44,16 @@ import {
   type Anschluesse,
   bearbeiten,
   type Mail,
+  type MetaEreignis,
   type StripeEreignis,
   type Trainer,
   type TrainerProfil,
 } from "./kern.ts";
+
+// Teil 7: Meta-Pixel-ID (dieselbe wie im Browser) und Merker, damit der Hinweis
+// bei fehlendem Secret nur einmal pro Instanz im Log steht.
+const META_PIXEL_ID = "1034036285801133";
+let capiHinweisGeloggt = false;
 
 const SMTP = { host: "smtp.gmail.com", port: 465 };
 
@@ -155,6 +161,31 @@ const anschluesse: Anschluesse = {
       `trainers?email=ilike.${encodeURIComponent(email)}&select=*`,
     );
     return zeilen[0] ?? null;
+  },
+
+  // Teil 7: ein Ereignis an die Meta Conversions API senden. Der Zugriffsschluessel
+  // kommt NUR aus META_CAPI_TOKEN. Fehlt er, macht die Funktion nichts und loggt
+  // genau einen Hinweis (kein Fehler) – die Registrierung laeuft weiter.
+  async metaConversion(ereignis: MetaEreignis): Promise<{ gesendet: boolean; grund?: string }> {
+    const token = Deno.env.get("META_CAPI_TOKEN");
+    if (!token) {
+      if (!capiHinweisGeloggt) {
+        capiHinweisGeloggt = true;
+        console.log("vexfit-automation: META_CAPI_TOKEN nicht gesetzt – Conversions API deaktiviert.");
+      }
+      return { gesendet: false, grund: "kein Token" };
+    }
+    const url = `https://graph.facebook.com/v21.0/${META_PIXEL_ID}/events?access_token=${encodeURIComponent(token)}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data: [ereignis] }),
+    });
+    if (!res.ok) {
+      console.error("vexfit-automation: Conversions API HTTP", res.status);
+      return { gesendet: false, grund: "HTTP " + res.status };
+    }
+    return { gesendet: true };
   },
 
   // Node "Offene Anfrage holen", erweitert um E2: die AELTESTE Anfrage.

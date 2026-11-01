@@ -228,6 +228,10 @@ export interface Anschluesse {
   aktiveVerifizierteTrainer?(): Promise<TrainerVoll[]>;
   /** Teil 4: Trainer mit allen Profilfeldern per E-Mail (service_role). */
   trainerProfilNachEmail?(email: string): Promise<TrainerProfil | null>;
+  /** Teil 7: ein Ereignis an die Meta Conversions API senden. Holt den Schluessel
+   *  aus META_CAPI_TOKEN; fehlt er, passiert nichts (gesendet=false, einmal
+   *  geloggt). Wirft nicht – die Registrierung laeuft immer weiter. */
+  metaConversion?(ereignis: MetaEreignis): Promise<{ gesendet: boolean; grund?: string }>;
   /** B4e: vermerkt, dass fuer eine Anfrage Alternativen verschickt wurden. */
   alternativenVermerken?(anfrageId: string): Promise<void>;
   /** B4e (48-Stunden-Fall): offene, noch unbeantwortete Anfragen, die vor dem
@@ -716,6 +720,67 @@ async function sendeWennAdresseTaugt(
   return true;
 }
 
+// ── Teil 7: Meta Conversions API (serverseitiges CompleteRegistration) ──
+
+/** SHA-256 als Hex-String. Rein (crypto.subtle, kein Netz) – für die
+ *  Nutzerdaten der Conversions API (E-Mail klein/getrimmt, dann gehasht). */
+export async function sha256Hex(text: string): Promise<string> {
+  const roh = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(roh)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export interface MetaEreignis {
+  event_name: string;
+  event_id: string;
+  event_time: number;
+  action_source: "website";
+  event_source_url?: string;
+  user_data: { em?: string[] };
+}
+
+/** Baut das CAPI-Ereignis (E-Mail gehasht: lowercase, getrimmt, SHA-256). */
+export async function metaEreignisBauen(
+  body: Record<string, unknown>,
+): Promise<MetaEreignis> {
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const ereignis: MetaEreignis = {
+    event_name: "CompleteRegistration",
+    event_id: String(body.event_id ?? ""),
+    event_time: Math.floor(Date.now() / 1000),
+    action_source: "website",
+    user_data: {},
+  };
+  const url = String(body.event_source_url ?? "");
+  if (url) ereignis.event_source_url = url;
+  if (email) ereignis.user_data.em = [await sha256Hex(email)];
+  return ereignis;
+}
+
+/**
+ * Teil 7: schickt CompleteRegistration serverseitig an Meta – aber nur, wenn der
+ * Nutzer zugestimmt hat UND eine event_id zum Entdoppeln vorliegt. Die Function
+ * holt den Zugriffsschluessel ausschliesslich aus dem Secret META_CAPI_TOKEN
+ * (im Anschluss metaConversion); fehlt es, passiert nichts (ein Hinweis wird
+ * dort einmal geloggt). Best effort: Fehler werden geschluckt, die Registrierung
+ * laeuft immer weiter.
+ */
+async function sendeMetaConversion(
+  a: Anschluesse,
+  body: Record<string, unknown>,
+): Promise<{ gesendet: boolean; grund?: string }> {
+  if (body.zustimmung !== true) return { gesendet: false, grund: "keine Zustimmung" };
+  if (!String(body.event_id ?? "")) return { gesendet: false, grund: "keine event_id" };
+  if (!a.metaConversion) return { gesendet: false, grund: "nicht verfuegbar" };
+  try {
+    const ereignis = await metaEreignisBauen(body);
+    const r = await a.metaConversion(ereignis);
+    return { gesendet: !!r?.gesendet, grund: r?.grund };
+  } catch (fehler) {
+    a.melden?.("Meta-Conversions-Fehler", { fehler: String(fehler) });
+    return { gesendet: false, grund: "fehler" };
+  }
+}
+
 /** Liest das Bearer-Token aus dem Authorization-Kopf, sonst null. */
 function bearerToken(r: Request): string | null {
   const h = r.headers.get("authorization") || r.headers.get("Authorization");
@@ -852,7 +917,11 @@ async function neuerTrainer(
   // exakt vorgegebenen Wortlaut der Trainer-Mail weg; a.adminHinweis bleibt im
   // Anschluss, wird aber nicht mehr verwendet.
   const gesendet = await sendeWennAdresseTaugt(a, mailNeuerTrainer(body));
-  return antwort(200, { ok: true, mails: gesendet ? 1 : 0 }, herkunft);
+  // Teil 7: CompleteRegistration zusaetzlich serverseitig an die Meta Conversions
+  // API (nur bei Zustimmung, mit event_id zum Entdoppeln). Best effort: ein
+  // Fehler oder ein fehlendes Secret bremst die Registrierung nicht.
+  const capi = await sendeMetaConversion(a, body);
+  return antwort(200, { ok: true, mails: gesendet ? 1 : 0, capi }, herkunft);
 }
 
 async function neuerKunde(
