@@ -145,6 +145,29 @@ export interface TrainerVoll {
   spezialisierungen?: string[] | null;
 }
 
+/** Teil 4: ein Trainer mit allen Feldern, die fuer die Vollstaendigkeits-Pruefung
+ *  und die Freigabe-Bitte gebraucht werden. */
+export interface TrainerProfil {
+  id: string;
+  vorname?: string | null;
+  nachname?: string | null;
+  email?: string | null;
+  plz?: string | null;
+  stadt?: string | null;
+  avatar_url?: string | null;
+  trainingsart?: string | null;
+  trainingsort?: string | null;
+  preis_stunde?: number | null;
+  bio?: string | null;
+  erfahrung?: string | null;
+  spezialisierungen?: string[] | null;
+  telefon?: string | null;
+  aktiv?: boolean | null;
+  /** Migration 2026-11-01-01: einmalige Freigabe-Bitte schon verschickt?
+   *  Fehlt die Spalte (Migration nicht eingespielt), ist das Feld undefined. */
+  freigabe_mail_gesendet?: boolean | null;
+}
+
 export interface Mail {
   an: string;
   betreff: string;
@@ -203,6 +226,8 @@ export interface Anschluesse {
   trainerVollNachId?(id: string): Promise<TrainerVoll | null>;
   /** B4e: alle freigeschalteten, verifizierten Trainer (Kandidaten). */
   aktiveVerifizierteTrainer?(): Promise<TrainerVoll[]>;
+  /** Teil 4: Trainer mit allen Profilfeldern per E-Mail (service_role). */
+  trainerProfilNachEmail?(email: string): Promise<TrainerProfil | null>;
   /** B4e: vermerkt, dass fuer eine Anfrage Alternativen verschickt wurden. */
   alternativenVermerken?(anfrageId: string): Promise<void>;
   /** B4e (48-Stunden-Fall): offene, noch unbeantwortete Anfragen, die vor dem
@@ -796,6 +821,8 @@ export async function bearbeiten(
       return await neueAnfrage(anfrageObjekt, a, herkunft);
     case "admin-aktion":
       return await adminAktion(anfrageObjekt, a, herkunft);
+    case "freigabe-pruefen":
+      return await freigabePruefen(anfrageObjekt, a, herkunft);
     case "passt-nicht":
       return await passtNicht(anfrageObjekt, a, herkunft);
     case "unbeantwortet-pruefen":
@@ -1039,6 +1066,97 @@ async function adminAktion(
       return antwort(400, { fehler: "unbekannte Aktion" }, herkunft);
   }
   return antwort(200, { ok: true, geaendert }, herkunft);
+}
+
+/**
+ * Teil 4: wird nach dem Speichern aus dem Trainerbereich aufgerufen und prueft
+ * das EIGENE Profil des angemeldeten Trainers. Ist es erstmals vollstaendig und
+ * der Trainer noch nicht freigegeben, geht EINMALIG eine Freigabe-Bitte an
+ * BETREIBER (office@vexfit.app). „Genau einmal" sichert das Feld
+ * freigabe_mail_gesendet. Fehlt die Spalte (Migration 2026-11-01-01 nicht
+ * eingespielt) oder der Anschluss, passiert nichts (nur ein Log-Hinweis) – so
+ * laeuft der Trainerbereich auch ohne Migration fehlerfrei weiter (Teil 1).
+ */
+async function freigabePruefen(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const token = bearerToken(r);
+  const nutzer = token ? await a.benutzerAusToken(token) : null;
+  if (!nutzer) return antwort(401, { fehler: "Anmeldung erforderlich" }, herkunft);
+  if (!a.trainerProfilNachEmail) {
+    a.melden?.("freigabe-pruefen: Anschluss nicht verfuegbar");
+    return antwort(200, { ok: true, gesendet: false, grund: "nicht verfuegbar" }, herkunft);
+  }
+  const t = nutzer.email ? await a.trainerProfilNachEmail(nutzer.email) : null;
+  if (!t) return antwort(200, { ok: true, gesendet: false, grund: "kein Trainer" }, herkunft);
+  if (t.aktiv === true) return antwort(200, { ok: true, gesendet: false, grund: "schon aktiv" }, herkunft);
+  if (t.freigabe_mail_gesendet === true) {
+    return antwort(200, { ok: true, gesendet: false, grund: "schon gemeldet" }, herkunft);
+  }
+  if (!profilVollstaendig(t)) {
+    return antwort(200, { ok: true, gesendet: false, grund: "unvollstaendig" }, herkunft);
+  }
+  // Ohne die Spalte laesst sich „genau einmal" nicht sichern -> nicht senden
+  // (verhindert Mehrfachversand bei jedem Speichern), nur Hinweis.
+  if (!("freigabe_mail_gesendet" in t) || t.freigabe_mail_gesendet === undefined) {
+    a.melden?.("freigabe-pruefen: Spalte freigabe_mail_gesendet fehlt (Migration 2026-11-01-01)");
+    return antwort(200, { ok: true, gesendet: false, grund: "migration fehlt" }, herkunft);
+  }
+  const gesendet = await sendeWennAdresseTaugt(a, mailProfilVollstaendig(t));
+  if (gesendet) {
+    try {
+      await a.adminTrainerSetzen(t.id, { freigabe_mail_gesendet: true });
+    } catch (fehler) {
+      if (istMigrationFehlt(fehler)) {
+        a.melden?.("freigabe-pruefen: Flag konnte nicht gesetzt werden (Migration fehlt)");
+      } else throw fehler;
+    }
+  }
+  return antwort(200, { ok: true, gesendet }, herkunft);
+}
+
+/**
+ * Teil 4: dieselben acht Vollstaendigkeitsfelder wie im Admin
+ * (admin.html fehlendeProfilfelder), inkl. Foto. Gibt true, wenn alle erfuellt
+ * sind. Rein, damit es ohne Netz pruefbar ist.
+ */
+export function profilVollstaendig(t: TrainerProfil): boolean {
+  const hatText = (v: unknown, minLen = 1) =>
+    typeof v === "string" && v.trim().length >= minLen;
+  return (
+    hatText(t.avatar_url) && // Foto
+    hatText(t.trainingsart) &&
+    hatText(t.trainingsort) &&
+    Number(t.preis_stunde) > 0 && // Preis pro Stunde
+    hatText(t.bio, 11) && // Ueber mich (> 10 Zeichen)
+    hatText(t.erfahrung) &&
+    Array.isArray(t.spezialisierungen) && t.spezialisierungen.length > 0 &&
+    hatText(t.telefon)
+  );
+}
+
+/** Teil 4 (intern an BETREIBER): Profil ist vollstaendig – bitte freigeben. */
+export function mailProfilVollstaendig(t: TrainerProfil): Mail {
+  const name = `${w(t.vorname)} ${w(t.nachname)}`.trim();
+  const spez = Array.isArray(t.spezialisierungen) ? t.spezialisierungen.join(", ") : "";
+  return baueMail(
+    BETREIBER,
+    `Profil vollständig – bitte freigeben: ${name}`,
+    {
+      ueberschrift: "Profil vollständig – bitte freigeben",
+      datenZeilen: [
+        { beschriftung: "Name", wert: name },
+        { beschriftung: "E-Mail", wert: w(t.email) },
+        { beschriftung: "PLZ", wert: w(t.plz) },
+        { beschriftung: "Spezialisierungen", wert: spez },
+      ],
+      knopfText: "Im Admin freigeben",
+      knopfLink: ADMIN_LINK,
+      grundZeile: "Dieser Trainer hat erstmals alle Profilfelder ausgefüllt.",
+    },
+  );
 }
 
 /**

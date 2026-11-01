@@ -46,6 +46,7 @@ import {
   type Mail,
   type StripeEreignis,
   type Trainer,
+  type TrainerProfil,
 } from "./kern.ts";
 
 const SMTP = { host: "smtp.gmail.com", port: 465 };
@@ -142,6 +143,16 @@ const anschluesse: Anschluesse = {
       `trainers?email=ilike.${
         encodeURIComponent(email)
       }&select=id,vorname,nachname,email,stripe_bezahlt`,
+    );
+    return zeilen[0] ?? null;
+  },
+
+  // Teil 4: vollstaendige Profilzeile per E-Mail. select=* – fehlt die Spalte
+  // freigabe_mail_gesendet (Migration nicht eingespielt), fehlt der Schluessel
+  // im Ergebnis einfach; kern.ts erkennt das und sendet dann nicht.
+  async trainerProfilNachEmail(email: string): Promise<TrainerProfil | null> {
+    const zeilen = await lesen<TrainerProfil>(
+      `trainers?email=ilike.${encodeURIComponent(email)}&select=*`,
     );
     return zeilen[0] ?? null;
   },

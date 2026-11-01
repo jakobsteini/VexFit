@@ -1146,6 +1146,15 @@ async function saveProfile() {
       updateDots();
       if(T) Object.assign(T, body);
 
+      // Teil 4: pruefen lassen, ob das Profil jetzt vollstaendig ist. Wenn ja und
+      // noch nicht freigegeben, geht EINMALIG eine Freigabe-Bitte an
+      // office@vexfit.app. Nicht blockierend; ein Fehler bleibt ohne Folge.
+      fetch(`${SB}/functions/v1/vexfit-automation/freigabe-pruefen`, {
+        method: 'POST',
+        headers: authKopf({ 'Content-Type': 'application/json' }),
+        body: '{}'
+      }).catch(() => {});
+
       // Bestaetigung kurz stehen lassen, dann zu den Anfragen wechseln.
       setTimeout(() => {
         showPage('anfragen');
