@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Studio-Plakat A4 – Vexfit</title>
+<link rel="stylesheet" href="../fonts/vexfit-fonts.css">
+<style>
+:root{--black:#0a0a0a;--accent:#e8ff00}
+*{margin:0;padding:0;box-sizing:border-box}
+html{overflow-x:hidden}
+body{background:#333;font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;align-items:center;padding:20px;gap:14px}
+/* A4-Blatt (210 x 297 mm) im Hochformat, schwarzer Grund, neongelbe Akzente. */
+.blatt{width:210mm;height:297mm;background:var(--black);color:#f5f5f0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:24mm 20mm;position:relative}
+.kopf{text-align:center}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:36mm;line-height:0.8;letter-spacing:4mm;color:#f5f5f0}
+.logo span{color:var(--accent)}
+.partner{margin-top:6mm;font-size:5mm;letter-spacing:2px;text-transform:uppercase;color:#999}
+.partner b{color:#f5f5f0}
+.jh{width:26mm;height:26mm;margin:8mm auto 0;border:2px solid var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:12mm;letter-spacing:1mm;color:var(--accent)}
+.jh-label{font-size:3.4mm;color:#888;text-align:center;margin-top:3mm;letter-spacing:1px;text-transform:uppercase}
+.titel{font-family:'Bebas Neue',sans-serif;font-size:17mm;line-height:1.0;letter-spacing:1px;text-align:center;margin:8mm 0 4mm}
+.standort{font-size:7mm;color:var(--accent);text-align:center;margin-bottom:8mm;letter-spacing:1px;text-transform:uppercase;font-weight:700}
+.qr{background:#fff;padding:6mm;border-radius:4mm}
+.qr svg{display:block;width:80mm;height:80mm}
+.hinweis{text-align:center;font-size:5mm;color:#bbb;line-height:1.5;margin-top:7mm}
+.link{font-size:4mm;color:#888;word-break:break-all;margin-top:3mm;text-align:center}
+.fuss{font-size:4mm;color:#777;text-align:center}
+.werkzeug{color:#ccc;font-size:13px;text-align:center;max-width:210mm}
+.werkzeug input{padding:8px;border-radius:4px;border:1px solid #666;background:#222;color:#eee}
+.drucken{background:var(--accent);color:var(--black);border:none;padding:12px 24px;border-radius:4px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;font-size:13px}
+@media screen and (max-width:620px){ .blatt{transform:scale(0.44);transform-origin:top center;margin-bottom:-166mm} }
+@media print{
+  body{background:#fff;padding:0;gap:0}
+  .drucken,.werkzeug{display:none}
+  .blatt{width:210mm;height:297mm;transform:none;margin:0}
+  @page{size:A4 portrait;margin:0}
+}
+</style>
+<script src="../vexfit-qr.js"></script>
+</head>
+<body>
+<div class="werkzeug">
+  Studio-Seite (s): <input id="sFeld" placeholder="john-harris-salzburg" size="24" />
+  <button class="drucken" onclick="neuLaden()">Anzeigen</button>
+  <button class="drucken" onclick="window.print()">Drucken</button>
+  <div style="margin-top:6px;font-size:12px;color:#999">Aufruf z. B.: studio-plakat.html?s=john-harris-salzburg</div>
+</div>
+
+<div class="blatt" id="blatt">
+  <div class="kopf">
+    <div class="logo">V<span>EXFIT</span></div>
+    <div class="partner">Partner-Studio</div>
+    <!-- Platzhalter-Monogramm (KEIN John-Harris-Logo, keine echten Namen). -->
+    <div class="jh" id="monogramm">JH</div>
+    <div class="jh-label">Platzhalter – echtes Logo trägt das Studio bei</div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center">
+    <div class="titel">FINDE DEINEN<br>PERSONAL TRAINER</div>
+    <div class="standort" id="standortName"></div>
+    <div class="qr" id="qr"></div>
+    <div class="hinweis">Scanne den Code mit deiner Handy-Kamera<br>und finde deinen Trainer – kostenlos.</div>
+    <div class="link" id="linkText"></div>
+  </div>
+  <div class="fuss">vexfit.app · Personal Training für die DACH-Region</div>
+</div>
+
+<script>
+// Ziel der QR: die Studio-Seite (nur diese Standort-Trainer). Standard-Standort
+// John Harris Salzburg; per ?s= aenderbar (gleicher Slug wie studio.html).
+const s = (new URLSearchParams(location.search).get('s') || 'john-harris-salzburg').trim();
+const ZIEL = 'https://vexfit.app/studio.html?s=' + encodeURIComponent(s);
+
+function neuLaden(){
+  const wert = document.getElementById('sFeld').value.trim() || s;
+  const url = new URL(location.href);
+  url.searchParams.set('s', wert);
+  location.href = url.toString();
+}
+
+function hübschName(slug){
+  // Nur fuer die Ueberschrift, ohne Netz: aus dem Slug einen lesbaren Namen.
+  return slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+document.getElementById('sFeld').value = s;
+document.getElementById('standortName').textContent = hübschName(s);
+document.getElementById('linkText').textContent = ZIEL;
+// Monogramm aus den Anfangsbuchstaben des Studionamens (Platzhalter).
+const teile = s.split('-').filter(Boolean);
+document.getElementById('monogramm').textContent =
+  (teile.slice(0, 2).map(t => t[0]).join('') || 'JH').toUpperCase();
+// QR ohne externen Dienst, schwarz auf weiss fuer den Druck.
+document.getElementById('qr').innerHTML = vexQR.svg(ZIEL, { groesse: 800, rand: 4 });
+</script>
+</body>
+</html>
