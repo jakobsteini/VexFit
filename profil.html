@@ -370,6 +370,23 @@ function setzeProfilSeo(t, id){
   addJsonLd(ld);
 }
 
+// D7: einmal pro Seitenaufruf den anonymen Tageszaehler erhoehen. Mit authKopf()
+// sieht die Funktion das Nutzer-Token (falls angemeldet) und kann eigene
+// Aufrufe des Trainers bzw. Admin-Aufrufe ausschliessen. Nicht blockierend;
+// ein Fehler (z. B. Migration 2026-11-01-05 nicht eingespielt) bleibt folgenlos.
+let _aufrufGezaehlt = false;
+function zaehleProfilaufruf(id) {
+  if(_aufrufGezaehlt || !id) return;
+  _aufrufGezaehlt = true;
+  try {
+    fetch(`${SUPABASE_URL}/rest/v1/rpc/profilaufruf_zaehlen`, {
+      method: 'POST',
+      headers: authKopf({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ p_trainer_id: id })
+    }).catch(() => {});
+  } catch(e) {}
+}
+
 async function loadProfile() {
   const urlParams = new URLSearchParams(window.location.search);
   const id = urlParams.get('id');
@@ -393,6 +410,11 @@ async function loadProfile() {
     trainerData = data[0];
     renderProfile(trainerData);
     setzeProfilSeo(trainerData, id);
+    // D7: anonymen Profilaufruf zaehlen (genau einmal pro Seitenaufruf). Die
+    // Zaehl-Funktion speichert KEINE IP, KEINE Nutzer-Kennung, KEINE Cookies –
+    // nur Trainer und Tag. Eigene Aufrufe des Trainers und Admin-Aufrufe zaehlen
+    // serverseitig nicht. Fehlt die Migration, bleibt es wirkungslos.
+    zaehleProfilaufruf(id);
   } catch(e) {
     console.error(e);
     const lp = document.getElementById('loadingProfile');

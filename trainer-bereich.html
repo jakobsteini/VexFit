@@ -214,6 +214,66 @@ try {
    Fusszeilen-Links vollstaendig sichtbar und antippbar bleiben. */
 @media (max-width:480px){body{padding-bottom:120px}.cookie-widerruf{padding-bottom:24px}}</style>
 <script type="module" src="vexfit-sitzung.js"></script>
+<style>
+/* ═══════════ DASHBOARD (Teil D) ═══════════ */
+#dashboardPage{max-width:960px}
+.dash-willkommen{display:flex;align-items:center;gap:12px;background:rgba(232,255,0,0.08);border:1px solid rgba(232,255,0,0.25);border-radius:8px;padding:12px 16px;margin-bottom:18px;font-size:14px;color:var(--white)}
+.dash-willkommen span{flex:1}
+.dash-willkommen-zu{background:transparent;border:none;color:var(--muted);font-size:18px;cursor:pointer;line-height:1;flex-shrink:0}
+.dash-kopf{margin-bottom:20px}
+.dash-hallo{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,7vw,38px);letter-spacing:1px;line-height:1}
+.dash-status{display:inline-block;padding:4px 12px;border-radius:100px;font-size:12px;font-weight:700;margin-top:10px}
+.dash-status.pruefung{background:rgba(251,146,60,0.15);color:var(--orange)}
+.dash-status.frei{background:rgba(74,222,128,0.15);color:var(--green)}
+.dash-status.gesperrt{background:rgba(255,107,107,0.15);color:var(--red)}
+.dash-status-text{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.5}
+.dash-kacheln{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:22px}
+.dash-kachel{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px}
+.dash-kachel-num{font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--accent);line-height:1}
+.dash-kachel-label{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.3}
+.dash-spalten{display:grid;grid-template-columns:1fr;gap:0}
+.dash-block{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:18px}
+.dash-block-kopf{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;font-weight:700;font-size:14px;gap:10px}
+.dash-block-kopf a{color:var(--accent);font-size:12px;text-decoration:none;font-weight:600;white-space:nowrap}
+.dash-leer{color:var(--muted);font-size:13px;text-align:center;padding:16px 8px;line-height:1.5}
+.dash-knopf-sek{display:block;text-align:center;margin-top:12px;background:var(--mid);border:1px solid var(--border);color:var(--white);padding:11px;border-radius:4px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;text-decoration:none}
+.dash-ring-wrap{position:relative;width:132px;height:132px;margin:0 auto 16px}
+.dash-ring{width:132px;height:132px;border-radius:50%;background:conic-gradient(var(--accent) 0%, var(--mid) 0)}
+.dash-ring-text{position:absolute;inset:14px;background:var(--card);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.dash-ring-text span{font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--accent);line-height:1}
+.dash-ring-text small{font-size:10px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+.dash-next{background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:14px}
+.dash-next-titel{font-weight:700;font-size:13px;margin-bottom:4px}
+.dash-next-tipp{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px}
+.dash-next-knopf{display:inline-block;background:var(--accent);color:#000;padding:9px 16px;border-radius:4px;font-size:12px;font-weight:700;text-decoration:none}
+.dash-next-mehr{display:block;width:100%;background:transparent;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit;padding:10px 0 2px;text-align:center}
+.dash-next-liste{margin-top:8px}
+.dash-next-zeile{display:flex;align-items:flex-start;gap:8px;font-size:13px;padding:5px 0}
+.dash-next-haken{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:1px}
+.dash-next-haken.ok{background:rgba(74,222,128,0.2);color:var(--green)}
+.dash-next-haken.no{background:var(--border);color:var(--muted)}
+.dash-vorschau{display:flex;gap:12px;align-items:center;background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:12px}
+.dash-vorschau-foto{width:56px;height:56px;border-radius:8px;background:linear-gradient(135deg,#1a1a1a,#2a2a2a);background-size:cover;background-position:center;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;color:rgba(232,255,0,0.45);font-size:18px}
+.dash-vorschau-name{font-weight:700;font-size:15px}
+.dash-vorschau-meta{font-size:12px;color:var(--muted);margin-top:2px}
+.dash-vorschau-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.dash-vorschau-tag{font-size:10px;background:rgba(255,255,255,0.06);border-radius:100px;padding:2px 8px;color:var(--muted)}
+.dash-anfrage{background:var(--mid);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:8px}
+.dash-anfrage-kopf{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;gap:8px}
+.dash-anfrage-name{font-weight:700}
+.dash-anfrage-datum{color:var(--muted);font-size:11px;white-space:nowrap}
+.dash-anfrage-ziel{font-size:12px;color:var(--muted);margin-bottom:8px}
+.dash-anfrage-zustand{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+.dash-anfrage-zustand.angenommen{color:var(--green)}
+.dash-anfrage-zustand.abgelehnt{color:var(--muted)}
+.dash-nachfrage-num{font-family:'Bebas Neue',sans-serif;font-size:40px;color:var(--accent);line-height:1}
+.dash-nachfrage-text{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.5}
+.dash-nachfrage-knopf{display:inline-block;margin-top:10px;background:var(--mid);border:1px solid var(--border);color:var(--white);padding:9px 14px;border-radius:4px;font-size:12px;font-weight:700;text-decoration:none}
+@media(min-width:900px){
+  .dash-spalten{grid-template-columns:1.25fr 1fr;gap:18px;align-items:start}
+  .dash-kacheln{grid-template-columns:repeat(4,1fr)}
+}
+</style>
 <style>/* Tippflaechen Handy Fusszeile (Fix 2 Nachtrag) */
 @media (max-width:640px){.cookie-widerruf a{min-height:44px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}}</style>
 </head>
@@ -222,6 +282,9 @@ try {
 <nav>
   <a href="index.html" class="logo" aria-label="Vexfit – zur Startseite"><svg viewBox="168 166 1265 1270" aria-hidden="true" style="height:0.7em;width:auto;vertical-align:0;margin-right:4px"><g transform="translate(800 800) translate(-1024.5 -1082.5)"><path fill="#E8FF00" fill-rule="evenodd" d="M914.3,1716.3C908.8,1701.1 867.1,1595.6 814.0,1462.5C803.5,1436.1 781.3,1380.5 764.8,1339.0C711.7,1205.5 681.3,1129.2 631.2,1003.5C604.3,935.9 566.9,842.0 548.2,795.0C511.9,703.7 445.4,538.0 437.4,519.0C429.8,500.7 417.2,481.4 402.3,465.0C394.6,456.6 392.1,452.5 393.8,450.8C394.6,450.0 399.9,449.3 408.3,448.9C426.0,448.0 685.1,448.0 705.9,448.9C721.8,449.6 722.4,449.7 723.9,452.0C727.9,458.2 770.3,508.1 807.0,550.0C814.4,558.5 826.2,572.0 833.0,580.0C839.9,588.0 851.8,601.7 859.5,610.4C877.5,630.9 886.5,641.2 901.0,658.5C907.4,666.2 922.9,684.2 935.4,698.5C947.9,712.8 970.0,738.3 984.6,755.2C1011.2,786.1 1018.5,793.6 1024.9,796.6C1031.0,799.5 1033.4,797.4 1059.5,766.6C1065.6,759.5 1080.0,742.8 1091.5,729.5C1103.0,716.2 1122.8,693.5 1135.5,678.9C1148.1,664.4 1162.0,648.4 1166.5,643.5C1170.9,638.5 1180.6,627.2 1188.1,618.5C1214.0,588.0 1252.4,543.4 1266.5,527.5C1274.2,518.7 1284.6,506.8 1289.5,501.0C1302.3,486.0 1312.4,474.6 1320.1,466.5C1323.7,462.6 1328.4,456.9 1330.4,453.7L1334.1,448.0L1495.6,448.0L1657.2,448.0L1656.5,452.2C1655.3,460.0 1653.8,463.1 1648.4,469.2C1641.6,476.8 1635.1,486.5 1630.0,496.6C1626.2,504.3 1596.4,577.4 1552.7,686.0C1540.9,715.4 1513.4,783.4 1491.7,837.0C1470.0,890.6 1437.6,970.7 1419.7,1015.0C1401.9,1059.3 1372.7,1131.7 1354.7,1176.0C1326.2,1246.6 1307.6,1292.5 1246.8,1443.0C1239.2,1462.0 1224.1,1499.3 1213.3,1526.0C1202.5,1552.7 1180.8,1606.7 1165.1,1646.0L1136.5,1717.5L1025.7,1717.8C920.9,1718.0 914.9,1717.9 914.3,1716.3ZM1034.7,1470.6C1037.4,1467.3 1056.2,1418.9 1122.5,1245.0C1142.5,1192.3 1161.3,1143.3 1191.0,1066.0C1225.3,976.5 1230.1,963.2 1228.7,959.6C1227.3,956.1 1224.1,958.2 1214.3,968.8C1201.7,982.3 1167.1,1021.6 1133.0,1061.0C1118.5,1077.8 1099.6,1099.4 1091.0,1109.0C1082.5,1118.7 1069.9,1133.1 1063.0,1141.0C1045.4,1161.5 1031.1,1176.0 1028.5,1176.0C1022.9,1176.0 1008.4,1162.3 986.5,1136.5C980.5,1129.3 969.2,1116.4 961.5,1107.6C953.8,1098.9 941.3,1084.5 933.6,1075.6C894.8,1030.6 852.0,982.7 848.5,980.4C845.3,978.3 844.0,979.3 844.0,983.8C844.0,989.7 845.7,994.6 866.8,1050.0C877.7,1078.9 896.9,1129.5 909.4,1162.5C921.9,1195.5 939.5,1241.8 948.5,1265.5C973.6,1331.6 983.2,1356.8 996.0,1391.0C1019.3,1452.7 1025.3,1467.3 1029.1,1471.1C1031.6,1473.6 1032.5,1473.5 1034.7,1470.6Z"/></g></svg>EX<span>FIT</span></a>
   <div class="nav-right">
+    <a href="#" class="nav-link active" id="navDashboard" onclick="showPage('dashboard',event)">
+      <span>Übersicht</span>
+    </a>
     <a href="#" class="nav-link" id="navProfil" onclick="showPage('profil',event)">
       <div class="nav-dot nav-dot-orange" id="navProfilDot"></div>
       <span>Profil</span>
@@ -235,8 +298,59 @@ try {
   </div>
 </nav>
 
+<!-- ═══════════ DASHBOARD (Teil D) ═══════════ -->
+<div class="page-wrap" id="dashboardPage">
+  <!-- D5: schließbare Willkommens-Leiste nach der Registrierung (?neu=1). Kein Modal, keine Wand. -->
+  <div class="dash-willkommen hidden" id="dashWillkommen">
+    <span>Willkommen bei Vexfit – starte mit dem nächsten Schritt rechts.</span>
+    <button class="dash-willkommen-zu" id="dashWillkommenZu" onclick="dashWillkommenSchliessen()" aria-label="Willkommenshinweis schließen">✕</button>
+  </div>
+
+  <!-- D1: Kopf mit Begrüßung und Status (In Prüfung / Freigeschaltet / Gesperrt) -->
+  <div class="dash-kopf fade">
+    <div class="dash-hallo" id="dashHallo">Hallo</div>
+    <span class="dash-status" id="dashStatus"></span>
+    <div class="dash-status-text" id="dashStatusText"></div>
+  </div>
+
+  <!-- D2: vier Kacheln -->
+  <div class="dash-kacheln fade fd1" id="dashKacheln"></div>
+
+  <div class="dash-spalten">
+    <!-- Links: Anfragen + Vorschau -->
+    <div class="dash-links">
+      <div class="dash-block fade fd2">
+        <div class="dash-block-kopf"><span>Neueste Anfragen</span><a href="#" onclick="showPage('anfragen',event)">Alle Anfragen →</a></div>
+        <div id="dashAnfragen"><div class="dash-leer">Wird geladen …</div></div>
+      </div>
+      <div class="dash-block fade fd2">
+        <div class="dash-block-kopf"><span>So sehen dich Kunden</span></div>
+        <div id="dashVorschau"></div>
+        <a href="profil-bearbeiten.html" class="dash-knopf-sek">Profil bearbeiten</a>
+      </div>
+    </div>
+
+    <!-- Rechts: Profilstärke + Nachfrage -->
+    <div class="dash-rechts">
+      <div class="dash-block fade fd2">
+        <div class="dash-ring-wrap">
+          <div class="dash-ring" id="dashRing"></div>
+          <div class="dash-ring-text"><span id="dashRingPct">0%</span><small>Profilstärke</small></div>
+        </div>
+        <div id="dashNext"></div>
+        <button class="dash-next-mehr" id="dashNextMehr" onclick="dashMehrUmschalten()">Alle Punkte anzeigen</button>
+        <div class="dash-next-liste hidden" id="dashNextListe"></div>
+      </div>
+      <div class="dash-block fade fd2">
+        <div class="dash-block-kopf"><span>Nachfrage in deiner Region</span></div>
+        <div id="dashNachfrage"><div class="dash-leer">–</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════ PROFIL BEARBEITEN ═══════════ -->
-<div class="page-wrap" id="profilPage">
+<div class="page-wrap hidden" id="profilPage">
   <div class="edit-title fade">PROFIL <span>VERVOLLSTÄNDIGEN</span></div>
   <p class="edit-sub fade fd1">Je vollständiger dein Profil, desto mehr Anfragen bekommst du von Kunden.</p>
 
@@ -486,6 +600,26 @@ function profilAuswertung(p) {
 }
 // ==KERN-ENDE==
 
+// ==DASHBOARD-KERN-ANFANG== (reine Funktion, von dashboard_test.ts geprueft)
+// Liefert den Namen des naechsten fehlenden Schritts in der vorgegebenen
+// Reihenfolge (D4): Foto · Kurztext · Spezialisierungen · Preis · Trainingsart ·
+// Trainingsort · PLZ · Telefon · Rest. Bekommt die Auswertung aus
+// profilAuswertung() und ob eine PLZ hinterlegt ist. Gibt null zurueck, wenn
+// nichts mehr fehlt. KEINE erfundenen Zahlen, nur die Reihenfolge.
+function naechsterSchritt(auswertung, hatPlz) {
+  const okVon = {};
+  ((auswertung && auswertung.alle) || []).forEach((i) => { okVon[i.name] = i.ok; });
+  const reihenfolge = ['Foto', 'Kurztext', 'Spezialisierungen', 'Preis pro Stunde', 'Trainingsart', 'Trainingsort', 'PLZ', 'Telefon'];
+  for (const name of reihenfolge) {
+    if (name === 'PLZ') { if (!hatPlz) return 'PLZ'; continue; }
+    if (okVon[name] === false) return name;
+  }
+  // Rest: erster uebriger noch fehlender Punkt aus der Auswertung.
+  const rest = ((auswertung && auswertung.alle) || []).find((i) => !i.ok);
+  return rest ? rest.name : null;
+}
+// ==DASHBOARD-KERN-ENDE==
+
 // ──── AUTH ────
 const raw = localStorage.getItem('vexfit_session');
 if(!raw) { location.href = 'login.html'; throw new Error(); }
@@ -517,10 +651,19 @@ function istAbgemeldet(r) {
 initChips();
 loadTrainer(sess.email);
 
-// Direkt nach der Registrierung (?neu=1) den kurzen Weiter-Hinweis zeigen.
+// Direkt nach der Registrierung (?neu=1): schließbare Willkommens-Leiste auf dem
+// Dashboard zeigen (D5) – kein Modal, keine 12-Punkte-Wand. Der ältere
+// neuHinweis auf dem Profilformular bleibt für den Fall, dass man dorthin wechselt.
 if(new URLSearchParams(location.search).get('neu') === '1') {
   const nh = document.getElementById('neuHinweis');
   if(nh) nh.classList.remove('hidden');
+  const dw = document.getElementById('dashWillkommen');
+  if(dw) dw.classList.remove('hidden');
+}
+
+function dashWillkommenSchliessen() {
+  const dw = document.getElementById('dashWillkommen');
+  if(dw) dw.classList.add('hidden');
 }
 
 function initChips() {
@@ -574,11 +717,14 @@ async function loadTrainer(email) {
       zeigeAvatar();
       updateDots();
 
-      // If profile already complete → go straight to Anfragen
+      // Teil D: Startseite ist jetzt das Dashboard (kein Sprung mehr direkt in
+      // die Anfragen). Dashboard sofort zeichnen und die Zahlen nachladen.
+      renderDashboard();
+      ladeDashboardZahlen();
+      // Bei vollständigem Profil braucht der Profil-Punkt keinen orangen Hinweis.
       if(profileComplete) {
-        showPage('anfragen');
-        // Hide profil nav dot (no need)
-        document.getElementById('navProfilDot').style.display = 'none';
+        const dot = document.getElementById('navProfilDot');
+        if(dot) dot.style.display = 'none';
       }
     }
     // Die Anfrage traegt die Kennung des Trainers, nicht mehr seine E-Mail.
@@ -838,6 +984,9 @@ function updateDots() {
   }
 
   renderProfilstaerke();
+  // Teil D: Dashboard (Ring, nächster Schritt, Vorschau) spiegelt dieselbe
+  // Berechnung – live mitziehen.
+  if(typeof renderDashboard === 'function' && document.getElementById('dashboardPage')) renderDashboard();
 }
 
 // EINE Checkliste (Profilstaerke-Karte): dieselbe Auswertung wie updateDots,
@@ -887,6 +1036,194 @@ function renderProfilstaerke() {
   karte.classList.remove('hidden');
 }
 
+// ──── DASHBOARD (Teil D) ────
+// Zahlen aus der Datenbank (per RPC). null/undefined = noch unbekannt bzw. ohne
+// eingespielte Migration – dann steht in der Kachel „–" statt einer erfundenen Zahl.
+let dashAufrufe = null;        // Profilaufrufe 30 Tage
+let dashNachfrage = undefined; // undefined=unbekannt, null=keine PLZ/keine Zahl, Zahl=Wert
+let dashMehrOffen = false;
+
+// Tipp je Schritt. Der Foto-Hinweis steht WÖRTLICH so in der Vorgabe (D4).
+const DASH_TIPPS = {
+  'Foto': 'Profile mit Foto werden von Kunden deutlich eher angefragt.',
+  'Kurztext': 'Schreib 2–3 Sätze über dich. Persönlich wirkt am besten.',
+  'Spezialisierungen': 'Wähle deine Schwerpunkte, damit Kunden dich gezielt finden.',
+  'Preis pro Stunde': 'Trag deinen Stundensatz ein.',
+  'Trainingsart': 'Wähle aus, was du anbietest.',
+  'Trainingsort': 'Wähle, ob du vor Ort, online oder beides anbietest.',
+  'PLZ': 'Trag deine PLZ ein, dann finden dich Kunden in deiner Nähe.',
+  'Telefon': 'Hinterlege deine Nummer — nur für gebuchte Kunden sichtbar.',
+  'Erfahrung': 'Gib an, wie lange du schon trainierst.',
+  'Vorstellungsvideo': 'Füge einen Video-Link hinzu (YouTube, Instagram, TikTok).',
+  'Galerie': 'Zeig mit Bildern, wie du arbeitest.',
+  'Sprachen': 'Gib an, welche Sprachen du sprichst.',
+  'Trainingsorte': 'Studio, Outdoor, beim Kunden oder Online?',
+  'Zertifikat': 'Lade deinen Nachweis hoch.'
+};
+// Diese Schritte werden auf der getrennten Seite profil-bearbeiten.html gepflegt.
+const DASH_EXTERN = { 'PLZ': 1, 'Vorstellungsvideo': 1, 'Galerie': 1, 'Sprachen': 1, 'Trainingsorte': 1, 'Zertifikat': 1 };
+
+// Status aus der Freigabe (T.aktiv) und einer etwaigen Sperre (T.gesperrt).
+// KEIN Bezug auf Foto/Text/Spezialisierung als Suchbedingung.
+function dashStatusInfo() {
+  if(T && T.gesperrt) return { klasse: 'gesperrt', text: 'Gesperrt', erklaerung: 'Dein Konto ist aktuell gesperrt. Bitte wende dich an uns.' };
+  if(T && T.aktiv) return { klasse: 'frei', text: 'Freigeschaltet', erklaerung: 'Dein Profil ist für Kundinnen und Kunden in deiner Nähe sichtbar.' };
+  return { klasse: 'pruefung', text: 'In Prüfung', erklaerung: 'Wir prüfen dein Profil und melden uns per Mail, sobald es freigeschaltet ist.' };
+}
+
+function renderDashboard() {
+  if(!document.getElementById('dashboardPage')) return;
+  const vn = (T && (T.vorname || '').trim()) || '';
+  const hallo = document.getElementById('dashHallo');
+  if(hallo) hallo.textContent = vn ? ('Hallo ' + vn) : 'Hallo';
+  const info = dashStatusInfo();
+  const st = document.getElementById('dashStatus');
+  if(st) { st.textContent = info.text; st.className = 'dash-status ' + info.klasse; }
+  const stx = document.getElementById('dashStatusText');
+  if(stx) stx.textContent = info.erklaerung;
+
+  // D2: vier Kacheln
+  const offen = anfragenDaten.filter(a => anfrageZustand(a) === 'offen').length;
+  const angenommen = anfragenDaten.filter(a => anfrageZustand(a) === 'angenommen').length;
+  const aufrufe = (dashAufrufe == null) ? '–' : dashAufrufe;
+  const istStudio = !!(T && T.studio_standort_id);
+  let kostenNum, kostenLabel;
+  if(istStudio) { kostenNum = '0 €'; kostenLabel = 'Studio-Trainer – kostenlos'; }
+  else if(T && T.stripe_bezahlt) { kostenNum = 'Aktiv'; kostenLabel = 'Abo läuft'; }
+  else { kostenNum = '0 €'; kostenLabel = 'bis zu deinem 1. Kunden'; }
+  const kacheln = [
+    { num: offen, label: 'Offene Anfragen' },
+    { num: angenommen, label: 'Angenommene Kunden' },
+    { num: aufrufe, label: 'Profilaufrufe (30 Tage)' },
+    { num: kostenNum, label: kostenLabel },
+  ];
+  const kw = document.getElementById('dashKacheln');
+  if(kw) kw.innerHTML = kacheln.map(k =>
+    `<div class="dash-kachel"><div class="dash-kachel-num">${vexEsc(String(k.num))}</div><div class="dash-kachel-label">${vexEsc(k.label)}</div></div>`
+  ).join('');
+
+  renderDashAnfragen();
+  renderDashVorschau();
+  renderDashStaerke();
+  renderDashNachfrage();
+}
+
+// D3: die neuesten 3 Anfragen mit Annehmen/Ablehnen (dieselbe Logik wie in der
+// Anfragen-Liste: beantworteAnfrage findet .anfrage-card und .anf-actions).
+function renderDashAnfragen() {
+  const el = document.getElementById('dashAnfragen');
+  if(!el) return;
+  const neueste = anfragenDaten.slice(0, 3);
+  if(!neueste.length) {
+    el.innerHTML = '<div class="dash-leer">Noch keine Anfragen – ein vollständiges Profil hilft dir zur ersten.</div>';
+    return;
+  }
+  const statusVorhanden = anfragenDaten.length > 0 && ('status' in anfragenDaten[0]);
+  el.innerHTML = neueste.map(a => {
+    const datum = new Date(a.created_at).toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    let akt = '';
+    if(statusVorhanden) {
+      const z = anfrageZustand(a);
+      if(z === 'angenommen') akt = '<div class="dash-anfrage-zustand angenommen">✓ Angenommen</div>';
+      else if(z === 'abgelehnt') akt = '<div class="dash-anfrage-zustand abgelehnt">Abgelehnt</div>';
+      else akt = `<div class="anf-actions dash-anfrage-akt">
+        <button class="btn-annehmen" onclick="beantworteAnfrage('${a.id}','angenommen',this)">Annehmen</button>
+        <button class="btn-ablehnen" onclick="beantworteAnfrage('${a.id}','abgelehnt',this)">Ablehnen</button></div>`;
+    }
+    return `<div class="dash-anfrage anfrage-card">
+      <div class="dash-anfrage-kopf"><span class="dash-anfrage-name">${vexEsc(a.kunden_name || 'Unbekannt')}</span><span class="dash-anfrage-datum">${datum}</span></div>
+      <div class="dash-anfrage-ziel">🎯 ${vexEsc(a.ziel || '–')}</div>
+      ${akt}
+    </div>`;
+  }).join('');
+}
+
+// D3: Vorschau-Karte „So sehen dich Kunden" im Stil der echten Suchkarte.
+function renderDashVorschau() {
+  const el = document.getElementById('dashVorschau');
+  if(!el || !T) return;
+  const bild = (typeof avatarAdresse === 'function') ? avatarAdresse(T.avatar_url) : null;
+  const initialen = ((T.vorname || '?')[0] + (T.nachname || '?')[0]).toUpperCase();
+  const fotoStil = bild ? `background-image:url('${vexEsc(bild)}')` : '';
+  const tags = (Array.isArray(T.spezialisierungen) ? T.spezialisierungen : []).slice(0, 3)
+    .map(s => `<span class="dash-vorschau-tag">${vexEsc(s)}</span>`).join('');
+  const ort = [T.stadt, T.trainingsart].filter(Boolean).map(vexEsc).join(' · ') || 'Ort & Trainingsart ergänzen';
+  el.innerHTML = `<div class="dash-vorschau">
+    <div class="dash-vorschau-foto" style="${fotoStil}">${bild ? '' : vexEsc(initialen)}</div>
+    <div><div class="dash-vorschau-name">${vexEsc(((T.vorname || '') + ' ' + (T.nachname || '')).trim() || 'Dein Name')}</div>
+      <div class="dash-vorschau-meta">${ort}</div>
+      <div class="dash-vorschau-tags">${tags}</div></div>
+  </div>`;
+}
+
+// D4: Profilstärke-Ring (aus der vorhandenen Berechnung) + NUR der nächste
+// fehlende Schritt; die übrigen Punkte eingeklappt.
+function renderDashStaerke() {
+  const a = profilAuswertung(aktuellesProfil());
+  const ring = document.getElementById('dashRing');
+  if(ring) ring.style.background = `conic-gradient(var(--accent) ${a.prozent}%, var(--mid) 0)`;
+  const pct = document.getElementById('dashRingPct');
+  if(pct) pct.textContent = a.prozent + '%';
+
+  const hatPlz = !!(T && String(T.plz || '').trim());
+  const schritt = naechsterSchritt(a, hatPlz);
+  const next = document.getElementById('dashNext');
+  if(next) {
+    if(!schritt) {
+      next.innerHTML = '<div class="dash-next"><div class="dash-next-titel">✓ Dein Profil ist vollständig.</div><div class="dash-next-tipp">Stark — so wirkst du vertrauenswürdig.</div></div>';
+    } else {
+      const tipp = DASH_TIPPS[schritt] || '';
+      const knopf = DASH_EXTERN[schritt]
+        ? '<a class="dash-next-knopf" href="profil-bearbeiten.html">Jetzt ergänzen →</a>'
+        : `<a class="dash-next-knopf" href="#" onclick="showPage('profil',event)">Jetzt ausfüllen →</a>`;
+      next.innerHTML = `<div class="dash-next"><div class="dash-next-titel">Nächster Schritt: ${vexEsc(schritt)}</div><div class="dash-next-tipp">${vexEsc(tipp)}</div>${knopf}</div>`;
+    }
+  }
+  const liste = document.getElementById('dashNextListe');
+  if(liste) {
+    liste.innerHTML = a.alle.map(i =>
+      `<div class="dash-next-zeile"><span class="dash-next-haken ${i.ok ? 'ok' : 'no'}">${i.ok ? '✓' : ''}</span><span>${vexEsc(i.name)}</span></div>`
+    ).join('');
+  }
+}
+
+function dashMehrUmschalten() {
+  dashMehrOffen = !dashMehrOffen;
+  const liste = document.getElementById('dashNextListe');
+  const knopf = document.getElementById('dashNextMehr');
+  if(liste) liste.classList.toggle('hidden', !dashMehrOffen);
+  if(knopf) knopf.textContent = dashMehrOffen ? 'Weniger anzeigen' : 'Alle Punkte anzeigen';
+}
+
+// D4: Nachfrage in der Region. Ohne PLZ ein Hinweis + Knopf; sonst die Zahl aus
+// nachfrage_region(). KEINE erfundenen Zahlen – „–"/Hinweis, wenn unbekannt.
+function renderDashNachfrage() {
+  const el = document.getElementById('dashNachfrage');
+  if(!el) return;
+  const hatPlz = !!(T && String(T.plz || '').trim());
+  if(!hatPlz) {
+    el.innerHTML = '<div class="dash-nachfrage-text">Trag deine PLZ ein, dann siehst du die Nachfrage in deiner Nähe.</div><a class="dash-nachfrage-knopf" href="profil-bearbeiten.html">PLZ eintragen</a>';
+    return;
+  }
+  if(dashNachfrage === undefined) { el.innerHTML = '<div class="dash-leer">Wird geladen …</div>'; return; }
+  if(dashNachfrage === null) { el.innerHTML = '<div class="dash-nachfrage-text">Für deine Region liegen noch keine Zahlen vor.</div>'; return; }
+  el.innerHTML = `<div class="dash-nachfrage-num">${vexEsc(String(dashNachfrage))}</div><div class="dash-nachfrage-text">Suchen in deiner Region in den letzten 30 Tagen.</div>`;
+}
+
+// Zahlen per RPC nachladen. Fehlt die Migration (404/400), bleibt „–"/Hinweis.
+async function ladeDashboardZahlen() {
+  try {
+    const r = await fetch(`${SB}/rest/v1/rpc/profilaufrufe_30tage`, { method: 'POST', headers: authKopf({ 'Content-Type': 'application/json' }), body: '{}' });
+    if(r.ok) { const n = await r.json().catch(() => null); if(typeof n === 'number') dashAufrufe = n; }
+  } catch(e) { /* bleibt null */ }
+  try {
+    const r = await fetch(`${SB}/rest/v1/rpc/nachfrage_region`, { method: 'POST', headers: authKopf({ 'Content-Type': 'application/json' }), body: '{}' });
+    if(r.ok) { const n = await r.json().catch(() => null); dashNachfrage = (typeof n === 'number') ? n : null; }
+    else dashNachfrage = null;
+  } catch(e) { dashNachfrage = null; }
+  renderDashboard();
+}
+
 // Live updates
 ['fTrainingsart','fPreis','fBio','fErfahrung','fTelefon'].forEach(id => {
   const el = document.getElementById(id);
@@ -897,22 +1234,20 @@ function renderProfilstaerke() {
 // ──── PAGE SWITCHING ────
 function showPage(page, e) {
   if(e) e.preventDefault();
-  const pp = document.getElementById('profilPage');
-  const ap = document.getElementById('anfragenPage');
-  const nl1 = document.getElementById('navProfil');
-  const nl2 = document.getElementById('navAnfragen');
-
-  if(page === 'profil') {
-    pp.classList.remove('hidden');
-    ap.classList.add('hidden');
-    nl1.classList.add('active');
-    nl2.classList.remove('active');
-  } else {
-    pp.classList.add('hidden');
-    ap.classList.remove('hidden');
-    nl1.classList.remove('active');
-    nl2.classList.add('active');
+  const seiten = {
+    dashboard: { el: 'dashboardPage', nav: 'navDashboard' },
+    profil: { el: 'profilPage', nav: 'navProfil' },
+    anfragen: { el: 'anfragenPage', nav: 'navAnfragen' },
+  };
+  if(!seiten[page]) page = 'dashboard';
+  for(const name in seiten) {
+    const el = document.getElementById(seiten[name].el);
+    const nav = document.getElementById(seiten[name].nav);
+    if(el) el.classList.toggle('hidden', name !== page);
+    if(nav) nav.classList.toggle('active', name === page);
   }
+  // Beim Öffnen des Dashboards die Zahlen frisch zeichnen.
+  if(page === 'dashboard') renderDashboard();
   window.scrollTo(0, 0);
 }
 
@@ -971,6 +1306,8 @@ function renderUebersichtZahlen(data) {
 
 function renderAnfragen(data) {
   renderUebersichtZahlen(data);
+  // Teil D: Dashboard-Kacheln und die neuesten 3 Anfragen mitziehen.
+  if(typeof renderDashboard === 'function' && document.getElementById('dashboardPage')) renderDashboard();
   const el = document.getElementById('anList');
   const sb = document.getElementById('statusBarEl');
   // Baustein 1: Studio-Trainer (angestellt) zahlen nichts - fuer sie nie ein
