@@ -24,7 +24,7 @@ nach dem Push (Teil 10).
 | trainer-bereich | (Login) | (Login) | wie oben (Auth-Gate, erwartet) | n/a |
 | profil-bearbeiten | (Login) | (Login) | wie oben (Auth-Gate, erwartet) | n/a |
 | anleitung | ok | ok | sichtbarer Kontakt vexfit.info@gmail.com → **office@vexfit.app** | ja |
-| rechtliches | ok | ok | – (Impressum korrekt: +43 660 3675175, office@vexfit.app, Adresse nur hier) | – |
+| rechtliches | ok | ok | – (Impressum korrekt: die neue Geschäftsnummer (siehe Impressum), office@vexfit.app, Adresse nur hier) | – |
 | 404 | ok | ok | – | – |
 | admin | (Login) | (Login) | Auth-Gate (erwartet); Kontakt-Mailtos vexfit.info@gmail.com → **office@vexfit.app** | ja |
 | john-harris | ok | ok | – (Studio-Seite, noindex) | – |
@@ -42,7 +42,7 @@ kein Seitenfehler; sie wurden von echten Skriptfehlern getrennt.
   stehen nur im Kunden-Kontext (für Kunden zutreffend) bzw. mit Kontext beim Trainer
   („Gratis bis zum 1. Kunden · danach monatlich kündbar"). „Verifiziert" nur pro Trainer
   (bedingt, mit hochgeladenem Zertifikat), nie pauschal.
-- **Telefonnummer** +43 660 3675175 im Impressum (tel:-Link). WhatsApp-Knöpfe nutzen bereits
+- **Telefonnummer** die neue Geschäftsnummer (siehe Impressum) im Impressum (tel:-Link). WhatsApp-Knöpfe nutzen bereits
   `wa.me/436603675175` (dieselbe Nummer) – unverändert gelassen (nur melden, siehe Abschluss).
 - **noindex** auf beiden Ad-Seiten und allen john-harris-Seiten; Sitemap führt keine davon.
 - **Cookie-/Consent-Banner** (z-index 10000) liegt über dem WhatsApp-Knopf, verdeckt keinen

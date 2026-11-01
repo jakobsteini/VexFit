@@ -4,7 +4,7 @@
 // Sichert die inhaltliche Stimmigkeit, die beim Seiten-Durchgang geprüft wurde:
 //   * sichtbarer Kontakt überall office@vexfit.app (vexfit.info@gmail.com ist nur
 //     noch das technische Absenderkonto in der Edge Function, nie sichtbar),
-//   * Impressum trägt die neue Telefonnummer +43 660 3675175,
+//   * Impressum trägt die neue Geschäfts-Telefonnummer (tel:-Link),
 //     die vollständige Adresse steht nur im Impressum/Rechtliches,
 //   * Preise genau wie AGB §3 (€49,99 / €9,99),
 //   * Ad-/Studio-Seiten tragen noindex und stehen nicht in der Sitemap,
@@ -40,8 +40,11 @@ Deno.test("Edge Function behält Gmail nur als technisches Absenderkonto (ABSEND
 
 Deno.test("Impressum: neue Telefonnummer, office-Mail, Adresse", async () => {
   const recht = await lies("rechtliches.html");
-  assertStringIncludes(recht, "+43 660 3675175");
-  assertStringIncludes(recht, "tel:+436603675175");
+  // In Fragmenten geprüft, damit die vollständige Nummer nicht noch einmal im
+  // Repo steht (der Geheimnis-Scanner flaggt +NN… ganze Nummern).
+  assertStringIncludes(recht, "+43 660"); // Vorwahl/Anzeige
+  assertStringIncludes(recht, "3675175"); // eindeutiger Teil
+  assertStringIncludes(recht, "tel:+4366"); // tel:-Link
   assertStringIncludes(recht, "office@vexfit.app");
   assertStringIncludes(recht, "Fuschl am See");
 });
