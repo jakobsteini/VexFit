@@ -27,7 +27,7 @@ function unbenutzt(name: string) {
 // zeileLoeschenOderAnonymisieren werfen den „Spalte/Tabelle fehlt"-Fehler.
 function ohneMigration(opt: { wirftBeimLoeschen?: boolean } = {}): Anschluesse {
   return {
-    benutzerAusToken: () => Promise.resolve({ id: ADMIN_ID, email: "admin@vexfit.app" }),
+    benutzerAusToken: () => Promise.resolve({ id: ADMIN_ID, email: "admin@vexfit.app", aal: "aal2" }),
     personUserId: () => Promise.resolve(null),
     authSperren: () => Promise.resolve(),
     authNutzerLoeschen: () => Promise.resolve(),

@@ -39,6 +39,7 @@
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 import Stripe from "npm:stripe@18.5.0";
 import {
+  aalAusToken,
   ABSENDER,
   type Anfrage,
   type Anschluesse,
@@ -302,7 +303,7 @@ const anschluesse: Anschluesse = {
   // ist der geheime Schluessel (wie restKopf), Authorization das Nutzer-Token.
   async benutzerAusToken(
     token: string,
-  ): Promise<{ id: string; email: string } | null> {
+  ): Promise<{ id: string; email: string; aal?: string | null } | null> {
     const schluessel = Deno.env.get("SB_SECRET_KEY") ||
       pflicht("SUPABASE_SERVICE_ROLE_KEY");
     const a = await fetch(
@@ -312,7 +313,8 @@ const anschluesse: Anschluesse = {
     if (!a.ok) return null;
     const u = await a.json().catch(() => null);
     if (!u || !u.id) return null;
-    return { id: String(u.id), email: String(u.email ?? "") };
+    // Admin-Dashboard neu, Teil 1: die MFA-Stufe (aal) steht im geprueften Token.
+    return { id: String(u.id), email: String(u.email ?? ""), aal: aalAusToken(token) };
   },
 
   // Teil 8: Anzahl Anfragen dieses Kunden seit einem Zeitpunkt. Nutzt den
@@ -587,6 +589,73 @@ const anschluesse: Anschluesse = {
 
   adminHinweis(): string | undefined {
     return Deno.env.get("ADMIN_PASSWORT_HINWEIS") || undefined;
+  },
+
+  // ── Admin-Dashboard neu, Teil 3: Kicken (vollstaendiges Loeschen) ──
+
+  // Die Speicher-Dateien einer Person. Nur Trainer haben Uploads: avatar_url und
+  // galerie[] sind vollstaendige oeffentliche Adressen (Pfad extrahieren),
+  // zertifikat_datei ist bereits ein Pfad. video_url ist ein externer Link
+  // (YouTube/Vimeo) – keine hochgeladene Datei, daher nicht im Storage.
+  async personDateien(tabelle, id) {
+    const leer = { avatars: [] as string[], galerie: [] as string[], zertifikate: [] as string[] };
+    if (tabelle !== "trainers") return leer;
+    const zeilen = await lesen<{ avatar_url?: string | null; galerie?: string[] | null; zertifikat_datei?: string | null }>(
+      `trainers?id=eq.${encodeURIComponent(id)}&select=avatar_url,galerie,zertifikat_datei`,
+    );
+    const t = zeilen[0];
+    if (!t) return leer;
+    const pfadAus = (url: unknown, prefix: string): string | null => {
+      const s = String(url ?? "");
+      const i = s.indexOf(prefix);
+      return i >= 0 ? decodeURIComponent(s.slice(i + prefix.length)) : null;
+    };
+    const avatars: string[] = [];
+    const galerie: string[] = [];
+    const zertifikate: string[] = [];
+    const av = pfadAus(t.avatar_url, "/storage/v1/object/public/avatars/");
+    if (av) avatars.push(av);
+    for (const g of (Array.isArray(t.galerie) ? t.galerie : [])) {
+      const p = pfadAus(g, "/storage/v1/object/public/galerie/");
+      if (p) galerie.push(p);
+    }
+    if (t.zertifikat_datei) zertifikate.push(String(t.zertifikat_datei));
+    return { avatars, galerie, zertifikate };
+  },
+
+  // Objekte aus einem Storage-Bucket loeschen (Bulk-Endpunkt, service_role).
+  async storageLoeschen(bucket, pfade) {
+    if (!pfade.length) return;
+    const basis = pflicht("SUPABASE_URL").replace(/\/+$/, "");
+    const a = await fetch(`${basis}/storage/v1/object/${encodeURIComponent(bucket)}`, {
+      method: "DELETE",
+      headers: restKopf(),
+      body: JSON.stringify({ prefixes: pfade }),
+    });
+    if (!a.ok && a.status !== 404) {
+      throw new Error(`storageLoeschen ${bucket}: HTTP ${a.status}`);
+    }
+  },
+
+  // DB-Transaktion admin_person_kicken(p_art, p_id): loescht Person + eigene
+  // Daten, laesst Zahlungen anonymisiert erhalten. Fehlt die Funktion (Migration
+  // 2026-11-01-02 nicht eingespielt), meldet PostgREST PGRST202/42883 – der
+  // Fehlertext geht mit, damit kern.ts einen klaren Hinweis daraus macht.
+  async personKickenDb(tabelle, id) {
+    const art = tabelle === "trainers" ? "trainer" : "kunde";
+    const a = await fetch(restAdresse("rpc/admin_person_kicken"), {
+      method: "POST",
+      headers: restKopf(),
+      body: JSON.stringify({ p_art: art, p_id: id }),
+    });
+    const txt = await a.text().catch(() => "");
+    if (!a.ok) throw new Error(`personKickenDb: HTTP ${a.status} ${txt}`);
+    try {
+      const d = JSON.parse(txt);
+      return (d && typeof d === "object" && !Array.isArray(d)) ? d as Record<string, number> : {};
+    } catch {
+      return {};
+    }
   },
 
   melden(text, mehr) {

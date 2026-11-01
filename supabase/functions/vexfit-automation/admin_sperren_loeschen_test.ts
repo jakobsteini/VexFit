@@ -27,7 +27,7 @@ function baue(opt: { nutzerId?: string; userId?: string | null; fkKonflikt?: boo
   const spur: Spur = { authSperren: [], authGeloescht: [], gesperrtGesetzt: [], loeschVersuche: [], protokoll: [] };
   const unbenutzt = (name: string) => () => { throw new Error(`${name} nicht erwartet`); };
   const anschluesse = {
-    benutzerAusToken: (_t: string) => Promise.resolve({ id: opt.nutzerId ?? ADMIN_ID, email: "admin@vexfit.app" }),
+    benutzerAusToken: (_t: string) => Promise.resolve({ id: opt.nutzerId ?? ADMIN_ID, email: "admin@vexfit.app", aal: "aal2" }),
     personUserId: (_tabelle: string, _id: string) => Promise.resolve(opt.userId === undefined ? "auth-1" : opt.userId),
     authSperren: (userId: string, gesperrt: boolean) => { spur.authSperren.push({ userId, gesperrt }); return Promise.resolve(); },
     authNutzerLoeschen: (userId: string) => { spur.authGeloescht.push(userId); return Promise.resolve(); },

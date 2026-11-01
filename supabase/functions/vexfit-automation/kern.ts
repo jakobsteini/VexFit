@@ -207,8 +207,11 @@ export interface Anschluesse {
   ): Promise<StripeEreignis | null>;
   ereignisSchonVerarbeitet(id: string): Promise<boolean>;
   ereignisVermerken(id: string, typ: string): Promise<void>;
-  /** Teil 8: Nutzer zu einem Zugangs-Token (ueber Supabase Auth), sonst null. */
-  benutzerAusToken(token: string): Promise<{ id: string; email: string } | null>;
+  /** Teil 8: Nutzer zu einem Zugangs-Token (ueber Supabase Auth), sonst null.
+   *  aal (Admin-Dashboard neu, Teil 1): die MFA-Stufe aus dem Token ("aal1"
+   *  ohne, "aal2" mit bestaetigtem zweiten Faktor). index.ts liest sie ueber
+   *  aalAusToken aus dem JWT. /admin-aktion verlangt aal2. */
+  benutzerAusToken(token: string): Promise<{ id: string; email: string; aal?: string | null } | null>;
   /** Teil 8: Anzahl Anfragen dieses Kunden seit einem Zeitpunkt (Ratenbremse). */
   anfragenAnzahlSeit(kundenEmail: string, seitISO: string): Promise<number>;
   /** Fix 7b: Zahl anonymer Formular-Eintraege dieser E-Mail seit einem Zeitpunkt. */
@@ -264,8 +267,22 @@ export interface Anschluesse {
    *  Loeschen, werden stattdessen die personenbezogenen Felder anonymisiert
    *  (Fremddaten bleiben erhalten). */
   zeileLoeschenOderAnonymisieren?(tabelle: "trainers" | "kunden", id: string): Promise<{ geloescht: boolean; anonymisiert: boolean }>;
-  /** Schreibt einen Protokolleintrag (Zeitpunkt/Admin/Aktion/Ziel). Best effort. */
-  protokoll?(eintrag: { admin_id: string; aktion: string; ziel_tabelle: string; ziel_id: string }): Promise<void>;
+  /** Schreibt einen Protokolleintrag (Zeitpunkt/Admin/Aktion/Ziel/Ergebnis).
+   *  Keine Klartext-Personendaten. Best effort. */
+  protokoll?(eintrag: { admin_id: string; aktion: string; ziel_tabelle: string; ziel_id: string; ergebnis?: string }): Promise<void>;
+
+  // ── Admin-Dashboard neu, Teil 3: Kicken (endgueltig loeschen, vollstaendig) ──
+  /** Die Speicher-Dateien einer Person: avatars/galerie (public) und zertifikate
+   *  (privat). Fuer das Loeschen aus dem Storage beim Kicken. */
+  personDateien?(tabelle: "trainers" | "kunden", id: string): Promise<{ avatars: string[]; galerie: string[]; zertifikate: string[] }>;
+  /** Loescht Objekte aus einem Storage-Bucket (best effort). */
+  storageLoeschen?(bucket: string, pfade: string[]): Promise<void>;
+  /** Ruft die DB-Funktion admin_person_kicken(p_art, p_id) auf: loescht in EINER
+   *  Transaktion die Person und ihre eigenen Daten (Anfragen, Alerts, Warteliste)
+   *  und laesst Zahlungs-/Buchhaltungsdaten anonymisiert erhalten. Gibt die
+   *  Trefferzahlen zurueck. Fehlt die Funktion (Migration 2026-11-01-02 nicht
+   *  eingespielt), wirft sie – kern.ts macht daraus einen klaren Hinweis. */
+  personKickenDb?(tabelle: "trainers" | "kunden", id: string): Promise<Record<string, number>>;
 }
 
 // ============================================================================
@@ -796,6 +813,47 @@ function bearerToken(r: Request): string | null {
   return m ? m[1].trim() : null;
 }
 
+/**
+ * Admin-Dashboard neu, Teil 1: liest die MFA-Stufe ("aal1"/"aal2") aus dem
+ * Nutzdaten-Teil des Supabase-Zugangs-Tokens (JWT). Das Token ist zu diesem
+ * Zeitpunkt bereits von der Auth-API geprueft (benutzerAusToken/getUser) —
+ * hier wird nur der schon vertrauenswuerdige Nutzdaten-Teil ausgelesen, keine
+ * Signaturpruefung. Gibt null, wenn das Token kein JWT ist oder keine aal traegt.
+ */
+export function aalAusToken(token: string | null): string | null {
+  if (!token) return null;
+  const teile = token.split(".");
+  if (teile.length < 2) return null;
+  try {
+    let b64 = teile[1].replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4 !== 0) b64 += "=";
+    const roh = atob(b64);
+    const daten = JSON.parse(roh) as { aal?: unknown };
+    return typeof daten.aal === "string" ? daten.aal : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Admin-Dashboard neu, Teil 1: einfache Mengenbegrenzung je Admin und Minute.
+ * Haelt die Zeitpunkte der letzten Aufrufe je Kennung im Arbeitsspeicher (pro
+ * Function-Instanz). Mehr als ADMIN_RATE_MAX Aktionen in 60 Sekunden -> true.
+ */
+export const ADMIN_RATE_MAX = 60;
+const _ratenFenster = new Map<string, number[]>();
+export function ratenGrenzeUeberschritten(
+  id: string,
+  jetzt: number = Date.now(),
+  max: number = ADMIN_RATE_MAX,
+): boolean {
+  const vor60 = jetzt - 60_000;
+  const liste = (_ratenFenster.get(id) || []).filter((t) => t > vor60);
+  liste.push(jetzt);
+  _ratenFenster.set(id, liste);
+  return liste.length > max;
+}
+
 /** Fix 7b: Klient-IP aus dem X-Forwarded-For-Kopf (erste Adresse), sonst "". */
 function klientIp(r: Request): string {
   const h = r.headers.get("x-forwarded-for") || "";
@@ -1051,6 +1109,16 @@ export function istMigrationFehlt(fehler: unknown): boolean {
 const MIGRATION_HINWEIS =
   "Die Datenbank-Erweiterung fehlt (Migration 2026-10-31-09 gesperrt/Protokoll nicht eingespielt). Bitte im Supabase-SQL-Editor einspielen, dann erneut versuchen.";
 
+/** Admin-Dashboard neu, Teil 3: erkennt die noch fehlende Kick-Funktion
+ *  admin_person_kicken (Migration 2026-11-01-02 nicht eingespielt). PostgREST
+ *  meldet dann PGRST202/42883 bzw. „Could not find the function". */
+export function istKickenMigrationFehlt(fehler: unknown): boolean {
+  const s = String((fehler as { message?: string })?.message ?? fehler ?? "");
+  return /admin_person_kicken|PGRST202|42883|Could not find the function/i.test(s);
+}
+const KICKEN_MIGRATION_HINWEIS =
+  "Die Lösch-Funktion fehlt noch (Migration 2026-11-01-02-admin-neu.sql nicht eingespielt). Bitte im Supabase-SQL-Editor einspielen, dann erneut versuchen.";
+
 async function adminAktion(
   r: Request,
   a: Anschluesse,
@@ -1060,14 +1128,28 @@ async function adminAktion(
   const nutzer = token ? await a.benutzerAusToken(token) : null;
   if (!nutzer) return antwort(401, { fehler: "Anmeldung erforderlich" }, herkunft);
   if (nutzer.id !== ADMIN_ID) return antwort(403, { fehler: "kein Admin" }, herkunft);
+  // Admin-Dashboard neu, Teil 1: zweiter Faktor (MFA, aal2) ist Pflicht. Ein
+  // Admin-Token ohne bestaetigten zweiten Faktor (aal1) darf keine Aktion
+  // ausloesen. aal kommt aus dem Token (index.ts: aalAusToken).
+  if ((nutzer.aal ?? null) !== "aal2") {
+    return antwort(403, { fehler: "Zweiter Faktor erforderlich (aal2)." }, herkunft);
+  }
+  // Einfache Mengenbegrenzung je Admin und Minute.
+  if (ratenGrenzeUeberschritten(nutzer.id)) {
+    return antwort(429, { fehler: "Zu viele Aktionen in kurzer Zeit. Bitte kurz warten." }, herkunft);
+  }
 
   const body = await koerperLesen(r);
   if (!body) return antwort(400, { fehler: "Die Anfrage war nicht lesbar." }, herkunft);
   const aktion = String(body.aktion ?? "");
   const zielId = String(body.ziel_id ?? "");
   if (!zielId) return antwort(400, { fehler: "ziel_id fehlt" }, herkunft);
+  // Eingaben begrenzen (Typ/Laenge): Kennungen sind UUIDs/kurze Strings.
+  if (zielId.length > 100) return antwort(400, { fehler: "ziel_id ungueltig" }, herkunft);
+  if (aktion.length > 50) return antwort(400, { fehler: "aktion ungueltig" }, herkunft);
 
-  // Protokoll: Zeitpunkt, Admin-ID, Aktion, Ziel-ID (keine neue Tabelle).
+  // Protokoll (Konsole zusaetzlich; die verbindliche Spur steht in admin_protokoll,
+  // geschrieben am Ende jeder Aktion). Keine Klartext-Personendaten.
   a.melden?.(
     `admin-aktion ${new Date().toISOString()} admin=${nutzer.id} aktion=${aktion} ziel=${zielId}`,
   );
@@ -1110,7 +1192,7 @@ async function adminAktion(
         let konto = false;
         if (userId) { await a.authSperren(userId, an); konto = true; }
         const n = await a.personGesperrtSetzen(tabelle, zielId, an);
-        await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: tabelle, ziel_id: zielId });
+        await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: tabelle, ziel_id: zielId, ergebnis: `gesperrt=${an} konto=${konto}` });
         return antwort(200, { ok: true, geaendert: n, gesperrt: an, konto }, herkunft);
       } catch (fehler) {
         if (istMigrationFehlt(fehler)) return antwort(400, { fehler: MIGRATION_HINWEIS }, herkunft);
@@ -1130,9 +1212,56 @@ async function adminAktion(
         const userId = a.personUserId ? await a.personUserId(tabelle, zielId) : null;
         if (userId && a.authNutzerLoeschen) await a.authNutzerLoeschen(userId);
         const res = await a.zeileLoeschenOderAnonymisieren(tabelle, zielId);
-        await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: tabelle, ziel_id: zielId });
+        await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: tabelle, ziel_id: zielId, ergebnis: `geloescht=${res.geloescht} anonymisiert=${res.anonymisiert} konto=${!!userId}` });
         return antwort(200, { ok: true, geloescht: res.geloescht, anonymisiert: res.anonymisiert, konto: !!userId }, herkunft);
       } catch (fehler) {
+        if (istMigrationFehlt(fehler)) return antwort(400, { fehler: MIGRATION_HINWEIS }, herkunft);
+        throw fehler;
+      }
+    }
+
+    // ── Admin-Dashboard neu, Teil 3: Kicken (endgueltig loeschen, vollstaendig) ──
+    // Loescht Person + eigene Daten (Anfragen, Alerts, Warteliste) in EINER
+    // DB-Transaktion (admin_person_kicken), dann Anmeldekonto und Speicher-Dateien.
+    // Zahlungs-/Buchhaltungsdaten bleiben anonymisiert erhalten (7-Jahres-Frist).
+    case "person_kicken": {
+      if (body.bestaetigt !== true) return antwort(400, { fehler: "Bestaetigung fehlt" }, herkunft);
+      const tabelle = artTabelle(body.art);
+      if (!tabelle) return antwort(400, { fehler: "art fehlt (trainer/kunde)" }, herkunft);
+      if (!a.personKickenDb) {
+        return antwort(501, { fehler: "Kicken ist in dieser Fassung nicht verfuegbar" }, herkunft);
+      }
+      try {
+        // 1. Speicher-Dateien einsammeln, solange die Zeile noch steht.
+        let dateien = { avatars: [] as string[], galerie: [] as string[], zertifikate: [] as string[] };
+        if (a.personDateien) {
+          try { dateien = await a.personDateien(tabelle, zielId); } catch (f) { a.melden?.("kicken: personDateien", String(f)); }
+        }
+        // 2. Auth-Kennung merken (fuer das Konto-Loeschen nach der Transaktion).
+        const userId = a.personUserId ? await a.personUserId(tabelle, zielId) : null;
+        // 3. DB-Transaktion: Person + eigene Daten weg, Zahlungen anonymisiert.
+        //    Scheitert sie, ist nichts geloescht (atomar) und der echte Fehler
+        //    geht zurueck – kein halber Zustand.
+        const zahlen = await a.personKickenDb(tabelle, zielId);
+        // 4. Anmeldekonto loeschen. Scheitert das (selten), ist die Person in der
+        //    DB bereits weg; dann nur vermerken (konto=false), nicht abbrechen.
+        let konto = false;
+        if (userId && a.authNutzerLoeschen) {
+          try { await a.authNutzerLoeschen(userId); konto = true; } catch (f) { a.melden?.("kicken: authNutzerLoeschen", String(f)); }
+        }
+        // 5. Speicher aufraeumen (best effort; verwaiste Dateien sind harmlos).
+        if (a.storageLoeschen) {
+          for (const [bucket, pfade] of [["avatars", dateien.avatars], ["galerie", dateien.galerie], ["zertifikate", dateien.zertifikate]] as const) {
+            if (pfade.length) {
+              try { await a.storageLoeschen(bucket, pfade); } catch (f) { a.melden?.("kicken: storage " + bucket, String(f)); }
+            }
+          }
+        }
+        const zahlenText = Object.entries(zahlen).map(([k, v]) => `${k}=${v}`).join(" ");
+        await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: tabelle, ziel_id: zielId, ergebnis: `konto=${konto} ${zahlenText}` });
+        return antwort(200, { ok: true, konto, ...zahlen }, herkunft);
+      } catch (fehler) {
+        if (istKickenMigrationFehlt(fehler)) return antwort(400, { fehler: KICKEN_MIGRATION_HINWEIS }, herkunft);
         if (istMigrationFehlt(fehler)) return antwort(400, { fehler: MIGRATION_HINWEIS }, herkunft);
         throw fehler;
       }
@@ -1141,6 +1270,15 @@ async function adminAktion(
     default:
       return antwort(400, { fehler: "unbekannte Aktion" }, herkunft);
   }
+  // Protokoll fuer die einfachen Aktionen (Freigeben/Sperren/Bezahlt/
+  // Verifizieren/Loeschen). Keine Personendaten, nur Aktion/Ziel/Ergebnis.
+  await a.protokoll?.({
+    admin_id: nutzer.id,
+    aktion,
+    ziel_tabelle: aktion.startsWith("kunde") ? "kunden" : "trainers",
+    ziel_id: zielId,
+    ergebnis: `geaendert=${geaendert}`,
+  });
   return antwort(200, { ok: true, geaendert }, herkunft);
 }
 

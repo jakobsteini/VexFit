@@ -9,7 +9,6 @@
 // Aufruf:  deno test --allow-run --allow-read --allow-env supabase/functions/vexfit-automation/
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
-  ADMIN_ID,
   type Anschluesse,
   bearbeiten,
   BETREIBER,

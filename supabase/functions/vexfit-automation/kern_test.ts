@@ -1271,7 +1271,8 @@ Deno.test("alle sechs Mails: kein Emoji im Betreff, Fusszeile im HTML, Text saub
 // ===========================================================================
 // /admin-aktion (Admin-Schreibaktionen ueber die Function)
 // ===========================================================================
-const ADMIN = { id: ADMIN_ID, email: "admin@vexfit.app" };
+// Admin-Dashboard neu, Teil 1: /admin-aktion verlangt den zweiten Faktor (aal2).
+const ADMIN = { id: ADMIN_ID, email: "admin@vexfit.app", aal: "aal2" };
 
 Deno.test("/admin-aktion: ohne Token → 401, nichts geschrieben", async () => {
   const { anschluesse, auf } = bau();
