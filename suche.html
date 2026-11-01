@@ -522,11 +522,13 @@ async function loadTrainers() {
       // Ohne Sitzung: oeffentliche Sicht, nur freigeschaltete Trainer, keine Kontaktdaten.
       daten = await ladeOeffentlich(fetch, SUPABASE_URL, SUPABASE_KEY);
     }
-    // Baustein 3c: Mindeststaerke (Foto + Spezialisierung + Kurztext). Die
-    // oeffentliche Sicht filtert das bereits; fuer den angemeldeten Pfad (liest
-    // die Tabelle direkt) wird hier dieselbe Regel angewendet, damit unfertige
-    // Profile auch Angemeldeten nicht in der Suche erscheinen.
-    allTrainers = daten.filter(mindeststaerkeErfuellt);
+    // "Admin entscheidet allein" (Migration 2026-10-31-10): die oeffentliche
+    // Sicht entscheidet die Sichtbarkeit bereits allein (aktiv & nicht gesperrt);
+    // Foto/Kurztext/Spezialisierung sind KEINE Bedingung mehr. Deshalb auf dem
+    // oeffentlichen Pfad NICHT noch einmal nach Mindeststaerke filtern - sonst
+    // verschwaenden freigegebene Trainer ohne Foto wieder aus der Suche.
+    // Der angemeldete Pfad liest die Tabelle direkt und behaelt die Mindeststaerke.
+    allTrainers = angemeldet ? daten.filter(mindeststaerkeErfuellt) : daten;
     spracheOptionenAufbauen();
     renderTrainers(allTrainers);
   } catch(e) {
