@@ -32,8 +32,12 @@ Deno.test("trainer-bereich.html: Profilstaerke mit 8 Punkten, Tipps und Mindests
   for (const p of ["Foto", "Kurztext", "Spezialisierungen", "Vorstellungsvideo", "Galerie", "Sprachen", "Trainingsorte", "Zertifikat"]) {
     assertStringIncludes(html, "'" + p + "'");
   }
-  // Mindeststaerke = Foto + Spezialisierung + Kurztext.
-  assertStringIncludes(html, "Dafür brauchst du mindestens Foto, Spezialisierung und Kurztext");
+  // Teil R: kein Text mehr, der Foto/Spezialisierung/Kurztext als Bedingung für
+  // die Suche behauptet (echte Regel: Freigabe entscheidet). Stattdessen der
+  // Hinweis, dass ein vollständiges Profil mehr Anfragen bekommt.
+  assert(!html.includes("Dafür brauchst du mindestens Foto, Spezialisierung und Kurztext"), "alte, irreführende Suche-Bedingung noch vorhanden");
+  assert(!html.includes("erscheint noch nicht in der Suche"), "Text behauptet noch, das Profil sei nicht in der Suche");
+  assertStringIncludes(html, "bekommt mehr Anfragen");
   // renderProfilstaerke wird aus updateDots aufgerufen (bleibt zusaetzlich zur
   // bestehenden Vollstaendigkeits-Anzeige).
   assertStringIncludes(html, "renderProfilstaerke();");
@@ -48,9 +52,10 @@ Deno.test("suche.html: Mindeststaerke-Filter wird auf die Liste angewendet", asy
 
 Deno.test("Blitz-Registrierung: Trainerformular verlangt nur die Pflichtfelder", async () => {
   const html = await lies("./registrieren.html");
-  // Pflichtpruefung bei submitTrainer: Vorname, Nachname, E-Mail, PLZ (Passwort
-  // separat). Keine weiteren Pflichtfelder beim Anmelden.
-  assertStringIncludes(html, "if(!fn||!ln||!email||!plz){showError('t-error','Bitte alle Felder ausfüllen!')");
+  // Teil R: nur noch Vorname, Nachname, E-Mail (Passwort separat, AGB separat).
+  // PLZ/Trainingsort sind beim Erstformular NICHT mehr nötig.
+  assertStringIncludes(html, "if(!fn||!ln||!email){showError('t-error','Bitte Vorname, Nachname und E-Mail ausfüllen!')");
+  assert(!html.includes("if(!fn||!ln||!email||!plz)"), "PLZ ist noch Pflicht im Erstformular");
   // Nach der Registrierung geht es ins Profilformular weiter (neu=1).
   assertStringIncludes(html, "trainer-bereich.html?neu=1");
 });

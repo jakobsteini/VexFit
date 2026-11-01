@@ -28,18 +28,16 @@ Deno.test("zieleText verbindet in Listen-Reihenfolge mit ', '", async () => {
   assertEquals(vexZiele.zieleAusText(""), []);
 });
 
-Deno.test("registrieren.html hat das Pflichtfeld Ziel und speichert den Wert", async () => {
+Deno.test("Teil R: Kunden-Erstformular ohne Ziel/PLZ – nötigste Felder, Ziel kommt bei der Suche", async () => {
   const html = await lies("./registrieren.html");
-  assert(html.includes('src="vexfit-ziele.js"'), "vexfit-ziele.js nicht eingebunden");
-  assert(html.includes('id="c-ziel"'), "Zielfeld c-ziel fehlt");
-  assert(html.includes("Was ist dein Ziel?"), "Feldbeschriftung fehlt");
-  assert(
-    html.includes("Bitte wähle mindestens ein Ziel."),
-    "Pflicht-Fehlermeldung fehlt",
-  );
-  assert(html.includes("vexZiele.zieleText("), "zieleText wird nicht verwendet");
-  assert(html.includes("ziel:zielText"), "cd.ziel wird nicht aus der Auswahl gesetzt");
-  assert(!/ziel:\s*''/.test(html), "cd darf kein festes leeres ziel mehr setzen");
+  // Teil R Punkt 10: das Kunden-Erstformular verlangt nur Vorname, Nachname,
+  // E-Mail, Passwort, AGB. Ziel und PLZ werden NICHT mehr abgefragt – der Kunde
+  // gibt sie direkt bei der Trainersuche (suche.html) ein.
+  assert(!html.includes('id="c-ziel"'), "Zielfeld sollte im Erstformular entfernt sein");
+  assert(!html.includes('id="c-plz"'), "PLZ-Feld sollte im Kunden-Erstformular entfernt sein");
+  assert(html.includes("if(!fn||!ln||!email){showError('c-error','Bitte Vorname, Nachname und E-Mail ausfüllen!')"), "Kurz-Pflichtprüfung fehlt");
+  // Neutrale Startwerte beim Anlegen; Ziel wird später gepflegt.
+  assert(html.includes("ziel:''"), "cd.ziel sollte neutral leer gesetzt werden");
 });
 
 Deno.test("kunden-bereich.html nutzt die gemeinsame Liste und aktualisiert kunden.ziel", async () => {

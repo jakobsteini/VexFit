@@ -27,5 +27,7 @@ Deno.test("Fix 3: jede Seite mit WhatsApp-Knopf hat unten Abstand unter 640px", 
     assertStringIncludes(block[0], "padding-bottom:84px", `${f}: Abstand fehlt`);
     geprueft++;
   }
-  assert(geprueft >= 11, `zu wenige Seiten mit Knopf geprueft: ${geprueft}`);
+  // Teil R: registrieren.html und login.html haben den Knopf nicht mehr (er
+  // verdeckte dort Felder). Die übrigen Seiten behalten ihn samt Abstand.
+  assert(geprueft >= 9, `zu wenige Seiten mit Knopf geprueft: ${geprueft}`);
 });

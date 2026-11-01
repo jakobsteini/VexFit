@@ -81,15 +81,7 @@ select option{background:var(--gray);color:var(--white)}
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes popIn{from{opacity:0;transform:scale(0.4)}to{opacity:1;transform:scale(1)}}
 @media(min-width:768px){nav{padding:18px 52px}.page-wrap{padding:90px 20px 60px}}
-.iab-banner{display:none;position:fixed;top:0;left:0;right:0;z-index:2000;background:#e8ff00;color:#0a0a0a;padding:10px 16px;font-size:12px;font-weight:600;text-align:center;line-height:1.5}
-.iab-banner.show{display:block}
-.iab-banner b{text-decoration:underline}
-/* Nur wenn der In-App-Hinweis wirklich sichtbar ist (.show), rueckt die Navi
-   darunter. Ohne diese .show-Bedingung schob der Nachbar-Selektor die Navi
-   dauerhaft um 38px nach unten - dann ragte sie in den Seiteninhalt und der
-   obere Rand (Badge "Trainer finden") wurde angeschnitten. */
-.iab-banner.show + nav{top:calc(38px + env(safe-area-inset-top))}
-body.iab-active{padding-top:38px}
+/* Teil R: der gelbe In-App-Hinweisbalken wurde entfernt (zugehöriges CSS raus). */
 .ort-chips{display:flex;flex-wrap:wrap;gap:8px}
 .ort-chip{padding:9px 16px;border:1px solid var(--border-input);border-radius:100px;font-size:13px;color:var(--text-muted);cursor:pointer;transition:all 0.2s;user-select:none}
 .ort-chip.active{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.08)}
@@ -134,14 +126,15 @@ try {
 <!-- End Meta Pixel Code -->
 <style>/* Tippflaechen Handy (Fix 2) */
 @media (max-width:640px){.nav-back{min-height:44px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}}</style>
-<style>/* Platz fuer WhatsApp-Knopf (Fix 3) */
-@media (max-width:640px){body{padding-bottom:84px}}</style>
+<style>/* Teil R: der WhatsApp-Knopf ist auf dieser Seite entfernt; der untere
+   Platzhalter dafuer entfaellt, aber etwas Luft unten bleibt angenehm. */
+@media (max-width:640px){body{padding-bottom:24px}}
+.pw-zeigen{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:6px 0 0;font-family:inherit}</style>
 <script type="module" src="vexfit-sitzung.js"></script>
 <style>/* Tippflaechen Handy Fusszeile (Fix 2 Nachtrag) */
 @media (max-width:640px){.cookie-widerruf a{min-height:44px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}}</style>
 </head>
 <body>
-<div class="iab-banner" id="iabBanner">📱 Für ein reibungsloses Erlebnis: Tippe oben rechts auf <b>⋯</b> und wähle <b>„Im Browser öffnen"</b></div>
 <nav><a href="index.html" class="logo" aria-label="Vexfit – zur Startseite"><svg viewBox="168 166 1265 1270" aria-hidden="true" style="height:0.7em;width:auto;vertical-align:0;margin-right:4px"><g transform="translate(800 800) translate(-1024.5 -1082.5)"><path fill="#E8FF00" fill-rule="evenodd" d="M914.3,1716.3C908.8,1701.1 867.1,1595.6 814.0,1462.5C803.5,1436.1 781.3,1380.5 764.8,1339.0C711.7,1205.5 681.3,1129.2 631.2,1003.5C604.3,935.9 566.9,842.0 548.2,795.0C511.9,703.7 445.4,538.0 437.4,519.0C429.8,500.7 417.2,481.4 402.3,465.0C394.6,456.6 392.1,452.5 393.8,450.8C394.6,450.0 399.9,449.3 408.3,448.9C426.0,448.0 685.1,448.0 705.9,448.9C721.8,449.6 722.4,449.7 723.9,452.0C727.9,458.2 770.3,508.1 807.0,550.0C814.4,558.5 826.2,572.0 833.0,580.0C839.9,588.0 851.8,601.7 859.5,610.4C877.5,630.9 886.5,641.2 901.0,658.5C907.4,666.2 922.9,684.2 935.4,698.5C947.9,712.8 970.0,738.3 984.6,755.2C1011.2,786.1 1018.5,793.6 1024.9,796.6C1031.0,799.5 1033.4,797.4 1059.5,766.6C1065.6,759.5 1080.0,742.8 1091.5,729.5C1103.0,716.2 1122.8,693.5 1135.5,678.9C1148.1,664.4 1162.0,648.4 1166.5,643.5C1170.9,638.5 1180.6,627.2 1188.1,618.5C1214.0,588.0 1252.4,543.4 1266.5,527.5C1274.2,518.7 1284.6,506.8 1289.5,501.0C1302.3,486.0 1312.4,474.6 1320.1,466.5C1323.7,462.6 1328.4,456.9 1330.4,453.7L1334.1,448.0L1495.6,448.0L1657.2,448.0L1656.5,452.2C1655.3,460.0 1653.8,463.1 1648.4,469.2C1641.6,476.8 1635.1,486.5 1630.0,496.6C1626.2,504.3 1596.4,577.4 1552.7,686.0C1540.9,715.4 1513.4,783.4 1491.7,837.0C1470.0,890.6 1437.6,970.7 1419.7,1015.0C1401.9,1059.3 1372.7,1131.7 1354.7,1176.0C1326.2,1246.6 1307.6,1292.5 1246.8,1443.0C1239.2,1462.0 1224.1,1499.3 1213.3,1526.0C1202.5,1552.7 1180.8,1606.7 1165.1,1646.0L1136.5,1717.5L1025.7,1717.8C920.9,1718.0 914.9,1717.9 914.3,1716.3ZM1034.7,1470.6C1037.4,1467.3 1056.2,1418.9 1122.5,1245.0C1142.5,1192.3 1161.3,1143.3 1191.0,1066.0C1225.3,976.5 1230.1,963.2 1228.7,959.6C1227.3,956.1 1224.1,958.2 1214.3,968.8C1201.7,982.3 1167.1,1021.6 1133.0,1061.0C1118.5,1077.8 1099.6,1099.4 1091.0,1109.0C1082.5,1118.7 1069.9,1133.1 1063.0,1141.0C1045.4,1161.5 1031.1,1176.0 1028.5,1176.0C1022.9,1176.0 1008.4,1162.3 986.5,1136.5C980.5,1129.3 969.2,1116.4 961.5,1107.6C953.8,1098.9 941.3,1084.5 933.6,1075.6C894.8,1030.6 852.0,982.7 848.5,980.4C845.3,978.3 844.0,979.3 844.0,983.8C844.0,989.7 845.7,994.6 866.8,1050.0C877.7,1078.9 896.9,1129.5 909.4,1162.5C921.9,1195.5 939.5,1241.8 948.5,1265.5C973.6,1331.6 983.2,1356.8 996.0,1391.0C1019.3,1452.7 1025.3,1467.3 1029.1,1471.1C1031.6,1473.6 1032.5,1473.5 1034.7,1470.6Z"/></g></svg>EX<span>FIT</span></a><a href="index.html" class="nav-back">← Zurück</a></nav>
 <div class="page-wrap">
   <div class="info-box" id="angemeldet-hinweis" style="display:none;text-align:center">
@@ -174,25 +167,15 @@ try {
       <div class="field"><label>Nachname</label><input type="text" placeholder="Mustermann" id="t-ln" autocomplete="family-name"></div>
     </div>
     <div class="field"><label>E-Mail</label><input type="email" placeholder="max@example.com" id="t-email" autocomplete="email"></div>
-    <div class="field-row">
-      <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="t-pw" autocomplete="new-password" oninput="pwMeter('t')"></div>
-      <div class="field"><label>Passwort wiederholen</label><input type="password" placeholder="Nochmal eingeben" id="t-pw2" autocomplete="new-password" oninput="pwMatch('t')"></div>
+    <div class="field"><label>Passwort</label>
+      <input type="password" placeholder="Mind. 8 Zeichen" id="t-pw" autocomplete="new-password" oninput="pwMeter('t')">
+      <button type="button" class="pw-zeigen" id="t-pw-zeigen" onclick="pwZeigen('t')">Passwort zeigen</button>
     </div>
     <div class="pw-meter" id="t-pw-meter" style="display:none"><div class="pw-bar"><span></span><span></span><span></span></div><div class="pw-word"></div></div>
-    <div class="pw-match" id="t-pw-match" style="display:none"></div>
     <div class="error-banner" id="t-pw-error"></div>
-    <div class="field"><label>PLZ</label><input type="text" placeholder="5020" id="t-plz" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="plzGeaendert('t')"></div>
-    <div id="t-plz-status" style="display:none;font-size:12px;color:var(--text-muted);margin:-6px 0 12px"></div>
-    <div class="field">
-      <label>Wo trainierst du?</label>
-      <div class="ort-chips" id="t-ort">
-        <div class="ort-chip" data-val="vor_ort" onclick="waehleOrt(this)">Vor Ort</div>
-        <div class="ort-chip" data-val="online" onclick="waehleOrt(this)">Online</div>
-        <div class="ort-chip" data-val="beides" onclick="waehleOrt(this)">Beides</div>
-      </div>
-    </div>
     <label class="checkbox-field"><input type="checkbox" id="t-agb"><div class="custom-cb"></div><span class="cb-label">Ich akzeptiere die <a href="rechtliches.html" target="_blank">AGB</a> und <a href="rechtliches.html#datenschutz" target="_blank">Datenschutzbestimmungen</a></span></label>
     <div class="form-actions"><button class="btn-next" id="t-submit-btn" onclick="submitTrainer()">Profil gratis erstellen 🚀</button></div>
+    <p style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:10px">PLZ, Trainingsort und dein Profil machst du gleich danach im Trainer-Bereich fertig.</p>
     <div class="trust-row"><div class="trust-item"><span>✓</span> Gratis bis zu deinem 1. Kunden</div><div class="trust-item"><span>✓</span> Danach monatlich kündbar</div><div class="trust-item"><span>✓</span> DACH-Region</div></div>
     <div class="already-account" style="margin-top:18px">Schon ein Konto? <a href="login.html?typ=trainer">Jetzt anmelden →</a></div>
     <div style="text-align:center;margin-top:16px"><button class="btn-back-s" onclick="backToSelector()">← Zurück</button></div>
@@ -211,18 +194,15 @@ try {
       <div class="field"><label>Nachname</label><input type="text" placeholder="Muster" id="c-ln" autocomplete="family-name"></div>
     </div>
     <div class="field"><label>E-Mail</label><input type="email" placeholder="anna@example.com" id="c-email" autocomplete="email"></div>
-    <div class="field-row">
-      <div class="field"><label>Passwort</label><input type="password" placeholder="Mind. 8 Zeichen" id="c-pw" autocomplete="new-password" oninput="pwMeter('c')"></div>
-      <div class="field"><label>Passwort wiederholen</label><input type="password" placeholder="Nochmal eingeben" id="c-pw2" autocomplete="new-password" oninput="pwMatch('c')"></div>
+    <div class="field"><label>Passwort</label>
+      <input type="password" placeholder="Mind. 8 Zeichen" id="c-pw" autocomplete="new-password" oninput="pwMeter('c')">
+      <button type="button" class="pw-zeigen" id="c-pw-zeigen" onclick="pwZeigen('c')">Passwort zeigen</button>
     </div>
     <div class="pw-meter" id="c-pw-meter" style="display:none"><div class="pw-bar"><span></span><span></span><span></span></div><div class="pw-word"></div></div>
-    <div class="pw-match" id="c-pw-match" style="display:none"></div>
     <div class="error-banner" id="c-pw-error"></div>
-    <div class="field"><label>PLZ</label><input type="text" placeholder="5026" id="c-plz" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="plzGeaendert('c')"></div>
-    <div id="c-plz-status" style="display:none;font-size:12px;color:var(--text-muted);margin:-6px 0 12px"></div>
-    <div class="field"><label>Was ist dein Ziel?</label><div class="ort-chips" id="c-ziel"></div></div>
     <label class="checkbox-field"><input type="checkbox" id="c-agb"><div class="custom-cb"></div><span class="cb-label">Ich akzeptiere die <a href="rechtliches.html#agb" target="_blank">AGB & Datenschutz</a></span></label>
     <div class="form-actions"><button class="btn-next" id="c-submit-btn" onclick="submitClient()">Trainer finden →</button></div>
+    <p style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:10px">PLZ und dein Ziel gibst du gleich bei der Trainersuche ein.</p>
     <div class="trust-row"><div class="trust-item"><span>✓</span> 100% kostenlos</div><div class="trust-item"><span>✓</span> Kein Abo</div><div class="trust-item"><span>✓</span> Sofort loslegen</div></div>
     <div class="already-account" style="margin-top:18px">Schon ein Konto? <a href="login.html?typ=kunde">Jetzt anmelden →</a></div>
     <div style="text-align:center;margin-top:16px"><button class="btn-back-s" onclick="backToSelector()">← Zurück</button></div>
@@ -247,9 +227,8 @@ try {
   </div>
 </div>
 
-<a href="https://wa.me/436603675175?text=Name%3A%20%0ANachricht%3A%20Hi%20ich%20habe%20eine%20Frage%20zu%20Vexfit%2C" target="_blank" class="wa-btn" aria-label="WhatsApp Kontakt">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-</a>
+<!-- Teil R: WhatsApp-Knopf auf der Registrierungsseite entfernt – er verdeckte
+     am Handy (390 px) Formularfelder und den Absenden-Knopf. -->
 
 <script src="vexfit-plz.js"></script>
 <script src="vexfit-ziele.js"></script>
@@ -258,15 +237,10 @@ try {
 const SUPABASE_URL='https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY='sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
 
-// In-App-Browser erkennen (Facebook/Instagram) und Hinweis-Banner zeigen
-(function(){
-  const ua = navigator.userAgent || '';
-  const isInApp = /FBAN|FBAV|Instagram/i.test(ua);
-  if(isInApp){
-    document.getElementById('iabBanner').classList.add('show');
-    document.body.classList.add('iab-active');
-  }
-})();
+// Teil R: Der gelbe In-App-Hinweisbalken ist entfernt. Die Registrierung
+// funktioniert auch im Instagram-/Facebook-In-App-Browser. Sollte ein konkreter
+// Schritt dort einmal scheitern, zeigt die jeweilige Fehlermeldung die Hilfe an
+// genau dieser Stelle (showError), nicht pauschal oben auf der Seite.
 
 // Oeffnet ein bereits Angemeldeter diese Seite direkt, zeigen wir nur einen
 // Hinweis mit dem Weg in seinen Bereich - kein zweites Konto. Anmeldung wie
@@ -351,14 +325,21 @@ function pwMatch(kuerzel){
 
 // Prueft die beiden Passwortfelder. Gibt das Passwort zurueck oder null bei Verstoss.
 // Solange die Stufe 'rot' ist, kommt man nicht durch - mit einem Satz, was fehlt.
+// Teil R: ein einziges Passwortfeld (kein Wiederholen mehr), mindestens 8 Zeichen.
 function pruefePasswort(kuerzel){
   hideError(kuerzel+'-pw-error');
   const pw=document.getElementById(kuerzel+'-pw').value;
-  const pw2=document.getElementById(kuerzel+'-pw2').value;
-  if(!pw||!pw2){showError(kuerzel+'-pw-error','Bitte wähle ein Passwort und wiederhole es.');return null}
+  if(!pw){showError(kuerzel+'-pw-error','Bitte wähle ein Passwort (mindestens 8 Zeichen).');return null}
   if(pwStufe(pw)==='rot'){showError(kuerzel+'-pw-error',pwMangel(pw));return null}
-  if(pw!==pw2){showError(kuerzel+'-pw-error','Die beiden Passwörter stimmen nicht überein.');return null}
   return pw;
+}
+// Teil R: Passwort ein-/ausblenden ("Passwort zeigen").
+function pwZeigen(kuerzel){
+  const i=document.getElementById(kuerzel+'-pw');
+  const b=document.getElementById(kuerzel+'-pw-zeigen');
+  if(!i)return;
+  if(i.type==='password'){i.type='text';if(b)b.textContent='Passwort verbergen';}
+  else{i.type='password';if(b)b.textContent='Passwort zeigen';}
 }
 
 // ──── PLZ -> STADT + LAND ────
@@ -474,21 +455,20 @@ function signupFehler(status, antwort){
 
 async function submitTrainer(){
   hideError('t-error');
-  const fn=document.getElementById('t-fn').value.trim(),ln=document.getElementById('t-ln').value.trim(),email=document.getElementById('t-email').value.trim().toLowerCase(),plz=document.getElementById('t-plz').value.trim();
-  if(!fn||!ln||!email||!plz){showError('t-error','Bitte alle Felder ausfüllen!');return}
+  // Teil R: kurzes Erstformular – nur Vorname, Nachname, E-Mail, Passwort, AGB.
+  // PLZ/Trainingsort/Profil kommen danach im Trainer-Bereich (geführter Ablauf).
+  const fn=document.getElementById('t-fn').value.trim(),ln=document.getElementById('t-ln').value.trim(),email=document.getElementById('t-email').value.trim().toLowerCase();
+  if(!fn||!ln||!email){showError('t-error','Bitte Vorname, Nachname und E-Mail ausfüllen!');return}
   const pw=pruefePasswort('t');
   if(pw===null)return;
   if(!document.getElementById('t-agb').checked){showError('t-error','Bitte AGB akzeptieren!');return}
-  // Ohne ermittelte Stadt wird nicht abgeschickt; der Grund steht am PLZ-Feld.
-  const city=await plzPruefen('t');
-  if(!city){showError('t-error','Die Stadt konnte nicht aus der Postleitzahl ermittelt werden. Bitte prüfe die PLZ.');return}
   const btn=document.getElementById('t-submit-btn');imVersand.t=true;btn.disabled=true;btn.textContent='Wird gespeichert...';
-  const td={vorname:fn,nachname:ln,email,telefon:'',stadt:city,plz,trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
-  // trainingsort nur mitsenden, wenn gewaehlt - so laeuft die Registrierung auch,
-  // solange die Spalte noch nicht existiert (Migration noch nicht eingespielt).
-  if(selectedOrt) td.trainingsort=selectedOrt;
-  // Land nur mitsenden, wenn aus der PLZ ermittelt - sonst bleibt die Spalte NULL.
-  if(plzStand['t'].land) td.land=plzStand['t'].land;
+  // Neutrale Startwerte: PLZ/Stadt/Trainingsart bleiben leer und werden später
+  // im Trainer-Bereich ergänzt. Leere Strings sind für NOT-NULL-Spalten gültig;
+  // falls die DB sie trotzdem ablehnt, siehe migrations/2026-11-01-03-registrierung-kurz.sql.
+  const td={vorname:fn,nachname:ln,email,telefon:'',stadt:'',plz:'',trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
+  // Herkunft der Anzeige (für die sofortige Meldung an office@vexfit.app).
+  const utm=new URLSearchParams(location.search).get('utm_campaign')||'';
   try{
     const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
     const ad=await ar.json();
@@ -510,7 +490,7 @@ async function submitTrainer(){
     try { zugestimmt = localStorage.getItem('vexfit_consent') === 'zugestimmt'; } catch(e) {}
     // Fix 7b: angemeldeter Pfad - Zugangs-Token mitschicken (die Function verlangt
     // es fuer nicht-anonyme Aufrufe). Ohne Sitzung wird keine interne Mail ausgeloest.
-    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-trainer',{method:'POST',headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...td, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href})}).catch(()=>{});
+    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-trainer',{method:'POST',headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...td, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_campaign: utm, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
     if(typeof fbq==='function')fbq('track','CompleteRegistration',{content_name:'Trainer',value:0,currency:'EUR'},{eventID:capiEventId});
     // Ohne Sitzung (E-Mail-Bestaetigung aktiv) kann der Trainerbereich nicht
     // geoeffnet werden - dann Hinweis statt Weiterleitung.
@@ -542,23 +522,16 @@ async function submitTrainer(){
 
 async function submitClient(){
   hideError('c-error');
-  const fn=document.getElementById('c-fn').value.trim(),ln=document.getElementById('c-ln').value.trim(),email=document.getElementById('c-email').value.trim().toLowerCase(),plz=document.getElementById('c-plz').value.trim();
-  if(!fn||!ln||!email||!plz){showError('c-error','Bitte alle Felder ausfüllen!');return}
+  // Teil R: kurzes Erstformular – nur Vorname, Nachname, E-Mail, Passwort, AGB.
+  // PLZ und Ziel gibt der Kunde direkt bei der Trainersuche (suche.html) ein.
+  const fn=document.getElementById('c-fn').value.trim(),ln=document.getElementById('c-ln').value.trim(),email=document.getElementById('c-email').value.trim().toLowerCase();
+  if(!fn||!ln||!email){showError('c-error','Bitte Vorname, Nachname und E-Mail ausfüllen!');return}
   const pw=pruefePasswort('c');
   if(pw===null)return;
   if(!document.getElementById('c-agb').checked){showError('c-error','Bitte AGB akzeptieren!');return}
-  // Pflichtfeld Ziel: mindestens ein Ziel waehlen; gespeichert wird ", "-getrennt
-  // in Listen-Reihenfolge (vexZiele.zieleText), derselbe Wert geht an neuer-kunde.
-  const zielWahl=[...document.querySelectorAll('#c-ziel .ort-chip.active')].map(c=>c.dataset.val);
-  if(zielWahl.length===0){showError('c-error','Bitte wähle mindestens ein Ziel.');return}
-  const zielText=window.vexZiele.zieleText(zielWahl);
-  // Ohne ermittelte Stadt wird nicht abgeschickt; der Grund steht am PLZ-Feld.
-  const city=await plzPruefen('c');
-  if(!city){showError('c-error','Die Stadt konnte nicht aus der Postleitzahl ermittelt werden. Bitte prüfe die PLZ.');return}
   const btn=document.getElementById('c-submit-btn');imVersand.c=true;btn.disabled=true;btn.textContent='Wird gespeichert...';
-  const cd={vorname:fn,nachname:ln,email,stadt:city,plz,ziel:zielText,erwartungen:''};
-  // Land nur mitsenden, wenn aus der PLZ ermittelt - sonst bleibt die Spalte NULL.
-  if(plzStand['c'].land) cd.land=plzStand['c'].land;
+  const cd={vorname:fn,nachname:ln,email,stadt:'',plz:'',ziel:'',erwartungen:''};
+  const utm=new URLSearchParams(location.search).get('utm_campaign')||'';
   try{
     const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
     const ad=await ar.json();
@@ -571,7 +544,7 @@ async function submitClient(){
     if(!ir.ok){console.error('Insert fail:',ir.status);showError('c-error','Profil konnte nicht gespeichert werden. Bitte erneut versuchen.');imVersand.c=false;btn.disabled=false;btn.textContent='Trainer finden →';return}
     // Fix 7b: angemeldeter Pfad - Zugangs-Token mitschicken (die Function verlangt
     // es fuer nicht-anonyme Aufrufe). Ohne Sitzung wird keine interne Mail ausgeloest.
-    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-kunde',{method:'POST',headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify(cd)}).catch(()=>{});
+    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-kunde',{method:'POST',headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...cd, utm_campaign: utm, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
     if(ad.access_token){try{localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,refresh_token:ad.refresh_token||null,user_id:userId,email,role:'kunde'}));}catch(e){console.warn('localStorage blockiert:',e);}}
     if(typeof fbq==='function')fbq('track','Lead',{content_name:'Kunde',value:0,currency:'EUR'});
     if(ad.access_token){ showSuccess('successClient'); }

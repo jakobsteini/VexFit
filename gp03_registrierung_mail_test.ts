@@ -41,7 +41,7 @@ Deno.test("Trainer-Submit: Knopf wird vor dem Feuern deaktiviert (genau einmal)"
 
 Deno.test("Fehler werden angezeigt, nicht verschluckt", () => {
   for (const msg of [
-    "Bitte alle Felder ausfüllen!",
+    "Bitte Vorname, Nachname und E-Mail ausfüllen!",
     "Profil konnte nicht gespeichert werden. Bitte erneut versuchen.",
     "Verbindungsfehler. Bitte prüfe deine Internetverbindung.",
   ]) {

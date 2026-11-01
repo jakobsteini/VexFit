@@ -392,14 +392,20 @@ export function mailNeuerTrainer(body: Record<string, unknown>): Mail {
     `Neuer Trainer: ${w(body.vorname)} ${w(body.nachname)}`,
     {
       ueberschrift: "Neuer Trainer registriert",
+      // Teil R: die Meldung geht jetzt SOFORT nach dem kurzen Erstformular raus –
+      // Name, E-Mail, Zeitpunkt und Herkunft (utm_campaign). Stadt/Trainingsart
+      // sind zu diesem Zeitpunkt meist noch leer (werden im Trainer-Bereich
+      // ergaenzt) und werden nur gezeigt, wenn schon vorhanden.
       datenZeilen: [
         {
           beschriftung: "Name",
           wert: `${w(body.vorname)} ${w(body.nachname)}`.trim(),
         },
         { beschriftung: "E-Mail", wert: w(body.email) },
-        { beschriftung: "Stadt", wert: w(body.stadt) },
-        { beschriftung: "Trainingsart", wert: w(body.trainingsart) },
+        ...(w(body.utm_campaign) ? [{ beschriftung: "Kampagne", wert: w(body.utm_campaign) }] : []),
+        ...(w(body.zeitpunkt) ? [{ beschriftung: "Zeitpunkt", wert: w(body.zeitpunkt) }] : []),
+        ...(w(body.stadt) ? [{ beschriftung: "Stadt", wert: w(body.stadt) }] : []),
+        ...(w(body.trainingsart) ? [{ beschriftung: "Trainingsart", wert: w(body.trainingsart) }] : []),
       ],
       knopfText: "Im Admin öffnen",
       knopfLink: ADMIN_LINK,

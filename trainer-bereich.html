@@ -390,7 +390,7 @@ try {
 
   <!-- Mini-Banner: nur sichtbar wenn Profil unvollständig -->
   <div class="mini-banner hidden" id="miniBanner" onclick="showPage('profil')">
-    <span class="mini-banner-text">📝 Profil vervollständigen für mehr Sichtbarkeit</span>
+    <span class="mini-banner-text">📝 Profil vervollständigen für mehr Anfragen</span>
     <span class="mini-banner-arrow">→</span>
   </div>
 
@@ -441,10 +441,11 @@ let profileComplete = false;
 // Karte, Nav-Punkt, Weiterleitung, Hinweise). Keine zweite, abweichende Zahl.
 //
 // Zwei Gruppen:
-//   noetig = GENAU die Bedingungen der oeffentlichen Sicht trainers_oeffentlich
-//            (migrations/2026-10-31-05-verfuegbarkeit.sql): Foto, Kurztext,
-//            mindestens eine Spezialisierung. Fehlt davon etwas, erscheint das
-//            Profil NICHT in der Suche.
+//   noetig = Foto, Kurztext, mindestens eine Spezialisierung. Teil R / Migration
+//            2026-10-31-10: das sind KEINE Bedingungen mehr fuer die Suche
+//            (sichtbar = aktiv und nicht gesperrt, der Admin gibt frei). Es sind
+//            nur die zuerst auszufuellenden Punkte – ein vollstaendiges Profil
+//            bekommt mehr Anfragen.
 //   stark  = alle uebrigen Punkte, die das Profil staerker machen (ohne
 //            Doppelungen aus beiden bisherigen Listen).
 // Prozent = erfuellte Punkte / alle Punkte (noetig + stark).
@@ -813,7 +814,7 @@ function updateDots() {
   if(navDot) navDot.className = profileComplete ? 'nav-dot nav-dot-green' : 'nav-dot nav-dot-orange';
 
   // Genau EINE Zeile unter "Meine Anfragen":
-  //   1. Pflichtpunkt fehlt -> orange "erscheint noch nicht in der Suche" + Liste
+  //   1. Pflichtpunkt fehlt -> orange Hinweis "Mach dein Profil fertig" + Liste
   //   2. sonst < 100 %      -> gruen "Profil vervollständigen für mehr Sichtbarkeit"
   //   3. 100 %              -> keine Zeile
   // Der Freigabe-Hinweis (aktiv=false) steht unabhaengig davon in der Statusleiste.
@@ -822,7 +823,10 @@ function updateDots() {
   if(!a.inSuche) {
     if(ubh) {
       ubh.className = 'ub-hinweis suche-warnung';
-      ubh.innerHTML = `<b>Dein Profil erscheint noch nicht in der Suche.</b> Es fehlt: ${vexEsc(a.noetigFehlt.join(', '))}. <a href="#" onclick="showPage('profil',event)">Zum Profilformular →</a>`;
+      // Teil R: echte Regel – Sichtbarkeit hängt an der Freigabe (aktiv), nicht an
+      // der Vollständigkeit. Vollständigkeit bringt mehr Anfragen, ist aber keine
+      // Bedingung für die Suche.
+      ubh.innerHTML = `<b>Mach dein Profil fertig.</b> Ein vollständiges Profil wirkt vertrauenswürdig und bekommt mehr Anfragen. Es fehlt noch: ${vexEsc(a.noetigFehlt.join(', '))}. <a href="#" onclick="showPage('profil',event)">Zum Profilformular →</a>`;
     }
     if(banner) banner.classList.add('hidden');
   } else if(!a.vollstaendig) {
@@ -871,9 +875,11 @@ function renderProfilstaerke() {
   };
   let html = `<div class="staerke-kopf"><div class="staerke-titel">Profilstärke</div><div class="staerke-pct">${a.prozent}%</div></div>`;
   if(a.noetigFehlt.length) {
-    html += `<div class="staerke-warnung"><b>Dein Profil erscheint noch nicht in der Suche.</b> Dafür brauchst du mindestens Foto, Spezialisierung und Kurztext. Es fehlt: ${vexEsc(a.noetigFehlt.join(', '))}.</div>`;
+    // Teil R: keine Behauptung mehr, Foto/Kurztext/Spezialisierung seien
+    // Bedingung für die Suche. Freigabe entscheidet; Vollständigkeit bringt mehr Anfragen.
+    html += `<div class="staerke-warnung"><b>Dein Profil wird von uns geprüft und freigeschaltet.</b> Ein vollständiges Profil bekommt mehr Anfragen. Es fehlt noch: ${vexEsc(a.noetigFehlt.join(', '))}.</div>`;
   }
-  html += '<div class="staerke-gruppe">Nötig für die Suche</div>';
+  html += '<div class="staerke-gruppe">Zuerst ausfüllen</div>';
   html += '<div class="staerke-liste">' + a.noetig.map(zeile).join('') + '</div>';
   html += '<div class="staerke-gruppe">Macht dein Profil stärker</div>';
   html += '<div class="staerke-liste">' + a.stark.map(zeile).join('') + '</div>';
