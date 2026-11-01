@@ -183,3 +183,26 @@ COMMENT ON FUNCTION public.nachfrage_region() IS
   'Anzahl Suchen der letzten 30 Tage in der Region der eigenen Trainer-PLZ (erste zwei PLZ-Ziffern). Nur eingeloggter Trainer, nur eigene PLZ, nur eine Zahl.';
 
 GRANT EXECUTE ON FUNCTION public.nachfrage_region() TO authenticated;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- A3 — WEB-PUSH-ABOS
+-- ════════════════════════════════════════════════════════════════════════════
+-- Ein Abo je Gerät (Browser-Push-Endpunkt + die beiden Schlüssel). Gelesen und
+-- geschrieben wird AUSSCHLIESSLICH über die abgesicherte Edge Function
+-- (service_role, nach Login + zweitem Faktor). Deshalb bleibt die Tabelle für
+-- anon/authenticated vollständig gesperrt (RLS an, keine Policy, alle Rechte
+-- entzogen) – service_role umgeht RLS.
+CREATE TABLE IF NOT EXISTS public.push_abos (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  endpoint    text        NOT NULL UNIQUE,
+  p256dh      text        NOT NULL,
+  auth        text        NOT NULL,
+  geraet      text,
+  erstellt_am timestamptz NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE public.push_abos IS
+  'Web-Push-Abos der Verwaltung (ein Gerät = eine Zeile: Endpoint + p256dh + auth). Nur über die Edge Function (service_role) les-/schreibbar; keine direkten Rechte für anon/authenticated.';
+
+ALTER TABLE public.push_abos ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.push_abos FROM anon, authenticated;

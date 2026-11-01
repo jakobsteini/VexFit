@@ -47,10 +47,14 @@ import {
   bearbeiten,
   type Mail,
   type MetaEreignis,
+  type PushAbo,
   type StripeEreignis,
   type Trainer,
   type TrainerProfil,
 } from "./kern.ts";
+// Teil A: Web-Push-Krypto (VAPID + aes128gcm) – nur hier, damit kern.ts
+// netz-/bibliotheksfrei bleibt.
+import { pushEinzelSenden as webPushEinzelSenden, vapidKonfig } from "../_shared/webpush.ts";
 
 // Teil 7: Meta-Pixel-ID (dieselbe wie im Browser) und Merker, damit der Hinweis
 // bei fehlendem Secret nur einmal pro Instanz im Log steht.
@@ -680,6 +684,60 @@ const anschluesse: Anschluesse = {
     } catch {
       return {};
     }
+  },
+
+  // ── Teil A: Web Push ──
+  vapidVorhanden(): boolean {
+    return vapidKonfig() !== null;
+  },
+
+  // Alle Abos lesen. Fehlt die Tabelle (Migration 2026-11-01-05 nicht
+  // eingespielt), leere Liste statt Fehler – Push ist dann einfach aus.
+  async pushAbosLesen(): Promise<PushAbo[]> {
+    try {
+      return await lesen<PushAbo>(
+        "push_abos?select=id,endpoint,p256dh,auth,geraet,erstellt_am&order=erstellt_am.asc",
+      );
+    } catch (fehler) {
+      console.log("vexfit-automation: push_abos nicht lesbar (Migration?)", String(fehler));
+      return [];
+    }
+  },
+
+  // Abo anlegen bzw. bei gleichem Endpoint aktualisieren (Upsert auf endpoint).
+  async pushAboSpeichern(abo: PushAbo): Promise<void> {
+    const a = await fetch(restAdresse("push_abos?on_conflict=endpoint"), {
+      method: "POST",
+      headers: { ...restKopf(), Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({
+        endpoint: abo.endpoint,
+        p256dh: abo.p256dh,
+        auth: abo.auth,
+        geraet: abo.geraet ?? null,
+      }),
+    });
+    if (!a.ok) throw new Error(`pushAboSpeichern fehlgeschlagen: HTTP ${a.status}`);
+  },
+
+  async pushAboEntfernen(endpoint: string): Promise<void> {
+    await fetch(
+      restAdresse(`push_abos?endpoint=eq.${encodeURIComponent(endpoint)}`),
+      { method: "DELETE", headers: { ...restKopf(), Prefer: "return=minimal" } },
+    );
+  },
+
+  async pushAboEntfernenNachId(id: string): Promise<number> {
+    const a = await fetch(
+      restAdresse(`push_abos?id=eq.${encodeURIComponent(id)}`),
+      { method: "DELETE", headers: { ...restKopf(), Prefer: "return=representation" } },
+    );
+    if (!a.ok) throw new Error(`pushAboEntfernenNachId fehlgeschlagen: HTTP ${a.status}`);
+    const z = await a.json().catch(() => []);
+    return Array.isArray(z) ? z.length : 0;
+  },
+
+  pushEinzelSenden(abo, nachricht) {
+    return webPushEinzelSenden(abo, nachricht);
   },
 
   melden(text, mehr) {

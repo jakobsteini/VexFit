@@ -10,9 +10,20 @@
      fremder Code, keine Inline-Skripte, keine Inline-Event-Handler (die ganze
      Logik liegt in vexfit-verwaltung.js, 'self'). Bilder nur von Supabase-
      Storage und data: (MFA-QR-Code). Verbindungen nur zu Supabase. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co data:; font-src 'self'; connect-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co">
+<!-- Teil A: manifest-src und worker-src ergänzt (PWA + Service Worker, beides 'self'). -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co data:; font-src 'self'; connect-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co; manifest-src 'self'; worker-src 'self'">
 <title>Vexfit – Verwaltung</title>
 <link rel="icon" type="image/png" sizes="32x32" href="marke/favicon-32.png">
+<!-- Teil A: Homescreen-App nur für die Verwaltung. Manifest + Icons sind nur von
+     dieser Seite verlinkt (nie von öffentlichen Seiten), der geheime Pfad wird
+     so nicht verraten. -->
+<link rel="manifest" href="manifest-admin.webmanifest">
+<link rel="apple-touch-icon" href="marke/favicon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Vexfit Admin">
+<meta name="theme-color" content="#0a0a0a">
 <link rel="stylesheet" href="fonts/vexfit-fonts.css">
 <style>
 :root{--black:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1e1e1e;--card:#161616;--text-muted:#777;--border:rgba(255,255,255,0.08)}
@@ -117,6 +128,54 @@ tr:last-child td{border-bottom:none}
   .stats-grid{grid-template-columns:repeat(4,1fr)}
   .content{padding:28px 36px}
 }
+
+/* ── Teil A: Tab-Mehr-Menü. Großer Bildschirm: alle Reiter in einer Zeile
+   (Wrapper verschwindet via display:contents, „Mehr" ausgeblendet). ── */
+.tab-mehr-menu{display:contents}
+.tab-mehr{display:none}
+
+/* ── Teil A: Push-Mitteilungen auf diesem Gerät ── */
+.push-box{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:16px}
+.push-kopf{font-weight:700;font-size:13px;margin-bottom:6px}
+.push-text{font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.5}
+.push-geraete{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.push-geraet{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;background:var(--gray);border:1px solid var(--border);border-radius:4px;padding:8px 10px}
+.push-geraet button{background:transparent;border:1px solid var(--border);color:#ff8a8a;border-radius:4px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:inherit}
+
+/* ── Teil A: Handy (<=600px): feste untere Leiste, Karten, wischbare Kennzahlen ── */
+@media(max-width:600px){
+  html,body{overflow-x:hidden}
+  .content{padding:16px 16px 84px}            /* Platz für die feste untere Leiste */
+  nav{padding-left:16px;padding-right:16px}
+
+  /* Kennzahlen als wischbare Kacheln */
+  .stats-grid{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;margin:0 -16px 18px;padding:0 16px}
+  .stat-card{flex:0 0 auto;min-width:150px;scroll-snap-align:start;border-radius:8px}
+
+  /* Reiter als feste Leiste unten: vier Hauptreiter + „Mehr" */
+  .tabs-unten{position:fixed;left:0;right:0;bottom:0;z-index:60;margin:0;display:flex;justify-content:space-around;gap:0;background:var(--gray);border-top:1px solid var(--border);padding:6px calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left))}
+  .tabs-unten .tab{flex:1;background:transparent;padding:10px 4px;font-size:10px;text-align:center;border-radius:6px}
+  .tabs-unten .tab.active{background:var(--accent);color:var(--black)}
+  .tab-mehr{display:block}
+  .tab-mehr-menu{display:none;position:fixed;left:12px;right:12px;bottom:66px;z-index:61;flex-direction:column;gap:4px;background:var(--gray);border:1px solid var(--border);border-radius:8px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+  .tab-mehr-menu.offen{display:flex}
+  .tab-mehr-menu .tab{width:100%;text-align:left;padding:12px;font-size:13px;border-radius:6px}
+
+  /* Listen als Karten statt breiter Tabellen (data-label liefert die Beschriftung) */
+  .table-wrap{overflow-x:visible;border:none;border-radius:0}
+  table,tbody,tr,td{display:block;width:100%}
+  thead{display:none}
+  tbody tr{background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:10px;padding:6px 12px}
+  tbody tr td{border:none;padding:7px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;text-align:right}
+  tbody tr td::before{content:attr(data-label);color:var(--text-muted);font-size:10px;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0;text-align:left}
+  tbody tr td:empty{display:none}
+
+  /* Aktionen groß und daumenfreundlich; Detail als Vollbild-Blatt */
+  .panel{max-width:100%}
+  .btn-gross{flex:1 1 44%;padding:14px 12px;font-size:12px}
+  .btn-klein{padding:11px 14px;font-size:13px}
+  .werkzeugleiste input[type=search]{min-width:100%}
+}
 </style>
 </head>
 <body>
@@ -178,21 +237,33 @@ tr:last-child td{border-bottom:none}
     <!-- Kennzahlen -->
     <div class="stats-grid" id="stats"></div>
 
-    <!-- Reiter -->
-    <div class="tabs" id="tabs">
+    <!-- Reiter. Am Handy (Teil A) feste Leiste unten: vier Hauptreiter + „Mehr".
+         Am großen Bildschirm fließen alle neun in einer Zeile (tab-mehr-menu:
+         display:contents, Mehr-Knopf ausgeblendet). -->
+    <div class="tabs tabs-unten" id="tabs">
       <button class="tab active" data-tab="uebersicht">Übersicht</button>
       <button class="tab" data-tab="trainer">Trainer</button>
       <button class="tab" data-tab="kunden">Kunden</button>
       <button class="tab" data-tab="anfragen">Anfragen</button>
-      <button class="tab" data-tab="zahlungen">Zahlungen</button>
-      <button class="tab" data-tab="studios">Studios</button>
-      <button class="tab" data-tab="zertifikate">Zertifikate</button>
-      <button class="tab" data-tab="nachfrage">Nachfrage</button>
-      <button class="tab" data-tab="protokoll">Protokoll</button>
+      <div class="tab-mehr-menu" id="tab-mehr-menu">
+        <button class="tab" data-tab="zahlungen">Zahlungen</button>
+        <button class="tab" data-tab="studios">Studios</button>
+        <button class="tab" data-tab="zertifikate">Zertifikate</button>
+        <button class="tab" data-tab="nachfrage">Nachfrage</button>
+        <button class="tab" data-tab="protokoll">Protokoll</button>
+      </div>
+      <button class="tab tab-mehr" id="tab-mehr-knopf" type="button" aria-label="Weitere Reiter">Mehr ▾</button>
     </div>
 
     <!-- Übersicht -->
     <div class="tab-content active" id="tab-uebersicht">
+      <!-- Teil A: Push-Mitteilungen auf diesem Gerät (mehrere Geräte möglich). -->
+      <div class="push-box" id="push-box">
+        <div class="push-kopf">Mitteilungen auf diesem Gerät</div>
+        <div class="push-text" id="push-status">Wird geprüft …</div>
+        <button class="btn-klein" id="push-aktivieren" type="button">Mitteilungen auf diesem Gerät aktivieren</button>
+        <div class="push-geraete" id="push-geraete"></div>
+      </div>
       <div class="section-hinweis">Klicke eine Kennzahl oben an, um in die gefilterte Liste zu springen.</div>
       <div class="table-wrap"><table>
         <thead><tr><th>Neu – wartet auf Freigabe</th><th>Vollständigkeit</th><th>Registriert</th><th></th></tr></thead>

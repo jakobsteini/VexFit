@@ -196,6 +196,24 @@ export interface StripeEreignis {
 }
 
 /** Alles Aeussere. Die Function setzt hier die echten Zugriffe ein. */
+/** Teil A: ein gespeichertes Web-Push-Abo (ein Gerät). */
+export interface PushAbo {
+  id?: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  geraet?: string | null;
+  erstellt_am?: string;
+}
+
+/** Teil A: Inhalt einer Push-Mitteilung. url ist das Ziel beim Antippen
+ *  (Deep-Link in die Verwaltung). Keine E-Mail/Telefon im Text. */
+export interface PushNachricht {
+  titel: string;
+  text: string;
+  url: string;
+}
+
 export interface Anschluesse {
   trainerNachId(id: string): Promise<Trainer | null>;
   trainerNachEmail(email: string): Promise<Trainer | null>;
@@ -295,6 +313,22 @@ export interface Anschluesse {
    *  Trefferzahlen zurueck. Fehlt die Funktion (Migration 2026-11-01-02 nicht
    *  eingespielt), wirft sie – kern.ts macht daraus einen klaren Hinweis. */
   personKickenDb?(tabelle: "trainers" | "kunden", id: string): Promise<Record<string, number>>;
+
+  // ── Teil A: Web Push ──
+  /** true, wenn die VAPID-Secrets gesetzt sind. Fehlen sie, wird Push
+   *  übersprungen (die Mail geht trotzdem), mit klarem Log-Eintrag. */
+  vapidVorhanden?(): boolean;
+  /** Alle Push-Abos lesen (service_role). */
+  pushAbosLesen?(): Promise<PushAbo[]>;
+  /** Ein Abo speichern bzw. (bei gleichem Endpoint) aktualisieren (service_role). */
+  pushAboSpeichern?(abo: PushAbo): Promise<void>;
+  /** Ein Abo per Endpoint entfernen – für die 404/410-Bereinigung. */
+  pushAboEntfernen?(endpoint: string): Promise<void>;
+  /** Ein Abo per Kennung entfernen – für die Geräteliste in der Verwaltung. */
+  pushAboEntfernenNachId?(id: string): Promise<number>;
+  /** Eine Mitteilung an EIN Abo senden; gibt den HTTP-Status zurück
+   *  (404/410 = Abo abgelaufen → wird entfernt). Wirft nicht nach oben. */
+  pushEinzelSenden?(abo: PushAbo, nachricht: PushNachricht): Promise<number>;
 }
 
 // ============================================================================
@@ -532,6 +566,115 @@ export function mailNeueAnfrageIntern(
     knopfLink: verwaltungLink(anker),
     grundZeile: "Interne Benachrichtigung.",
   });
+}
+
+// ── Teil A: Web-Push-Mitteilungen ──
+
+/** Push-Mitteilung „Neuer Trainer: <Name>, <Ort>" (ohne E-Mail/Telefon). */
+export function pushNeuerTrainer(
+  body: Record<string, unknown>,
+  profil?: Record<string, unknown> | null,
+): PushNachricht {
+  const p = profil || {};
+  const name = `${w(body.vorname) || w(p.vorname)} ${w(body.nachname) || w(p.nachname)}`.trim() || "Trainer";
+  const ort = w(p.stadt) || w(body.stadt);
+  const id = w(p.id);
+  return {
+    titel: "Neuer Trainer",
+    text: `${name}${ort ? `, ${ort}` : ""}`,
+    url: verwaltungLink(id ? `trainer-${id}` : ""),
+  };
+}
+
+/** Push-Mitteilung „Neuer Kunde: <Name>, <Ort>". */
+export function pushNeuerKunde(
+  body: Record<string, unknown>,
+  profil?: Record<string, unknown> | null,
+): PushNachricht {
+  const p = profil || {};
+  const name = `${w(body.vorname) || w(p.vorname)} ${w(body.nachname) || w(p.nachname)}`.trim() || "Kunde";
+  const ort = w(p.stadt) || w(body.stadt);
+  const id = w(p.id);
+  return {
+    titel: "Neuer Kunde",
+    text: `${name}${ort ? `, ${ort}` : ""}`,
+    url: verwaltungLink(id ? `kunde-${id}` : ""),
+  };
+}
+
+/** Push-Mitteilung „Neue Anfrage: <Kunde> → <Trainer>". */
+export function pushNeueAnfrage(
+  body: Record<string, unknown>,
+  anfrageId?: string | null,
+): PushNachricht {
+  const kunde = w(body.kunden_name) || "Kunde";
+  const trainerName = w(body.trainer_name) || "Trainer";
+  return {
+    titel: "Neue Anfrage",
+    text: `${kunde} → ${trainerName}`,
+    url: verwaltungLink(w(anfrageId) ? `anfrage-${w(anfrageId)}` : "anfragen"),
+  };
+}
+
+export interface PushErgebnis {
+  gesendet: number;
+  entfernt: number;
+  /** gesetzt, wenn gar nicht gesendet wurde (z. B. VAPID-Secrets fehlen). */
+  uebersprungen?: string;
+}
+
+/**
+ * Teil A: eine Mitteilung an ALLE Abos senden. Reine Ablaufsteuerung (ohne
+ * Krypto – die steckt in pushEinzelSenden/webpush.ts): fehlen die VAPID-Secrets,
+ * wird NICHTS gesendet (uebersprungen, ein Log-Eintrag) – die Mail läuft davon
+ * unberührt. Pro Abo wird der HTTP-Status geholt; 404/410 entfernt das Abo.
+ * Wirft nie nach oben.
+ */
+export async function pushSenden(
+  a: Anschluesse,
+  nachricht: PushNachricht,
+): Promise<PushErgebnis> {
+  if (!a.pushAbosLesen || !a.pushEinzelSenden) {
+    return { gesendet: 0, entfernt: 0, uebersprungen: "nicht verfügbar" };
+  }
+  if (a.vapidVorhanden && !a.vapidVorhanden()) {
+    a.melden?.("push: VAPID-Secrets fehlen – Mitteilung übersprungen, Mail geht trotzdem");
+    return { gesendet: 0, entfernt: 0, uebersprungen: "VAPID fehlt" };
+  }
+  let abos: PushAbo[] = [];
+  try {
+    abos = await a.pushAbosLesen();
+  } catch (fehler) {
+    a.melden?.("push: Abos lesen fehlgeschlagen", String(fehler));
+    return { gesendet: 0, entfernt: 0, uebersprungen: "Lesefehler" };
+  }
+  let gesendet = 0;
+  let entfernt = 0;
+  for (const abo of abos) {
+    try {
+      const status = await a.pushEinzelSenden(abo, nachricht);
+      if (status === 404 || status === 410) {
+        if (a.pushAboEntfernen) await a.pushAboEntfernen(abo.endpoint);
+        entfernt++;
+      } else if (status >= 200 && status < 300) {
+        gesendet++;
+      } else {
+        a.melden?.("push: unerwarteter Status", { status, endpoint: abo.endpoint.slice(0, 40) });
+      }
+    } catch (fehler) {
+      a.melden?.("push: Senden an ein Abo fehlgeschlagen", String(fehler));
+    }
+  }
+  return { gesendet, entfernt };
+}
+
+/** Push best effort auslösen – wirft nie, damit die Mail nie darunter leidet. */
+async function pushBenachrichtigung(a: Anschluesse, nachricht: PushNachricht): Promise<void> {
+  try {
+    await pushSenden(a, nachricht);
+  } catch (fehler) {
+    a.melden?.("push: unerwarteter Fehler", String(fehler));
+  }
 }
 
 /**
@@ -1106,6 +1249,9 @@ async function neuerTrainer(
     a.melden?.("neuer-trainer: Profil-Nachschlag fehlgeschlagen", String(fehler));
   }
   const gesendet = await sendeWennAdresseTaugt(a, mailNeuerTrainer(body, profil));
+  // Teil A: Push-Mitteilung an alle Admin-Geräte (best effort, nach der Mail –
+  // ohne VAPID-Secrets übersprungen, die Mail bleibt davon unberührt).
+  await pushBenachrichtigung(a, pushNeuerTrainer(body, profil));
   // Teil 7: CompleteRegistration zusaetzlich serverseitig an die Meta Conversions
   // API (nur bei Zustimmung, mit event_id zum Entdoppeln). Best effort: ein
   // Fehler oder ein fehlendes Secret bremst die Registrierung nicht.
@@ -1135,6 +1281,7 @@ async function neuerKunde(
     a.melden?.("neuer-kunde: Profil-Nachschlag fehlgeschlagen", String(fehler));
   }
   const gesendet = await sendeWennAdresseTaugt(a, mailNeuerKunde(body, profil));
+  await pushBenachrichtigung(a, pushNeuerKunde(body, profil));
   return antwort(200, { ok: true, mails: gesendet ? 1 : 0 }, herkunft);
 }
 
@@ -1209,6 +1356,7 @@ async function neueAnfrage(
     mailNeueAnfrageIntern(body, w(body.anfrage_id) || null),
   );
   const mails = (trainerMail ? 1 : 0) + (anJakob ? 1 : 0);
+  await pushBenachrichtigung(a, pushNeueAnfrage(body, w(body.anfrage_id) || null));
   return antwort(
     200,
     { ok: true, mails, ...(trainer.studio_standort_id ? { studio: true } : {}) },
@@ -1331,6 +1479,55 @@ async function freischaltMailAbwickeln(
   return { gesendet: true, datum, sperre_fehlt: sperreFehlt };
 }
 
+/**
+ * Teil A: Push-Aktionen der Verwaltung (Gerät aktivieren, Geräteliste, Gerät
+ * entfernen). Wird nur aus adminAktion aufgerufen, NACH Admin-Konto- und
+ * aal2-Prüfung. Abos werden nur hier (service_role) geschrieben/gelesen.
+ */
+async function adminPushAktion(
+  aktion: string,
+  body: Record<string, unknown>,
+  a: Anschluesse,
+  adminId: string,
+  herkunft: string | null,
+): Promise<Response> {
+  if (aktion === "push_abo_speichern") {
+    const abo = (body.abo ?? {}) as Record<string, unknown>;
+    const endpoint = String(abo.endpoint ?? "");
+    const p256dh = String(abo.p256dh ?? "");
+    const auth = String(abo.auth ?? "");
+    if (!endpoint.startsWith("https://") || !p256dh || !auth) {
+      return antwort(400, { fehler: "Abo unvollständig" }, herkunft);
+    }
+    if (!a.pushAboSpeichern) {
+      return antwort(501, { fehler: "Push ist in dieser Fassung nicht verfügbar" }, herkunft);
+    }
+    await a.pushAboSpeichern({ endpoint, p256dh, auth, geraet: String(abo.geraet ?? "") || null });
+    await a.protokoll?.({ admin_id: adminId, aktion, ziel_tabelle: "push_abos", ziel_id: "-", ergebnis: "gespeichert" });
+    return antwort(200, { ok: true }, herkunft);
+  }
+  if (aktion === "push_abos_liste") {
+    if (!a.pushAbosLesen) return antwort(200, { ok: true, abos: [] }, herkunft);
+    const abos = await a.pushAbosLesen();
+    // Nur unbedenkliche Felder zurückgeben (kein Endpoint, keine Schlüssel).
+    return antwort(200, {
+      ok: true,
+      abos: abos.map((x) => ({ id: x.id ?? "", geraet: x.geraet ?? "", erstellt_am: x.erstellt_am ?? "" })),
+    }, herkunft);
+  }
+  if (aktion === "push_abo_entfernen") {
+    const id = String(body.ziel_id ?? body.id ?? "");
+    if (!id) return antwort(400, { fehler: "id fehlt" }, herkunft);
+    if (!a.pushAboEntfernenNachId) {
+      return antwort(501, { fehler: "Push ist in dieser Fassung nicht verfügbar" }, herkunft);
+    }
+    const n = await a.pushAboEntfernenNachId(id);
+    await a.protokoll?.({ admin_id: adminId, aktion, ziel_tabelle: "push_abos", ziel_id: id, ergebnis: `entfernt=${n}` });
+    return antwort(200, { ok: true, entfernt: n }, herkunft);
+  }
+  return antwort(400, { fehler: "unbekannte Push-Aktion" }, herkunft);
+}
+
 async function adminAktion(
   r: Request,
   a: Anschluesse,
@@ -1354,6 +1551,12 @@ async function adminAktion(
   const body = await koerperLesen(r);
   if (!body) return antwort(400, { fehler: "Die Anfrage war nicht lesbar." }, herkunft);
   const aktion = String(body.aktion ?? "");
+  // Teil A: Push-Aktionen tragen kein ziel_id (sie betreffen Geräte-Abos, nicht
+  // einen Trainer/Kunden) – vor der ziel_id-Pflicht abhandeln. Sie laufen genau
+  // wie die übrigen Aktionen nur mit Admin-Konto + aal2 (oben geprüft).
+  if (aktion.startsWith("push_")) {
+    return await adminPushAktion(aktion, body, a, nutzer.id, herkunft);
+  }
   const zielId = String(body.ziel_id ?? "");
   if (!zielId) return antwort(400, { fehler: "ziel_id fehlt" }, herkunft);
   // Eingaben begrenzen (Typ/Laenge): Kennungen sind UUIDs/kurze Strings.

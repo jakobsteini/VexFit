@@ -30,6 +30,9 @@ export const INAKTIV_MS = 30 * 60 * 1000; // 30 Minuten
 export const PROFIL_FELDER_GESAMT = 8;
 // Stripe-Zahlungslink „ERSTE Anfrage" (wortgleich zum Workflow/kern.ts).
 export const STRIPE_ERSTE = "https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00";
+// Teil A: öffentlicher VAPID-Schlüssel für Web Push. Darf im Code stehen; der
+// PRIVATE Schlüssel ist ausschließlich das Supabase-Secret VAPID_PRIVATE_KEY.
+export const VAPID_PUBLIC_KEY = "BO2R6TqUNLrPOKLQs1LThvjih094DldW9Mi6uY6QOxu_I-6JW6Uj5Z2pIF_TaTSVjKjv_IH6F8WqV9o41GyCYZg";
 
 // ============================================================================
 // REINE FUNKTIONEN (ohne Browser, in verwaltung_logik_test.ts geprüft)
@@ -462,6 +465,8 @@ function starteVerwaltung() {
     zeigeAnsicht("ansicht-dashboard");
     inaktivitaetsWache();
     ladeDaten();
+    // Teil A: Push-Bereich vorbereiten (Status + Geräteliste).
+    pushInit();
   }
 
   // ── Datenabruf ──
@@ -555,10 +560,10 @@ function starteVerwaltung() {
       const voll = PROFIL_FELDER_GESAMT - fehlt.length;
       const farbe = fehlt.length === 0 ? "#4ade80" : (voll >= 4 ? "var(--accent)" : "#ff6b6b");
       return `<tr class="klickbar" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">
-        <td><strong>${escapeHtml(t.vorname)} ${escapeHtml(t.nachname)}</strong><br><span style="color:var(--text-muted);font-size:11px">${escapeHtml(t.email)}</span></td>
-        <td><span style="color:${farbe};font-weight:700">${voll}/${PROFIL_FELDER_GESAMT}</span> <span style="color:var(--text-muted);font-size:11px">${fehlt.length ? "fehlt: " + escapeHtml(fehlt.join(", ")) : "vollständig"}</span></td>
-        <td>${t.created_at ? new Date(t.created_at).toLocaleDateString("de-AT") : "–"}</td>
-        <td><button class="btn-klein" data-aktion="freigeben" data-id="${escapeHtml(t.id)}">Freigeben</button></td>
+        <td data-label="Name"><strong>${escapeHtml(t.vorname)} ${escapeHtml(t.nachname)}</strong><br><span style="color:var(--text-muted);font-size:11px">${escapeHtml(t.email)}</span></td>
+        <td data-label="Vollständigkeit"><span style="color:${farbe};font-weight:700">${voll}/${PROFIL_FELDER_GESAMT}</span> <span style="color:var(--text-muted);font-size:11px">${fehlt.length ? "fehlt: " + escapeHtml(fehlt.join(", ")) : "vollständig"}</span></td>
+        <td data-label="Registriert">${t.created_at ? new Date(t.created_at).toLocaleDateString("de-AT") : "–"}</td>
+        <td data-label=""><button class="btn-klein" data-aktion="freigeben" data-id="${escapeHtml(t.id)}">Freigeben</button></td>
       </tr>`;
     }).join("");
   }
@@ -581,14 +586,14 @@ function starteVerwaltung() {
     tb.innerHTML = liste.map((t) => {
       const voll = PROFIL_FELDER_GESAMT - fehlendeProfilfelder(t).length;
       return `<tr class="klickbar" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">
-        <td><strong>${escapeHtml(t.vorname)} ${escapeHtml(t.nachname)}</strong></td>
-        <td>${escapeHtml(t.email)}</td>
-        <td>${t.telefon ? escapeHtml(t.telefon) : "–"}</td>
-        <td>${escapeHtml(t.stadt) || "–"}</td>
-        <td>${voll}/${PROFIL_FELDER_GESAMT}</td>
-        <td><span class="badge ${t.stripe_bezahlt ? "badge-paid" : "badge-unpaid"}">${t.stripe_bezahlt ? "Ja" : "Nein"}</span></td>
-        <td><span class="badge ${t.aktiv ? "badge-active" : "badge-grau"}">${t.aktiv ? "Aktiv" : "Inaktiv"}</span>${t.gesperrt ? ' <span class="badge badge-abg">Gesperrt</span>' : ""}${t.studio_standort_id ? ' <span class="badge badge-grau">Studio</span>' : ""}</td>
-        <td>${t.created_at ? new Date(t.created_at).toLocaleDateString("de-AT") : "–"}</td>
+        <td data-label="Name"><strong>${escapeHtml(t.vorname)} ${escapeHtml(t.nachname)}</strong></td>
+        <td data-label="E-Mail">${escapeHtml(t.email)}</td>
+        <td data-label="Telefon">${t.telefon ? escapeHtml(t.telefon) : "–"}</td>
+        <td data-label="Stadt">${escapeHtml(t.stadt) || "–"}</td>
+        <td data-label="Vollst.">${voll}/${PROFIL_FELDER_GESAMT}</td>
+        <td data-label="Bezahlt"><span class="badge ${t.stripe_bezahlt ? "badge-paid" : "badge-unpaid"}">${t.stripe_bezahlt ? "Ja" : "Nein"}</span></td>
+        <td data-label="Status"><span class="badge ${t.aktiv ? "badge-active" : "badge-grau"}">${t.aktiv ? "Aktiv" : "Inaktiv"}</span>${t.gesperrt ? ' <span class="badge badge-abg">Gesperrt</span>' : ""}${t.studio_standort_id ? ' <span class="badge badge-grau">Studio</span>' : ""}</td>
+        <td data-label="Registriert">${t.created_at ? new Date(t.created_at).toLocaleDateString("de-AT") : "–"}</td>
       </tr>`;
     }).join("");
   }
@@ -599,12 +604,12 @@ function starteVerwaltung() {
     if (!liste.length) { tb.innerHTML = '<tr><td colspan="6" class="leer-text">Keine Treffer.</td></tr>'; return; }
     tb.innerHTML = liste.map((k) =>
       `<tr class="klickbar" data-aktion="detail" data-art="kunde" data-id="${escapeHtml(k.id)}">
-        <td><strong>${escapeHtml(k.vorname)} ${escapeHtml(k.nachname)}</strong>${k.gesperrt ? ' <span class="badge badge-abg">Gesperrt</span>' : ""}</td>
-        <td>${escapeHtml(k.email)}</td>
-        <td>${k.telefon ? escapeHtml(k.telefon) : "–"}</td>
-        <td>${escapeHtml(k.stadt) || "–"}</td>
-        <td>${escapeHtml(k.ziel) || "–"}</td>
-        <td>${k.created_at ? new Date(k.created_at).toLocaleDateString("de-AT") : "–"}</td>
+        <td data-label="Name"><strong>${escapeHtml(k.vorname)} ${escapeHtml(k.nachname)}</strong>${k.gesperrt ? ' <span class="badge badge-abg">Gesperrt</span>' : ""}</td>
+        <td data-label="E-Mail">${escapeHtml(k.email)}</td>
+        <td data-label="Telefon">${k.telefon ? escapeHtml(k.telefon) : "–"}</td>
+        <td data-label="Stadt">${escapeHtml(k.stadt) || "–"}</td>
+        <td data-label="Ziel">${escapeHtml(k.ziel) || "–"}</td>
+        <td data-label="Registriert">${k.created_at ? new Date(k.created_at).toLocaleDateString("de-AT") : "–"}</td>
       </tr>`
     ).join("");
   }
@@ -621,12 +626,12 @@ function starteVerwaltung() {
         const b = z === "angenommen" ? '<span class="badge badge-ang">Angenommen</span>' : z === "abgelehnt" ? '<span class="badge badge-abg">Abgelehnt</span>' : '<span class="badge badge-offen">Offen</span>';
         const std = unbeantwortetSeitStunden(a);
         return `<tr>
-          <td>${a.created_at ? new Date(a.created_at).toLocaleDateString("de-AT") : "–"}</td>
-          <td>${escapeHtml(a.trainer_name) || "–"}</td>
-          <td>${escapeHtml(a.kunden_name) || "–"}</td>
-          <td>${b}</td>
-          <td>${std == null ? "–" : std + " h"}</td>
-          <td>${a.weitergeleitet ? '<span class="badge badge-paid">Ja</span>' : '<span class="badge badge-grau">Nein</span>'}</td>
+          <td data-label="Datum">${a.created_at ? new Date(a.created_at).toLocaleDateString("de-AT") : "–"}</td>
+          <td data-label="Trainer">${escapeHtml(a.trainer_name) || "–"}</td>
+          <td data-label="Kunde">${escapeHtml(a.kunden_name) || "–"}</td>
+          <td data-label="Status">${b}</td>
+          <td data-label="Unbeantwortet seit">${std == null ? "–" : std + " h"}</td>
+          <td data-label="Weitergeleitet">${a.weitergeleitet ? '<span class="badge badge-paid">Ja</span>' : '<span class="badge badge-grau">Nein</span>'}</td>
         </tr>`;
       }).join("");
     } catch { tb.innerHTML = '<tr><td colspan="6" class="leer-text">Anfragen konnten nicht geladen werden.</td></tr>'; }
@@ -1121,6 +1126,95 @@ function starteVerwaltung() {
     else if (art === "anfrage" || art === "anfragen") { zeigeTab("anfragen"); }
   }
 
+  // ── Teil A: Web Push (Mitteilungen auf diesem Gerät) ──
+  function pushUnterstuetzt() {
+    return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  }
+  function b64urlZuUint8(s) {
+    const pad = "=".repeat((4 - (s.length % 4)) % 4);
+    const b64 = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
+    const roh = atob(b64);
+    const out = new Uint8Array(roh.length);
+    for (let i = 0; i < roh.length; i++) out[i] = roh.charCodeAt(i);
+    return out;
+  }
+  function geraetName() {
+    const ua = navigator.userAgent || "";
+    let plt = "Gerät";
+    if (/iPhone|iPad|iPod/.test(ua)) plt = "iPhone/iPad";
+    else if (/Android/.test(ua)) plt = "Android";
+    else if (/Macintosh/.test(ua)) plt = "Mac";
+    else if (/Windows/.test(ua)) plt = "Windows";
+    return plt + " · " + new Date().toLocaleDateString("de-AT");
+  }
+  async function swRegistrierung() {
+    if (!("serviceWorker" in navigator)) return null;
+    try {
+      return await navigator.serviceWorker.register("sw-verwaltung.js", {
+        scope: "verwaltung-88fd2cb35d54e09c68c8e60199d97b66.html",
+      });
+    } catch { return null; }
+  }
+  async function pushInit() {
+    const status = $("push-status");
+    const knopf = $("push-aktivieren");
+    if (!status) return;
+    if (!pushUnterstuetzt()) {
+      status.textContent = "Dein Browser unterstützt hier keine Mitteilungen. Auf dem iPhone zuerst über „Teilen → Zum Home-Bildschirm“ installieren und die App öffnen.";
+      if (knopf) knopf.style.display = "none";
+      return;
+    }
+    let aktiv = false;
+    try {
+      const reg = await navigator.serviceWorker.getRegistration("verwaltung-88fd2cb35d54e09c68c8e60199d97b66.html");
+      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      aktiv = !!sub && Notification.permission === "granted";
+    } catch { /* egal */ }
+    status.textContent = aktiv
+      ? "Dieses Gerät erhält Mitteilungen. Du kannst weitere Geräte aktivieren."
+      : "Auf diesem Gerät noch nicht aktiviert. Mehrere Geräte sind möglich.";
+    if (knopf) knopf.textContent = aktiv ? "Mitteilungen erneut einrichten" : "Mitteilungen auf diesem Gerät aktivieren";
+    pushGeraeteLaden();
+  }
+  async function pushAktivieren() {
+    const status = $("push-status");
+    if (!pushUnterstuetzt()) { fehler("Dein Browser unterstützt hier keine Mitteilungen."); return; }
+    try {
+      // Berechtigung erst nach Klick anfragen.
+      const erlaubnis = await Notification.requestPermission();
+      if (erlaubnis !== "granted") { if (status) status.textContent = "Mitteilungen wurden nicht erlaubt."; return; }
+      const reg = await swRegistrierung();
+      if (!reg) { fehler("Service Worker konnte nicht registriert werden."); return; }
+      await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: b64urlZuUint8(VAPID_PUBLIC_KEY),
+      });
+      const j = sub.toJSON();
+      const d = await adminEdge({
+        aktion: "push_abo_speichern",
+        abo: { endpoint: j.endpoint, p256dh: j.keys && j.keys.p256dh, auth: j.keys && j.keys.auth, geraet: geraetName() },
+      });
+      if (d && d.ok) { erfolg("Mitteilungen auf diesem Gerät aktiviert."); pushInit(); }
+      else fehler("Aktivierung fehlgeschlagen.");
+    } catch { fehler("Mitteilungen konnten nicht aktiviert werden."); }
+  }
+  async function pushGeraeteLaden() {
+    const wrap = $("push-geraete");
+    if (!wrap) return;
+    const d = await adminEdge({ aktion: "push_abos_liste" });
+    if (!d || !Array.isArray(d.abos)) { wrap.innerHTML = ""; return; }
+    if (!d.abos.length) { wrap.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">Noch keine Geräte aktiviert.</div>'; return; }
+    wrap.innerHTML = d.abos.map((g) =>
+      `<div class="push-geraet"><span>${escapeHtml(g.geraet || "Gerät")}${g.erstellt_am ? " · seit " + new Date(g.erstellt_am).toLocaleDateString("de-AT") : ""}</span><button data-aktion="push-entfernen" data-id="${escapeHtml(g.id)}">Entfernen</button></div>`
+    ).join("");
+  }
+  async function pushGeraetEntfernen(id) {
+    const d = await adminEdge({ aktion: "push_abo_entfernen", ziel_id: id });
+    if (d && d.ok) { erfolg("Gerät entfernt."); pushGeraeteLaden(); }
+    else fehler("Entfernen fehlgeschlagen.");
+  }
+
   // ── Ereignis-Delegation ──
   function verdrahten() {
     $("btn-login").addEventListener("click", anmelden);
@@ -1148,13 +1242,30 @@ function starteVerwaltung() {
     $("csv-trainer").addEventListener("click", exportiereTrainer);
     $("csv-kunden").addEventListener("click", exportiereKunden);
 
+    // Teil A: Push-Knopf + „Mehr"-Reiter (untere Leiste am Handy).
+    const pushKnopf = $("push-aktivieren");
+    if (pushKnopf) pushKnopf.addEventListener("click", pushAktivieren);
+    const mehrKnopf = $("tab-mehr-knopf");
+    if (mehrKnopf) {
+      mehrKnopf.addEventListener("click", () => {
+        const menu = $("tab-mehr-menu");
+        if (menu) menu.classList.toggle("offen");
+      });
+    }
+
     // Aktivität (für die 30-Minuten-Wache)
     for (const ev of ["click", "keydown"]) document.addEventListener(ev, aktivitaet, { passive: true });
 
     // Delegierte Klicks
     document.addEventListener("click", (e) => {
       const tab = e.target.closest("[data-tab]");
-      if (tab && tab.classList.contains("tab")) { zeigeTab(tab.dataset.tab); return; }
+      if (tab && tab.classList.contains("tab")) {
+        zeigeTab(tab.dataset.tab);
+        // „Mehr"-Menü nach der Wahl schließen (Handy).
+        const menu = $("tab-mehr-menu");
+        if (menu) menu.classList.remove("offen");
+        return;
+      }
       const sort = e.target.closest("th[data-sort]");
       if (sort) { aufSortieren(sort.dataset.liste, sort.dataset.sort); return; }
       const schliessen = e.target.closest("[data-schliessen]");
@@ -1172,6 +1283,7 @@ function starteVerwaltung() {
       if (akt === "sperren") { sperren(art, id); return; }
       if (akt === "kicken") { kicken(art, id); return; }
       if (akt === "zertifikat") { zertifikatOeffnen(a.dataset.pfad); return; }
+      if (akt === "push-entfernen") { pushGeraetEntfernen(id); return; }
       if (akt === "kopieren") { navigator.clipboard && navigator.clipboard.writeText(a.dataset.text).then(() => erfolg("Kopiert."), () => {}); return; }
       if (akt === "studio-freigabe") { studioRpc("studio_admin_freigabe", { p_studio_id: id, p_an: a.checked }); return; }
       if (akt === "studio-anlegen") { studioAnlegen(); return; }
@@ -1220,6 +1332,8 @@ function starteVerwaltung() {
   // ── Start ──
   function start() {
     verdrahten();
+    // Teil A: Service Worker früh registrieren (Homescreen-App + Push).
+    swRegistrierung();
     let s = null;
     try { s = JSON.parse(sessionStorage.getItem(SITZUNG_SCHLUESSEL) || "null"); } catch { s = null; }
     if (sitzungGueltig(s)) {

@@ -29,7 +29,7 @@ const trainerProfil = {
   email: "mara@example.com",
   stadt: "Salzburg",
   plz: "5020",
-  telefon: "+43 660 1234567",
+  telefon: "Nummer hinterlegt",
   trainingsart: "Personal Training",
   trainingsort: "beides",
   preis_stunde: 60,
@@ -57,7 +57,7 @@ Deno.test("M1/M2: Neuer-Trainer-Mail hat HTML+Text, Deep-Link #trainer-<id>, x/8
   assertStringIncludes(m.text, "Profil-Vollständigkeit: 8/8");
   assertStringIncludes(m.text, "Herkunft: Meta – trainer_at_1_beruf");
   assertStringIncludes(m.text, "Ort / PLZ: Salzburg · 5020");
-  assertStringIncludes(m.text, "Telefon: +43 660 1234567");
+  assertStringIncludes(m.text, "Telefon: Nummer hinterlegt");
   // Keine Aktion aus der Mail: kein Formular, nur der Weg in die Verwaltung.
   assert(!/<form/i.test(m.html), "Mail enthält ein Formular");
   // Hosted PNG (keine Data-URI).
