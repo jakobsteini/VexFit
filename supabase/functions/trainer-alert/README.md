@@ -14,7 +14,7 @@ Gebaut am 26.09.2026 aus der Sicherung des Workflows, Verhalten unverändert.
    Radius: 25 km). Koordinaten kommen von `api.zippopotam.us`, der Reihe nach
    für `at`, `de`, `ch`.
 4. Schickt je Treffer eine HTML-Mail an `kunden_email`, Absender
-   `vexfit.info@gmail.com`.
+   `office@vexfit.app` (Versand über Google Workspace, Secrets `SMTP_BENUTZER`/`SMTP_PASSWORT`).
 5. Setzt `trainers.alert_sent = true`, damit kein Trainer zweimal gemeldet wird.
 
 Gibt es **keine** aktiven Alerts, passiert gar nichts — auch kein Markieren. Das
@@ -84,7 +84,8 @@ Nichts davon steht im Code — alles kommt aus der Umgebung:
 | Name                        | Woher                                                                          |
 | --------------------------- | ------------------------------------------------------------------------------ |
 | `TRAINER_ALERT_KEY`         | Secret an der Function; derselbe Wert wie im Vault-Eintrag `trainer_alert_key` |
-| `GMAIL_PASSWORT`            | Secret an der Function; App-Passwort des Absenderkontos                        |
+| `SMTP_BENUTZER`             | Secret an der Function; SMTP-Anmeldename (z. B. `jakob@jsvision.at`)           |
+| `SMTP_PASSWORT`             | Secret an der Function; App-Passwort für diesen SMTP-Zugang (Workspace)        |
 | `SUPABASE_URL`              | setzt Supabase selbst                                                          |
 | `SUPABASE_SERVICE_ROLE_KEY` | setzt Supabase selbst                                                          |
 

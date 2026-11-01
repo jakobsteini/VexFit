@@ -255,9 +255,9 @@ const MIT_TOKEN = {
 // Grundlagen
 // ===========================================================================
 Deno.test("Festwerte stehen unveraendert wie im Workflow", () => {
-  // Absender bleibt das Gmail-Konto (dort haengt GMAIL_PASSWORT); die internen
-  // Benachrichtigungen gehen jetzt an das ueberwachte Postfach office@vexfit.app.
-  assertEquals(ABSENDER, "vexfit.info@gmail.com");
+  // Teil M: Absender und interner Empfaenger sind das Workspace-Postfach
+  // office@vexfit.app (Versand ueber SMTP_BENUTZER/SMTP_PASSWORT).
+  assertEquals(ABSENDER, "office@vexfit.app");
   assertEquals(BETREIBER, "office@vexfit.app");
   assertEquals(LINK_ERSTE, "https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00");
   assertEquals(LINK_WEITERE, "https://buy.stripe.com/7sYbJ1fkl8sX8jxfxM2oE01");

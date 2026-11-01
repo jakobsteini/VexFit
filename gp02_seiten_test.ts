@@ -32,10 +32,16 @@ Deno.test("Keine Seite führt die alte Gmail-Adresse sichtbar als Kontakt", asyn
   }
 });
 
-Deno.test("Edge Function behält Gmail nur als technisches Absenderkonto (ABSENDER)", async () => {
+Deno.test("Edge Function sendet über Workspace (office@vexfit.app), kein Gmail mehr", async () => {
   const kern = await lies("supabase/functions/vexfit-automation/kern.ts");
-  assertStringIncludes(kern, 'ABSENDER = "vexfit.info@gmail.com"');
+  const index = await lies("supabase/functions/vexfit-automation/index.ts");
+  assertStringIncludes(kern, 'ABSENDER = "office@vexfit.app"');
   assertStringIncludes(kern, 'BETREIBER = "office@vexfit.app"');
+  // Anmeldung über die neuen Secrets, kein GMAIL_PASSWORT mehr.
+  assertStringIncludes(index, 'pflicht("SMTP_BENUTZER")');
+  assertStringIncludes(index, 'pflicht("SMTP_PASSWORT")');
+  assert(!index.includes("GMAIL_PASSWORT"), "index.ts nutzt noch GMAIL_PASSWORT");
+  assert(!kern.includes("vexfit.info@gmail.com"), "kern.ts enthält noch die alte Gmail-Adresse");
 });
 
 Deno.test("Impressum: neue Telefonnummer, office-Mail, Adresse", async () => {

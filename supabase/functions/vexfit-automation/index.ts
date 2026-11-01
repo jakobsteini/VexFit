@@ -19,7 +19,8 @@
 // Stripe-Signatur auf /stripe.
 //
 // Umgebung (alles Secrets, nichts davon steht im Code):
-//   GMAIL_PASSWORT            — App-Passwort des Absenderkontos (schon gesetzt)
+//   SMTP_BENUTZER             — SMTP-Anmeldename (z. B. jakob@jsvision.at)
+//   SMTP_PASSWORT             — App-Passwort fuer diesen SMTP-Zugang (Workspace)
 //   STRIPE_WEBHOOK_SECRET     — Signaturgeheimnis des Stripe-Endpunkts
 //   ADMIN_PASSWORT_HINWEIS    — optional; siehe unten
 //   SUPABASE_URL              — von Supabase gesetzt
@@ -226,18 +227,22 @@ const anschluesse: Anschluesse = {
   },
 
   async mailSenden(mail: Mail): Promise<void> {
+    // Teil M: Versand ueber Google Workspace. Anmeldung mit den Secrets
+    // SMTP_BENUTZER (z. B. jakob@jsvision.at) und SMTP_PASSWORT (App-Passwort).
+    // Fehlt eines, wirft pflicht() einen klaren Fehler (kein stiller Versand).
     const client = new SMTPClient({
       connection: {
         hostname: SMTP.host,
         port: SMTP.port,
         tls: true,
-        auth: { username: ABSENDER, password: pflicht("GMAIL_PASSWORT") },
+        auth: { username: pflicht("SMTP_BENUTZER"), password: pflicht("SMTP_PASSWORT") },
       },
     });
     try {
       await client.send({
-        // Absendername statt nackter Adresse; die Adresse selbst bleibt gleich.
+        // Sichtbarer Absender und Reply-To: office@vexfit.app (ABSENDER).
         from: `Vexfit <${ABSENDER}>`,
+        replyTo: ABSENDER,
         to: mail.an,
         subject: mail.betreff,
         // Multipart: Textfassung als text/plain, HTML als text/html, beide

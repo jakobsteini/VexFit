@@ -87,7 +87,8 @@ Nichts davon steht im Code:
 
 | Name                                        | Woher                                          |
 | ------------------------------------------- | ---------------------------------------------- |
-| `GMAIL_PASSWORT`                            | schon gesetzt, App-Passwort des Absenderkontos |
+| `SMTP_BENUTZER`                             | SMTP-Anmeldename (z. B. `jakob@jsvision.at`) |
+| `SMTP_PASSWORT`                             | App-Passwort für diesen SMTP-Zugang (Google Workspace) |
 | `STRIPE_WEBHOOK_SECRET`                     | legt `werkzeuge/stripe-endpunkt-anlegen.sh` an |
 | `ADMIN_PASSWORT_HINWEIS`                    | **optional**, siehe unten                      |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | setzt Supabase selbst                          |

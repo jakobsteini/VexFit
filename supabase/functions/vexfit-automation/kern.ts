@@ -29,15 +29,16 @@ import {
 // Festwerte aus dem Workflow
 // ============================================================================
 
-/** Absender aller sechs Mail-Nodes. */
-export const ABSENDER = "vexfit.info@gmail.com";
+/** Sichtbarer Absender aller Mails: "Vexfit <office@vexfit.app>". Zuvor war das
+ *  das inzwischen geloeschte Gmail-Absenderkonto — seitdem schlug
+ *  jeder Versand fehl. Der Versand laeuft jetzt ueber Google Workspace: die
+ *  SMTP-Anmeldung kommt aus den Secrets SMTP_BENUTZER/SMTP_PASSWORT (index.ts),
+ *  die sichtbare From-Adresse ist office@vexfit.app. */
+export const ABSENDER = "office@vexfit.app";
 
-/** Empfaenger der drei internen Benachrichtigungen an Jakob (neuer Trainer,
- *  neuer Kunde, Zahlung). Das aktiv ueberwachte Postfach ist office@vexfit.app
- *  (Google Workspace). Frueher ging die Mail an vexfit.info@gmail.com — genau
- *  dort lag die Registrierungs-Benachrichtigung, die Jakob in office@vexfit.app
- *  nie gesehen hat. vexfit.info@gmail.com bleibt nur noch ABSENDER (dort haengt
- *  das GMAIL_PASSWORT). Absender und Empfaenger sind also bewusst verschieden. */
+/** Empfaenger der internen Benachrichtigungen an Jakob (neuer Trainer, neuer
+ *  Kunde, Zahlung) und Reply-To aller Mails: das aktiv ueberwachte Workspace-
+ *  Postfach office@vexfit.app. */
 export const BETREIBER = "office@vexfit.app";
 
 /** Zahlungslink aus "Email Trainer - ERSTE Anfrage 49,99€". */
@@ -730,7 +731,7 @@ async function sendeWennAdresseTaugt(
     await a.mailSenden(mail);
   } catch (fehler) {
     // Nicht still verschlucken: ein fehlgeschlagener Versand (SMTP-Fehler,
-    // fehlendes GMAIL_PASSWORT, gesperrter Port) wird ausdruecklich gemeldet und
+    // fehlende SMTP-Zugangsdaten, gesperrter Port) wird ausdruecklich gemeldet und
     // dann erneut geworfen. So liefert der Endpunkt 500 und der Fehler steht in
     // den Function-Logs, statt dass eine Registrierung lautlos ohne
     // Benachrichtigung durchlaeuft.
@@ -942,25 +943,34 @@ export async function bearbeiten(
     return antwort(405, { fehler: "nur POST" }, herkunft);
   }
 
-  switch (pfad) {
-    case "neuer-trainer":
-      return await neuerTrainer(anfrageObjekt, a, herkunft);
-    case "neuer-kunde":
-      return await neuerKunde(anfrageObjekt, a, herkunft);
-    case "neue-anfrage":
-      return await neueAnfrage(anfrageObjekt, a, herkunft);
-    case "admin-aktion":
-      return await adminAktion(anfrageObjekt, a, herkunft);
-    case "freigabe-pruefen":
-      return await freigabePruefen(anfrageObjekt, a, herkunft);
-    case "passt-nicht":
-      return await passtNicht(anfrageObjekt, a, herkunft);
-    case "unbeantwortet-pruefen":
-      return await unbeantwortetePruefen(anfrageObjekt, a, herkunft);
-    case "stripe":
-      return await stripe(anfrageObjekt, a);
-    default:
-      return antwort(404, { fehler: "unbekannter Pfad" }, herkunft);
+  // Teil M: unerwartete Fehler (z. B. SMTP-Versand/fehlende Secrets) nicht als
+  // nackten 500 durchreichen, sondern als klaren Fehler in der Antwort – und,
+  // ueber a.melden in den Aufrufern, auch im Log. Nie still verschlucken.
+  try {
+    switch (pfad) {
+      case "neuer-trainer":
+        return await neuerTrainer(anfrageObjekt, a, herkunft);
+      case "neuer-kunde":
+        return await neuerKunde(anfrageObjekt, a, herkunft);
+      case "neue-anfrage":
+        return await neueAnfrage(anfrageObjekt, a, herkunft);
+      case "admin-aktion":
+        return await adminAktion(anfrageObjekt, a, herkunft);
+      case "freigabe-pruefen":
+        return await freigabePruefen(anfrageObjekt, a, herkunft);
+      case "passt-nicht":
+        return await passtNicht(anfrageObjekt, a, herkunft);
+      case "unbeantwortet-pruefen":
+        return await unbeantwortetePruefen(anfrageObjekt, a, herkunft);
+      case "stripe":
+        return await stripe(anfrageObjekt, a);
+      default:
+        return antwort(404, { fehler: "unbekannter Pfad" }, herkunft);
+    }
+  } catch (fehler) {
+    const nachricht = String((fehler as { message?: string })?.message ?? fehler);
+    a.melden?.("bearbeiten: unerwarteter Fehler", { pfad, fehler: nachricht });
+    return antwort(500, { fehler: nachricht }, herkunft);
   }
 }
 

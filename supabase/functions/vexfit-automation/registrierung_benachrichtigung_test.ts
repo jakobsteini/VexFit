@@ -4,8 +4,8 @@
 //
 // Am 31.10.2026 hat sich ein Trainer registriert, Jakob bekam in
 // office@vexfit.app aber KEINE Mail. Ursache: die interne Benachrichtigung ging
-// an vexfit.info@gmail.com (nur noch Absenderkonto), nicht an das ueberwachte
-// Postfach office@vexfit.app. Die Korrektur: BETREIBER = "office@vexfit.app".
+// an das alte Absenderkonto, nicht an das ueberwachte Postfach office@vexfit.app.
+// Die Korrektur: BETREIBER = "office@vexfit.app".
 //
 // Dieser Test prueft ohne Netz (Datenbank, Auth und SMTP sind ersetzt) genau
 // zwei Dinge:
@@ -123,19 +123,13 @@ Deno.test("Trainer-Registrierung: Benachrichtigung geht an office@vexfit.app", a
 Deno.test("Trainer-Registrierung: ein Versandfehler wird geloggt, nicht still verschluckt", async () => {
   const { anschluesse, spur } = baueAnschluss({ smtpFehler: true });
 
-  let geworfen = false;
-  try {
-    await bearbeiten(
-      registrierung({ vorname: "Max", nachname: "Muster", email: "neu@beispiel.at" }),
-      anschluesse,
-    );
-  } catch (_fehler) {
-    // Erwartet: der Fehler wird weitergeworfen, damit der Endpunkt 500 liefert
-    // und der Supabase-Function-Log den Fehlschlag sieht.
-    geworfen = true;
-  }
-
-  assert(geworfen, "ein SMTP-Fehler muss sichtbar werden (weitergeworfen), nicht verschluckt");
+  // Teil M: der Fehler wird NICHT still verschluckt, sondern als klarer 500 mit
+  // Fehlertext beantwortet (und zusätzlich geloggt), damit Jakob/der Log ihn sieht.
+  const res = await bearbeiten(
+    registrierung({ vorname: "Max", nachname: "Muster", email: "neu@beispiel.at" }),
+    anschluesse,
+  );
+  assertEquals(res.status, 500);
   // Und er wird ausdruecklich gemeldet (Function-Log).
   const fehlerMeldung = spur.meldungen.find((m) => m.text === "Mailversand fehlgeschlagen");
   assert(fehlerMeldung, "der Fehlschlag wurde nicht ueber a.melden geloggt");

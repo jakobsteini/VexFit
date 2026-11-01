@@ -46,10 +46,9 @@ Deno.test("7.3 sichtbare Kontaktadresse ist office@vexfit.app", async () => {
   const recht = await lies("./rechtliches.html");
   assertStringIncludes(recht, "office@vexfit.app");
   assert(!recht.includes("vexfit.info@gmail.com"), "rechtliches.html darf vexfit.info nicht mehr fuehren");
-  // Absender bleibt das Gmail-Konto (dort haengt GMAIL_PASSWORT); die internen
-  // Benachrichtigungen an Jakob gehen jetzt ebenfalls an das ueberwachte
-  // Postfach office@vexfit.app (Baustein "Registrierungs-Benachrichtigung").
-  assertEquals(ABSENDER, "vexfit.info@gmail.com");
+  // Teil M: sichtbarer Absender UND interner Empfaenger sind jetzt das
+  // Workspace-Postfach office@vexfit.app (Versand ueber SMTP_BENUTZER/SMTP_PASSWORT).
+  assertEquals(ABSENDER, "office@vexfit.app");
   assertEquals(BETREIBER, "office@vexfit.app");
 });
 

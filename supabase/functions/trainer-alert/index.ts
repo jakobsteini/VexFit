@@ -17,7 +17,8 @@
 //
 // Umgebung (alles Secrets, nichts davon steht im Code):
 //   TRAINER_ALERT_KEY        — derselbe Wert wie im Vault-Eintrag trainer_alert_key
-//   GMAIL_PASSWORT           — App-Passwort des Gmail-Kontos des Absenders
+//   SMTP_BENUTZER            — SMTP-Anmeldename (z. B. jakob@jsvision.at)
+//   SMTP_PASSWORT            — App-Passwort fuer diesen SMTP-Zugang (Workspace)
 //   SUPABASE_URL             — von Supabase gesetzt
 //   SB_SECRET_KEY      — neuer geheimer Schluessel (sb_secret_…); bevorzugt, siehe restKopf()
 //   SUPABASE_SERVICE_ROLE_KEY— alter Schluessel; nur noch Rueckfall, von Supabase gesetzt
@@ -121,18 +122,20 @@ const anschluesse: Anschluesse = {
 
   // Node "Alert-Mail senden"
   async mailSenden(mail: Alertmail): Promise<void> {
+    // Teil M: Versand ueber Google Workspace (Secrets SMTP_BENUTZER/SMTP_PASSWORT),
+    // sichtbarer Absender und Reply-To office@vexfit.app (ABSENDER).
     const client = new SMTPClient({
       connection: {
         hostname: SMTP_HOST,
         port: SMTP_PORT,
         tls: true,
-        auth: { username: ABSENDER, password: pflicht("GMAIL_PASSWORT") },
+        auth: { username: pflicht("SMTP_BENUTZER"), password: pflicht("SMTP_PASSWORT") },
       },
     });
     try {
       await client.send({
-        // Absendername statt nackter Adresse; die Adresse selbst bleibt gleich.
         from: `Vexfit <${ABSENDER}>`,
+        replyTo: ABSENDER,
         to: mail.kunden_email,
         subject: mailBetreff(mail),
         // Multipart: Textfassung als text/plain, HTML als text/html, beide

@@ -114,7 +114,8 @@ Deno.test("Spaltenlisten und Absender stehen unveraendert wie im Workflow", () =
     "id,vorname,nachname,email,stadt,plz,trainingsart,preis_stunde,bio,spezialisierungen",
   );
   assertEquals(ALERT_SPALTEN, "id,kunden_email,kunden_name,plz,stadt,radius");
-  assertEquals(ABSENDER, "vexfit.info@gmail.com");
+  // Teil M: Versand über Workspace, sichtbarer Absender office@vexfit.app.
+  assertEquals(ABSENDER, "office@vexfit.app");
 });
 
 // --------------------------------------------------------------- Auswahl

@@ -9,9 +9,9 @@
 // Filter, Zuordnung ueber PLZ und Radius, Betreff, HTML-Mail, das Setzen von
 // trainers.alert_sent.
 //
-// Keine Adressen, Nummern oder Schluessel als Festwerte — ausser dem Absender
-// vexfit.info@gmail.com, der auf der Seite selbst schon oeffentlich steht
-// (index.html, admin.html) und fuer die Pruefung des Mailwegs gebraucht wird.
+// Keine Adressen, Nummern oder Schluessel als Festwerte — ausser dem sichtbaren
+// Absender office@vexfit.app, der ohnehin oeffentlich auf der Seite steht und
+// fuer die Pruefung des Mailwegs gebraucht wird.
 //
 // Zwei Dinge weichen bewusst vom Workflow ab, beide zur Absicherung vor dem
 // ersten Einsatz: jeder Wert aus der Datenbank wird vor dem Einsetzen ins
@@ -30,7 +30,10 @@ export const TRAINER_SPALTEN =
 export const ALERT_SPALTEN = "id,kunden_email,kunden_name,plz,stadt,radius";
 
 /** Absender des Nodes "Alert-Mail senden". */
-export const ABSENDER = "vexfit.info@gmail.com";
+// Teil M: sichtbarer Absender und Reply-To ist das Workspace-Postfach. Die
+// SMTP-Anmeldung kommt aus den Secrets SMTP_BENUTZER/SMTP_PASSWORT (index.ts);
+// das frueher genutzte Gmail-Absenderkonto wurde geloescht.
+export const ABSENDER = "office@vexfit.app";
 
 /** Radius in km, wenn der Alert keinen hat — `a.radius || 25` im Workflow. */
 export const RADIUS_STANDARD = 25;

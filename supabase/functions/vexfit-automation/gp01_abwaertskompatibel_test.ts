@@ -8,7 +8,7 @@
 // Gemockt: PostgREST antwortet wie ohne Migration mit 42703/42P01.
 //
 // Aufruf:  deno test --allow-run --allow-read --allow-env supabase/functions/vexfit-automation/
-import { assert, assertEquals, assertRejects, assertStringIncludes } from "jsr:@std/assert@1";
+import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import { ADMIN_ID, type Anschluesse, bearbeiten, ERLAUBTE_HERKUNFT, istMigrationFehlt } from "./kern.ts";
 
 // Fehler, wie PostgREST ihn ohne die Spalte gesperrt liefert.
@@ -95,12 +95,12 @@ Deno.test("Ein anderer Fehler (nicht Migration) wird NICHT als Migration gemelde
   const a = ohneMigration();
   (a as unknown as { personGesperrtSetzen: () => Promise<number> }).personGesperrtSetzen = () =>
     Promise.reject(new Error("HTTP 500 Datenbank nicht erreichbar"));
-  // Kein Migrations-Hinweis: der unerwartete Fehler wird durchgereicht (Deno.serve
-  // beantwortet ihn mit 500; der Prozess läuft weiter). Er wird NICHT fälschlich
-  // als „Migration fehlt" (400) gemeldet.
-  await assertRejects(
-    () => bearbeiten(req({ aktion: "login_sperren", art: "trainer", ziel_id: "t-1" }), a),
-    Error,
-    "Datenbank nicht erreichbar",
-  );
+  // Kein Migrations-Hinweis: der unerwartete Fehler wird als klarer 500 mit dem
+  // echten Fehlertext beantwortet (Teil M), NICHT fälschlich als „Migration
+  // fehlt" (400).
+  const res = await bearbeiten(req({ aktion: "login_sperren", art: "trainer", ziel_id: "t-1" }), a);
+  const d = await res.json();
+  assertEquals(res.status, 500);
+  assertStringIncludes(d.fehler, "Datenbank nicht erreichbar");
+  assert(!String(d.fehler).includes("Migration"), "unerwarteter Fehler darf nicht als Migration gemeldet werden");
 });
