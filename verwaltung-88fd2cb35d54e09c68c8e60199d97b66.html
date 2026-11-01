@@ -176,6 +176,63 @@ tr:last-child td{border-bottom:none}
   .btn-klein{padding:11px 14px;font-size:13px}
   .werkzeugleiste input[type=search]{min-width:100%}
 }
+
+/* ════ Feinschliff Teil 1/2: Kopf, Karten, Mehr-Blatt, Push kompakt ════ */
+/* 1a: kleiner Aktualisieren-Knopf im Kopf */
+.btn-aktualisieren{background:transparent;border:1px solid var(--border);color:var(--text-muted);width:34px;height:34px;border-radius:4px;font-size:16px;cursor:pointer;line-height:1;flex-shrink:0}
+.btn-aktualisieren:hover{color:var(--white);border-color:rgba(255,255,255,0.3)}
+.btn-aktualisieren.laeuft{animation:dreh .8s linear infinite}
+@keyframes dreh{to{transform:rotate(360deg)}}
+
+/* 1b: kompakte Karten – nur am Handy sichtbar (sonst Tabelle) */
+.karten{display:none}
+.karte{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;cursor:pointer}
+.karte:active{background:var(--mid)}
+.karte-kopf{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.karte-name{font-weight:700;font-size:16px;line-height:1.2;word-break:break-word}
+.karte-zeile{font-size:12px;color:var(--text-muted);margin-top:4px}
+.karte-voll{display:flex;align-items:center;gap:8px;margin-top:9px}
+.karte-balken{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden}
+.karte-balken span{display:block;height:100%;border-radius:3px}
+.karte-voll-text{font-size:11px;color:var(--text-muted);font-weight:700;flex-shrink:0}
+.karte-aktionen{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.karte-aktionen button{flex:1 1 auto;min-width:92px;min-height:42px;padding:10px 12px;border-radius:6px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid transparent}
+.karte-neu{animation:neuBlitz 2.6s ease-out}
+@keyframes neuBlitz{0%{box-shadow:0 0 0 2px var(--accent) inset;background:rgba(232,255,0,0.14)}100%{box-shadow:none;background:var(--card)}}
+
+/* 1c: Mehr-Blatt (von unten) + Abdunkelung */
+.mehr-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:60}
+.mehr-griff{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,0.25);margin:2px auto 10px}
+.mehr-nur-handy{display:none}
+.mehr-aktionen{flex-direction:column;gap:4px;border-top:1px solid var(--border);margin-top:6px;padding-top:6px}
+.mehr-aktion{width:100%;text-align:left;padding:13px 12px;font-size:13px;border-radius:6px;background:transparent;border:none;color:var(--white);font-family:inherit;cursor:pointer}
+.mehr-aktion:active{background:var(--mid)}
+.mehr-aktion-aus{color:var(--text-muted)}
+
+/* 1f: Push kompakt, wenn das Gerät eingerichtet ist */
+.push-kompakt-zeile{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:13px}
+.push-verwalten-link{margin-left:auto;background:transparent;border:none;color:var(--accent);font-size:13px;cursor:pointer;text-decoration:underline;font-family:inherit}
+
+/* 1g: aktive Kennzahl-Kachel markiert */
+.stat-card.aktiv{background:var(--mid);border-left-color:var(--white)}
+
+/* 1a: „Zum Aktualisieren ziehen" (Pull-to-Refresh) */
+.ptr{position:fixed;top:0;left:0;right:0;z-index:55;text-align:center;font-size:12px;color:var(--text-muted);background:var(--gray);border-bottom:1px solid var(--border);padding:8px;transform:translateY(-100%);pointer-events:none}
+.ptr.sichtbar{transform:translateY(0)}
+
+@media(max-width:600px){
+  .logo-zusatz{display:none}
+  #btn-logout{display:none}                     /* 1d: Abmelden ins Mehr-Blatt */
+  /* 1b: Karten statt Tabelle in Übersicht/Trainer/Kunden */
+  #tab-uebersicht .table-wrap,#tab-trainer .table-wrap,#tab-kunden .table-wrap{display:none}
+  .karten{display:block}
+  /* 1c: das Mehr-Blatt geht von unten über der Leiste auf */
+  .mehr-nur-handy{display:flex}
+  .tab-mehr-menu{left:0;right:0;bottom:0;border-radius:14px 14px 0 0;max-height:72vh;overflow-y:auto;padding:12px 14px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,0.6)}
+  /* 1e: leere Zustände in den Reflow-Tabellen wirklich zentrieren */
+  tbody tr td.leer-text{display:block;text-align:center;width:100%}
+  tbody tr td.leer-text::before{content:none}
+}
 </style>
 </head>
 <body>
@@ -226,10 +283,15 @@ tr:last-child td{border-bottom:none}
 
 <!-- ══ DASHBOARD ══ -->
 <div id="ansicht-dashboard" class="verborgen">
+  <!-- Teil 1a: Hinweis für „Zum Aktualisieren ziehen" (Pull-to-Refresh am Handy) -->
+  <div class="ptr" id="ptr">↻ Zum Aktualisieren ziehen</div>
   <nav>
-    <a class="logo">VEX<span>FIT</span> <span style="color:var(--text-muted);font-size:14px;letter-spacing:2px">VERWALTUNG</span></a>
+    <a class="logo">VEX<span>FIT</span> <span class="logo-zusatz" style="color:var(--text-muted);font-size:14px;letter-spacing:2px">VERWALTUNG</span></a>
     <div class="nav-links">
       <span id="zuletzt" class="nav-meta"></span>
+      <!-- Teil 1a: kleiner Aktualisieren-Knopf -->
+      <button id="btn-aktualisieren" class="btn-aktualisieren" type="button" aria-label="Aktualisieren" title="Aktualisieren">↻</button>
+      <!-- Teil 1d: „Abmelden" wandert am Handy ins Mehr-Blatt (hier per CSS versteckt) -->
       <button id="btn-logout" class="btn-aus">Abmelden</button>
     </div>
   </nav>
@@ -240,17 +302,26 @@ tr:last-child td{border-bottom:none}
     <!-- Reiter. Am Handy (Teil A) feste Leiste unten: vier Hauptreiter + „Mehr".
          Am großen Bildschirm fließen alle neun in einer Zeile (tab-mehr-menu:
          display:contents, Mehr-Knopf ausgeblendet). -->
+    <!-- Teil 1c: Abdunkelung hinter dem Mehr-Blatt (nur am Handy sichtbar) -->
+    <div class="mehr-overlay verborgen" id="mehr-overlay" data-schliessen="mehr"></div>
     <div class="tabs tabs-unten" id="tabs">
       <button class="tab active" data-tab="uebersicht">Übersicht</button>
       <button class="tab" data-tab="trainer">Trainer</button>
       <button class="tab" data-tab="kunden">Kunden</button>
       <button class="tab" data-tab="anfragen">Anfragen</button>
       <div class="tab-mehr-menu" id="tab-mehr-menu">
+        <!-- Teil 1c: Griff + Titel nur im Blatt (am großen Bildschirm ausgeblendet) -->
+        <div class="mehr-griff mehr-nur-handy" aria-hidden="true"></div>
         <button class="tab" data-tab="zahlungen">Zahlungen</button>
         <button class="tab" data-tab="studios">Studios</button>
         <button class="tab" data-tab="zertifikate">Zertifikate</button>
         <button class="tab" data-tab="nachfrage">Nachfrage</button>
         <button class="tab" data-tab="protokoll">Protokoll</button>
+        <!-- Teil 1d/1f: Geräte-Mitteilungen + Abmelden nur im Mehr-Blatt (Handy) -->
+        <div class="mehr-nur-handy mehr-aktionen">
+          <button class="mehr-aktion" id="mehr-push-verwalten" type="button">🔔 Mitteilungen verwalten</button>
+          <button class="mehr-aktion mehr-aktion-aus" id="mehr-logout" type="button">Abmelden</button>
+        </div>
       </div>
       <button class="tab tab-mehr" id="tab-mehr-knopf" type="button" aria-label="Weitere Reiter">Mehr ▾</button>
     </div>
@@ -258,6 +329,11 @@ tr:last-child td{border-bottom:none}
     <!-- Übersicht -->
     <div class="tab-content active" id="tab-uebersicht">
       <!-- Teil A: Push-Mitteilungen auf diesem Gerät (mehrere Geräte möglich). -->
+      <!-- Teil 1f: eingerichtet → nur eine kleine Zeile; sonst der große Kasten. -->
+      <div class="push-kompakt-zeile verborgen" id="push-kompakt">
+        <span>🔔 Mitteilungen aktiv</span>
+        <button class="push-verwalten-link" id="push-verwalten" type="button">verwalten</button>
+      </div>
       <div class="push-box" id="push-box">
         <div class="push-kopf">Mitteilungen auf diesem Gerät</div>
         <div class="push-text" id="push-status">Wird geprüft …</div>
@@ -265,10 +341,12 @@ tr:last-child td{border-bottom:none}
         <div class="push-geraete" id="push-geraete"></div>
       </div>
       <div class="section-hinweis">Klicke eine Kennzahl oben an, um in die gefilterte Liste zu springen.</div>
+      <!-- Teil 1b: am Handy kompakte Karten (unten), am großen Bildschirm die Tabelle. -->
       <div class="table-wrap"><table>
         <thead><tr><th>Neu – wartet auf Freigabe</th><th>Vollständigkeit</th><th>Registriert</th><th></th></tr></thead>
         <tbody id="freigabe-tbody"><tr><td colspan="4" class="leer-text">Lade …</td></tr></tbody>
       </table></div>
+      <div class="karten" id="freigabe-karten"><div class="leer-text">Lade …</div></div>
     </div>
 
     <!-- Trainer -->
@@ -299,6 +377,7 @@ tr:last-child td{border-bottom:none}
         </tr></thead>
         <tbody id="trainer-tbody"><tr><td colspan="8" class="leer-text">Lade …</td></tr></tbody>
       </table></div>
+      <div class="karten" id="trainer-karten"><div class="leer-text">Lade …</div></div>
     </div>
 
     <!-- Kunden -->
@@ -319,6 +398,7 @@ tr:last-child td{border-bottom:none}
         </tr></thead>
         <tbody id="kunden-tbody"><tr><td colspan="6" class="leer-text">Lade …</td></tr></tbody>
       </table></div>
+      <div class="karten" id="kunden-karten"><div class="leer-text">Lade …</div></div>
     </div>
 
     <!-- Anfragen -->

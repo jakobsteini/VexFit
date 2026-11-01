@@ -316,6 +316,14 @@ function starteVerwaltung() {
   let _dialogAufloesen = null;
   let _formAufloesen = null;
   let hashSprungGemacht = false; // Teil M: Deep-Link nur einmal nach dem ersten Laden anspringen
+  // Teil 1a: Auto-Aktualisieren ohne Flackern. Signaturen erkennen echte
+  // Änderungen (nur dann neu zeichnen); bekannte IDs markieren neue Einträge.
+  let autoTimer = null, zeitTimer = null;
+  let letzteAktualisierung = 0;
+  let trainerSig = "", kundenSig = "";
+  let ersteLadung = true;
+  const bekannt = { trainer: new Set(), kunde: new Set() };
+  const neueIds = { trainer: new Set(), kunde: new Set() };
 
   // ── Ansichten ──
   function zeigeAnsicht(id) {
@@ -398,6 +406,8 @@ function starteVerwaltung() {
     if (auth.token) { authMit("logout", {}).catch(() => {}); }
     auth.token = null; auth.user = null;
     if (inaktivTimer) { clearInterval(inaktivTimer); inaktivTimer = null; }
+    if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    if (zeitTimer) { clearInterval(zeitTimer); zeitTimer = null; }
     zeigeAnsicht("ansicht-login");
     if (grund) fehler(grund);
   }
@@ -501,6 +511,8 @@ function starteVerwaltung() {
     ladeDaten();
     // Teil A: Push-Bereich vorbereiten (Status + Geräteliste).
     pushInit();
+    // Teil 1a: im Hintergrund alle 30 s aktualisieren + Zeit-Label mitführen.
+    starteAutoAktualisieren();
   }
 
   // ── Datenabruf ──
@@ -529,7 +541,17 @@ function starteVerwaltung() {
       if (!kuRes.ok) throw new Error("Kunden laden: HTTP " + kuRes.status);
       daten.trainers = await trRes.json();
       daten.kunden = await kuRes.json();
-      $("zuletzt").textContent = "Aktualisiert: " + new Date().toLocaleTimeString("de-AT");
+      // Teil 1a: bekannte IDs und Signaturen setzen (beim ersten Laden ohne
+      // Hervorhebung), Zeitstempel merken.
+      for (const p of daten.trainers) if (p.id != null) bekannt.trainer.add(String(p.id));
+      for (const p of daten.kunden) if (p.id != null) bekannt.kunde.add(String(p.id));
+      trainerSig = signatur(daten.trainers);
+      kundenSig = signatur(daten.kunden);
+      neueIds.trainer = new Set();
+      neueIds.kunde = new Set();
+      ersteLadung = false;
+      letzteAktualisierung = Date.now();
+      zeitLabelAktualisieren();
       renderStats();
       renderFreigabe();
       renderTrainer();
@@ -548,6 +570,127 @@ function starteVerwaltung() {
       if (String(e && e.message) !== "abgemeldet") fehler("Daten konnten nicht geladen werden: " + (e && e.message ? e.message : e));
     }
   }
+
+  // ── Teil 1a: Auto-Aktualisieren, Signaturen, neue Einträge hervorheben ──
+  // Signatur einer Liste aus den Feldern, die die Anzeige verändern. Ändert sich
+  // nichts, wird nicht neu gezeichnet (kein Flackern).
+  function signatur(liste) {
+    return (Array.isArray(liste) ? liste : []).map((p) =>
+      [p.id, p.vorname, p.nachname, p.email, p.telefon, p.stadt, p.plz, p.aktiv,
+       p.gesperrt, p.stripe_bezahlt, p.verifiziert, p.ziel, p.avatar_url,
+       Array.isArray(p.spezialisierungen) ? p.spezialisierungen.length : 0].join("~")
+    ).join("|");
+  }
+  function markiereNeu(art, liste) {
+    const neu = new Set();
+    if (!ersteLadung) {
+      for (const p of liste) if (p.id != null && !bekannt[art].has(String(p.id))) neu.add(String(p.id));
+    }
+    neueIds[art] = neu;
+    for (const p of liste) if (p.id != null) bekannt[art].add(String(p.id));
+  }
+  function zeitLabelAktualisieren() {
+    const el = $("zuletzt");
+    if (!el || !letzteAktualisierung) return;
+    const min = Math.floor((Date.now() - letzteAktualisierung) / 60000);
+    el.textContent = min <= 0 ? "gerade aktualisiert" : `vor ${min} Min aktualisiert`;
+  }
+  function spin(an) {
+    const b = $("btn-aktualisieren");
+    if (b) b.classList.toggle("laeuft", !!an);
+  }
+  // Leichter Poller: nur Trainer/Kunden (die veränderlichen Listen) neu laden und
+  // NUR neu zeichnen, wenn sich wirklich etwas geändert hat.
+  async function autoAktualisieren(manuell = false) {
+    if (!auth.token) return;
+    if (manuell) spin(true);
+    try {
+      const [trRes, kuRes] = await Promise.all([
+        hole("trainers?select=*&order=created_at.desc"),
+        hole("kunden?select=*&order=created_at.desc"),
+      ]);
+      if (!trRes.ok || !kuRes.ok) return;
+      const tr = await trRes.json(), ku = await kuRes.json();
+      const trSig = signatur(tr), kuSig = signatur(ku);
+      if (trSig !== trainerSig) {
+        markiereNeu("trainer", tr);
+        daten.trainers = tr; trainerSig = trSig;
+        renderStats(); renderFreigabe(); renderTrainer(); ladeZertifikate();
+      }
+      if (kuSig !== kundenSig) {
+        markiereNeu("kunde", ku);
+        daten.kunden = ku; kundenSig = kuSig;
+        renderStats(); renderKunden();
+      }
+      neueIds.trainer = new Set();
+      neueIds.kunde = new Set();
+      letzteAktualisierung = Date.now();
+      zeitLabelAktualisieren();
+      // Beim bewussten Zug auch die sekundären Listen mitnehmen.
+      if (manuell) { ladeAnfragen(); ladeZahlungslinkOffen(); ladeNachfrage(); }
+    } catch (e) {
+      if (String(e && e.message) !== "abgemeldet") { /* stiller Poll */ }
+    } finally {
+      if (manuell) setTimeout(() => spin(false), 400);
+    }
+  }
+  function starteAutoAktualisieren() {
+    if (autoTimer) clearInterval(autoTimer);
+    autoTimer = setInterval(() => { if (!document.hidden) autoAktualisieren(false); }, 30 * 1000);
+    if (zeitTimer) clearInterval(zeitTimer);
+    zeitTimer = setInterval(zeitLabelAktualisieren, 30 * 1000);
+  }
+
+  // ── Teil 1b: Karten fürs Handy ──
+  function vollBalken(t) {
+    const voll = PROFIL_FELDER_GESAMT - fehlendeProfilfelder(t).length;
+    const pct = Math.round(voll / PROFIL_FELDER_GESAMT * 100);
+    const farbe = voll === PROFIL_FELDER_GESAMT ? "#4ade80" : (voll >= 4 ? "var(--accent)" : "#ff6b6b");
+    return { voll, html: `<div class="karte-voll"><div class="karte-balken"><span style="width:${pct}%;background:${farbe}"></span></div><span class="karte-voll-text">${voll}/${PROFIL_FELDER_GESAMT}</span></div>` };
+  }
+  function statusChip(t) {
+    if (t.gesperrt) return '<span class="badge badge-abg">Gesperrt</span>';
+    if (!t.aktiv) return '<span class="badge badge-offen">Wartet</span>';
+    return '<span class="badge badge-active">Aktiv</span>';
+  }
+  function datumKurz(s) { return s ? new Date(s).toLocaleDateString("de-AT") : "–"; }
+  function trainerKarte(t) {
+    const neu = neueIds.trainer.has(String(t.id)) ? " karte-neu" : "";
+    const ort = escapeHtml(nameFormatieren(t.stadt) || "Ort offen");
+    const bal = vollBalken(t);
+    const akt = !t.aktiv
+      ? `<button class="btn-ja" data-aktion="freigeben" data-id="${escapeHtml(t.id)}">Freigeben</button>`
+      : `<button class="btn-warn" data-aktion="sperren" data-art="trainer" data-id="${escapeHtml(t.id)}">${t.gesperrt ? "Entsperren" : "Sperren"}</button>`;
+    const sperrBtn = t.aktiv ? "" : `<button class="btn-warn" data-aktion="sperren" data-art="trainer" data-id="${escapeHtml(t.id)}">${t.gesperrt ? "Entsperren" : "Sperren"}</button>`;
+    return `<div class="karte${neu}" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">
+      <div class="karte-kopf"><div class="karte-name">${namePaarHtml(t.vorname, t.nachname)}</div>${statusChip(t)}</div>
+      <div class="karte-zeile">${ort} · ${datumKurz(t.created_at)}${t.studio_standort_id ? " · Studio" : ""}</div>
+      ${bal.html}
+      <div class="karte-aktionen">${akt}${sperrBtn}<button class="btn-gefahr" data-aktion="kicken" data-art="trainer" data-id="${escapeHtml(t.id)}">Kicken</button></div>
+    </div>`;
+  }
+  function kundeKarte(k) {
+    const neu = neueIds.kunde.has(String(k.id)) ? " karte-neu" : "";
+    const ort = escapeHtml(nameFormatieren(k.stadt) || "Ort offen");
+    const chip = k.gesperrt ? '<span class="badge badge-abg">Gesperrt</span>' : '<span class="badge badge-grau">Kunde</span>';
+    return `<div class="karte${neu}" data-aktion="detail" data-art="kunde" data-id="${escapeHtml(k.id)}">
+      <div class="karte-kopf"><div class="karte-name">${namePaarHtml(k.vorname, k.nachname)}</div>${chip}</div>
+      <div class="karte-zeile">${ort} · ${datumKurz(k.created_at)}${k.ziel ? " · " + escapeHtml(k.ziel) : ""}</div>
+      <div class="karte-aktionen"><button class="btn-warn" data-aktion="sperren" data-art="kunde" data-id="${escapeHtml(k.id)}">${k.gesperrt ? "Entsperren" : "Sperren"}</button><button class="btn-gefahr" data-aktion="kicken" data-art="kunde" data-id="${escapeHtml(k.id)}">Kicken</button></div>
+    </div>`;
+  }
+  function freigabeKarte(t) {
+    const neu = neueIds.trainer.has(String(t.id)) ? " karte-neu" : "";
+    const ort = escapeHtml(nameFormatieren(t.stadt) || "Ort offen");
+    const bal = vollBalken(t);
+    return `<div class="karte${neu}" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">
+      <div class="karte-kopf"><div class="karte-name">${namePaarHtml(t.vorname, t.nachname)}</div><span class="badge badge-offen">Wartet</span></div>
+      <div class="karte-zeile">${ort} · ${datumKurz(t.created_at)}</div>
+      ${bal.html}
+      <div class="karte-aktionen"><button class="btn-ja" data-aktion="freigeben" data-id="${escapeHtml(t.id)}">Freigeben</button></div>
+    </div>`;
+  }
+  function leerKarte(text) { return `<div class="leer-text">${escapeHtml(text)}</div>`; }
 
   // ── Kennzahlen ──
   async function renderStats() {
@@ -587,19 +730,25 @@ function starteVerwaltung() {
 
   function renderFreigabe() {
     const tb = $("freigabe-tbody");
+    const karten = $("freigabe-karten");
     const neue = sichtbar(daten.trainers, zustand.testsAusTrainer).filter((t) => !t.aktiv);
-    if (!neue.length) { tb.innerHTML = '<tr><td colspan="4" class="leer-text">Keine Trainer warten auf Freigabe.</td></tr>'; return; }
+    if (!neue.length) {
+      tb.innerHTML = '<tr><td colspan="4" class="leer-text">Keine Trainer warten auf Freigabe.</td></tr>';
+      if (karten) karten.innerHTML = leerKarte("Keine Trainer warten auf Freigabe.");
+      return;
+    }
     tb.innerHTML = neue.map((t) => {
       const fehlt = fehlendeProfilfelder(t);
       const voll = PROFIL_FELDER_GESAMT - fehlt.length;
       const farbe = fehlt.length === 0 ? "#4ade80" : (voll >= 4 ? "var(--accent)" : "#ff6b6b");
       return `<tr class="klickbar" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">
-        <td data-label="Name"><strong>${escapeHtml(t.vorname)} ${escapeHtml(t.nachname)}</strong><br><span style="color:var(--text-muted);font-size:11px">${escapeHtml(t.email)}</span></td>
+        <td data-label="Name"><strong>${namePaarHtml(t.vorname, t.nachname)}</strong><br><span style="color:var(--text-muted);font-size:11px">${escapeHtml(t.email)}</span></td>
         <td data-label="Vollständigkeit"><span style="color:${farbe};font-weight:700">${voll}/${PROFIL_FELDER_GESAMT}</span> <span style="color:var(--text-muted);font-size:11px">${fehlt.length ? "fehlt: " + escapeHtml(fehlt.join(", ")) : "vollständig"}</span></td>
         <td data-label="Registriert">${t.created_at ? new Date(t.created_at).toLocaleDateString("de-AT") : "–"}</td>
         <td data-label=""><button class="btn-klein" data-aktion="freigeben" data-id="${escapeHtml(t.id)}">Freigeben</button></td>
       </tr>`;
     }).join("");
+    if (karten) karten.innerHTML = neue.map(freigabeKarte).join("");
   }
 
   function aktuelleTrainerliste() {
@@ -615,12 +764,18 @@ function starteVerwaltung() {
 
   function renderTrainer() {
     const tb = $("trainer-tbody");
+    const karten = $("trainer-karten");
     const liste = aktuelleTrainerliste();
-    if (!liste.length) { tb.innerHTML = '<tr><td colspan="8" class="leer-text">Keine Treffer.</td></tr>'; return; }
+    if (!liste.length) {
+      tb.innerHTML = '<tr><td colspan="8" class="leer-text">Keine Treffer.</td></tr>';
+      if (karten) karten.innerHTML = leerKarte("Keine Treffer.");
+      return;
+    }
+    if (karten) karten.innerHTML = liste.map(trainerKarte).join("");
     tb.innerHTML = liste.map((t) => {
       const voll = PROFIL_FELDER_GESAMT - fehlendeProfilfelder(t).length;
       return `<tr class="klickbar" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">
-        <td data-label="Name"><strong>${escapeHtml(t.vorname)} ${escapeHtml(t.nachname)}</strong></td>
+        <td data-label="Name"><strong>${namePaarHtml(t.vorname, t.nachname)}</strong></td>
         <td data-label="E-Mail">${escapeHtml(t.email)}</td>
         <td data-label="Telefon">${t.telefon ? escapeHtml(t.telefon) : "–"}</td>
         <td data-label="Stadt">${escapeHtml(t.stadt) || "–"}</td>
@@ -634,11 +789,17 @@ function starteVerwaltung() {
 
   function renderKunden() {
     const tb = $("kunden-tbody");
+    const karten = $("kunden-karten");
     const liste = aktuelleKundenliste();
-    if (!liste.length) { tb.innerHTML = '<tr><td colspan="6" class="leer-text">Keine Treffer.</td></tr>'; return; }
+    if (!liste.length) {
+      tb.innerHTML = '<tr><td colspan="6" class="leer-text">Keine Treffer.</td></tr>';
+      if (karten) karten.innerHTML = leerKarte("Keine Treffer.");
+      return;
+    }
+    if (karten) karten.innerHTML = liste.map(kundeKarte).join("");
     tb.innerHTML = liste.map((k) =>
       `<tr class="klickbar" data-aktion="detail" data-art="kunde" data-id="${escapeHtml(k.id)}">
-        <td data-label="Name"><strong>${escapeHtml(k.vorname)} ${escapeHtml(k.nachname)}</strong>${k.gesperrt ? ' <span class="badge badge-abg">Gesperrt</span>' : ""}</td>
+        <td data-label="Name"><strong>${namePaarHtml(k.vorname, k.nachname)}</strong>${k.gesperrt ? ' <span class="badge badge-abg">Gesperrt</span>' : ""}</td>
         <td data-label="E-Mail">${escapeHtml(k.email)}</td>
         <td data-label="Telefon">${k.telefon ? escapeHtml(k.telefon) : "–"}</td>
         <td data-label="Stadt">${escapeHtml(k.stadt) || "–"}</td>
@@ -661,8 +822,8 @@ function starteVerwaltung() {
         const std = unbeantwortetSeitStunden(a);
         return `<tr>
           <td data-label="Datum">${a.created_at ? new Date(a.created_at).toLocaleDateString("de-AT") : "–"}</td>
-          <td data-label="Trainer">${escapeHtml(a.trainer_name) || "–"}</td>
-          <td data-label="Kunde">${escapeHtml(a.kunden_name) || "–"}</td>
+          <td data-label="Trainer">${escapeHtml(nameFormatieren(a.trainer_name)) || "–"}</td>
+          <td data-label="Kunde">${escapeHtml(nameFormatieren(a.kunden_name)) || "–"}</td>
           <td data-label="Status">${b}</td>
           <td data-label="Unbeantwortet seit">${std == null ? "–" : std + " h"}</td>
           <td data-label="Weitergeleitet">${a.weitergeleitet ? '<span class="badge badge-paid">Ja</span>' : '<span class="badge badge-grau">Nein</span>'}</td>
@@ -685,7 +846,7 @@ function starteVerwaltung() {
         // vorausgefüllter E-Mail – wie bisher, zum Kopieren/Schicken.
         const link = `${STRIPE_ERSTE}?client_reference_id=${encodeURIComponent(t.id)}&prefilled_email=${encodeURIComponent(t.email || "")}`;
         return `<tr class="klickbar" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">
-          <td><strong>${escapeHtml(t.vorname)} ${escapeHtml(t.nachname)}</strong></td>
+          <td><strong>${namePaarHtml(t.vorname, t.nachname)}</strong></td>
           <td>${escapeHtml(t.email)}</td><td>${escapeHtml(t.stadt) || "–"}</td>
           <td><button class="btn-klein" data-aktion="kopieren" data-text="${escapeHtml(link)}">Zahlungslink kopieren</button></td>
         </tr>`;
@@ -715,7 +876,7 @@ function starteVerwaltung() {
     if (!liste.length) { tb.innerHTML = '<tr><td colspan="5" class="leer-text">Noch keine Zertifikate.</td></tr>'; return; }
     tb.innerHTML = liste.map((t) =>
       `<tr class="klickbar" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">
-        <td><strong>${escapeHtml(t.vorname)} ${escapeHtml(t.nachname)}</strong></td>
+        <td><strong>${namePaarHtml(t.vorname, t.nachname)}</strong></td>
         <td>${escapeHtml(t.stadt) || "–"}</td>
         <td><button class="btn-klein" data-aktion="zertifikat" data-pfad="${escapeHtml(t.zertifikat_datei)}">Ansehen</button></td>
         <td>${t.verifiziert ? '<span class="badge badge-paid">Verifiziert</span>' : '<span class="badge badge-unpaid">offen</span>'}</td>
@@ -817,7 +978,7 @@ function starteVerwaltung() {
     ].join("");
     const body = `
       <div style="display:flex;gap:16px;align-items:center;margin-bottom:18px">${fotoHtml}
-        <div><div style="font-size:20px;font-weight:700">${escapeHtml(t.vorname)} ${escapeHtml(t.nachname)}</div>
+        <div><div style="font-size:20px;font-weight:700">${namePaarHtml(t.vorname, t.nachname)}</div>
           <div style="color:var(--text-muted);font-size:13px">${escapeHtml(t.email) || "—"}</div>
           <div class="chiprow" style="margin-top:8px">${statusB}</div></div></div>
       ${df("Profil-Vollständigkeit", vollTxt)}
@@ -852,7 +1013,7 @@ function starteVerwaltung() {
       ${t.verifiziert ? `<button class="btn-gross btn-neutral" data-aktion="entverifizieren" data-id="${escapeHtml(t.id)}">Verifizierung zurück</button>` : `<button class="btn-gross btn-neutral" data-aktion="verifizieren" data-id="${escapeHtml(t.id)}">Verifizieren</button>`}
       <button class="btn-gross btn-warn" data-aktion="sperren" data-art="trainer" data-id="${escapeHtml(t.id)}">${t.gesperrt ? "Entsperren" : "Sperren (Login)"}</button>
       <button class="btn-gross btn-gefahr" data-aktion="kicken" data-art="trainer" data-id="${escapeHtml(t.id)}">Kicken</button>`;
-    detailOeffnen(`${t.vorname || ""} ${t.nachname || ""}`.trim() || "Trainer", body, foot);
+    detailOeffnen(nameFormatieren(`${t.vorname || ""} ${t.nachname || ""}`.trim()) || "Trainer", body, foot);
     ladeDetailAnfragen("trainer_id=eq." + encodeURIComponent(t.id), "an ", "kunden_name");
   }
 
@@ -861,7 +1022,7 @@ function starteVerwaltung() {
     if (!k) { fehler("Kunde nicht gefunden. Bitte neu laden."); return; }
     const LABEL = { telefon: "Telefon", plz: "PLZ", stadt: "Stadt", ziel: "Ziele", nachricht: "Nachricht", erwartungen: "Antworten aus dem Einstieg", land: "Land" };
     const VERBERGEN = new Set(["id", "user_id", "vorname", "nachname", "email", "created_at", "gesperrt"]);
-    let body = `<div style="margin-bottom:16px"><div style="font-size:20px;font-weight:700">${escapeHtml(k.vorname)} ${escapeHtml(k.nachname)}</div>
+    let body = `<div style="margin-bottom:16px"><div style="font-size:20px;font-weight:700">${namePaarHtml(k.vorname, k.nachname)}</div>
       <div style="color:var(--text-muted);font-size:13px">${escapeHtml(k.email) || "—"}</div>
       ${k.gesperrt ? '<div class="chiprow" style="margin-top:8px"><span class="badge badge-abg">Gesperrt</span></div>' : ""}</div>`;
     for (const key of ["telefon", "plz", "stadt", "ziel", "erwartungen", "nachricht", "land"]) {
@@ -877,7 +1038,7 @@ function starteVerwaltung() {
     body += `<div class="feld"><div class="feld-label">Gestellte Anfragen</div><div id="detail-anfragen" class="feld-wert" style="color:var(--text-muted)">Lade …</div></div>`;
     const foot = `<button class="btn-gross btn-warn" data-aktion="sperren" data-art="kunde" data-id="${escapeHtml(k.id)}">${k.gesperrt ? "Entsperren" : "Sperren (Login)"}</button>
       <button class="btn-gross btn-gefahr" data-aktion="kicken" data-art="kunde" data-id="${escapeHtml(k.id)}">Kicken</button>`;
-    detailOeffnen(`${k.vorname || ""} ${k.nachname || ""}`.trim() || "Kunde", body, foot);
+    detailOeffnen(nameFormatieren(`${k.vorname || ""} ${k.nachname || ""}`.trim()) || "Kunde", body, foot);
     const name = `${k.vorname || ""} ${k.nachname || ""}`.trim();
     if (name) ladeDetailAnfragen("kunden_name=eq." + encodeURIComponent(name), "an ", "trainer_name");
     else { const z = $("detail-anfragen"); if (z) z.textContent = "Kein Name – nicht zuordenbar."; }
@@ -895,7 +1056,7 @@ function starteVerwaltung() {
       ziel.innerHTML = rows.map((a) => {
         const z = anfrageZustand(a);
         const farbe = z === "angenommen" ? "#4ade80" : z === "abgelehnt" ? "#ff6b6b" : "var(--accent)";
-        return `<div style="padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:${farbe};font-weight:700;text-transform:capitalize">${z}</span> · ${escapeHtml(prefix)}${escapeHtml(a[gegenseite]) || "—"} ${a.ziel ? "· " + escapeHtml(a.ziel) : ""} <span style="color:var(--text-muted);font-size:11px">${a.created_at ? new Date(a.created_at).toLocaleDateString("de-AT") : ""}</span></div>`;
+        return `<div style="padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:${farbe};font-weight:700;text-transform:capitalize">${z}</span> · ${escapeHtml(prefix)}${escapeHtml(nameFormatieren(a[gegenseite])) || "—"} ${a.ziel ? "· " + escapeHtml(a.ziel) : ""} <span style="color:var(--text-muted);font-size:11px">${a.created_at ? new Date(a.created_at).toLocaleDateString("de-AT") : ""}</span></div>`;
       }).join("");
     } catch { ziel.textContent = "Anfragen konnten nicht geladen werden."; }
   }
@@ -986,7 +1147,7 @@ function starteVerwaltung() {
   // Einzelner Versand über den Knopf beim Trainer – mit einer Bestätigung.
   async function freischaltMailBestaetigen(id) {
     const t = daten.trainers.find((x) => String(x.id) === String(id));
-    const name = t ? `${t.vorname || ""} ${t.nachname || ""}`.trim() : "";
+    const name = t ? nameFormatieren(`${t.vorname || ""} ${t.nachname || ""}`.trim()) : "";
     const ja = await bestaetige({
       titel: "Freischalt-Mail senden",
       text: `Die Mail „Dein Vexfit-Profil ist freigeschaltet" an ${name || "diesen Trainer"} (${t ? (t.email || "") : ""}) senden?`,
@@ -1017,7 +1178,7 @@ function starteVerwaltung() {
   async function sperren(art, id) {
     const liste = art === "trainer" ? daten.trainers : daten.kunden;
     const p = liste.find((x) => String(x.id) === String(id));
-    const name = p ? `${p.vorname || ""} ${p.nachname || ""}`.trim() : "";
+    const name = p ? nameFormatieren(`${p.vorname || ""} ${p.nachname || ""}`.trim()) : "";
     const ent = !!(p && p.gesperrt);
     const ja = await bestaetige({
       titel: ent ? "Sperre aufheben" : "Anmeldung sperren",
@@ -1036,7 +1197,7 @@ function starteVerwaltung() {
   async function kicken(art, id) {
     const liste = art === "trainer" ? daten.trainers : daten.kunden;
     const p = liste.find((x) => String(x.id) === String(id));
-    const name = p ? `${p.vorname || ""} ${p.nachname || ""}`.trim() : "";
+    const name = p ? nameFormatieren(`${p.vorname || ""} ${p.nachname || ""}`.trim()) : "";
     const email = p ? (p.email || "") : "";
     const ja = await bestaetige({
       titel: "Endgültig löschen",
@@ -1160,6 +1321,70 @@ function starteVerwaltung() {
     else if (art === "anfrage" || art === "anfragen") { zeigeTab("anfragen"); }
   }
 
+  // ── Teil 1c: Mehr-Blatt (von unten) mit Abdunkelung ──
+  function mehrOeffnen() {
+    const menu = $("tab-mehr-menu"); const ov = $("mehr-overlay");
+    if (menu) menu.classList.add("offen");
+    if (ov) ov.classList.remove("verborgen");
+  }
+  function mehrSchliessen() {
+    const menu = $("tab-mehr-menu"); const ov = $("mehr-overlay");
+    if (menu) menu.classList.remove("offen");
+    if (ov) ov.classList.add("verborgen");
+  }
+
+  // Teil 1c: Wisch-nach-unten schließt das Mehr-Blatt.
+  function mehrSwipeVerdrahten() {
+    const menu = $("tab-mehr-menu");
+    if (!menu) return;
+    let sy = 0;
+    menu.addEventListener("touchstart", (e) => { sy = e.touches[0] ? e.touches[0].clientY : 0; }, { passive: true });
+    menu.addEventListener("touchend", (e) => {
+      const dy = (e.changedTouches[0] ? e.changedTouches[0].clientY : 0) - sy;
+      if (dy > 60) mehrSchliessen();
+    }, { passive: true });
+  }
+
+  // ── Teil 1f: Push-Kasten ein-/ausklappen (kompakt wenn eingerichtet) ──
+  function pushGrossZeigen() {
+    const box = $("push-box"); const komp = $("push-kompakt");
+    if (box) box.classList.remove("verborgen");
+    if (komp) komp.classList.add("verborgen");
+    pushGeraeteLaden();
+  }
+
+  // ── Teil 1g: aktive Kennzahl-Kachel markieren ──
+  function statAktivMarkieren(el) {
+    for (const c of document.querySelectorAll(".stat-card")) c.classList.remove("aktiv");
+    if (el && el.classList) el.classList.add("aktiv");
+  }
+
+  // ── Teil 1a: „Zum Aktualisieren ziehen" (Pull-to-Refresh) ──
+  function pullToRefreshVerdrahten() {
+    const ptr = $("ptr");
+    const dash = $("ansicht-dashboard");
+    let startY = 0, ziehen = false;
+    const schwelle = 80;
+    const obenImDash = () => dash && !dash.classList.contains("verborgen") && (globalThis.scrollY || 0) <= 0;
+    document.addEventListener("touchstart", (e) => {
+      ziehen = obenImDash() && !!e.touches[0];
+      startY = e.touches[0] ? e.touches[0].clientY : 0;
+    }, { passive: true });
+    document.addEventListener("touchmove", (e) => {
+      if (!ziehen) return;
+      const dy = (e.touches[0] ? e.touches[0].clientY : 0) - startY;
+      if (ptr) ptr.classList.toggle("sichtbar", dy > 24 && (globalThis.scrollY || 0) <= 0);
+    }, { passive: true });
+    document.addEventListener("touchend", (e) => {
+      if (!ziehen) return;
+      ziehen = false;
+      const dy = (e.changedTouches[0] ? e.changedTouches[0].clientY : 0) - startY;
+      if (ptr) ptr.classList.remove("sichtbar");
+      if (dy > schwelle && (globalThis.scrollY || 0) <= 0) autoAktualisieren(true);
+    }, { passive: true });
+    mehrSwipeVerdrahten();
+  }
+
   // ── Teil A: Web Push (Mitteilungen auf diesem Gerät) ──
   function pushUnterstuetzt() {
     return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -1192,10 +1417,14 @@ function starteVerwaltung() {
   async function pushInit() {
     const status = $("push-status");
     const knopf = $("push-aktivieren");
+    const box = $("push-box");
+    const komp = $("push-kompakt");
     if (!status) return;
     if (!pushUnterstuetzt()) {
       status.textContent = "Dein Browser unterstützt hier keine Mitteilungen. Auf dem iPhone zuerst über „Teilen → Zum Home-Bildschirm“ installieren und die App öffnen.";
       if (knopf) knopf.style.display = "none";
+      if (box) box.classList.remove("verborgen");
+      if (komp) komp.classList.add("verborgen");
       return;
     }
     let aktiv = false;
@@ -1208,6 +1437,9 @@ function starteVerwaltung() {
       ? "Dieses Gerät erhält Mitteilungen. Du kannst weitere Geräte aktivieren."
       : "Auf diesem Gerät noch nicht aktiviert. Mehrere Geräte sind möglich.";
     if (knopf) knopf.textContent = aktiv ? "Mitteilungen erneut einrichten" : "Mitteilungen auf diesem Gerät aktivieren";
+    // Teil 1f: eingerichtet → nur die kleine Zeile; sonst der große Kasten.
+    if (box) box.classList.toggle("verborgen", aktiv);
+    if (komp) komp.classList.toggle("verborgen", !aktiv);
     pushGeraeteLaden();
   }
   async function pushAktivieren() {
@@ -1280,12 +1512,28 @@ function starteVerwaltung() {
     const pushKnopf = $("push-aktivieren");
     if (pushKnopf) pushKnopf.addEventListener("click", pushAktivieren);
     const mehrKnopf = $("tab-mehr-knopf");
-    if (mehrKnopf) {
-      mehrKnopf.addEventListener("click", () => {
-        const menu = $("tab-mehr-menu");
-        if (menu) menu.classList.toggle("offen");
-      });
-    }
+    if (mehrKnopf) mehrKnopf.addEventListener("click", () => {
+      const menu = $("tab-mehr-menu");
+      if (menu && menu.classList.contains("offen")) mehrSchliessen(); else mehrOeffnen();
+    });
+
+    // Teil 1a: Aktualisieren-Knopf + sofort beim Zurückkehren in die App.
+    const btnAkt = $("btn-aktualisieren");
+    if (btnAkt) btnAkt.addEventListener("click", () => autoAktualisieren(true));
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && auth.token) autoAktualisieren(true); });
+    // Beim Antippen einer Push-Mitteilung öffnet sich die App mit einem #-Anker.
+    globalThis.addEventListener("hashchange", () => { if (auth.token) { springeZuHash(); autoAktualisieren(true); } });
+
+    // Teil 1d/1f: Abmelden + Mitteilungen verwalten aus dem Mehr-Blatt.
+    const mehrLogout = $("mehr-logout");
+    if (mehrLogout) mehrLogout.addEventListener("click", () => { mehrSchliessen(); abmelden(); });
+    const mehrPush = $("mehr-push-verwalten");
+    if (mehrPush) mehrPush.addEventListener("click", () => { mehrSchliessen(); zeigeTab("uebersicht"); pushGrossZeigen(); });
+    const pushVerw = $("push-verwalten");
+    if (pushVerw) pushVerw.addEventListener("click", pushGrossZeigen);
+
+    // Teil 1a: „Zum Aktualisieren ziehen" (Pull-to-Refresh, nur Touch, nur am Kopf).
+    pullToRefreshVerdrahten();
 
     // Aktivität (für die 30-Minuten-Wache)
     for (const ev of ["click", "keydown"]) document.addEventListener(ev, aktivitaet, { passive: true });
@@ -1295,19 +1543,18 @@ function starteVerwaltung() {
       const tab = e.target.closest("[data-tab]");
       if (tab && tab.classList.contains("tab")) {
         zeigeTab(tab.dataset.tab);
-        // „Mehr"-Menü nach der Wahl schließen (Handy).
-        const menu = $("tab-mehr-menu");
-        if (menu) menu.classList.remove("offen");
+        statAktivMarkieren(null); // Reiterwahl hebt die Kennzahl-Markierung auf
+        mehrSchliessen(); // Teil 1c: „Mehr"-Blatt nach der Wahl schließen (Handy)
         return;
       }
       const sort = e.target.closest("th[data-sort]");
       if (sort) { aufSortieren(sort.dataset.liste, sort.dataset.sort); return; }
       const schliessen = e.target.closest("[data-schliessen]");
-      if (schliessen) { if (schliessen.dataset.schliessen === "detail") detailSchliessen(); else if (schliessen.dataset.schliessen === "dialog") dialogZu(false); else if (schliessen.dataset.schliessen === "form") formZu(null); return; }
+      if (schliessen) { const was = schliessen.dataset.schliessen; if (was === "detail") detailSchliessen(); else if (was === "dialog") dialogZu(false); else if (was === "form") formZu(null); else if (was === "mehr") mehrSchliessen(); return; }
       const a = e.target.closest("[data-aktion]");
       if (!a) return;
       const akt = a.dataset.aktion, id = a.dataset.id, art = a.dataset.art;
-      if (akt === "stat") { zeigeTab(a.dataset.tab); if (a.dataset.filter) { const f = $("trainer-filter"); if (f) { f.value = a.dataset.filter; renderTrainer(); } } return; }
+      if (akt === "stat") { zeigeTab(a.dataset.tab); statAktivMarkieren(a); if (a.dataset.filter) { const f = $("trainer-filter"); if (f) { f.value = a.dataset.filter; renderTrainer(); } } return; }
       if (akt === "detail") { art === "kunde" ? kundeDetail(id) : trainerDetail(id); return; }
       if (akt === "freigeben") { freigeben(id); return; }
       if (akt === "freischalt-mail") { freischaltMailBestaetigen(id); return; }
