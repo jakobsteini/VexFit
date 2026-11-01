@@ -397,7 +397,13 @@ const anschluesse: Anschluesse = {
       headers: { ...restKopf(), Prefer: "return=representation" },
       body: JSON.stringify({ gesperrt }),
     });
-    if (!a.ok) throw new Error(`personGesperrtSetzen fehlgeschlagen: HTTP ${a.status}`);
+    // Der Antwort-Rumpf traegt den Postgres-Fehlercode (z. B. 42703 „column
+    // gesperrt does not exist", falls Migration 2026-10-31-09 fehlt). kern.ts
+    // leitet daraus einen verstaendlichen Hinweis ab, darum den Text mitgeben.
+    if (!a.ok) {
+      const txt = await a.text().catch(() => "");
+      throw new Error(`personGesperrtSetzen fehlgeschlagen: HTTP ${a.status} ${txt}`);
+    }
     const zeilen = await a.json().catch(() => []);
     return Array.isArray(zeilen) ? zeilen.length : 0;
   },

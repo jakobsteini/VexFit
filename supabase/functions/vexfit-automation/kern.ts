@@ -935,6 +935,19 @@ function artTabelle(art: unknown): "trainers" | "kunden" | null {
   return null;
 }
 
+/**
+ * Abwaertskompatibilitaet (Teil 1): Sperren/Loeschen brauchen die Spalte
+ * `gesperrt` aus Migration 2026-10-31-09. Fehlt sie (Migration nicht
+ * eingespielt), antwortet PostgREST mit 42703 („column ... does not exist").
+ * Daraus machen wir einen verstaendlichen Hinweis statt eines rohen HTTP-Fehlers.
+ */
+export function istMigrationFehlt(fehler: unknown): boolean {
+  const s = String((fehler as { message?: string })?.message ?? fehler ?? "");
+  return /42703|42P01|does not exist|column .*gesperrt|admin_protokoll/i.test(s);
+}
+const MIGRATION_HINWEIS =
+  "Die Datenbank-Erweiterung fehlt (Migration 2026-10-31-09 gesperrt/Protokoll nicht eingespielt). Bitte im Supabase-SQL-Editor einspielen, dann erneut versuchen.";
+
 async function adminAktion(
   r: Request,
   a: Anschluesse,
@@ -989,12 +1002,17 @@ async function adminAktion(
         return antwort(501, { fehler: "Sperren ist in dieser Fassung nicht verfuegbar" }, herkunft);
       }
       const an = aktion === "login_sperren";
-      const userId = await a.personUserId(tabelle, zielId);
-      let konto = false;
-      if (userId) { await a.authSperren(userId, an); konto = true; }
-      const n = await a.personGesperrtSetzen(tabelle, zielId, an);
-      await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: tabelle, ziel_id: zielId });
-      return antwort(200, { ok: true, geaendert: n, gesperrt: an, konto }, herkunft);
+      try {
+        const userId = await a.personUserId(tabelle, zielId);
+        let konto = false;
+        if (userId) { await a.authSperren(userId, an); konto = true; }
+        const n = await a.personGesperrtSetzen(tabelle, zielId, an);
+        await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: tabelle, ziel_id: zielId });
+        return antwort(200, { ok: true, geaendert: n, gesperrt: an, konto }, herkunft);
+      } catch (fehler) {
+        if (istMigrationFehlt(fehler)) return antwort(400, { fehler: MIGRATION_HINWEIS }, herkunft);
+        throw fehler;
+      }
     }
 
     // ── Teil 5: endgueltig loeschen (Auth-Benutzer + Zeile, sonst anonymisieren) ──
@@ -1005,11 +1023,16 @@ async function adminAktion(
       if (!a.zeileLoeschenOderAnonymisieren) {
         return antwort(501, { fehler: "Loeschen ist in dieser Fassung nicht verfuegbar" }, herkunft);
       }
-      const userId = a.personUserId ? await a.personUserId(tabelle, zielId) : null;
-      if (userId && a.authNutzerLoeschen) await a.authNutzerLoeschen(userId);
-      const res = await a.zeileLoeschenOderAnonymisieren(tabelle, zielId);
-      await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: tabelle, ziel_id: zielId });
-      return antwort(200, { ok: true, geloescht: res.geloescht, anonymisiert: res.anonymisiert, konto: !!userId }, herkunft);
+      try {
+        const userId = a.personUserId ? await a.personUserId(tabelle, zielId) : null;
+        if (userId && a.authNutzerLoeschen) await a.authNutzerLoeschen(userId);
+        const res = await a.zeileLoeschenOderAnonymisieren(tabelle, zielId);
+        await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: tabelle, ziel_id: zielId });
+        return antwort(200, { ok: true, geloescht: res.geloescht, anonymisiert: res.anonymisiert, konto: !!userId }, herkunft);
+      } catch (fehler) {
+        if (istMigrationFehlt(fehler)) return antwort(400, { fehler: MIGRATION_HINWEIS }, herkunft);
+        throw fehler;
+      }
     }
 
     default:
