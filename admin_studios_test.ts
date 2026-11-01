@@ -26,24 +26,20 @@ Deno.test("Ruecknahme 06 entfernt die Funktionen", async () => {
   }
 });
 
-Deno.test("admin.html: drei neue Tabs und ihre Funktionen", async () => {
-  const html = await lies("./admin.html");
-  assertStringIncludes(html, "vexfit-video.js");
-  // Tabs.
-  for (const t of ["'studios'", "'zertifikate'", "'profiluebersicht'"]) {
-    assertStringIncludes(html, "showTab(" + t);
-  }
-  // 7a Studios: liest ueber die Admin-Funktion, zeigt Links, schaltet frei.
-  assertStringIncludes(html, "rpc/studios_admin_liste");
-  assertStringIncludes(html, "rpc/studio_admin_freigabe");
-  assertStringIncludes(html, "rpc/studio_admin_anlegen");
-  // 7b Zertifikate: signierte Adresse + Verifizieren ueber die bestehende Admin-Aktion.
-  assertStringIncludes(html, "storage/v1/object/sign/zertifikate/");
-  assertStringIncludes(html, "adminAktion('trainer_verifizieren'");
-  // 7c Profil-Übersicht: neue Felder + Filter + Profilstaerke.
-  assertStringIncludes(html, "function renderProfilUebersicht()");
-  assertStringIncludes(html, "function profilStaerke(t)");
-  assertStringIncludes(html, "profilFilter");
+Deno.test("Verwaltung: Studios/Zertifikate/Profilstärke verdrahtet", async () => {
+  const html = await lies("./verwaltung-88fd2cb35d54e09c68c8e60199d97b66.html");
+  const js = await lies("./vexfit-verwaltung.js");
+  // Reiter Studios und Zertifikate vorhanden.
+  for (const t of ["studios", "zertifikate"]) assertStringIncludes(html, `data-tab="${t}"`);
+  // Studios: liest ueber die Admin-Funktion, zeigt Links, schaltet frei.
+  assertStringIncludes(js, "studios_admin_liste");
+  assertStringIncludes(js, "studio_admin_freigabe");
+  assertStringIncludes(js, "studio_admin_anlegen");
+  // Zertifikate: signierte Adresse + Verifizieren ueber die Admin-Aktion.
+  assertStringIncludes(js, "storage/v1/object/sign/zertifikate/");
+  assertStringIncludes(js, "trainer_verifizieren");
+  // Profilstärke als eigene Funktion.
+  assertStringIncludes(js, "export function profilStaerke(");
 });
 
 // --------------------------------------------------------------------------
@@ -72,12 +68,11 @@ Deno.test("Ruecknahme 08 entfernt die Funktion und nimmt 'land' aus der Liste", 
   assert(!sql.includes("'land', st.land"), "Rueckbau laesst 'land' in der Liste stehen");
 });
 
-Deno.test("admin.html: Standort bearbeiten - Knopf, Dialog, RPC", async () => {
-  const html = await lies("./admin.html");
-  assertStringIncludes(html, "Adresse bearbeiten");
-  assertStringIncludes(html, "function standortBearbeiten(");
-  assertStringIncludes(html, "function studioAdresse(");
-  assertStringIncludes(html, "rpc/standort_admin_bearbeiten");
-  // Standortdaten werden gemerkt, nicht durch onclick geschleust.
-  assertStringIncludes(html, "window._adminStudios");
+Deno.test("Verwaltung: Standort bearbeiten - Knopf, Dialog, RPC", async () => {
+  const js = await lies("./vexfit-verwaltung.js");
+  assertStringIncludes(js, "Adresse bearbeiten");
+  assertStringIncludes(js, "function standortBearbeiten(");
+  assertStringIncludes(js, "standort_admin_bearbeiten");
+  // Standortdaten werden gemerkt (Cache), nicht durch Inline-onclick geschleust.
+  assertStringIncludes(js, "_studios");
 });

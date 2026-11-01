@@ -31,7 +31,6 @@ function jwt(expSek: number): string {
 }
 
 const SITZUNG_SEITEN = [
-  "admin.html",
   "index.html",
   "kunden-bereich.html",
   "login.html",

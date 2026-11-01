@@ -22,8 +22,10 @@ async function ladeVexEsc(): Promise<(w: unknown) => string> {
   return fn;
 }
 
+// admin.html ist nur noch eine Weiterleitung; die geschützte Verwaltungsseite
+// nutzt ihr eigenes Escaping (escapeHtml in vexfit-verwaltung.js, in
+// verwaltung_logik_test.ts geprüft). Darum hier ohne den Admin-Bereich.
 const SEITEN = [
-  "admin.html",
   "trainer-bereich.html",
   "kunden-bereich.html",
   "profil.html",
@@ -53,7 +55,7 @@ Deno.test("vexEsc macht aus <img onerror> harmlosen Text", async () => {
 });
 
 // ── Jede betroffene Seite bindet die Funktion ein und nutzt sie ──────────────
-Deno.test("alle sechs Seiten binden vexfit-escape.js ein und nutzen vexEsc", async () => {
+Deno.test("alle eingebundenen Seiten binden vexfit-escape.js ein und nutzen vexEsc", async () => {
   for (const seite of SEITEN) {
     const html = await lies("./" + seite);
     assert(

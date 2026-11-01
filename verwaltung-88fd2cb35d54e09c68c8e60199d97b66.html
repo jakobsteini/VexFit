@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Admin-Dashboard neu (Teil 1): nicht indexieren, nicht verfolgen. Nirgends
+     verlinkt; der Pfad steht nicht in robots.txt (das wuerde ihn verraten). -->
+<meta name="robots" content="noindex,nofollow">
+<!-- Content-Security-Policy (Teil 1): nur eigene Quelle + Supabase. Kein
+     fremder Code, keine Inline-Skripte, keine Inline-Event-Handler (die ganze
+     Logik liegt in vexfit-verwaltung.js, 'self'). Bilder nur von Supabase-
+     Storage und data: (MFA-QR-Code). Verbindungen nur zu Supabase. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co data:; font-src 'self'; connect-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co">
+<title>Vexfit – Verwaltung</title>
+<link rel="icon" type="image/png" sizes="32x32" href="marke/favicon-32.png">
+<link rel="stylesheet" href="fonts/vexfit-fonts.css">
+<style>
+:root{--black:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1e1e1e;--card:#161616;--text-muted:#777;--border:rgba(255,255,255,0.08)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;color:var(--white);text-decoration:none}
+.logo span{color:var(--accent)}
+.verborgen{display:none !important}
+a{color:var(--accent)}
+
+/* ── ANMELDUNG / MFA ── */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.auth-box{background:var(--card);border:1px solid var(--border);padding:38px 30px;border-radius:5px;width:100%;max-width:400px;text-align:center}
+.auth-box .logo{display:block;margin-bottom:22px;font-size:30px}
+.auth-title{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:2px;margin-bottom:6px}
+.auth-sub{font-size:13px;color:var(--text-muted);margin-bottom:24px;font-weight:300;line-height:1.5}
+.feld-ein{display:flex;flex-direction:column;gap:7px;margin-bottom:14px;text-align:left}
+.feld-ein label{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)}
+.feld-ein input{background:var(--gray);border:1px solid rgba(255,255,255,0.12);color:var(--white);padding:13px 16px;font-family:'DM Sans',sans-serif;font-size:15px;border-radius:4px;outline:none;transition:border-color .2s;width:100%}
+.feld-ein input:focus{border-color:rgba(232,255,0,0.45)}
+.btn-haupt{width:100%;background:var(--accent);color:var(--black);padding:14px;border:none;border-radius:4px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-top:8px}
+.btn-haupt:disabled{opacity:.5;cursor:not-allowed}
+.auth-fehler{color:#ff8a8a;font-size:13px;margin-top:12px;min-height:16px}
+.auth-link{background:none;border:none;color:var(--text-muted);font-size:12px;margin-top:16px;cursor:pointer;text-decoration:underline;font-family:inherit}
+.qr-box{background:#fff;padding:14px;border-radius:6px;display:inline-block;margin:6px 0 14px}
+.qr-box img{display:block;width:200px;height:200px}
+.mfa-secret{font-family:monospace;font-size:13px;word-break:break-all;background:var(--gray);border:1px solid var(--border);padding:10px;border-radius:4px;margin-bottom:14px;color:var(--accent)}
+
+/* ── DASHBOARD ── */
+nav{background:var(--gray);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:50}
+.nav-links{display:flex;align-items:center;gap:14px}
+.nav-meta{font-size:11px;color:var(--text-muted)}
+.btn-aus{background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:8px 16px;border-radius:4px;font-family:inherit;font-size:12px;cursor:pointer}
+.btn-aus:hover{color:var(--white);border-color:rgba(255,255,255,0.3)}
+.content{padding:20px}
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-bottom:22px}
+.stat-card{background:var(--card);padding:18px;border-left:3px solid var(--accent);cursor:pointer}
+.stat-card:hover{background:var(--mid)}
+.stat-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;font-weight:600}
+.stat-value{font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--accent);letter-spacing:2px;line-height:1}
+.stat-sub{font-size:11px;color:var(--text-muted);margin-top:4px}
+.tabs{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:18px}
+.tab{padding:9px 16px;background:var(--card);border:none;color:var(--text-muted);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;cursor:pointer}
+.tab.active{background:var(--accent);color:var(--black)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.werkzeugleiste{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.werkzeugleiste input,.werkzeugleiste select{background:var(--gray);border:1px solid var(--border);color:var(--white);padding:9px 12px;border-radius:4px;font-family:inherit;font-size:13px;outline:none}
+.werkzeugleiste input[type=search]{flex:1;min-width:160px}
+.btn-klein{background:rgba(232,255,0,0.1);border:1px solid rgba(232,255,0,0.3);color:var(--accent);padding:8px 14px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.schalter{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-muted);cursor:pointer}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:4px}
+table{width:100%;border-collapse:collapse}
+th{background:var(--gray);padding:11px 14px;text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);font-weight:600;white-space:nowrap;cursor:pointer;user-select:none}
+th[data-sort]:hover{color:var(--white)}
+td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px;color:rgba(245,245,240,0.85)}
+tr:last-child td{border-bottom:none}
+.klickbar{cursor:pointer}
+.klickbar:hover td{background:var(--card)}
+.badge{display:inline-block;padding:3px 8px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap}
+.badge-paid,.badge-ang{background:rgba(74,222,128,0.15);color:#4ade80}
+.badge-unpaid,.badge-abg{background:rgba(255,80,80,0.12);color:#ff6b6b}
+.badge-active,.badge-offen{background:rgba(232,255,0,0.12);color:var(--accent)}
+.badge-grau{background:rgba(255,255,255,0.06);color:var(--text-muted)}
+.leer-text{text-align:center;padding:36px;color:var(--text-muted);font-size:14px}
+.section-hinweis{font-size:12px;color:var(--text-muted);margin:8px 2px}
+
+/* ── DETAIL / DIALOG ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:900}
+.panel{position:fixed;top:0;right:0;height:100%;width:100%;max-width:520px;background:var(--gray);border-left:1px solid var(--border);z-index:901;display:flex;flex-direction:column}
+.panel-kopf{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border)}
+.panel-titel{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px}
+.panel-zu{background:transparent;border:1px solid var(--border);color:var(--text-muted);width:36px;height:36px;border-radius:4px;font-size:18px;cursor:pointer}
+.panel-body{padding:20px;overflow-y:auto;flex:1}
+.panel-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px}
+.feld{margin-bottom:13px}
+.feld-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px}
+.feld-wert{font-size:14px;color:var(--white);word-break:break-word;white-space:pre-wrap}
+.feld-fehlt{color:#ff8a8a}
+.chiprow{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--mid);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px}
+.btn-gross{padding:11px 16px;border-radius:4px;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;border:1px solid transparent;font-family:inherit}
+.btn-ja{background:var(--accent);color:var(--black)}
+.btn-warn{background:rgba(255,165,0,0.12);border-color:rgba(255,165,0,0.4);color:#ffaa00}
+.btn-gefahr{background:rgba(255,80,80,0.12);border-color:rgba(255,80,80,0.4);color:#ff6b6b}
+.btn-neutral{background:rgba(255,255,255,0.06);border-color:var(--border);color:var(--white)}
+.dialog-box{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1001;background:var(--gray);border:1px solid var(--border);border-radius:6px;width:calc(100% - 40px);max-width:440px;padding:26px}
+.dialog-titel{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;margin-bottom:10px}
+.dialog-text{font-size:14px;color:rgba(245,245,240,0.85);line-height:1.6;margin-bottom:18px}
+.dialog-aktionen{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.dialog-box .feld{margin-bottom:12px}
+.dialog-box input{width:100%;background:var(--black);border:1px solid var(--border);color:var(--white);padding:11px 13px;border-radius:4px;font-family:inherit;font-size:14px;outline:none}
+
+/* ── MELDUNGEN ── */
+#meldungen{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2000;display:flex;flex-direction:column;gap:8px;width:calc(100% - 24px);max-width:520px;pointer-events:none}
+.meldung{pointer-events:auto;padding:12px 16px;border-radius:5px;font-size:13px;line-height:1.5;box-shadow:0 8px 28px rgba(0,0,0,0.5);display:flex;gap:10px;align-items:flex-start}
+.meldung-ok{background:#143d22;border:1px solid rgba(74,222,128,0.5);color:#d6ffe4}
+.meldung-fehler{background:#3d1414;border:1px solid rgba(255,80,80,0.5);color:#ffd9d9}
+.meldung-info{background:#1e1e1e;border:1px solid rgba(255,255,255,0.18);color:var(--white)}
+.meldung button{margin-left:auto;background:transparent;border:none;color:inherit;font-size:16px;line-height:1;cursor:pointer;opacity:.7}
+@media(min-width:768px){
+  .stats-grid{grid-template-columns:repeat(4,1fr)}
+  .content{padding:28px 36px}
+}
+</style>
+</head>
+<body>
+
+<div id="meldungen"></div>
+
+<!-- ══ ANMELDUNG ══ -->
+<div id="ansicht-login" class="auth-wrap verborgen">
+  <div class="auth-box">
+    <a class="logo">VEX<span>FIT</span></a>
+    <div class="auth-title">Verwaltung</div>
+    <div class="auth-sub">Geschützter Bereich. Anmeldung mit zweitem Faktor erforderlich.</div>
+    <div class="feld-ein"><label for="login-email">E-Mail</label><input id="login-email" type="email" autocomplete="username" inputmode="email"></div>
+    <div class="feld-ein"><label for="login-pw">Passwort</label><input id="login-pw" type="password" autocomplete="current-password"></div>
+    <button id="btn-login" class="btn-haupt">Anmelden</button>
+    <div id="login-fehler" class="auth-fehler"></div>
+  </div>
+</div>
+
+<!-- ══ ZWEITER FAKTOR: EINRICHTEN ══ -->
+<div id="ansicht-mfa-setup" class="auth-wrap verborgen">
+  <div class="auth-box">
+    <a class="logo">VEX<span>FIT</span></a>
+    <div class="auth-title">Zweiter Faktor</div>
+    <div class="auth-sub">Scanne den Code mit einer Authenticator-App (z. B. Google Authenticator) und gib dann den 6-stelligen Code ein.</div>
+    <div class="qr-box"><img id="mfa-qr" alt="QR-Code für die Authenticator-App"></div>
+    <div class="auth-sub" style="margin-bottom:6px">Falls der Scan nicht geht, Schlüssel manuell eingeben:</div>
+    <div id="mfa-secret" class="mfa-secret"></div>
+    <div class="feld-ein"><label for="mfa-setup-code">6-stelliger Code</label><input id="mfa-setup-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>
+    <button id="btn-mfa-setup" class="btn-haupt">Einrichtung abschließen</button>
+    <div id="mfa-setup-fehler" class="auth-fehler"></div>
+    <button id="btn-mfa-setup-abbruch" class="auth-link">Abmelden</button>
+  </div>
+</div>
+
+<!-- ══ ZWEITER FAKTOR: CODE ══ -->
+<div id="ansicht-mfa-code" class="auth-wrap verborgen">
+  <div class="auth-box">
+    <a class="logo">VEX<span>FIT</span></a>
+    <div class="auth-title">Zweiter Faktor</div>
+    <div class="auth-sub">Gib den 6-stelligen Code aus deiner Authenticator-App ein.</div>
+    <div class="feld-ein"><label for="mfa-code">Code</label><input id="mfa-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>
+    <button id="btn-mfa-code" class="btn-haupt">Bestätigen</button>
+    <div id="mfa-code-fehler" class="auth-fehler"></div>
+    <button id="btn-mfa-code-abbruch" class="auth-link">Abmelden</button>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD ══ -->
+<div id="ansicht-dashboard" class="verborgen">
+  <nav>
+    <a class="logo">VEX<span>FIT</span> <span style="color:var(--text-muted);font-size:14px;letter-spacing:2px">VERWALTUNG</span></a>
+    <div class="nav-links">
+      <span id="zuletzt" class="nav-meta"></span>
+      <button id="btn-logout" class="btn-aus">Abmelden</button>
+    </div>
+  </nav>
+  <div class="content">
+    <!-- Kennzahlen -->
+    <div class="stats-grid" id="stats"></div>
+
+    <!-- Reiter -->
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="uebersicht">Übersicht</button>
+      <button class="tab" data-tab="trainer">Trainer</button>
+      <button class="tab" data-tab="kunden">Kunden</button>
+      <button class="tab" data-tab="anfragen">Anfragen</button>
+      <button class="tab" data-tab="zahlungen">Zahlungen</button>
+      <button class="tab" data-tab="studios">Studios</button>
+      <button class="tab" data-tab="zertifikate">Zertifikate</button>
+      <button class="tab" data-tab="nachfrage">Nachfrage</button>
+      <button class="tab" data-tab="protokoll">Protokoll</button>
+    </div>
+
+    <!-- Übersicht -->
+    <div class="tab-content active" id="tab-uebersicht">
+      <div class="section-hinweis">Klicke eine Kennzahl oben an, um in die gefilterte Liste zu springen.</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Neu – wartet auf Freigabe</th><th>Vollständigkeit</th><th>Registriert</th><th></th></tr></thead>
+        <tbody id="freigabe-tbody"><tr><td colspan="4" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- Trainer -->
+    <div class="tab-content" id="tab-trainer">
+      <div class="werkzeugleiste">
+        <input type="search" id="trainer-suche" placeholder="Suche Name, E-Mail, Stadt, PLZ …">
+        <select id="trainer-filter">
+          <option value="">Alle</option>
+          <option value="warten">Wartet auf Freigabe</option>
+          <option value="aktiv">Aktiv</option>
+          <option value="gesperrt">Gesperrt</option>
+          <option value="unvollstaendig">Profil unvollständig</option>
+          <option value="studio">Studio-Trainer</option>
+        </select>
+        <label class="schalter"><input type="checkbox" id="tests-aus-trainer" checked> Testkonten ausblenden</label>
+        <button class="btn-klein" id="csv-trainer">CSV-Export</button>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th data-sort="name" data-liste="trainer">Name</th>
+          <th data-sort="email" data-liste="trainer">E-Mail</th>
+          <th>Telefon</th>
+          <th data-sort="stadt" data-liste="trainer">Stadt</th>
+          <th>Vollst.</th>
+          <th>Bezahlt</th>
+          <th>Status</th>
+          <th data-sort="created_at" data-liste="trainer">Registriert</th>
+        </tr></thead>
+        <tbody id="trainer-tbody"><tr><td colspan="8" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- Kunden -->
+    <div class="tab-content" id="tab-kunden">
+      <div class="werkzeugleiste">
+        <input type="search" id="kunden-suche" placeholder="Suche Name, E-Mail, Stadt, PLZ …">
+        <label class="schalter"><input type="checkbox" id="tests-aus-kunden" checked> Testkonten ausblenden</label>
+        <button class="btn-klein" id="csv-kunden">CSV-Export</button>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th data-sort="name" data-liste="kunde">Name</th>
+          <th data-sort="email" data-liste="kunde">E-Mail</th>
+          <th>Telefon</th>
+          <th data-sort="stadt" data-liste="kunde">Stadt</th>
+          <th>Ziel</th>
+          <th data-sort="created_at" data-liste="kunde">Registriert</th>
+        </tr></thead>
+        <tbody id="kunden-tbody"><tr><td colspan="6" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- Anfragen -->
+    <div class="tab-content" id="tab-anfragen">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Datum</th><th>Trainer</th><th>Kunde</th><th>Status</th><th>Unbeantwortet seit</th><th>Weitergeleitet</th></tr></thead>
+        <tbody id="anfragen-tbody"><tr><td colspan="6" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- Zahlungen -->
+    <div class="tab-content" id="tab-zahlungen">
+      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Erste Anfrage angenommen – Zahlungslink offen</h3>
+      <div class="table-wrap" style="margin-bottom:22px"><table>
+        <thead><tr><th>Name</th><th>E-Mail</th><th>Stadt</th><th>Status</th></tr></thead>
+        <tbody id="zahlungslink-tbody"><tr><td colspan="4" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
+      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Verarbeitete Zahlungsereignisse</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Zeitpunkt</th><th>Typ</th><th>Ereignis-ID</th></tr></thead>
+        <tbody id="zahlungen-tbody"><tr><td colspan="3" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- Studios -->
+    <div class="tab-content" id="tab-studios">
+      <div id="studios-inhalt"><div class="leer-text">Lade …</div></div>
+    </div>
+
+    <!-- Zertifikate -->
+    <div class="tab-content" id="tab-zertifikate">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Name</th><th>Stadt</th><th>Zertifikat</th><th>Status</th><th>Aktion</th></tr></thead>
+        <tbody id="zertifikate-tbody"><tr><td colspan="5" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- Nachfrage -->
+    <div class="tab-content" id="tab-nachfrage">
+      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Nachfrage je Ort</h3>
+      <div class="table-wrap" style="margin-bottom:22px"><table>
+        <thead><tr><th>Ort</th><th>Suchen</th><th>Vormerkungen</th><th>Trainer</th></tr></thead>
+        <tbody id="nachfrage-tbody"><tr><td colspan="4" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
+      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Häufig gesuchte Ziele</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Ziel</th><th>Anzahl</th></tr></thead>
+        <tbody id="ziele-tbody"><tr><td colspan="2" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- Protokoll -->
+    <div class="tab-content" id="tab-protokoll">
+      <div class="section-hinweis">Die letzten Admin-Aktionen (ohne Personendaten).</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Zeitpunkt</th><th>Aktion</th><th>Ziel</th><th>Ergebnis</th></tr></thead>
+        <tbody id="protokoll-tbody"><tr><td colspan="4" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- Detailfenster -->
+  <div id="detail-overlay" class="overlay verborgen" data-schliessen="detail"></div>
+  <div id="detail-panel" class="panel verborgen">
+    <div class="panel-kopf"><div class="panel-titel" id="detail-titel"></div><button class="panel-zu" data-schliessen="detail">✕</button></div>
+    <div class="panel-body" id="detail-body"></div>
+    <div class="panel-foot" id="detail-foot"></div>
+  </div>
+
+  <!-- Bestätigungsdialog -->
+  <div id="dialog-overlay" class="overlay verborgen" data-schliessen="dialog"></div>
+  <div id="dialog-box" class="dialog-box verborgen">
+    <div class="dialog-titel" id="dialog-titel"></div>
+    <div class="dialog-text" id="dialog-text"></div>
+    <div class="dialog-aktionen">
+      <button class="btn-gross btn-neutral" id="dialog-abbrechen">Abbrechen</button>
+      <button class="btn-gross btn-ja" id="dialog-ok">Bestätigen</button>
+    </div>
+  </div>
+
+  <!-- Formulardialog (Studios) -->
+  <div id="form-overlay" class="overlay verborgen" data-schliessen="form"></div>
+  <div id="form-box" class="dialog-box verborgen">
+    <div class="dialog-titel" id="form-titel"></div>
+    <div id="form-felder"></div>
+    <div class="dialog-aktionen">
+      <button class="btn-gross btn-neutral" id="form-abbrechen">Abbrechen</button>
+      <button class="btn-gross btn-ja" id="form-ok">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="vexfit-verwaltung.js"></script>
+</body>
+</html>

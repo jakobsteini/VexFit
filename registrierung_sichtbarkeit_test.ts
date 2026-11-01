@@ -24,15 +24,15 @@ import { assert, assertStringIncludes } from "jsr:@std/assert@1";
 
 const lies = (p: string) => Deno.readTextFile(new URL(p, import.meta.url));
 
-// Die Zeile, mit der admin.html die Trainerliste laedt.
+// Die Zeile, mit der die Verwaltung die Trainerliste laedt.
 async function adminTrainerLadezeile(): Promise<string> {
-  const html = await lies("./admin.html");
-  const i = html.indexOf("/rest/v1/trainers?select=");
-  assert(i >= 0, "admin.html laedt die Trainerliste nicht ueber /rest/v1/trainers");
-  return html.slice(i, html.indexOf("`", i) + 1);
+  const js = await lies("./vexfit-verwaltung.js");
+  const i = js.indexOf("trainers?select=");
+  assert(i >= 0, "die Verwaltung laedt die Trainerliste nicht ueber trainers?select=");
+  return js.slice(i, js.indexOf('"', i) + 1);
 }
 
-Deno.test("admin.html laedt Trainer OHNE aktiv-Filter — inaktive/unbestaetigte sind sichtbar", async () => {
+Deno.test("Verwaltung laedt Trainer OHNE aktiv-Filter — inaktive/unbestaetigte sind sichtbar", async () => {
   const zeile = await adminTrainerLadezeile();
   assertStringIncludes(zeile, "trainers?select=*");
   // Kein aktiv-Filter in der Ladeabfrage: sonst blieben frisch registrierte
@@ -43,13 +43,13 @@ Deno.test("admin.html laedt Trainer OHNE aktiv-Filter — inaktive/unbestaetigte
   );
 });
 
-Deno.test("admin.html zeigt inaktive Trainer eigens an (Badge + Freigeben-Knopf + Neu-Liste)", async () => {
-  const html = await lies("./admin.html");
-  // Inaktive Zeile wird gerendert (Badge "Inaktiv" und Knopf "Profil freigeben").
-  assertStringIncludes(html, "Inaktiv");
-  assertStringIncludes(html, "Profil freigeben");
+Deno.test("Verwaltung zeigt inaktive Trainer eigens an (Badge + Freigeben-Knopf + Neu-Liste)", async () => {
+  const js = await lies("./vexfit-verwaltung.js");
+  // Inaktive Zeile wird gerendert (Badge "Inaktiv" und Knopf "Freigeben").
+  assertStringIncludes(js, "Inaktiv");
+  assertStringIncludes(js, "Freigeben");
   // Es gibt eine eigene Auswahl der noch nicht freigeschalteten Trainer.
-  assertStringIncludes(html, "filter(t => !t.aktiv)");
+  assertStringIncludes(js, "filter((t) => !t.aktiv)");
 });
 
 Deno.test("registrieren.html: ein Fehler beim Anlegen der Trainer-Zeile wird angezeigt, nicht verschluckt", async () => {

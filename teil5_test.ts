@@ -34,9 +34,10 @@ Deno.test("Function: aelteste offene Anfrage laesst abgelehnte aus", async () =>
   assertStringIncludes(idx, "status.neq.abgelehnt");
 });
 
-Deno.test("Zahlungslinks auf den Seiten tragen client_reference_id", async () => {
+Deno.test("Zahlungslinks tragen client_reference_id", async () => {
   const tb = await lies("./trainer-bereich.html");
   assert(tb.includes("client_reference_id="), "trainer-bereich.html ohne client_reference_id");
-  const adm = await lies("./admin.html");
-  assert(adm.includes("client_reference_id="), "admin.html ohne client_reference_id");
+  // Der Admin-Zahlungslink liegt jetzt im Verwaltungs-Modul.
+  const js = await lies("./vexfit-verwaltung.js");
+  assert(js.includes("client_reference_id="), "vexfit-verwaltung.js ohne client_reference_id");
 });

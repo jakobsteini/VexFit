@@ -1,66 +1,66 @@
 // /Users/js/Projekte/Vexfit/app/vexfit/gp05_admin_feinschliff_test.ts
 //
-// Gesamtprüfung 2026-11-01, Teil 5: Admin-Feinschliff.
-// Ergänzt admin_test.ts um die neuen Punkte dieser Sitzung:
-//   * jede Aktion aktualisiert sofort ohne Neuladen (Cache + renderAllesNeu),
-//   * Reiter Anfragen/Zahlungen/Studios/Zertifikate zeigen echte Felder,
+// Admin-Feinschliff, jetzt gegen die neue Verwaltungsseite:
+//   * jede Aktion aktualisiert sofort ohne Neuladen (Cache + neuZeichnen),
+//   * Reiter Anfragen/Zahlungen/Studios/Zertifikate laden echte Felder,
 //   * Vollständigkeit kommt aus EINER Zahl (PROFIL_FELDER_GESAMT),
-//   * Darstellung am Handy (Panel Vollbild, kein Querscroll).
+//   * Darstellung am Handy (Panel Vollbild, Tabellen scrollen in sich).
 //
 // Aufruf:  deno test --allow-read gp05_admin_feinschliff_test.ts
 import { assert, assertStringIncludes } from "jsr:@std/assert@1";
 
-const html = await Deno.readTextFile(new URL("./admin.html", import.meta.url));
+const js = await Deno.readTextFile(new URL("./vexfit-verwaltung.js", import.meta.url));
+const html = await Deno.readTextFile(new URL("./verwaltung-88fd2cb35d54e09c68c8e60199d97b66.html", import.meta.url));
 
-Deno.test("Sperren/Entsperren aktualisiert sofort (Cache + renderAllesNeu)", () => {
-  // In sperrePerson wird die Markierung im Cache gesetzt und neu gezeichnet.
-  assertStringIncludes(html, "if(p) p.gesperrt = !entsperren;");
-  const sperre = html.slice(html.indexOf("async function sperrePerson"), html.indexOf("async function loeschePerson"));
-  assertStringIncludes(sperre, "renderAllesNeu();");
+Deno.test("Sperren aktualisiert sofort (Cache + neuZeichnen)", () => {
+  const sperre = js.slice(js.indexOf("async function sperren("), js.indexOf("async function kicken("));
+  assertStringIncludes(sperre, "p.gesperrt = !ent;");
+  assertStringIncludes(sperre, "neuZeichnen();");
 });
 
-Deno.test("Freigeben aktualisiert sofort (t.aktiv im Cache + renderAllesNeu)", () => {
-  const akt = html.slice(html.indexOf("async function activateTrainer"), html.indexOf("async function activateTrainer") + 900);
-  assertStringIncludes(akt, "if(t) t.aktiv = true;");
-  assertStringIncludes(akt, "renderAllesNeu();");
+Deno.test("Freigeben aktualisiert sofort (t.aktiv im Cache + neuZeichnen)", () => {
+  const f = js.slice(js.indexOf("async function freigeben("), js.indexOf("async function freigeben(") + 700);
+  assertStringIncludes(f, "t.aktiv = true;");
+  assertStringIncludes(f, "neuZeichnen();");
 });
 
-Deno.test("Löschen entfernt sofort aus dem Cache", () => {
-  assertStringIncludes(html, "window.allTrainers = (window.allTrainers || []).filter(x => String(x.id) !== String(id));");
-  assertStringIncludes(html, "window.allKunden = (window.allKunden || []).filter(x => String(x.id) !== String(id));");
+Deno.test("Kicken entfernt sofort aus dem Cache", () => {
+  const k = js.slice(js.indexOf("async function kicken("), js.indexOf("async function kicken(") + 1200);
+  assertStringIncludes(k, "daten.trainers = daten.trainers.filter((x) => String(x.id) !== String(id));");
+  assertStringIncludes(k, "daten.kunden = daten.kunden.filter((x) => String(x.id) !== String(id));");
 });
 
 Deno.test("Reiter Anfragen/Zahlungen/Studios/Zertifikate werden geladen", () => {
-  for (const fn of ["ladeAnfragenListe(", "ladeZahlungen(", "ladeStudios(", "ladeZertifikate("]) {
-    assertStringIncludes(html, "function " + fn);
+  for (const fn of ["ladeAnfragen(", "ladeZahlungen(", "ladeStudios(", "ladeZertifikate("]) {
+    assertStringIncludes(js, "function " + fn);
   }
 });
 
 Deno.test("Zahlungen-Reiter zeigt echte Felder und fängt fehlende Tabelle ab", () => {
-  const z = html.slice(html.indexOf("function ladeZahlungen"), html.indexOf("function ladeZahlungen") + 1500);
+  const z = js.slice(js.indexOf("async function ladeZahlungen"), js.indexOf("async function ladeZahlungen") + 1200);
   assertStringIncludes(z, "verarbeitet_am");
-  // Hinweis statt Absturz, falls die Tabelle/Migration fehlt.
-  assert(/Migration|nicht eingespielt|noch nicht/i.test(z), "Zahlungen-Reiter ohne Migrationshinweis");
+  assert(/Migration|nicht eingespielt|nicht freigeschaltet/i.test(z), "Zahlungen-Reiter ohne Migrationshinweis");
 });
 
 Deno.test("Studios-Reiter zeigt Slug, Veröffentlicht-Status und Einladungsschlüssel", () => {
-  const s = html.slice(html.indexOf("function ladeStudios"), html.indexOf("function ladeStudios") + 2500);
-  assertStringIncludes(s, "slug");
-  assertStringIncludes(s, "veroeffentlicht");
-  assertStringIncludes(s, "einladungs_schluessel");
+  assertStringIncludes(js, "function ladeStudios");
+  assertStringIncludes(js, ".slug");
+  assertStringIncludes(js, "veroeffentlicht");
+  assertStringIncludes(js, "einladungs_schluessel");
 });
 
 Deno.test("Vollständigkeit: EINE Zahl PROFIL_FELDER_GESAMT = 8, Foto zählt", () => {
-  assertStringIncludes(html, "const PROFIL_FELDER_GESAMT = 8;");
-  assertStringIncludes(html, "fehlt.push('Foto');");
+  assertStringIncludes(js, "PROFIL_FELDER_GESAMT = 8");
+  assertStringIncludes(js, 'fehlt.push("Foto")');
 });
 
-Deno.test("Handy: Panel Vollbild, kein Querscroll", () => {
-  assertStringIncludes(html, "body{overflow-x:hidden}");
-  assertStringIncludes(html, ".panel{max-width:100%}");
+Deno.test("Handy: Panel am Handy voll, Tabellen scrollen in sich (kein Querscroll)", () => {
+  assertStringIncludes(html, "overflow-x:auto");
+  assertStringIncludes(html, "max-width:520px");
 });
 
-Deno.test("Aktionen laufen über die abgesicherte Edge Function, Löschen mit Namen", () => {
-  assertStringIncludes(html, "vexfit-automation/admin-aktion");
-  assertStringIncludes(html, "ok.disabled = eingabe.value.trim() !== opt.nameZumTippen.trim();");
+Deno.test("Aktionen laufen über die Edge Function; Kicken = EIN Dialog ohne Namen-Eintippen", () => {
+  assertStringIncludes(js, "vexfit-automation/admin-aktion");
+  assertStringIncludes(js, "Ja, endgültig löschen");
+  assert(!/nameZumTippen/.test(js), "Kicken verlangt noch das Eintippen des Namens");
 });

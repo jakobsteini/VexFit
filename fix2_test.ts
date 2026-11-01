@@ -19,7 +19,6 @@ const seiten: Record<string, string[]> = {
   "passwort-vergessen.html": [".nav-back"],
   "passwort-neu.html": [".nav-back"],
   "profil-bearbeiten.html": [".btn-back"],
-  "admin.html": [".logout-btn"],
   "kunden-bereich.html": [".btn-logout"],
   "trainer-bereich.html": [".btn-logout", ".nav-link"],
   "anleitung.html": [".nav-back"],
@@ -45,7 +44,6 @@ Deno.test("Fix 2: jede Seite hat die 44px-Tippflaechen-Regel unter 640px", async
 const WIDERRUF_SEITEN = [
   "404.html",
   "anleitung.html",
-  "admin.html",
   "kunden-bereich.html",
   "passwort-vergessen.html",
   "login.html",

@@ -26,6 +26,16 @@ async function htmlDateien(): Promise<string[]> {
   return out.sort();
 }
 
+// Sonderseiten ohne öffentliche Wortmarke/Favicons: admin.html ist nur noch
+// eine Weiterleitung, und die geheime Verwaltungsseite (verwaltung-…) ist ein
+// abgeschottetes internes Werkzeug (eigener Stil, kein Marketing-Pixel/Logo).
+function istSonderseite(name: string): boolean {
+  return name === "admin.html" || name.startsWith("verwaltung-");
+}
+async function oeffentlicheHtml(): Promise<string[]> {
+  return (await htmlDateien()).filter((f) => !istSonderseite(f));
+}
+
 Deno.test("kein Verweis mehr auf vexfit-logo.png; Datei geloescht", async () => {
   for (const f of await htmlDateien()) {
     const s = await lies("./" + f);
@@ -45,7 +55,7 @@ Deno.test("kein Verweis mehr auf vexfit-logo.png; Datei geloescht", async () => 
 Deno.test("jede .html hat beide Favicon-Links auf existierende Dateien", async () => {
   assert(await existiert("./marke/favicon-32.png"));
   assert(await existiert("./marke/favicon-180.png"));
-  for (const f of await htmlDateien()) {
+  for (const f of await oeffentlicheHtml()) {
     const s = await lies("./" + f);
     assertStringIncludes(s, 'href="marke/favicon-32.png"');
     assertStringIncludes(s, 'href="marke/favicon-180.png"');
@@ -72,7 +82,7 @@ Deno.test("og:image/twitter:image auf das Vorschaubild, Datei existiert", async 
 
 Deno.test("Kopf-/Fusszeilen mit Logo tragen das Inline-V und EXFIT", async () => {
   let geprueft = 0;
-  for (const f of await htmlDateien()) {
+  for (const f of await oeffentlicheHtml()) {
     const s = await lies("./" + f);
     if (s.includes('class="logo"') || s.includes('class="footer-logo"')) {
       assertStringIncludes(s, 'viewBox="168 166 1265 1270"'); // das Inline-V, eng begrenzt
@@ -101,7 +111,7 @@ Deno.test("Mailkopf: dunkler Balken (#0A0A0A) + Wortmarkenbild mit alt=VEXFIT", 
 
 Deno.test("jeder Wortmarken-Link traegt aria-label", async () => {
   let geprueft = 0;
-  for (const f of await htmlDateien()) {
+  for (const f of await oeffentlicheHtml()) {
     const s = await lies("./" + f);
     // Jeder <a ... class="logo"/"footer-logo"> muss das aria-label tragen.
     const offen = s.match(/<a [^>]*class="(?:logo|footer-logo)"[^>]*>/g) ?? [];

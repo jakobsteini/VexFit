@@ -1,27 +1,29 @@
 // /Users/js/Projekte/Vexfit/app/vexfit/gp08_zahlungslink_test.ts
 //
-// Gesamtprüfung 2026-11-01, Teil 8 (optionaler Admin-Reiter): „Zahlungslink
-// offen" – freigeschaltete Trainer mit angenommener Anfrage, die noch nicht
-// bezahlt haben. Nur lesend, aus vorhandenen Daten.
+// Gesamtprüfung, Teil 8 (Admin-Reiter): „Zahlungslink offen" – freigeschaltete
+// Trainer mit angenommener Anfrage, die noch nicht bezahlt haben. Nur lesend,
+// aus vorhandenen Daten. Jetzt in der neuen Verwaltungsseite.
 //
 // Aufruf:  deno test --allow-read gp08_zahlungslink_test.ts
-import { assert, assertStringIncludes } from "jsr:@std/assert@1";
+import { assertStringIncludes } from "jsr:@std/assert@1";
 
-const html = await Deno.readTextFile(new URL("./admin.html", import.meta.url));
+const html = await Deno.readTextFile(new URL("./verwaltung-88fd2cb35d54e09c68c8e60199d97b66.html", import.meta.url));
+const js = await Deno.readTextFile(new URL("./vexfit-verwaltung.js", import.meta.url));
 
-Deno.test("Reiter 'Zahlungslink offen' vorhanden (Tab + Inhalt + Lader)", () => {
-  assertStringIncludes(html, "showTab('zahlungslink', this)");
-  assertStringIncludes(html, 'id="tab-zahlungslink"');
+Deno.test("Reiter 'Zahlungen' enthält den Block 'Zahlungslink offen'", () => {
+  assertStringIncludes(html, 'id="tab-zahlungen"');
   assertStringIncludes(html, 'id="zahlungslink-tbody"');
-  assertStringIncludes(html, "function ladeZahlungslinkOffen(");
+  assertStringIncludes(html, "Zahlungslink offen");
+  assertStringIncludes(js, "function ladeZahlungslinkOffen(");
 });
 
 Deno.test("Zahlungslink-Filter: angenommene Anfrage + nicht bezahlt + aktiv", () => {
-  const fn = html.slice(html.indexOf("async function ladeZahlungslinkOffen"), html.indexOf("async function ladeZahlungslinkOffen") + 1400);
+  const i = js.indexOf("async function ladeZahlungslinkOffen");
+  const fn = js.slice(i, i + 1400);
   assertStringIncludes(fn, "status=eq.angenommen");
-  assertStringIncludes(fn, "t.aktiv && !t.stripe_bezahlt && mitAngenommen.has(t.id)");
+  assertStringIncludes(fn, "t.aktiv && !t.stripe_bezahlt && mitAng.has(t.id)");
 });
 
-Deno.test("Lader wird mitgeladen (renderAllesNeu/loadData)", () => {
-  assertStringIncludes(html, "ladeZahlungslinkOffen();");
+Deno.test("Lader wird beim Laden der Daten mitgezogen", () => {
+  assertStringIncludes(js, "ladeZahlungslinkOffen();");
 });
