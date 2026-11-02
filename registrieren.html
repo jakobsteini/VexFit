@@ -98,9 +98,6 @@ select option{background:var(--gray);color:var(--white)}
 .pw-meter.s-gelb .pw-word{color:#e8ff00}
 .pw-meter.s-gruen .pw-bar span{background:#25D366}
 .pw-meter.s-gruen .pw-word{color:#25D366}
-.pw-match{font-size:12px;margin:-6px 0 12px}
-.pw-match.ok{color:#25D366}
-.pw-match.no{color:#ff6b6b}
 </style>
 <!-- Meta Pixel Code -->
 <!-- Laedt NICHT beim Seitenaufruf. Nur wenn eine Zustimmung fuer Marketing vorliegt. -->
@@ -168,7 +165,7 @@ try {
     </div>
     <div class="field"><label>E-Mail</label><input type="email" placeholder="max@example.com" id="t-email" autocomplete="email"></div>
     <div class="field"><label>Passwort</label>
-      <input type="password" placeholder="Mind. 8 Zeichen" id="t-pw" autocomplete="new-password" oninput="pwMeter('t')">
+      <input type="password" placeholder="Mind. 8 Zeichen" id="t-pw" autocomplete="new-password" oninput="pwMeter('t')" onkeydown="if(event.key==='Enter'){event.preventDefault();submitTrainer()}">
       <button type="button" class="pw-zeigen" id="t-pw-zeigen" onclick="pwZeigen('t')">Passwort zeigen</button>
     </div>
     <div class="pw-meter" id="t-pw-meter" style="display:none"><div class="pw-bar"><span></span><span></span><span></span></div><div class="pw-word"></div></div>
@@ -196,7 +193,7 @@ try {
     </div>
     <div class="field"><label>E-Mail</label><input type="email" placeholder="anna@example.com" id="c-email" autocomplete="email"></div>
     <div class="field"><label>Passwort</label>
-      <input type="password" placeholder="Mind. 8 Zeichen" id="c-pw" autocomplete="new-password" oninput="pwMeter('c')">
+      <input type="password" placeholder="Mind. 8 Zeichen" id="c-pw" autocomplete="new-password" oninput="pwMeter('c')" onkeydown="if(event.key==='Enter'){event.preventDefault();submitClient()}">
       <button type="button" class="pw-zeigen" id="c-pw-zeigen" onclick="pwZeigen('c')">Passwort zeigen</button>
     </div>
     <div class="pw-meter" id="c-pw-meter" style="display:none"><div class="pw-bar"><span></span><span></span><span></span></div><div class="pw-word"></div></div>
@@ -310,18 +307,6 @@ function pwMeter(kuerzel){
     m.querySelector('.pw-word').textContent=PW_WORT[stufe];
     m.style.display='block';
   }
-  pwMatch(kuerzel);
-}
-// Beim Feld "wiederholen" nur der Hinweis, ob beide Eingaben uebereinstimmen -
-// kein zweiter Balken.
-function pwMatch(kuerzel){
-  const pw=document.getElementById(kuerzel+'-pw').value;
-  const pw2=document.getElementById(kuerzel+'-pw2').value;
-  const el=document.getElementById(kuerzel+'-pw-match');
-  if(!pw2){ el.style.display='none'; return; }
-  if(pw===pw2){ el.className='pw-match ok'; el.textContent='✓ Passwörter stimmen überein'; }
-  else{ el.className='pw-match no'; el.textContent='✗ Passwörter stimmen noch nicht überein'; }
-  el.style.display='block';
 }
 
 // Prueft die beiden Passwortfelder. Gibt das Passwort zurueck oder null bei Verstoss.

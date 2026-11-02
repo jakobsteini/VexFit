@@ -40,7 +40,11 @@ test("Trainer-Erstformular: nur Pflichtfelder, Mail sofort mit utm_campaign, dan
   await page.fill("#t-ln", "Muster");
   await page.fill("#t-email", "max+e2e@example.com");
   await page.fill("#t-pw", "geheim123");
-  await page.check("#t-agb");
+  // Die echte Checkbox ist display:none (eigenes Kästchen); echte Nutzer tippen
+  // auf das sichtbare Kästchen (.custom-cb). Genau das klicken wir hier.
+  await page.locator(".checkbox-field", { has: page.locator("#t-agb") })
+    .locator(".custom-cb").click();
+  await expect(page.locator("#t-agb")).toBeChecked();
   await page.click("#t-submit-btn");
 
   // neuer-trainer genau einmal, mit utm_campaign.

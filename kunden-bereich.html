@@ -622,7 +622,7 @@ function karte(t, modus) {
   const dist = modus === 'online'
     ? '<div class="tc-dist">🌐 Online</div>'
     : (t._dist != null ? `<div class="tc-dist">📍 ${t._dist} km</div>` : '');
-  const price = t.preis_stunde ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">ab €${t.preis_stunde}/Std</div>` : '';
+  const price = t.preis_stunde ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px">ab ${t.preis_stunde} €/Std</div>` : '';
   return `<div class="trainer-card">
     <div class="tc-top">
       <div class="tc-av" style="${avStyle}">${avStyle?'':vexEsc(ini)}</div>

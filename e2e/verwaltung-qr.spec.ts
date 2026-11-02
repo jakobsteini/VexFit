@@ -27,7 +27,13 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1440, height: 900 
     const cspFehler: string[] = [];
     page.on("console", (m) => {
       const t = m.text();
-      if (/Content Security Policy|Refused to load the image/i.test(t)) cspFehler.push(t);
+      // Nur ECHTES Blockieren zaehlt. Der Hinweis, dass 'frame-ancestors' per
+      // <meta> ignoriert wird, ist eine bekannte, harmlose Browser-Warnung und
+      // hat mit dem Laden des QR-Bildes nichts zu tun.
+      if (/frame-ancestors/i.test(t)) return;
+      if (/Refused to (load|apply)|violates the following Content Security Policy/i.test(t)) {
+        cspFehler.push(t);
+      }
     });
     await page.setViewportSize(viewport);
     await page.goto(SEITE);

@@ -156,7 +156,7 @@ try {
   <div class="sh-label">Trainer finden</div>
   <div class="sh-title">FINDE DEINEN<br>PERFEKTEN TRAINER</div>
   <div class="search-bar">
-    <input class="s-input" type="text" placeholder="Deine PLZ (z.B. 5026)" id="plzInput" maxlength="5" inputmode="numeric" autocomplete="postal-code">
+    <input class="s-input" type="text" placeholder="Deine PLZ (z.B. 5026)" id="plzInput" maxlength="5" inputmode="numeric" autocomplete="postal-code" onkeydown="if(event.key==='Enter'){event.preventDefault();searchByPLZ()}">
     <select class="s-input" id="radiusInput" style="max-width:130px;cursor:pointer">
       <option value="10">10 km</option>
       <option value="25" selected>25 km</option>
@@ -450,7 +450,11 @@ async function umkreisSuche(coords, radius, status) {
   // Filter trainers with known PLZ by distance, also include online trainers
   const filtered = [];
   for(const t of allTrainers) {
-    if((t.trainingsart||'').toLowerCase().includes('online')) {
+    // Online-Trainer: trainingsort ('online'/'beides') hat Vorrang, sonst der
+    // Freitext trainingsart. So fallen reine Online-Trainer ohne PLZ nicht aus
+    // der Umkreissuche (gleiche Regel wie vexEinstieg.istOnline).
+    const ort = String(t.trainingsort||'').toLowerCase();
+    if(ort === 'online' || ort === 'beides' || (t.trainingsart||'').toLowerCase().includes('online')) {
       filtered.push({...t, _distance: 0, _online: true});
       continue;
     }
@@ -486,7 +490,7 @@ function renderTrainersWithDistance(trainers) {
   grid.innerHTML = trainers.map((t,i) => {
     const initials = vexEsc(((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase());
     const tags = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="ctag">${vexEsc(s)}</span>`).join('');
-    const preis = t.preis_stunde ? `€${t.preis_stunde}<span>/Std</span>` : '<span>Auf Anfrage</span>';
+    const preis = t.preis_stunde ? `${t.preis_stunde} €<span>/Std</span>` : '<span>Auf Anfrage</span>';
     const distLabel = t._online ? '<span style="color:#e8ff00;font-size:11px">🌐 Online</span>' : t._distance !== undefined ? `<span style="color:#888;font-size:11px">📍 ${t._distance} km</span>` : '';
     const bild = avatarAdresse(t.avatar_url);
     const ciStyle = bild ? `background-image:url('${vexEsc(bild)}');background-size:cover;background-position:center` : `background:${bgColors[i%bgColors.length]}`;
@@ -573,7 +577,7 @@ function renderTrainers(trainers) {
     const bg = bgColors[i % bgColors.length];
     const isOnline = t.trainingsart === 'Online';
     const tags = (t.spezialisierungen || []).slice(0, 3);
-    const preis = t.preis_stunde ? `€${t.preis_stunde}<span>/Std</span>` : '<span>Auf Anfrage</span>';
+    const preis = t.preis_stunde ? `${t.preis_stunde} €<span>/Std</span>` : '<span>Auf Anfrage</span>';
     const bild = avatarAdresse(t.avatar_url);
     const ciStyle = bild ? `background-image:url('${vexEsc(bild)}');background-size:cover;background-position:center` : `background:${bg}`;
 
@@ -729,7 +733,10 @@ function showEmpty() {
 async function submitNotify() {
   const email = document.getElementById('notif-email').value.trim();
   if(!email) { alert('Bitte E-Mail eingeben!'); return; }
-  const stadt = document.getElementById('searchInput')?.value || '';
+  // Die Suche laeuft ueber die PLZ (#plzInput); so geht der Standort des
+  // Interessenten nicht verloren (frueher wurde das nicht vorhandene
+  // #searchInput gelesen und immer leer gesendet).
+  const stadt = document.getElementById('plzInput')?.value.trim() || '';
   // Fix 7b: verstecktes Koederfeld mitschicken (bleibt bei Menschen leer).
   const koeder = document.getElementById('notif-webseite')?.value || '';
   try {
