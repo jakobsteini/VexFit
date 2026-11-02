@@ -81,12 +81,17 @@ Deno.test("index.html und registrieren.html laden den Pixel mit der richtigen ID
   }
 });
 
-Deno.test("registrieren.html: Zustimmung schaltet den Pixel frei, Lead und CompleteRegistration unveraendert", async () => {
+Deno.test("registrieren.html: Zustimmung schaltet den Pixel frei; CompleteRegistration für Trainer UND Kunde", async () => {
   const s = await inhalt("registrieren.html");
   // Nach dem Zustimmen wird der Pixel geladen (Einwilligungs-Knopf).
   assertStringIncludes(s, "setItem('vexfit_consent','zugestimmt')");
   assertStringIncludes(s, "vexfitPixelLaden()");
-  // Die beiden Kampagnen-Ereignisse stehen unveraendert.
-  assertStringIncludes(s, "fbq('track','CompleteRegistration',{content_name:'Trainer'");
-  assertStringIncludes(s, "fbq('track','Lead',{content_name:'Kunde'");
+  // Teil 1: beide Wege feuern CompleteRegistration (Kunde war vorher 'Lead'),
+  // über einen gemeinsamen, zustimmungsgebundenen Helfer.
+  assertStringIncludes(s, "function pixelRegistrierungFertig(");
+  assertStringIncludes(s, "fbq('track','CompleteRegistration'");
+  assertStringIncludes(s, "pixelRegistrierungFertig('trainer'");
+  assertStringIncludes(s, "pixelRegistrierungFertig('kunde')");
+  // Das alte, falsche Lead-Ereignis ist weg.
+  assert(!s.includes("fbq('track','Lead'"), "altes Lead-Ereignis noch vorhanden");
 });

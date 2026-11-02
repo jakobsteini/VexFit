@@ -453,6 +453,22 @@ function signupFehler(status, antwort){
   return 'Registrierung fehlgeschlagen. Bitte versuche es später erneut.';
 }
 
+// Teil 1: Meta-Pixel-Ereignis "CompleteRegistration" – genau EINMAL nach einer
+// erfolgreichen Registrierung (Trainer wie Kunde) und NUR mit Cookie-Zustimmung.
+// Ohne Zustimmung ist das Pixel gar nicht geladen (fbq nicht definiert), dann
+// passiert hier nichts. Wird nur im Erfolgszweig aufgerufen – nie bei Fehlern,
+// nie beim Neuladen.
+function pixelRegistrierungFertig(typ, eventId){
+  try { if(localStorage.getItem('vexfit_consent') !== 'zugestimmt') return; } catch(e){ return; }
+  if(typeof fbq !== 'function') return;
+  var daten = {content_name: typ, value: 0, currency: 'EUR'};
+  if(eventId) fbq('track','CompleteRegistration', daten, {eventID: eventId});
+  else fbq('track','CompleteRegistration', daten);
+}
+// Teil 1: kurz warten, bevor wir weiterleiten – sonst bricht die Weiterleitung
+// die gerade abgeschickte Pixel-Meldung (und den Admin-Webhook) ab.
+function weiterNach(url){ setTimeout(function(){ window.location.href = url; }, 600); }
+
 async function submitTrainer(){
   hideError('t-error');
   // Teil R: kurzes Erstformular – nur Vorname, Nachname, E-Mail, Passwort, AGB.
@@ -492,7 +508,7 @@ async function submitTrainer(){
     // Fix 7b: angemeldeter Pfad - Zugangs-Token mitschicken (die Function verlangt
     // es fuer nicht-anonyme Aufrufe). Ohne Sitzung wird keine interne Mail ausgeloest.
     fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-trainer',{method:'POST',headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...td, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_source: utmSrc, utm_campaign: utm, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
-    if(typeof fbq==='function')fbq('track','CompleteRegistration',{content_name:'Trainer',value:0,currency:'EUR'},{eventID:capiEventId});
+    pixelRegistrierungFertig('trainer', capiEventId);
     // Ohne Sitzung (E-Mail-Bestaetigung aktiv) kann der Trainerbereich nicht
     // geoeffnet werden - dann Hinweis statt Weiterleitung.
     if(ad.access_token){
@@ -510,9 +526,9 @@ async function submitTrainer(){
             body:JSON.stringify({p_schluessel:EINLADUNG})
           });
         }catch(e){console.warn('Einladung:',e);}
-        window.location.href = 'trainer-bereich.html?neu=1&studio=1';
+        weiterNach('trainer-bereich.html?neu=1&studio=1');
       } else {
-        window.location.href = 'trainer-bereich.html?neu=1';
+        weiterNach('trainer-bereich.html?neu=1');
       }
     } else {
       showError('t-error','Konto erstellt! Bitte bestätige deine E-Mail-Adresse, dann kannst du dich anmelden.');
@@ -548,7 +564,7 @@ async function submitClient(){
     // es fuer nicht-anonyme Aufrufe). Ohne Sitzung wird keine interne Mail ausgeloest.
     fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-kunde',{method:'POST',headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...cd, utm_source: utmSrc, utm_campaign: utm, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
     if(ad.access_token){try{localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,refresh_token:ad.refresh_token||null,user_id:userId,email,role:'kunde'}));}catch(e){console.warn('localStorage blockiert:',e);}}
-    if(typeof fbq==='function')fbq('track','Lead',{content_name:'Kunde',value:0,currency:'EUR'});
+    pixelRegistrierungFertig('kunde');
     if(ad.access_token){ showSuccess('successClient'); }
     else { showError('c-error','Konto erstellt! Bitte bestätige deine E-Mail-Adresse, dann kannst du dich anmelden.'); imVersand.c=false;btn.disabled=false;btn.textContent='Trainer finden →'; }
   }catch(e){showError('c-error','Verbindungsfehler. Bitte prüfe deine Internetverbindung.');imVersand.c=false;btn.disabled=false;btn.textContent='Trainer finden →';}

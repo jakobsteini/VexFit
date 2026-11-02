@@ -46,8 +46,11 @@ Deno.test("Trainer-Ansicht: die praezisierten Texte sind da, DACH-Region bleibt"
 Deno.test("der Meta-Pixel bleibt unveraendert (ID 1034036285801133, keine neue ID)", () => {
   assertStringIncludes(html, "fbq('init', '1034036285801133')");
   assert(!html.includes("1105307262121912"), "die zurueckgenommene Pixel-ID ist wieder aufgetaucht");
-  // Zustimmungs-Gate und die Kampagnen-Ereignisse unangetastet.
+  // Zustimmungs-Gate bleibt; Teil 1: CompleteRegistration für Trainer UND Kunde
+  // über den gemeinsamen Helfer (Kunde war vorher 'Lead').
   assertStringIncludes(html, "=== 'zugestimmt') vexfitPixelLaden()");
-  assertStringIncludes(html, "fbq('track','CompleteRegistration',{content_name:'Trainer'");
-  assertStringIncludes(html, "fbq('track','Lead',{content_name:'Kunde'");
+  assertStringIncludes(html, "fbq('track','CompleteRegistration'");
+  assertStringIncludes(html, "pixelRegistrierungFertig('trainer'");
+  assertStringIncludes(html, "pixelRegistrierungFertig('kunde')");
+  assert(!html.includes("fbq('track','Lead'"), "altes Lead-Ereignis noch vorhanden");
 });

@@ -26,16 +26,24 @@ Deno.test("Pixel lädt nur nach Zustimmung", () => {
   assertStringIncludes(reg, "setItem('vexfit_consent','zugestimmt')");
 });
 
-Deno.test("CompleteRegistration/Lead feuern nur, wenn fbq existiert (= Zustimmung)", () => {
-  assertStringIncludes(reg, "if(typeof fbq==='function')fbq('track','CompleteRegistration'");
-  assertStringIncludes(reg, "if(typeof fbq==='function')fbq('track','Lead'");
+Deno.test("CompleteRegistration feuert zustimmungsgebunden über den Helfer (Teil 1: Kunde jetzt auch)", () => {
+  // Teil 1: ein gemeinsamer Helfer mit Zustimmungs- und fbq-Schutz; Trainer UND
+  // Kunde feuern CompleteRegistration (Kunde war vorher fälschlich 'Lead').
+  const i = reg.indexOf("function pixelRegistrierungFertig(");
+  const helfer = reg.slice(i, i + 500);
+  assertStringIncludes(helfer, "vexfit_consent");
+  assertStringIncludes(helfer, "typeof fbq !== 'function'");
+  assertStringIncludes(helfer, "fbq('track','CompleteRegistration'");
+  assertStringIncludes(reg, "pixelRegistrierungFertig('trainer'");
+  assertStringIncludes(reg, "pixelRegistrierungFertig('kunde')");
+  assert(!reg.includes("fbq('track','Lead'"), "altes Lead-Ereignis darf nicht mehr auftauchen");
   // Exakt die kampagnenrelevante ID, kein Umbau.
   assert(!reg.includes("1105307262121912"), "alte/falsche Pixel-ID darf nicht auftauchen");
 });
 
 Deno.test("Trainer-Submit: Knopf wird vor dem Feuern deaktiviert (genau einmal)", () => {
-  // imVersand + btn.disabled stehen VOR dem CompleteRegistration-Aufruf.
-  const vorPixel = reg.slice(0, reg.indexOf("fbq('track','CompleteRegistration'"));
+  // imVersand + btn.disabled stehen VOR dem Pixel-Aufruf.
+  const vorPixel = reg.slice(0, reg.indexOf("pixelRegistrierungFertig('trainer'"));
   assertStringIncludes(vorPixel, "imVersand.t=true;btn.disabled=true");
 });
 

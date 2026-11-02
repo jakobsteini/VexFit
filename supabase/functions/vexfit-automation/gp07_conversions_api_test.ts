@@ -90,8 +90,10 @@ Deno.test("Ohne event_id: KEIN serverseitiges Ereignis (keine Entdopplung mögli
 
 Deno.test("Browser: gemeinsame event_id + Zustimmung an die Function, Pixel-ID unverändert", async () => {
   const reg = await Deno.readTextFile(new URL("../../../registrieren.html", import.meta.url));
-  // event_id wird an fbq (Entdopplung) UND an die Function gegeben.
-  assertStringIncludes(reg, "{eventID:capiEventId}");
+  // event_id wird an fbq (Entdopplung) UND an die Function gegeben. Teil 1: der
+  // Browser-Track läuft über den Helfer, der die eventID weiterreicht.
+  assertStringIncludes(reg, "{eventID: eventId}");
+  assertStringIncludes(reg, "pixelRegistrierungFertig('trainer', capiEventId)");
   assertStringIncludes(reg, "event_id: capiEventId");
   assertStringIncludes(reg, "zustimmung: zugestimmt");
   assertStringIncludes(reg, "event_source_url: location.href");
