@@ -31,7 +31,7 @@ const vorStundenNun = (h: number) => new Date(Date.now() - h * 3_600_000).toISOS
 function trainer(ueber: Partial<TrainerProfil> = {}): TrainerProfil {
   return {
     id: "t-1", vorname: "lukas", nachname: "pichler", email: "lukas@example.com",
-    avatar_url: "https://x/y.jpg", trainingsart: "Personal Training",
+    avatar_url: "https://hbapzwxdehfgnputrfjf.supabase.co/storage/v1/object/public/avatars/x.jpg", trainingsart: "Personal Training",
     trainingsort: "vor_ort", preis_stunde: 60, bio: "Ein ausreichend langer Text über mich.",
     erfahrung: "3-5 Jahre", spezialisierungen: ["Muskelaufbau"], telefon: "",
     aktiv: false, gesperrt: false, erinnerungen_aus: false, erinnerung_stufe: 0,
@@ -84,7 +84,10 @@ Deno.test("Teil 4: mailErinnerung – Anrede, X von 8, fehlende Angaben, Knopf, 
   assertStringIncludes(m.text, "Telefon");               // fehlende Angabe benannt
   assertStringIncludes(m.text, "Profil jetzt vervollständigen");
   assertStringIncludes(m.text, "profil-bearbeiten.html#fTelefon");
-  assertStringIncludes(m.text, "erinnerung-abmelden?token=tok-1");
+  // Abmelde-Link zeigt auf die Supabase-Functions-Domain (NICHT vexfit.app,
+  // dort gibt es keine Functions – Fund B1 aus der Prüfung).
+  assertStringIncludes(m.text, "https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/erinnerung-abmelden?token=tok-1");
+  assert(!m.text.includes("vexfit.app/functions/v1"), "Abmelde-Link zeigt auf den falschen Host");
   assertStringIncludes(m.text, "Keine Erinnerungen mehr");
   // Fußzeile ohne genaue Adresse.
   assertStringIncludes(m.text, "Salzburg · Österreich");

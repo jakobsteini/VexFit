@@ -19,6 +19,16 @@ Deno.test("Teil 3: Mehrfach-Trainingsorte wie im Formular", () => {
   assertEquals(ortText("studio", ORT_TEXT), "Studio");
   assertEquals(ortText("outdoor", ORT_TEXT), "Outdoor");
   assertEquals(ortText("beim_kunden", ORT_TEXT), "Beim Kunden zuhause");
+  // Fund B2 aus der Prüfung: ORTE_OPTIONS enthält auch 'online'.
+  assertEquals(ortText("online", ORT_TEXT), "Online");
+});
+
+Deno.test("Teil 3: ORT_TEXT deckt ALLE ORTE_OPTIONS aus dem Formular ab", async () => {
+  const edit = await lies("./profil-bearbeiten.html");
+  const block = edit.slice(edit.indexOf("const ORTE_OPTIONS"), edit.indexOf("const ORTE_OPTIONS") + 260);
+  for (const val of [...block.matchAll(/val: '([^']+)'/g)].map((m) => m[1])) {
+    assert(Object.prototype.hasOwnProperty.call(ORT_TEXT, val), `ORT_TEXT fehlt '${val}' aus ORTE_OPTIONS`);
+  }
 });
 
 Deno.test("Teil 3: unbekannter Wert bleibt unverändert, kein Absturz", () => {

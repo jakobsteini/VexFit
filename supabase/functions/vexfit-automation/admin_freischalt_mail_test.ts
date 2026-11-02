@@ -41,7 +41,7 @@ const VOLL: TrainerProfil = {
   vorname: "Marco",
   nachname: "Blome",
   email: "marco.blome@live.de",
-  avatar_url: "https://x/a.jpg",
+  avatar_url: "https://hbapzwxdehfgnputrfjf.supabase.co/storage/v1/object/public/avatars/x.jpg",
   trainingsart: "online",
   trainingsort: "studio",
   preis_stunde: 60,

@@ -22,7 +22,7 @@ import {
 function vollesProfil(ueber: Partial<TrainerProfil> = {}): TrainerProfil {
   return {
     id: "t-1", vorname: "Mara", nachname: "Blume", email: "mara@example.com", plz: "5020",
-    stadt: "Salzburg", avatar_url: "https://x/y.jpg", trainingsart: "Personal Training",
+    stadt: "Salzburg", avatar_url: "https://hbapzwxdehfgnputrfjf.supabase.co/storage/v1/object/public/avatars/x.jpg", trainingsart: "Personal Training",
     trainingsort: "studio", preis_stunde: 60, bio: "Ein ausreichend langer Text über mich.",
     erfahrung: "3-5 Jahre", spezialisierungen: ["Muskelaufbau"], telefon: "0660...",
     aktiv: false, freigabe_mail_gesendet: false, ...ueber,

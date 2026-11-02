@@ -300,7 +300,7 @@ export function csvBauen(zeilen, spalten) {
 //   * Einzelauswahl „Trainingsort": vor_ort / online / beides.
 //   * Mehrfachauswahl „Trainingsorte" (ORTE_OPTIONS): studio / outdoor / beim_kunden.
 export const TRAININGSORT_TEXT = { vor_ort: "Vor Ort", online: "Online", beides: "Beides" };
-export const ORT_TEXT = { studio: "Studio", outdoor: "Outdoor", beim_kunden: "Beim Kunden zuhause" };
+export const ORT_TEXT = { studio: "Studio", outdoor: "Outdoor", beim_kunden: "Beim Kunden zuhause", online: "Online" };
 /** Lesbaren Ort-Text liefern. Unbekannter Wert bleibt unverändert (kein Absturz,
  *  kein Rohwert-Verlust); leerer Wert wird zu "".
  *  @param {unknown} wert

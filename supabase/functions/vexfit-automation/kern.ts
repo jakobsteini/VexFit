@@ -518,13 +518,21 @@ function herkunftText(body: Record<string, unknown>): string {
  *  Felder wie in der Verwaltung (fehlendeProfilfelder): Foto, Trainingsart,
  *  Trainingsort, Preis pro Stunde, Ueber mich (>10 Zeichen), Erfahrung,
  *  Spezialisierungen, Telefon. */
+// Foto gilt NUR als vorhanden, wenn die Adresse aus dem Avatar-Bucket kommt –
+// genau wie im Admin (vexfit-verwaltung.js avatarVorhanden). So zählen „X von 8"
+// in Mail/Erinnerung und im Admin dasselbe (sonst gälte ein beliebiger
+// avatar_url für die Freigabe-/Erinnerungslogik als Foto, im Admin aber nicht).
+function fotoDa(v: unknown): boolean {
+  return typeof v === "string" && v.includes("/avatars/");
+}
+
 export function profilVollstaendigkeitAcht(
   t: Record<string, unknown>,
 ): { erfuellt: number; gesamt: number } {
   const txt = (v: unknown) => (v == null ? "" : String(v)).trim();
   const liste = (v: unknown) => (Array.isArray(v) ? v : []);
   const felder = [
-    txt(t.avatar_url).includes("/avatars/"),
+    fotoDa(t.avatar_url),
     txt(t.trainingsart) !== "",
     txt(t.trainingsort) !== "",
     Number(t.preis_stunde) > 0,
@@ -1894,7 +1902,7 @@ export function profilVollstaendig(t: TrainerProfil): boolean {
   const hatText = (v: unknown, minLen = 1) =>
     typeof v === "string" && v.trim().length >= minLen;
   return (
-    hatText(t.avatar_url) && // Foto
+    fotoDa(t.avatar_url) && // Foto (nur aus dem Avatar-Bucket)
     hatText(t.trainingsart) &&
     hatText(t.trainingsort) &&
     Number(t.preis_stunde) > 0 && // Preis pro Stunde
@@ -1934,7 +1942,7 @@ export function freischaltFehlendeFelder(t: TrainerProfil): string[] {
   const hatText = (v: unknown, minLen = 1) =>
     typeof v === "string" && v.trim().length >= minLen;
   const fehlt: string[] = [];
-  if (!hatText(t.avatar_url)) fehlt.push("Foto");
+  if (!fotoDa(t.avatar_url)) fehlt.push("Foto");
   if (!hatText(t.trainingsart)) fehlt.push("Trainingsart");
   if (!hatText(t.trainingsort)) fehlt.push("Trainingsort");
   if (!(Number(t.preis_stunde) > 0)) fehlt.push("Preis pro Stunde");
@@ -1979,6 +1987,10 @@ export function mailFreischaltung(t: TrainerProfil): Mail {
 // ============================================================================
 
 const VEXFIT_BASIS = "https://vexfit.app";
+// Edge-Functions laufen NICHT unter vexfit.app (GitHub Pages, nur statisch),
+// sondern unter der Supabase-Functions-Domain – genau wie der Cron-Aufruf in
+// der Migration. Der Abmelde-Link MUSS hierher zeigen, sonst läuft er ins Leere.
+const FUNKTIONEN_BASIS = "https://hbapzwxdehfgnputrfjf.supabase.co";
 
 /** Feste Zeitfenster nach der Registrierung (in Stunden). Damit Altkonten nicht
  *  auf einmal mehrere Mails bekommen: jede Stufe gilt nur in IHREM Fenster. */
@@ -2079,7 +2091,7 @@ export function mailErinnerung(
   const fehlt = freischaltFehlendeFelder(t);
   const vorname = nameFormatieren(w(t.vorname)) || "du";
   const abmeldeLink = w(abmeldeToken)
-    ? `${VEXFIT_BASIS}/functions/v1/vexfit-automation/erinnerung-abmelden?token=${encodeURIComponent(w(abmeldeToken))}`
+    ? `${FUNKTIONEN_BASIS}/functions/v1/vexfit-automation/erinnerung-abmelden?token=${encodeURIComponent(w(abmeldeToken))}`
     : undefined;
   return baueMail(w(t.email), text.betreff, {
     ueberschrift: "Dein Profil ist fast fertig",
