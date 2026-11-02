@@ -238,8 +238,10 @@ export function unbeantwortetSeitStunden(a, jetzt = Date.now()) {
 export function trainerFiltern(liste, { q = "", status = "" } = {}) {
   const suche = String(q).toLowerCase().trim();
   return (Array.isArray(liste) ? liste : []).filter((t) => {
-    if (status === "warten" && t.aktiv) return false;
-    if (status === "aktiv" && !t.aktiv) return false;
+    // Gesperrte zaehlen weder als "wartet" noch als "aktiv" – sie erscheinen nur
+    // unter "gesperrt" (gleiche Regel wie in den Kennzahlen/der Freigabeliste).
+    if (status === "warten" && (t.aktiv || t.gesperrt)) return false;
+    if (status === "aktiv" && (!t.aktiv || t.gesperrt)) return false;
     if (status === "gesperrt" && !t.gesperrt) return false;
     if (status === "unvollstaendig" && fehlendeProfilfelder(t).length === 0) return false;
     if (status === "studio" && !t.studio_standort_id) return false;
@@ -280,6 +282,10 @@ export function sortieren(liste, feld, absteigend = false) {
 export function csvZelle(v) {
   let s = v === null || v === undefined ? "" : String(v);
   if (Array.isArray(v)) s = v.join("; ");
+  // Formel-Einschleusung verhindern: Werte, die mit = + - @ (oder Tab/CR)
+  // beginnen, deutet Excel/Numbers als Formel (auch "+43 660 …" bei Telefon).
+  // Ein vorangestelltes ' macht die Zelle zu reinem Text.
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
   if (/[";\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
   return s;
 }
@@ -593,6 +599,7 @@ function starteVerwaltung() {
     return (Array.isArray(liste) ? liste : []).map((p) =>
       [p.id, p.vorname, p.nachname, p.email, p.telefon, p.stadt, p.plz, p.aktiv,
        p.gesperrt, p.stripe_bezahlt, p.verifiziert, p.ziel, p.avatar_url,
+       p.zertifikat_datei, p.studio_standort_id,
        Array.isArray(p.spezialisierungen) ? p.spezialisierungen.length : 0].join("~")
     ).join("|");
   }
@@ -711,7 +718,7 @@ function starteVerwaltung() {
   async function renderStats() {
     const tr = sichtbar(daten.trainers, zustand.testsAusTrainer);
     const ku = sichtbar(daten.kunden, zustand.testsAusKunden);
-    const warten = tr.filter((t) => !t.aktiv).length;
+    const warten = tr.filter((t) => !t.aktiv && !t.gesperrt).length;
     const aktiv = tr.filter((t) => t.aktiv && !t.gesperrt).length;
     const gesperrt = tr.filter((t) => t.gesperrt).length;
     const bezahlt = tr.filter((t) => t.stripe_bezahlt).length;
@@ -732,7 +739,7 @@ function starteVerwaltung() {
       { label: "Anfragen offen", wert: offen == null ? "–" : offen, sub: `${gesamt == null ? "–" : gesamt} gesamt`, tab: "anfragen" },
       { label: "Angenommen", wert: ang == null ? "–" : ang, sub: `${abg == null ? "–" : abg} abgelehnt`, tab: "anfragen" },
       { label: "Bezahlt", wert: bezahlt, sub: eur.format(bezahlt * 49.99) + "/Mo", tab: "zahlungen" },
-      { label: "Wartet auf Freigabe", wert: warten, sub: "zur Freigabe", tab: "uebersicht" },
+      { label: "Freigabe-Liste", wert: warten, sub: "zur Übersicht", tab: "uebersicht" },
     ];
     $("stats").innerHTML = karten.map((k) =>
       `<div class="stat-card" data-aktion="stat" data-tab="${escapeHtml(k.tab)}" data-filter="${escapeHtml(k.filter || "")}">
@@ -746,7 +753,7 @@ function starteVerwaltung() {
   function renderFreigabe() {
     const tb = $("freigabe-tbody");
     const karten = $("freigabe-karten");
-    const neue = sichtbar(daten.trainers, zustand.testsAusTrainer).filter((t) => !t.aktiv);
+    const neue = sichtbar(daten.trainers, zustand.testsAusTrainer).filter((t) => !t.aktiv && !t.gesperrt);
     if (!neue.length) {
       tb.innerHTML = '<tr><td colspan="4" class="leer-text">Keine Trainer warten auf Freigabe.</td></tr>';
       if (karten) karten.innerHTML = leerKarte("Keine Trainer warten auf Freigabe.");
@@ -1035,7 +1042,7 @@ function starteVerwaltung() {
   function kundeDetail(id) {
     const k = daten.kunden.find((x) => String(x.id) === String(id));
     if (!k) { fehler("Kunde nicht gefunden. Bitte neu laden."); return; }
-    const LABEL = { telefon: "Telefon", plz: "PLZ", stadt: "Stadt", ziel: "Ziele", nachricht: "Nachricht", erwartungen: "Antworten aus dem Einstieg", land: "Land" };
+    const LABEL = { telefon: "Telefon", plz: "PLZ", stadt: "Stadt", ziel: "Ziel", nachricht: "Nachricht", erwartungen: "Antworten aus dem Einstieg", land: "Land" };
     const VERBERGEN = new Set(["id", "user_id", "vorname", "nachname", "email", "created_at", "gesperrt"]);
     let body = `<div style="margin-bottom:16px"><div style="font-size:20px;font-weight:700">${namePaarHtml(k.vorname, k.nachname)}</div>
       <div style="color:var(--text-muted);font-size:13px">${escapeHtml(k.email) || "—"}</div>
@@ -1047,7 +1054,9 @@ function starteVerwaltung() {
       if (VERBERGEN.has(key) || LABEL[key]) continue;
       const v = k[key];
       if (v === null || v === "" || (Array.isArray(v) && v.length === 0)) continue;
-      body += df(key, escapeHtml(Array.isArray(v) ? v.join(", ") : String(v)));
+      // Technischen Schluessel lesbar machen (kein roher DB-Name als Label).
+      const label = key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+      body += df(label, escapeHtml(Array.isArray(v) ? v.join(", ") : String(v)));
     }
     body += df("Registriert am", k.created_at ? new Date(k.created_at).toLocaleString("de-AT") : "");
     body += `<div class="feld"><div class="feld-label">Gestellte Anfragen</div><div id="detail-anfragen" class="feld-wert" style="color:var(--text-muted)">Lade …</div></div>`;
@@ -1137,10 +1146,11 @@ function starteVerwaltung() {
   async function freigeben(id) {
     const t = daten.trainers.find((x) => String(x.id) === String(id));
     const d = await adminEdge({ aktion: "trainer_aktivieren", ziel_id: id });
-    if (!d || !(d.geaendert > 0)) { fehler("Freigeben fehlgeschlagen."); return; }
+    if (!d) return; // adminEdge hat den Fehler bereits gemeldet – keine zweite Meldung
+    if (!(d.geaendert > 0)) { fehler("Freigeben fehlgeschlagen."); return; }
     if (t) { t.aktiv = true; if (d.mail && d.mail.datum) t.freischalt_mail_gesendet = d.mail.datum; }
     freischaltMailMelden(id, d.mail, true);
-    neuZeichnen(); ladeDaten();
+    detailSchliessen(); neuZeichnen(); ladeDaten();
   }
 
   // Meldung nach einem Versuch, die Freischalt-Mail zu senden. `beiFreigabe`
@@ -1184,11 +1194,13 @@ function starteVerwaltung() {
     const ja = await bestaetige({ titel: "Freigabe zurücknehmen", text: "Das Profil verschwindet aus der Suche, das Konto bleibt bestehen.", okText: "Zurücknehmen", okArt: "btn-warn" });
     if (!ja) return;
     const d = await adminEdge({ aktion: "trainer_sperren", ziel_id: id });
-    if (d && d.geaendert > 0) { erfolg("Freigabe zurückgenommen."); ladeDaten(); } else fehler("Zurücknehmen fehlgeschlagen.");
+    if (!d) return; // adminEdge hat den Fehler bereits gemeldet
+    if (d.geaendert > 0) { erfolg("Freigabe zurückgenommen."); detailSchliessen(); ladeDaten(); } else fehler("Zurücknehmen fehlgeschlagen.");
   }
   async function verifizieren(id, an) {
     const d = await adminEdge({ aktion: an ? "trainer_verifizieren" : "trainer_entverifizieren", ziel_id: id });
-    if (d && d.geaendert > 0) { erfolg(an ? "Zertifikat verifiziert." : "Verifizierung zurückgenommen."); ladeDaten(); } else fehler("Aktion fehlgeschlagen.");
+    if (!d) return; // adminEdge hat den Fehler bereits gemeldet
+    if (d.geaendert > 0) { erfolg(an ? "Zertifikat verifiziert." : "Verifizierung zurückgenommen."); detailSchliessen(); ladeDaten(); } else fehler("Aktion fehlgeschlagen.");
   }
   async function sperren(art, id) {
     const liste = art === "trainer" ? daten.trainers : daten.kunden;

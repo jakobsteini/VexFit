@@ -48,8 +48,9 @@ Deno.test("Verwaltung zeigt inaktive Trainer eigens an (Badge + Freigeben-Knopf 
   // Inaktive Zeile wird gerendert (Badge "Inaktiv" und Knopf "Freigeben").
   assertStringIncludes(js, "Inaktiv");
   assertStringIncludes(js, "Freigeben");
-  // Es gibt eine eigene Auswahl der noch nicht freigeschalteten Trainer.
-  assertStringIncludes(js, "filter((t) => !t.aktiv)");
+  // Es gibt eine eigene Auswahl der noch nicht freigeschalteten Trainer
+  // (gesperrte erscheinen dort nicht, sondern nur unter "gesperrt").
+  assertStringIncludes(js, "filter((t) => !t.aktiv && !t.gesperrt)");
 });
 
 Deno.test("registrieren.html: ein Fehler beim Anlegen der Trainer-Zeile wird angezeigt, nicht verschluckt", async () => {

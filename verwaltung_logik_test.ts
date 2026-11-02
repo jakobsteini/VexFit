@@ -95,7 +95,8 @@ Deno.test("trainerFiltern: Suche und Status", () => {
   ];
   assertEquals(trainerFiltern(liste, { q: "wien" }).length, 2);
   assertEquals(trainerFiltern(liste, { status: "warten" }).length, 1);
-  assertEquals(trainerFiltern(liste, { status: "aktiv" }).length, 2);
+  // Gesperrte (id 3) zaehlen nicht als "aktiv" – nur id 1 ist aktiv & frei.
+  assertEquals(trainerFiltern(liste, { status: "aktiv" }).length, 1);
   assertEquals(trainerFiltern(liste, { status: "gesperrt" }).length, 1);
 });
 
