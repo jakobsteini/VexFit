@@ -16,7 +16,10 @@ import { csvZelle, trainerFiltern } from "./vexfit-verwaltung.js";
 const lies = (p: string) => Deno.readTextFile(new URL(p, import.meta.url));
 
 Deno.test("csvZelle entschaerft Formel-Werte (= + - @)", () => {
-  assertEquals(csvZelle("+43 660 3675175"), "'+43 660 3675175");
+  // Fuehrendes +, =, -, @ wird mit ' entschaerft (so auch Telefonnummern wie
+  // +43…, die hier bewusst NICHT als Literal stehen, damit der Geheimnis-
+  // Waechter nicht anschlaegt).
+  assertEquals(csvZelle("+A1*2"), "'+A1*2");
   assertEquals(csvZelle("=1+1"), "'=1+1");
   assertEquals(csvZelle("@name"), "'@name");
   assertEquals(csvZelle("-5"), "'-5");
