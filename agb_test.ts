@@ -57,16 +57,21 @@ Deno.test("die Preise stimmen zwischen AGB, index.html und registrieren.html ueb
   const p = await paragraf3();
   const index = await lies("./index.html");
   const registrieren = await lies("./registrieren.html");
-  // 49,99 € und 9,99 € stehen gleichlautend in AGB und index.html.
-  for (const preis of ["€49,99", "€9,99"]) {
-    assertStringIncludes(p, preis, `AGB ohne ${preis}`);
-    assertStringIncludes(index, preis, `index.html ohne ${preis}`);
+  // Entscheidend ist der Betrag, nicht die Schreibweise des €-Zeichens: 49,99
+  // und 9,99 muessen in AGB, index.html und registrieren.html gleichlautend
+  // stehen (sonst Streit zwischen Werbung und AGB).
+  for (const betrag of ["49,99", "9,99"]) {
+    assertStringIncludes(p, betrag, `AGB ohne ${betrag}`);
+    assertStringIncludes(index, betrag, `index.html ohne ${betrag}`);
+    assertStringIncludes(registrieren, betrag, `registrieren.html ohne ${betrag}`);
   }
-  // index.html nennt dieselbe Gratis-Regel wie die AGB.
-  assertStringIncludes(index, "Kostenlos bis zum ersten Kunden · danach €49,99/Monat");
-  // registrieren.html nennt die Gratis-Phase (kein abweichender Preis) — die
-  // Trainer-Ansicht wirbt mit "Gratis bis zu deinem 1. Kunden".
+  // index.html nennt dieselbe Gratis-Regel (neue, einheitliche Schreibweise).
+  assertStringIncludes(index, "Kostenlos bis zum ersten Kunden · danach 49,99 €/Monat");
+  // registrieren.html wirbt mit der Gratis-Phase UND nennt direkt beim Knopf
+  // ehrlich den Monatspreis und den Preis je weiterem Kunden.
   assertStringIncludes(registrieren, "Gratis bis zu deinem 1. Kunden");
-  // Kein widerspruechlicher Monatspreis auf der Registrierseite.
-  assert(!registrieren.includes("€49,99"), "registrieren.html nennt einen eigenen Monatspreis — bitte pruefen");
+  assertStringIncludes(registrieren, "49,99 €/Monat");
+  // Einheitliche Schreibweise: kein "€49,99" (€ vor der Zahl) auf der
+  // Registrierseite.
+  assert(!registrieren.includes("€49,99"), "registrieren.html schreibt den Preis in falscher Reihenfolge");
 });
