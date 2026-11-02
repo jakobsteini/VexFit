@@ -433,6 +433,50 @@ const anschluesse: Anschluesse = {
     return Array.isArray(zeilen) && zeilen.length === 1;
   },
 
+  // Teil 4: Kandidaten für Erinnerungs-Mails – noch nicht freigegeben, nicht
+  // gesperrt, nicht abgemeldet, in den letzten 96 h registriert. Vollständigkeit
+  // und Zeitfenster entscheidet der Kern. Fehlen die Spalten (Migration
+  // 2026-11-02 nicht eingespielt), antwortet PostgREST mit Fehler → "migration fehlt".
+  async trainerFuerErinnerung(): Promise<TrainerProfil[]> {
+    const seit = new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString();
+    const spalten = "id,vorname,email,created_at,avatar_url,trainingsart,trainingsort,preis_stunde,bio,erfahrung,spezialisierungen,telefon,aktiv,gesperrt,erinnerung_stufe,erinnerungen_aus,erinnerung_token";
+    const pfad = `trainers?select=${spalten}` +
+      `&aktiv=eq.false&gesperrt=eq.false&erinnerungen_aus=eq.false` +
+      `&created_at=gte.${encodeURIComponent(seit)}&order=created_at.desc&limit=500`;
+    const a = await fetch(restAdresse(pfad), { headers: restKopf() });
+    if (!a.ok) throw new Error(`trainerFuerErinnerung fehlgeschlagen: HTTP ${a.status}`);
+    const zeilen = await a.json().catch(() => []);
+    return Array.isArray(zeilen) ? zeilen as TrainerProfil[] : [];
+  },
+
+  // Teil 4: Erinnerungsstufe atomar beanspruchen (bedingter PATCH, nur wenn die
+  // bisherige Stufe kleiner ist). 1 geänderte Zeile = Anspruch bekommen.
+  async erinnerungStufeBeanspruchen(id: string, stufe: number): Promise<boolean> {
+    const filter = `trainers?id=eq.${encodeURIComponent(id)}&erinnerung_stufe=lt.${stufe}`;
+    const a = await fetch(restAdresse(filter), {
+      method: "PATCH",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify({ erinnerung_stufe: stufe }),
+    });
+    if (!a.ok) throw new Error(`erinnerungStufeBeanspruchen fehlgeschlagen: HTTP ${a.status}`);
+    const zeilen = await a.json().catch(() => []);
+    return Array.isArray(zeilen) && zeilen.length === 1;
+  },
+
+  // Teil 4: Abmeldung per Token (ohne Login). Setzt erinnerungen_aus=true, wo das
+  // Token passt. 1 geänderte Zeile = erfolgreich.
+  async erinnerungAbmelden(token: string): Promise<boolean> {
+    const filter = `trainers?erinnerung_token=eq.${encodeURIComponent(token)}`;
+    const a = await fetch(restAdresse(filter), {
+      method: "PATCH",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify({ erinnerungen_aus: true }),
+    });
+    if (!a.ok) throw new Error(`erinnerungAbmelden fehlgeschlagen: HTTP ${a.status}`);
+    const zeilen = await a.json().catch(() => []);
+    return Array.isArray(zeilen) && zeilen.length >= 1;
+  },
+
   // Admin-Aktion: loescht eine Zeile in trainers oder kunden (service_role).
   // Tabelle zusaetzlich hier abgesichert (nur diese zwei).
   async adminZeileLoeschen(tabelle: string, id: string): Promise<number> {

@@ -37,6 +37,14 @@ export interface MailAngaben {
   grundZeile: string;
   /** Nur Mail 4: die Bio als eigener Absatz (#bbb), wenn vorhanden. */
   bioAbsatz?: string;
+  /** Teil 4 (Erinnerungs-Mails): ersetzt die zweite Fußzeile (sonst
+   *  FIRMENANGABE). Für die Erinnerungen ausdrücklich ohne genaue Adresse
+   *  („Salzburg · Österreich"). Fehlt der Wert, bleibt alles wie bisher. */
+  fusszeile?: string;
+  /** Teil 4: kleiner Abmelde-Link unten („Keine Erinnerungen mehr"). Nur https.
+   *  Fehlt er, wird nichts gerendert (bestehende Mails unverändert). */
+  abmeldeLink?: string;
+  abmeldeText?: string;
 }
 
 function hatText(w: unknown): boolean {
@@ -88,6 +96,16 @@ export function mailRahmen(a: MailAngaben): string {
     }</p>`
     : "";
 
+  // Teil 4: kleiner Abmelde-Link (nur https) unten im Inhalt.
+  const abLink = a.abmeldeLink ? sichereAdresse(a.abmeldeLink) : null;
+  const abmelden = (abLink && hatText(a.abmeldeText))
+    ? `<p style="margin:18px 0 0;text-align:center"><a href="${
+      maskieren(abLink)
+    }" style="color:#777;font-size:12px;text-decoration:underline">${
+      maskieren(a.abmeldeText)
+    }</a></p>`
+    : "";
+
   return `<div style="background:#0a0a0a;padding:40px 20px;font-family:Arial,sans-serif">
   <div style="max-width:520px;margin:0 auto;background:#141414;border:1px solid rgba(255,255,255,0.08);border-radius:8px;overflow:hidden">
     <div bgcolor="#0A0A0A" style="background:#0A0A0A;padding:18px;text-align:center">
@@ -102,9 +120,10 @@ export function mailRahmen(a: MailAngaben): string {
       ${bio}
       ${knopf}
       ${hinweis}
+      ${abmelden}
       <p style="color:#666;font-size:12px;margin:24px 0 0;text-align:center;line-height:1.6">${
     maskieren(a.grundZeile)
-  }<br>${FIRMENANGABE}</p>
+  }<br>${maskieren(a.fusszeile ?? FIRMENANGABE)}</p>
     </div>
   </div>
 </div>`;
@@ -123,7 +142,9 @@ export function mailText(a: MailAngaben): string {
   const link = a.knopfLink ? sichereAdresse(a.knopfLink) : null;
   if (link && hatText(a.knopfText)) teile.push("", `${a.knopfText}: ${link}`);
   if (hatText(a.hinweis)) teile.push("", a.hinweis!.trim());
-  teile.push("", a.grundZeile, FIRMENANGABE);
+  const abLink = a.abmeldeLink ? sichereAdresse(a.abmeldeLink) : null;
+  if (abLink && hatText(a.abmeldeText)) teile.push("", `${a.abmeldeText}: ${abLink}`);
+  teile.push("", a.grundZeile, a.fusszeile ?? FIRMENANGABE);
   // Jede Zeile rechts beschneiden: ein Zeilenende auf einem Leerzeichen wuerde
   // der Quoted-Printable-Versand zu einem sichtbaren "=20" machen (Livebetrieb
   // 25.10.2026, "Trainingsart:=20"). Leere Werte sind oben schon weggefallen.

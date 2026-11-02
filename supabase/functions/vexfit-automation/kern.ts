@@ -171,6 +171,17 @@ export interface TrainerProfil {
    *  (timestamptz, kommt als ISO-String). NULL/undefined = noch nicht gesendet;
    *  undefined zugleich, wenn die Spalte fehlt (Migration nicht eingespielt). */
   freischalt_mail_gesendet?: string | boolean | null;
+  /** Registrierzeitpunkt (timestamptz als ISO-String) – für die Zeitfenster der
+   *  Erinnerungs-Mails (Teil 4). */
+  created_at?: string | null;
+  /** Anmeldung gesperrt (Admin) – dann keine Erinnerung. */
+  gesperrt?: boolean | null;
+  /** Migration 2026-11-02: höchste bereits verschickte Erinnerungsstufe (0–3). */
+  erinnerung_stufe?: number | null;
+  /** Migration 2026-11-02: Trainer hat Erinnerungen abbestellt. */
+  erinnerungen_aus?: boolean | null;
+  /** Migration 2026-11-02: geheimes Token für den Abmelde-Link (ohne Login). */
+  erinnerung_token?: string | null;
 }
 
 export interface Mail {
@@ -261,6 +272,18 @@ export interface Anschluesse {
   aktiveVerifizierteTrainer?(): Promise<TrainerVoll[]>;
   /** Teil 4: Trainer mit allen Profilfeldern per E-Mail (service_role). */
   trainerProfilNachEmail?(email: string): Promise<TrainerProfil | null>;
+  /** Teil 4 (Erinnerungen): noch nicht freigegebene, nicht gesperrte, nicht
+   *  abgemeldete Trainer, die in den letzten 96 h registriert wurden – als
+   *  Kandidaten für eine Erinnerungs-Mail (Vollständigkeit/Fenster prüft der
+   *  Kern). Fehlt die Verdrahtung/Migration, ist der Pfad still zu. */
+  trainerFuerErinnerung?(): Promise<TrainerProfil[]>;
+  /** Teil 4: Erinnerungsstufe ATOMAR beanspruchen – setzt erinnerung_stufe nur,
+   *  wenn sie kleiner als `stufe` ist, und meldet, ob dieser Aufruf sie bekam
+   *  (kein Doppelversand bei überlappenden Läufen). */
+  erinnerungStufeBeanspruchen?(id: string, stufe: number): Promise<boolean>;
+  /** Teil 4: Abmeldung per Token (ohne Login). Setzt erinnerungen_aus=true und
+   *  meldet, ob ein Token passte. */
+  erinnerungAbmelden?(token: string): Promise<boolean>;
   /** Teil M: Kundenzeile per E-Mail (service_role) für Deep-Link #kunde-<id> und
    *  die Inhalte der Betreiber-Mail. Fehlt sie, wird ohne Deep-Link gebaut. */
   kundeProfilNachEmail?(email: string): Promise<Record<string, unknown> | null>;
@@ -1226,6 +1249,16 @@ export async function bearbeiten(
   if (anfrageObjekt.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsKopf(herkunft) });
   }
+  // Teil 4: der Abmelde-Link aus der Erinnerungs-Mail wird im Browser per GET
+  // geöffnet (ein Klick, ohne Login). Alle übrigen Pfade bleiben POST-only.
+  if (pfad === "erinnerung-abmelden" && anfrageObjekt.method === "GET") {
+    try {
+      return await erinnerungAbmeldenEndpunkt(anfrageObjekt, a, herkunft);
+    } catch (fehler) {
+      a.melden?.("erinnerung-abmelden fehlgeschlagen", String(fehler));
+      return antwort(500, { fehler: "Fehler" }, herkunft);
+    }
+  }
   if (anfrageObjekt.method !== "POST") {
     return antwort(405, { fehler: "nur POST" }, herkunft);
   }
@@ -1249,6 +1282,10 @@ export async function bearbeiten(
         return await passtNicht(anfrageObjekt, a, herkunft);
       case "unbeantwortet-pruefen":
         return await unbeantwortetePruefen(anfrageObjekt, a, herkunft);
+      case "erinnerungen":
+        return await erinnerungenPruefen(anfrageObjekt, a, herkunft);
+      case "erinnerung-abmelden":
+        return await erinnerungAbmeldenEndpunkt(anfrageObjekt, a, herkunft);
       case "stripe":
         return await stripe(anfrageObjekt, a);
       default:
@@ -1934,6 +1971,215 @@ export function mailFreischaltung(t: TrainerProfil): Mail {
     datenZeilen: [],
     ...(fehlt.length > 0 ? { knopfText: "Profil vervollständigen", knopfLink: LOGIN_LINK } : {}),
     grundZeile: "Du erhältst diese E-Mail, weil dein Trainerprofil auf Vexfit freigeschaltet wurde.",
+  });
+}
+
+// ============================================================================
+// Teil 4: Erinnerungs-Mails für unvollständige Trainerprofile
+// ============================================================================
+
+const VEXFIT_BASIS = "https://vexfit.app";
+
+/** Feste Zeitfenster nach der Registrierung (in Stunden). Damit Altkonten nicht
+ *  auf einmal mehrere Mails bekommen: jede Stufe gilt nur in IHREM Fenster. */
+export const ERINNERUNG_FENSTER = [
+  { stufe: 1, abStunden: 2, bisStunden: 24 },
+  { stufe: 2, abStunden: 24, bisStunden: 72 },
+  { stufe: 3, abStunden: 72, bisStunden: 96 },
+] as const;
+
+/**
+ * Welche Erinnerungsstufe ist für diesen Trainer JETZT fällig – oder null?
+ * Rein (ohne Netz prüfbar). Keine Erinnerung, wenn das Profil vollständig,
+ * freigeschaltet (aktiv), gesperrt oder abgemeldet ist; außerhalb von 2–96 h
+ * nach der Registrierung; oder wenn die Stufe des aktuellen Fensters schon
+ * verschickt wurde. Höchstens eine Stufe je Aufruf.
+ */
+export function erinnerungStufeFaellig(
+  t: TrainerProfil,
+  jetzt: number = Date.now(),
+): number | null {
+  if (t.aktiv === true) return null;
+  if (t.gesperrt === true) return null;
+  if (t.erinnerungen_aus === true) return null;
+  if (profilVollstaendig(t)) return null;
+  const ms = t.created_at ? Date.parse(String(t.created_at)) : NaN;
+  if (Number.isNaN(ms)) return null;
+  const stunden = (jetzt - ms) / 3_600_000;
+  const bereits = Number(t.erinnerung_stufe) || 0;
+  for (const f of ERINNERUNG_FENSTER) {
+    if (stunden >= f.abStunden && stunden < f.bisStunden) {
+      return bereits < f.stufe ? f.stufe : null;
+    }
+  }
+  return null; // vor dem ersten Fenster, in keiner Lücke oder ab 96 h
+}
+
+/** Ziel-Adresse „zur ersten fehlenden Angabe". Das Profilfoto wird im
+ *  Trainer-Bereich hochgeladen, die übrigen Felder stehen in profil-bearbeiten.
+ *  Unbekannt/leer → der Profil-Editor ohne Sprungmarke. */
+export function erinnerungZiel(erstesFehlend?: string | null): string {
+  const anker: Record<string, string> = {
+    "Trainingsart": "fTrainingsart",
+    "Trainingsort": "dotTrainingsort",
+    "Preis pro Stunde": "fPreis",
+    "Über mich": "fBio",
+    "Erfahrung": "fErfahrung",
+    "Spezialisierungen": "chipWrap",
+    "Telefon": "fTelefon",
+  };
+  if (erstesFehlend === "Foto") return `${VEXFIT_BASIS}/trainer-bereich.html`;
+  const a = erstesFehlend ? anker[erstesFehlend] : undefined;
+  return a ? `${VEXFIT_BASIS}/profil-bearbeiten.html#${a}` : `${VEXFIT_BASIS}/profil-bearbeiten.html`;
+}
+
+/** Die drei Erinnerungstexte (Du-Form, österreichisches Deutsch, keine
+ *  erfundenen Zahlen). Wortgleich auch in docs/erinnerungs-mails.md. Die
+ *  Sichtbarkeit hängt an der Freigabe durch Jakob – genau so steht es hier. */
+export const ERINNERUNG_TEXTE: Record<number, { betreff: string; absatz: (vorname: string, offen: number) => string }> = {
+  1: {
+    betreff: "Dein Vexfit.app-Profil ist fast fertig",
+    absatz: (vn, offen) =>
+      `Hallo ${vn}, schön, dass du bei Vexfit.app dabei bist! Dein Profil ist ` +
+      `noch nicht ganz fertig – es fehlen noch ${offen} von 8 Angaben. Mit einem ` +
+      `vollständigen Profil wirkst du auf Interessentinnen und Interessenten ` +
+      `gleich überzeugender. Das dauert nur ein paar Minuten.`,
+  },
+  2: {
+    betreff: "Noch ein paar Minuten bis zu deinem fertigen Profil",
+    absatz: (vn, offen) =>
+      `Hallo ${vn}, dein Profil auf Vexfit.app wartet noch auf dich: ${offen} von ` +
+      `8 Angaben fehlen. Je vollständiger dein Profil, desto eher entscheiden sich ` +
+      `Interessentinnen und Interessenten für dich. Ergänze die fehlenden Punkte ` +
+      `am besten gleich – es geht schnell.`,
+  },
+  3: {
+    betreff: "Letzte Erinnerung zu deinem Vexfit.app-Profil",
+    absatz: (vn, offen) =>
+      `Hallo ${vn}, das ist unsere letzte Erinnerung: In deinem Profil auf ` +
+      `Vexfit.app fehlen noch ${offen} von 8 Angaben. Sobald dein Profil ` +
+      `vollständig ist, prüfen wir es und schalten dich frei – dann bist du für ` +
+      `Kundinnen und Kunden in deiner Nähe sichtbar. Melde dich gern, wenn du ` +
+      `Fragen hast.`,
+  },
+};
+
+/**
+ * Erinnerungs-Mail an den Trainer für eine Stufe (1–3). Anrede mit Vorname,
+ * Stand „X von 8 fehlen" aus der bestehenden Logik, die fehlenden Angaben beim
+ * Namen, EIN Knopf zur ersten fehlenden Angabe, Abmelde-Link mit Token. Fußzeile
+ * ohne genaue Adresse. `abmeldeToken` kommt aus der Trainerzeile.
+ */
+export function mailErinnerung(
+  t: TrainerProfil,
+  stufe: number,
+  abmeldeToken: string,
+): Mail {
+  const text = ERINNERUNG_TEXTE[stufe] || ERINNERUNG_TEXTE[1];
+  const fehlt = freischaltFehlendeFelder(t);
+  const vorname = nameFormatieren(w(t.vorname)) || "du";
+  const abmeldeLink = w(abmeldeToken)
+    ? `${VEXFIT_BASIS}/functions/v1/vexfit-automation/erinnerung-abmelden?token=${encodeURIComponent(w(abmeldeToken))}`
+    : undefined;
+  return baueMail(w(t.email), text.betreff, {
+    ueberschrift: "Dein Profil ist fast fertig",
+    absatz: text.absatz(vorname, fehlt.length),
+    datenZeilen: fehlt.length ? [{ beschriftung: "Es fehlt noch", wert: fehlt.join(", ") }] : [],
+    knopfText: "Profil jetzt vervollständigen",
+    knopfLink: erinnerungZiel(fehlt[0]),
+    grundZeile:
+      "Du erhältst diese E-Mail, weil du dich bei Vexfit.app als Trainer " +
+      "registriert und dein Profil noch nicht fertiggestellt hast.",
+    fusszeile: "Salzburg · Österreich",
+    ...(abmeldeLink ? { abmeldeLink, abmeldeText: "Keine Erinnerungen mehr" } : {}),
+  });
+}
+
+/**
+ * Teil 4: vom Zeitplan (pg_cron, alle 15 min) gerufen. Prüft den eigenen
+ * Schlüssel (x-vexfit-cron / VEXFIT_CRON_KEY, wie unbeantwortet-pruefen), lädt
+ * die Kandidaten, bestimmt je Trainer die fällige Stufe, beansprucht sie atomar
+ * und schickt höchstens EINE Erinnerung je Trainer. Ohne Verdrahtung/Migration
+ * bleibt der Pfad still zu.
+ */
+async function erinnerungenPruefen(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const geheim = a.cronGeheimnis?.();
+  const mitgeschickt = r.headers.get("x-vexfit-cron");
+  if (!geheim || !mitgeschickt || mitgeschickt !== geheim) {
+    return antwort(401, { fehler: "nicht berechtigt" }, herkunft);
+  }
+  if (!a.trainerFuerErinnerung || !a.erinnerungStufeBeanspruchen) {
+    return antwort(200, { ok: true, geprueft: 0, mails: 0, uebersprungen: "nicht verdrahtet" }, herkunft);
+  }
+  let kandidaten: TrainerProfil[] = [];
+  try {
+    kandidaten = await a.trainerFuerErinnerung();
+  } catch (fehler) {
+    if (istMigrationFehlt(fehler)) {
+      a.melden?.("erinnerungen: Spalten fehlen (Migration 2026-11-02 nicht eingespielt)");
+      return antwort(200, { ok: true, geprueft: 0, mails: 0, uebersprungen: "migration fehlt" }, herkunft);
+    }
+    throw fehler;
+  }
+  const jetzt = Date.now();
+  let mails = 0;
+  for (const t of kandidaten) {
+    const stufe = erinnerungStufeFaellig(t, jetzt);
+    if (!stufe) continue;
+    const vorher = Number(t.erinnerung_stufe) || 0;
+    // Atomar beanspruchen: nur wer die Stufe bekommt, sendet (ein Lauf = eine
+    // Mail je Trainer; keine Doppelung bei Überlappung).
+    let beansprucht = false;
+    try {
+      beansprucht = await a.erinnerungStufeBeanspruchen(t.id, stufe);
+    } catch (fehler) {
+      a.melden?.("erinnerungen: Beanspruchen fehlgeschlagen", String(fehler));
+      continue;
+    }
+    if (!beansprucht) continue;
+    const gesendet = await sendeWennAdresseTaugt(
+      a,
+      mailErinnerung(t, stufe, w(t.erinnerung_token)),
+    );
+    if (gesendet) mails++;
+    else {
+      // Versand fehlgeschlagen -> Stufe auf den Stand vor dem Anspruch
+      // zurücksetzen, damit ein späterer Lauf es erneut versuchen darf.
+      try { await a.adminTrainerSetzen(t.id, { erinnerung_stufe: vorher }); } catch { /* best effort */ }
+    }
+  }
+  return antwort(200, { ok: true, geprueft: kandidaten.length, mails }, herkunft);
+}
+
+/**
+ * Teil 4: Abmelde-Link aus der Erinnerungs-Mail (ohne Login). Nimmt das Token
+ * aus der Query, stellt weitere Erinnerungen ab und antwortet mit einer kurzen
+ * Seite. Unbekanntes/fehlendes Token: freundlicher Hinweis, kein Fehler, keine
+ * Preisgabe, ob es das Token gab.
+ */
+async function erinnerungAbmeldenEndpunkt(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const token = new URL(r.url).searchParams.get("token") || "";
+  if (token && a.erinnerungAbmelden) {
+    try { await a.erinnerungAbmelden(token); } catch (fehler) { a.melden?.("erinnerung-abmelden fehlgeschlagen", String(fehler)); }
+  }
+  const seite = `<!doctype html><html lang="de"><head><meta charset="utf-8">` +
+    `<meta name="viewport" content="width=device-width, initial-scale=1">` +
+    `<title>Vexfit.app</title><style>body{margin:0;background:#0a0a0a;color:#f5f5f0;` +
+    `font-family:Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}` +
+    `.k{max-width:420px;text-align:center}h1{color:#e8ff00;font-size:22px}a{color:#e8ff00}</style></head>` +
+    `<body><div class="k"><h1>Erledigt</h1><p>Du bekommst keine Erinnerungen mehr zu deinem Vexfit.app-Profil. ` +
+    `Du kannst dein Profil jederzeit in deinem <a href="${VEXFIT_BASIS}/login.html">Trainer-Bereich</a> fertigstellen.</p></div></body></html>`;
+  return new Response(seite, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8", ...(herkunft ? { "Access-Control-Allow-Origin": herkunft } : {}) },
   });
 }
 
