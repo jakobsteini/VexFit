@@ -414,6 +414,25 @@ const anschluesse: Anschluesse = {
     return Array.isArray(zeilen) ? zeilen.length : 0;
   },
 
+  // Teil 2: „Profil vollständig"-Mail ATOMAR beanspruchen. Ein bedingter PATCH:
+  // setzt freigabe_mail_gesendet nur, solange es false ODER null ist. Bei zwei
+  // gleichzeitigen Aufrufen aktualisiert nur EINER eine Zeile; der andere trifft
+  // auf keine passende Zeile mehr (0 zurückgegebene Zeilen). Fehlt die Spalte
+  // (Migration 2026-11-01-01 nicht eingespielt), wirft PostgREST einen Fehler,
+  // den freigabePruefen als „Migration fehlt" behandelt.
+  async freigabeMailBeanspruchen(id: string): Promise<boolean> {
+    const filter = `trainers?id=eq.${encodeURIComponent(id)}` +
+      `&or=(freigabe_mail_gesendet.is.false,freigabe_mail_gesendet.is.null)`;
+    const a = await fetch(restAdresse(filter), {
+      method: "PATCH",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify({ freigabe_mail_gesendet: true }),
+    });
+    if (!a.ok) throw new Error(`freigabeMailBeanspruchen fehlgeschlagen: HTTP ${a.status}`);
+    const zeilen = await a.json().catch(() => []);
+    return Array.isArray(zeilen) && zeilen.length === 1;
+  },
+
   // Admin-Aktion: loescht eine Zeile in trainers oder kunden (service_role).
   // Tabelle zusaetzlich hier abgesichert (nur diese zwei).
   async adminZeileLoeschen(tabelle: string, id: string): Promise<number> {

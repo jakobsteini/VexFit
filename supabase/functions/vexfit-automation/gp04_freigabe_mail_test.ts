@@ -39,13 +39,23 @@ function baue(opt: {
   ohneAnschluss?: boolean;
 } = {}): { a: Anschluesse; spur: Spur } {
   const spur: Spur = { mails: [], gesetzt: [], meldungen: [] };
+  // Teil 2: atomarer Anspruch. Startet "schon vergeben", wenn das Profil bereits
+  // als gemeldet gilt; sonst bekommt genau der ERSTE Aufruf true.
+  let anspruchVergeben = (opt.profil !== undefined && opt.profil?.freigabe_mail_gesendet === true);
   const base: Record<string, unknown> = {
     benutzerAusToken: () => Promise.resolve(opt.nutzer === undefined ? { id: "auth-1", email: "mara@example.com" } : opt.nutzer),
     mailSenden: (m: Mail) => { if (opt.mailWirft) return Promise.reject(new Error("SMTP dicht")); spur.mails.push(m); return Promise.resolve(); },
     adminTrainerSetzen: (id: string, felder: Record<string, unknown>) => {
       if (opt.setzenWirft) return Promise.reject(opt.setzenWirft);
       spur.gesetzt.push({ id, felder });
+      if (felder.freigabe_mail_gesendet === false) anspruchVergeben = false; // Rücknahme
       return Promise.resolve(1);
+    },
+    freigabeMailBeanspruchen: (_id: string) => {
+      if (opt.setzenWirft) return Promise.reject(opt.setzenWirft);
+      if (anspruchVergeben) return Promise.resolve(false);
+      anspruchVergeben = true;
+      return Promise.resolve(true);
     },
     melden: (m: string) => { spur.meldungen.push(m); },
   };
@@ -84,14 +94,34 @@ Deno.test("mailProfilVollstaendig: an BETREIBER mit Name/E-Mail/PLZ/Spezialisier
   }
 });
 
-Deno.test("Vollständig + nicht freigegeben: sendet einmal und setzt das Flag", async () => {
+Deno.test("Vollständig + nicht freigegeben: beansprucht atomar und sendet einmal", async () => {
   const { a, spur } = baue();
   const res = await bearbeiten(req(), a);
   const d = await res.json();
   assertEquals(d.gesendet, true);
   assertEquals(spur.mails.length, 1);
   assertEquals(spur.mails[0].an, BETREIBER);
-  assertEquals(spur.gesetzt, [{ id: "t-1", felder: { freigabe_mail_gesendet: true } }]);
+  // Der Anspruch setzt das Flag atomar (freigabeMailBeanspruchen); bei Erfolg
+  // wird adminTrainerSetzen NICHT mehr gebraucht.
+  assertEquals(spur.gesetzt, []);
+});
+
+Deno.test("Teil 2: zwei gleichzeitige Aufrufe → nur EINE Mail (Doppelversand verhindert)", async () => {
+  const { a, spur } = baue();
+  const [r1, r2] = await Promise.all([bearbeiten(req(), a), bearbeiten(req(), a)]);
+  const d1 = await r1.json(), d2 = await r2.json();
+  assertEquals(spur.mails.length, 1, "es wurde mehr als eine Mail gesendet");
+  // Genau einer der beiden hat gesendet, der andere nicht.
+  assertEquals([d1.gesendet, d2.gesendet].filter(Boolean).length, 1);
+  assert(d1.grund === "schon gemeldet" || d2.grund === "schon gemeldet");
+});
+
+Deno.test("Teil 2: Versandfehler nimmt den Anspruch zurück (späterer Lauf darf erneut)", async () => {
+  // Erster Lauf scheitert am SMTP -> Anspruch zurückgenommen.
+  const { a, spur } = baue({ mailWirft: true });
+  try { await bearbeiten(req(), a); } catch { /* erwartet */ }
+  // Das Flag wurde atomar gesetzt und wegen des Fehlers wieder auf false gesetzt.
+  assert(spur.gesetzt.some((g) => g.felder.freigabe_mail_gesendet === false), "Anspruch nicht zurückgenommen");
 });
 
 Deno.test("Unvollständiges Profil: keine Mail", async () => {

@@ -246,6 +246,13 @@ export interface Anschluesse {
   /** Admin-Aktion: setzt feste Felder (aktiv/stripe_bezahlt) einer Trainerzeile
    *  mit service_role. Gibt die Zahl geaenderter Zeilen zurueck. */
   adminTrainerSetzen(id: string, felder: Record<string, unknown>): Promise<number>;
+  /** Teil 2: die „Profil vollständig"-Mail ATOMAR beanspruchen. Setzt
+   *  freigabe_mail_gesendet nur dann auf true, wenn es noch false/null ist, und
+   *  gibt zurück, ob genau DIESER Aufruf den Anspruch bekommen hat. So kann bei
+   *  zwei gleichzeitigen Aufrufen nur einer die Mail senden (verhindert den
+   *  Doppelversand in derselben Sekunde). Fehlt die Verdrahtung, degradiert
+   *  freigabePruefen auf den bisherigen (nicht-atomaren) Weg. */
+  freigabeMailBeanspruchen?(id: string): Promise<boolean>;
   /** B4e: eine Anfrage per Kennung (mit Kundendaten, service_role). */
   anfrageNachId?(id: string): Promise<AnfrageVoll | null>;
   /** B4e: ein Trainer mit den fuer die Zuordnung noetigen Feldern. */
@@ -1795,6 +1802,39 @@ async function freigabePruefen(
     a.melden?.("freigabe-pruefen: Spalte freigabe_mail_gesendet fehlt (Migration 2026-11-01-01)");
     return antwort(200, { ok: true, gesendet: false, grund: "migration fehlt" }, herkunft);
   }
+  // Teil 2: Doppelversand (zwei gleichzeitige Aufrufe lasen beide „noch nicht
+  // gesendet") verhindern. Erst ATOMAR beanspruchen – nur wer den Anspruch
+  // bekommt, sendet. Danach erst die Mail. Scheitert der Versand, Anspruch
+  // zurücknehmen, damit ein späterer Lauf es erneut versuchen darf.
+  if (a.freigabeMailBeanspruchen) {
+    let beansprucht = false;
+    try {
+      beansprucht = await a.freigabeMailBeanspruchen(t.id);
+    } catch (fehler) {
+      if (istMigrationFehlt(fehler)) {
+        a.melden?.("freigabe-pruefen: Anspruch nicht möglich (Migration fehlt)");
+        return antwort(200, { ok: true, gesendet: false, grund: "migration fehlt" }, herkunft);
+      }
+      throw fehler;
+    }
+    if (!beansprucht) {
+      return antwort(200, { ok: true, gesendet: false, grund: "schon gemeldet" }, herkunft);
+    }
+    let gesendet = false;
+    try {
+      gesendet = await sendeWennAdresseTaugt(a, mailProfilVollstaendig(t));
+    } catch (fehler) {
+      // Versand scheiterte -> Anspruch zurücknehmen, damit ein späterer Lauf
+      // erneut senden darf, und den Fehler sichtbar lassen.
+      try { await a.adminTrainerSetzen(t.id, { freigabe_mail_gesendet: false }); } catch { /* best effort */ }
+      throw fehler;
+    }
+    if (!gesendet) {
+      try { await a.adminTrainerSetzen(t.id, { freigabe_mail_gesendet: false }); } catch { /* best effort */ }
+    }
+    return antwort(200, { ok: true, gesendet }, herkunft);
+  }
+  // Rückfall ohne atomaren Anspruch (alte Verdrahtung): wie bisher.
   const gesendet = await sendeWennAdresseTaugt(a, mailProfilVollstaendig(t));
   if (gesendet) {
     try {
