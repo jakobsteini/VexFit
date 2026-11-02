@@ -29,13 +29,13 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:calc(56px + env(safe-
 .logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:4px;color:var(--white);text-decoration:none}
 .logo span{color:var(--accent)}
 .nav-right{display:flex;align-items:center;gap:12px}
-.nav-link{display:flex;align-items:center;gap:8px;background:var(--mid);border:1px solid var(--border);padding:7px 14px;border-radius:100px;font-size:12px;color:var(--white);cursor:pointer;text-decoration:none;transition:border-color 0.2s}
+.nav-link{position:relative;display:flex;align-items:center;gap:8px;background:var(--mid);border:1px solid var(--border);padding:7px 14px;border-radius:100px;font-size:12px;color:var(--white);cursor:pointer;text-decoration:none;transition:border-color 0.2s}
 .nav-link:hover{border-color:rgba(232,255,0,0.3)}
 .nav-link.active{border-color:var(--accent);color:var(--accent)}
 .nav-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .nav-dot-green{background:var(--accent)}
 .nav-dot-orange{background:var(--orange)}
-.nav-badge{background:var(--accent);color:var(--bg);font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;display:none;align-items:center;justify-content:center}
+.nav-badge{position:absolute;top:-6px;right:-6px;background:var(--accent);color:var(--bg);font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;display:none;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--bg)}
 .btn-logout{background:none;border:1px solid var(--border);color:var(--muted);padding:6px 12px;border-radius:3px;font-family:'DM Sans',sans-serif;font-size:11px;cursor:pointer}
 .btn-logout:hover{color:var(--white)}
 
@@ -1347,7 +1347,7 @@ function renderAnfragen(data) {
     } else if(istStudio) {
       sb.innerHTML = '<div class="status-bar aktiv">✅ Profil aktiv · Studio-Trainer — für dich kostenlos, keine Gebühren. Kontaktdaten siehst du bei jeder Anfrage direkt.</div>';
     } else if(!T.stripe_bezahlt) {
-      sb.innerHTML = '<div class="status-bar aktiv">✓ Profil aktiv · Kostenlose Phase — sobald du deine erste Kundenanfrage über Vexfit annimmst, schicken wir dir den Zahlungslink.</div>';
+      sb.innerHTML = '<div class="status-bar aktiv">✓ Profil aktiv · Kostenlose Phase — sobald die erste Kundenanfrage über Vexfit eingeht, bekommst du den Zahlungslink per E-Mail. Die Kontaktdaten schaltest du mit dem Abo frei.</div>';
     } else {
       sb.innerHTML = '<div class="status-bar aktiv">✅ Profil aktiv · Abo läuft</div>';
     }
