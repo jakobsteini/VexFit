@@ -294,7 +294,22 @@ export function csvBauen(zeilen, spalten) {
   return "﻿" + kopf + "\r\n" + rumpf;
 }
 
-export const ORT_TEXT = { studio: "Studio", outdoor: "Outdoor", beim_kunden: "Beim Kunden", online: "Online", beides: "Studio & beim Kunden" };
+// Teil 3: Beschriftungen für den Trainingsort GENAU wie im Trainer-Formular
+// (profil-bearbeiten.html / trainer-bereich.html), damit im Admin nie ein
+// Rohwert wie „vor_ort" steht.
+//   * Einzelauswahl „Trainingsort": vor_ort / online / beides.
+//   * Mehrfachauswahl „Trainingsorte" (ORTE_OPTIONS): studio / outdoor / beim_kunden.
+export const TRAININGSORT_TEXT = { vor_ort: "Vor Ort", online: "Online", beides: "Beides" };
+export const ORT_TEXT = { studio: "Studio", outdoor: "Outdoor", beim_kunden: "Beim Kunden zuhause" };
+/** Lesbaren Ort-Text liefern. Unbekannter Wert bleibt unverändert (kein Absturz,
+ *  kein Rohwert-Verlust); leerer Wert wird zu "".
+ *  @param {unknown} wert
+ *  @param {Record<string, string>} [karte]
+ *  @returns {string} */
+export function ortText(wert, karte = TRAININGSORT_TEXT) {
+  if (wert === null || wert === undefined || wert === "") return "";
+  return Object.prototype.hasOwnProperty.call(karte, wert) ? karte[wert] : String(wert);
+}
 
 // ============================================================================
 // DOM-TEIL (nur im Browser)
@@ -962,7 +977,7 @@ function starteVerwaltung() {
     const mailStatus = freischaltMailStatus(t);
     const spez = Array.isArray(t.spezialisierungen) && t.spezialisierungen.length
       ? `<div class="chiprow">${t.spezialisierungen.map((s) => `<span class="chip">${escapeHtml(s)}</span>`).join("")}</div>` : "";
-    const orte = Array.isArray(t.trainingsorte) ? t.trainingsorte.map((o) => ORT_TEXT[o] || o).map(escapeHtml).join(", ") : "";
+    const orte = Array.isArray(t.trainingsorte) ? t.trainingsorte.map((o) => ortText(o, ORT_TEXT)).map(escapeHtml).join(", ") : "";
     const fotoHtml = foto
       ? `<img src="${escapeHtml(foto)}" alt="" style="width:110px;height:110px;border-radius:8px;object-fit:cover;border:1px solid var(--border)">`
       : `<div style="width:110px;height:110px;border-radius:8px;background:var(--mid);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:12px">Kein Foto</div>`;
@@ -985,7 +1000,7 @@ function starteVerwaltung() {
       ${df("Telefon", escapeHtml(t.telefon || ""), fehlt.includes("Telefon"))}
       ${df("PLZ / Stadt", [t.plz, t.stadt].filter(Boolean).map(escapeHtml).join(" · "))}
       ${df("Trainingsart", escapeHtml(t.trainingsart || ""), fehlt.includes("Trainingsart"))}
-      ${df("Trainingsort", escapeHtml(ORT_TEXT[t.trainingsort] || t.trainingsort || ""), fehlt.includes("Trainingsort"))}
+      ${df("Trainingsort", escapeHtml(ortText(t.trainingsort)), fehlt.includes("Trainingsort"))}
       ${orte ? df("Weitere Trainingsorte", orte) : ""}
       ${df("Preis pro Stunde", t.preis_stunde ? "€" + escapeHtml(t.preis_stunde) : "", fehlt.includes("Preis pro Stunde"))}
       ${t.preis_monat ? df("Preis pro Monat", "€" + escapeHtml(t.preis_monat)) : ""}
