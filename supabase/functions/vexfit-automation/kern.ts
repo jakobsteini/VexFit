@@ -2093,16 +2093,20 @@ export function mailErinnerung(
   const abmeldeLink = w(abmeldeToken)
     ? `${FUNKTIONEN_BASIS}/functions/v1/vexfit-automation/erinnerung-abmelden?token=${encodeURIComponent(w(abmeldeToken))}`
     : undefined;
+  // Teil (Fußzeile): feste 3 Zeilen OHNE Straße/PLZ/Telefon –
+  //   1) Vexfit.app · Salzburg · Österreich
+  //   2) Impressum-Link (dort steht die vollständige Anschrift, § 5 ECG)
+  //   3) Abmelde-Link „Keine Erinnerungen mehr"
+  // Daher kein grundZeile-Satz mehr in den Erinnerungen.
   return baueMail(w(t.email), text.betreff, {
     ueberschrift: "Dein Profil ist fast fertig",
     absatz: text.absatz(vorname, fehlt.length),
     datenZeilen: fehlt.length ? [{ beschriftung: "Es fehlt noch", wert: fehlt.join(", ") }] : [],
     knopfText: "Profil jetzt vervollständigen",
     knopfLink: erinnerungZiel(fehlt[0]),
-    grundZeile:
-      "Du erhältst diese E-Mail, weil du dich bei Vexfit.app als Trainer " +
-      "registriert und dein Profil noch nicht fertiggestellt hast.",
-    fusszeile: "Salzburg · Österreich",
+    fusszeile: "Vexfit.app · Salzburg · Österreich",
+    impressumLink: `${VEXFIT_BASIS}/rechtliches.html`,
+    impressumText: "Impressum",
     ...(abmeldeLink ? { abmeldeLink, abmeldeText: "Keine Erinnerungen mehr" } : {}),
   });
 }

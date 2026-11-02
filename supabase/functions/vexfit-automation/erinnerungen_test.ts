@@ -97,6 +97,33 @@ Deno.test("Teil 4: mailErinnerung – Anrede, X von 8, fehlende Angaben, Knopf, 
   assert(mailErinnerung(trainer(), 1, "t").betreff !== mailErinnerung(trainer(), 3, "t").betreff);
 });
 
+Deno.test("Fußzeile: alle drei Stufen – Salzburg · Österreich, Impressum-Link, Abmelde-Link; keine Adresse/Telefon", () => {
+  for (const stufe of [1, 2, 3]) {
+    const m = mailErinnerung(trainer(), stufe, "tok-9");
+    for (const fassung of [m.text, m.html]) {
+      // Pflichtinhalt.
+      assertStringIncludes(fassung, "Salzburg · Österreich");
+      assertStringIncludes(fassung, "https://vexfit.app/rechtliches.html");
+      assertStringIncludes(fassung, "erinnerung-abmelden?token=tok-9");
+      // Keine Straße/PLZ/Telefon in der Fußzeile.
+      assert(!fassung.includes("Kreuzbichl"), `Stufe ${stufe}: Straße in der Fußzeile`);
+      assert(!fassung.includes("5330"), `Stufe ${stufe}: PLZ in der Fußzeile`);
+      assert(!fassung.includes("Fuschl am See"), `Stufe ${stufe}: Ort/Anschrift in der Fußzeile`);
+      assert(!/\+?\d[\d /()-]{6,}\d/.test(fassung), `Stufe ${stufe}: Telefonnummer in der Mail`);
+    }
+    // Erste Zeile der Fußzeile beginnt mit "Vexfit.app · Salzburg · Österreich".
+    assertStringIncludes(m.text, "Vexfit.app · Salzburg · Österreich");
+  }
+});
+
+Deno.test("Fußzeile: Reihenfolge Adresse → Impressum → Abmelde", () => {
+  const t = mailErinnerung(trainer(), 1, "tok-r").text;
+  const pAdr = t.indexOf("Salzburg · Österreich");
+  const pImp = t.indexOf("rechtliches.html");
+  const pAb = t.indexOf("erinnerung-abmelden");
+  assert(pAdr >= 0 && pImp > pAdr && pAb > pImp, `falsche Reihenfolge: Adresse@${pAdr} Impressum@${pImp} Abmelde@${pAb}`);
+});
+
 // ── Endpunkt: Cron-Schlüssel + Versand ──────────────────────────────────────
 interface Spur { mails: Mail[]; stufen: { id: string; stufe: number }[]; }
 function baue(opt: { kandidaten?: TrainerProfil[]; mailWirft?: boolean; ohneVerdrahtung?: boolean } = {}): { a: Anschluesse; spur: Spur } {

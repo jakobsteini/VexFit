@@ -7,7 +7,14 @@ Stufe 2 zwischen 24 und 72 Stunden, Stufe 3 zwischen 72 und 96 Stunden. Älter
 als 96 Stunden → keine Erinnerung. Pro Lauf höchstens eine Mail pro Trainer.
 
 Absender: office@vexfit.app · gleiches Mailgerüst wie die übrigen Vexfit-Mails.
-Fußzeile ohne genaue Adresse: „Salzburg · Österreich". Schreibweise: „Vexfit.app".
+
+Fußzeile (genau drei Zeilen, ohne Straße, Hausnummer, PLZ oder Telefonnummer):
+1. `Vexfit.app · Salzburg · Österreich`
+2. Link **Impressum** → https://vexfit.app/rechtliches.html (dort steht die
+   vollständige Anschrift gemäß § 5 ECG)
+3. Link **Keine Erinnerungen mehr** (ohne Login, mit geheimem Token)
+
+Schreibweise: „Vexfit.app".
 
 Jede Mail enthält:
 - Anrede mit Vorname
@@ -15,7 +22,7 @@ Jede Mail enthält:
 - die fehlenden Angaben beim Namen (z. B. „Foto, Preis pro Stunde, Telefon")
 - einen Knopf **Profil jetzt vervollständigen** direkt zur ersten fehlenden
   Angabe (Foto → Trainer-Bereich, übrige Felder → Profil-Editor mit Sprungmarke)
-- unten den Link **Keine Erinnerungen mehr** (ohne Login, mit geheimem Token)
+- die dreizeilige Fußzeile oben
 
 Die Quelle dieser Texte ist `ERINNERUNG_TEXTE` in
 `supabase/functions/vexfit-automation/kern.ts`. `{vorname}` und `{X}` werden

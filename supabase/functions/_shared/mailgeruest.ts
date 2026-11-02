@@ -34,7 +34,14 @@ export interface MailAngaben {
   knopfText?: string;
   knopfLink?: string;
   hinweis?: string;
-  grundZeile: string;
+  /** „Du erhältst diese E-Mail, weil…". Steht als erste Fußzeile. Darf fehlen
+   *  (Teil 4: die Erinnerungs-Mails haben stattdessen eine feste 3-zeilige
+   *  Fußzeile aus Adresse, Impressum-Link und Abmelde-Link). */
+  grundZeile?: string;
+  /** Teil 4: Impressum-Link (nur https) als Fußzeile zwischen Adresse und
+   *  Abmelde-Link. Fehlt er, wird nichts gerendert. */
+  impressumLink?: string;
+  impressumText?: string;
   /** Nur Mail 4: die Bio als eigener Absatz (#bbb), wenn vorhanden. */
   bioAbsatz?: string;
   /** Teil 4 (Erinnerungs-Mails): ersetzt die zweite Fußzeile (sonst
@@ -96,15 +103,28 @@ export function mailRahmen(a: MailAngaben): string {
     }</p>`
     : "";
 
-  // Teil 4: kleiner Abmelde-Link (nur https) unten im Inhalt.
+  // Teil 4: Impressum-Link (nur https) als zweite Fußzeile.
+  const impLink = a.impressumLink ? sichereAdresse(a.impressumLink) : null;
+  const impressum = (impLink && hatText(a.impressumText))
+    ? `<p style="margin:10px 0 0;text-align:center"><a href="${
+      maskieren(impLink)
+    }" style="color:#777;font-size:12px;text-decoration:underline">${
+      maskieren(a.impressumText)
+    }</a></p>`
+    : "";
+
+  // Teil 4: Abmelde-Link (nur https) als LETZTE Fußzeile.
   const abLink = a.abmeldeLink ? sichereAdresse(a.abmeldeLink) : null;
   const abmelden = (abLink && hatText(a.abmeldeText))
-    ? `<p style="margin:18px 0 0;text-align:center"><a href="${
+    ? `<p style="margin:10px 0 0;text-align:center"><a href="${
       maskieren(abLink)
     }" style="color:#777;font-size:12px;text-decoration:underline">${
       maskieren(a.abmeldeText)
     }</a></p>`
     : "";
+
+  // Erste Fußzeile: (optionaler) Grund + Adresse. Ohne Grund nur die Adresse.
+  const grund = hatText(a.grundZeile) ? `${maskieren(a.grundZeile)}<br>` : "";
 
   return `<div style="background:#0a0a0a;padding:40px 20px;font-family:Arial,sans-serif">
   <div style="max-width:520px;margin:0 auto;background:#141414;border:1px solid rgba(255,255,255,0.08);border-radius:8px;overflow:hidden">
@@ -120,10 +140,11 @@ export function mailRahmen(a: MailAngaben): string {
       ${bio}
       ${knopf}
       ${hinweis}
+      <p style="color:#666;font-size:12px;margin:24px 0 0;text-align:center;line-height:1.6">${grund}${
+    maskieren(a.fusszeile ?? FIRMENANGABE)
+  }</p>
+      ${impressum}
       ${abmelden}
-      <p style="color:#666;font-size:12px;margin:24px 0 0;text-align:center;line-height:1.6">${
-    maskieren(a.grundZeile)
-  }<br>${maskieren(a.fusszeile ?? FIRMENANGABE)}</p>
     </div>
   </div>
 </div>`;
@@ -142,9 +163,14 @@ export function mailText(a: MailAngaben): string {
   const link = a.knopfLink ? sichereAdresse(a.knopfLink) : null;
   if (link && hatText(a.knopfText)) teile.push("", `${a.knopfText}: ${link}`);
   if (hatText(a.hinweis)) teile.push("", a.hinweis!.trim());
+  // Fußzeile in fester Reihenfolge: (optionaler) Grund, Adresse, Impressum, Abmelde.
+  teile.push("");
+  if (hatText(a.grundZeile)) teile.push(a.grundZeile!);
+  teile.push(a.fusszeile ?? FIRMENANGABE);
+  const impLink = a.impressumLink ? sichereAdresse(a.impressumLink) : null;
+  if (impLink && hatText(a.impressumText)) teile.push(`${a.impressumText}: ${impLink}`);
   const abLink = a.abmeldeLink ? sichereAdresse(a.abmeldeLink) : null;
-  if (abLink && hatText(a.abmeldeText)) teile.push("", `${a.abmeldeText}: ${abLink}`);
-  teile.push("", a.grundZeile, a.fusszeile ?? FIRMENANGABE);
+  if (abLink && hatText(a.abmeldeText)) teile.push(`${a.abmeldeText}: ${abLink}`);
   // Jede Zeile rechts beschneiden: ein Zeilenende auf einem Leerzeichen wuerde
   // der Quoted-Printable-Versand zu einem sichtbaren "=20" machen (Livebetrieb
   // 25.10.2026, "Trainingsart:=20"). Leere Werte sind oben schon weggefallen.
