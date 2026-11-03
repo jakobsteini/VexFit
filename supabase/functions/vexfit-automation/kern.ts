@@ -225,6 +225,16 @@ export interface PushNachricht {
   url: string;
 }
 
+/** B4: ein „Benachrichtige mich"-Eintrag (trainer_alerts) für die Mails. */
+export interface WartelistenEintrag {
+  id: string;
+  kunden_email: string;
+  kunden_name?: string | null;
+  plz?: string | null;
+  stadt?: string | null;
+  abmelde_token?: string | null;
+}
+
 export interface Anschluesse {
   trainerNachId(id: string): Promise<Trainer | null>;
   trainerNachEmail(email: string): Promise<Trainer | null>;
@@ -361,6 +371,23 @@ export interface Anschluesse {
   /** Eine Mitteilung an EIN Abo senden; gibt den HTTP-Status zurück
    *  (404/410 = Abo abgelaufen → wird entfernt). Wirft nicht nach oben. */
   pushEinzelSenden?(abo: PushAbo, nachricht: PushNachricht): Promise<number>;
+
+  // ── B4: Warteliste ("Benachrichtige mich" = trainer_alerts) ──
+  /** B4.1: noch aktiver „Benachrichtige mich"-Eintrag einer E-Mail (optional auf
+   *  eine PLZ begrenzt) – für die Bestätigungsmail (Ort + Abmelde-Token).
+   *  service_role. Fehlt die Spalte abmelde_token (Migration 2026-11-03-02 nicht
+   *  eingespielt), wirft es. */
+  alertFuerBestaetigung?(email: string, plz: string): Promise<WartelistenEintrag | null>;
+  /** B4.2: offene (aktiv=true) Einträge einer PLZ – bei der Freigabe eines
+   *  Trainers in dieser PLZ-Region zu benachrichtigen. service_role. */
+  alertsOffeneFuerPlz?(plz: string): Promise<WartelistenEintrag[]>;
+  /** B4.2: schließt EINEN Eintrag ATOMAR (aktiv=true→false) und meldet, ob dieser
+   *  Aufruf ihn bekam (nie doppelt). service_role. */
+  alertSchliessen?(id: string): Promise<boolean>;
+  /** B4.1: Abmeldung per Token (ohne Login): setzt aktiv=false. service_role. */
+  alertAbmelden?(token: string): Promise<boolean>;
+  /** B4.2: PLZ eines Trainers per Kennung (service_role). */
+  trainerPlzNachId?(id: string): Promise<string | null>;
 }
 
 // ============================================================================
@@ -1269,6 +1296,15 @@ export async function bearbeiten(
       return antwort(500, { fehler: "Fehler" }, herkunft);
     }
   }
+  // B4: Abmelde-Link aus den Warteliste-Mails, auch per GET (ein Klick, ohne Login).
+  if (pfad === "warteliste-abmelden" && anfrageObjekt.method === "GET") {
+    try {
+      return await wartelisteAbmeldenEndpunkt(anfrageObjekt, a, herkunft);
+    } catch (fehler) {
+      a.melden?.("warteliste-abmelden fehlgeschlagen", String(fehler));
+      return antwort(500, { fehler: "Fehler" }, herkunft);
+    }
+  }
   if (anfrageObjekt.method !== "POST") {
     return antwort(405, { fehler: "nur POST" }, herkunft);
   }
@@ -1296,6 +1332,10 @@ export async function bearbeiten(
         return await erinnerungenPruefen(anfrageObjekt, a, herkunft);
       case "erinnerung-abmelden":
         return await erinnerungAbmeldenEndpunkt(anfrageObjekt, a, herkunft);
+      case "warteliste-bestaetigung":
+        return await wartelisteBestaetigung(anfrageObjekt, a, herkunft);
+      case "warteliste-abmelden":
+        return await wartelisteAbmeldenEndpunkt(anfrageObjekt, a, herkunft);
       case "stripe":
         return await stripe(anfrageObjekt, a);
       default:
@@ -1672,14 +1712,21 @@ async function adminAktion(
       const mail: FreischaltMailErgebnis = n > 0
         ? await freischaltMailAbwickeln(a, zielId)
         : { gesendet: false, grund: "keine Zeile geaendert" };
+      // B4.2: Warteliste in der PLZ-Region des Trainers benachrichtigen (best effort,
+      // bricht die Freigabe nicht). Jeder Eintrag höchstens einmal.
+      let warteliste = { mails: 0 };
+      if (n > 0) {
+        try { warteliste = await wartelisteAufFreigabe(a, zielId); }
+        catch (fehler) { a.melden?.("warteliste bei Freigabe fehlgeschlagen", String(fehler)); }
+      }
       await a.protokoll?.({
         admin_id: nutzer.id,
         aktion,
         ziel_tabelle: "trainers",
         ziel_id: zielId,
-        ergebnis: `geaendert=${n} mail=${mail.gesendet}${mail.grund ? " (" + mail.grund + ")" : ""}`,
+        ergebnis: `geaendert=${n} mail=${mail.gesendet} warteliste=${warteliste.mails}${mail.grund ? " (" + mail.grund + ")" : ""}`,
       });
-      return antwort(200, { ok: true, geaendert: n, mail }, herkunft);
+      return antwort(200, { ok: true, geaendert: n, mail, warteliste }, herkunft);
     }
 
     // Freischalt-Mail einzeln senden / nach einem Fehler erneut senden
@@ -2200,6 +2247,159 @@ async function erinnerungAbmeldenEndpunkt(
     `.k{max-width:420px;text-align:center}h1{color:#e8ff00;font-size:22px}a{color:#e8ff00}</style></head>` +
     `<body><div class="k"><h1>Erledigt</h1><p>Du bekommst keine Erinnerungen mehr zu deinem Vexfit.app-Profil. ` +
     `Du kannst dein Profil jederzeit in deinem <a href="${VEXFIT_BASIS}/login.html">Trainer-Bereich</a> fertigstellen.</p></div></body></html>`;
+  return new Response(seite, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8", ...(herkunft ? { "Access-Control-Allow-Origin": herkunft } : {}) },
+  });
+}
+
+// ============================================================================
+// B4: Warteliste, die Kunden zurückholt (Bestätigung + Trainer-da-Mail)
+// ============================================================================
+
+/** "Stadt (PLZ)" bzw. nur eines – für die Warteliste-Mails. */
+function wartelisteOrt(e: WartelistenEintrag): string {
+  const stadt = nameFormatieren(w(e.stadt));
+  const plz = w(e.plz);
+  if (stadt && plz) return `${stadt} (${plz})`;
+  return stadt || plz;
+}
+/** Abmelde-Link (ohne Login) für die Warteliste-Mails. */
+function wartelisteAbmeldeLink(token: string | null | undefined): string | undefined {
+  return w(token)
+    ? `${FUNKTIONEN_BASIS}/functions/v1/vexfit-automation/warteliste-abmelden?token=${encodeURIComponent(w(token))}`
+    : undefined;
+}
+
+/** B4.1: Bestätigung direkt nach dem Eintrag in die Warteliste. */
+export function mailWartelisteBestaetigung(e: WartelistenEintrag): Mail {
+  const ort = wartelisteOrt(e);
+  const anrede = w(e.kunden_name) ? `Hallo ${nameFormatieren(w(e.kunden_name))}, ` : "Hallo, ";
+  const abmeldeLink = wartelisteAbmeldeLink(e.abmelde_token);
+  return baueMail(w(e.kunden_email), "Wir haben deine Anfrage – Vexfit", {
+    ueberschrift: "Deine Anfrage ist bei uns",
+    absatz: `${anrede}wir haben deine Anfrage für ${ort || "deine Region"}. ` +
+      "Sobald ein Trainer in deiner Nähe startet, melden wir uns bei dir.",
+    datenZeilen: [],
+    fusszeile: "Vexfit.app · Salzburg · Österreich",
+    impressumLink: `${VEXFIT_BASIS}/rechtliches.html`,
+    impressumText: "Impressum",
+    ...(abmeldeLink ? { abmeldeLink, abmeldeText: "Keine Benachrichtigung mehr" } : {}),
+  });
+}
+
+/** B4.2: „Ein Trainer in deiner Nähe ist da" bei Freigabe in der PLZ-Region. */
+export function mailTrainerDa(e: WartelistenEintrag): Mail {
+  const ort = wartelisteOrt(e);
+  const anrede = w(e.kunden_name) ? `Hallo ${nameFormatieren(w(e.kunden_name))}, ` : "Hallo, ";
+  const abmeldeLink = wartelisteAbmeldeLink(e.abmelde_token);
+  return baueMail(w(e.kunden_email), "Ein Trainer in deiner Nähe ist da – Vexfit", {
+    ueberschrift: "Ein Trainer in deiner Nähe ist da",
+    absatz: `${anrede}gute Nachricht: In ${ort || "deiner Region"} ist jetzt ein Personal ` +
+      "Trainer auf Vexfit verfügbar. Schau dir die Trainer an und frag direkt an.",
+    datenZeilen: [],
+    knopfText: "Trainer ansehen",
+    knopfLink: `${VEXFIT_BASIS}/suche.html`,
+    fusszeile: "Vexfit.app · Salzburg · Österreich",
+    impressumLink: `${VEXFIT_BASIS}/rechtliches.html`,
+    impressumText: "Impressum",
+    ...(abmeldeLink ? { abmeldeLink, abmeldeText: "Keine Benachrichtigung mehr" } : {}),
+  });
+}
+
+/**
+ * B4.1: /warteliste-bestaetigung (angemeldet). Nach dem Eintrag in die
+ * Warteliste schickt der Kunden-Bereich best-effort hierher; wir lesen die
+ * E-Mail NUR aus dem Token (niemand bestätigt fremde Adressen) und senden die
+ * Bestätigung an den neuesten noch offenen Eintrag. Ohne Verdrahtung/Migration
+ * still (keine Mail, kein Fehler).
+ */
+async function wartelisteBestaetigung(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const token = bearerToken(r);
+  const nutzer = token ? await a.benutzerAusToken(token) : null;
+  if (!nutzer) return antwort(401, { fehler: "Anmeldung erforderlich" }, herkunft);
+  const email = w((nutzer as { email?: string }).email).toLowerCase();
+  if (!email || !a.alertFuerBestaetigung) {
+    return antwort(200, { ok: true, mails: 0, uebersprungen: "nicht verdrahtet" }, herkunft);
+  }
+  const body = (await koerperLesen(r)) || {};
+  const plz = w(body.plz);
+  let eintrag: WartelistenEintrag | null = null;
+  try {
+    eintrag = await a.alertFuerBestaetigung(email, plz);
+  } catch (fehler) {
+    if (istMigrationFehlt(fehler)) {
+      a.melden?.("warteliste-bestaetigung: Spalte fehlt (Migration 2026-11-03-02 nicht eingespielt)");
+      return antwort(200, { ok: true, mails: 0, uebersprungen: "migration fehlt" }, herkunft);
+    }
+    throw fehler;
+  }
+  if (!eintrag) return antwort(200, { ok: true, mails: 0 }, herkunft);
+  const gesendet = await sendeWennAdresseTaugt(a, mailWartelisteBestaetigung(eintrag));
+  return antwort(200, { ok: true, mails: gesendet ? 1 : 0 }, herkunft);
+}
+
+/**
+ * B4.2: bei der Freigabe eines Trainers (trainer_aktivieren) alle noch offenen
+ * Warteliste-Einträge in SEINER PLZ-Region (gleiche PLZ – Konzept Punkt 3b, weil
+ * die Suche keinen festen km-Umkreis hat) genau einmal benachrichtigen und den
+ * Eintrag danach schließen (nie doppelt; abgemeldete/geschlossene sind aktiv=
+ * false und fallen hier raus). Der km-Umkreis bleibt der bestehenden
+ * trainer-alert-Funktion (Cron) überlassen. Best effort.
+ */
+async function wartelisteAufFreigabe(
+  a: Anschluesse,
+  trainerId: string,
+): Promise<{ mails: number }> {
+  if (!a.trainerPlzNachId || !a.alertsOffeneFuerPlz || !a.alertSchliessen) return { mails: 0 };
+  let plz: string | null = null;
+  try { plz = await a.trainerPlzNachId(trainerId); } catch { return { mails: 0 }; }
+  if (!w(plz)) return { mails: 0 };
+  let eintraege: WartelistenEintrag[] = [];
+  try {
+    eintraege = await a.alertsOffeneFuerPlz(w(plz));
+  } catch (fehler) {
+    if (istMigrationFehlt(fehler)) {
+      a.melden?.("warteliste: Spalte fehlt (Migration 2026-11-03-02 nicht eingespielt)");
+      return { mails: 0 };
+    }
+    throw fehler;
+  }
+  let mails = 0;
+  for (const e of eintraege) {
+    const gesendet = await sendeWennAdresseTaugt(a, mailTrainerDa(e));
+    if (!gesendet) continue; // Versand gescheitert -> offen lassen (später erneut)
+    try { await a.alertSchliessen(e.id); } catch { /* best effort */ }
+    mails++;
+  }
+  return { mails };
+}
+
+/**
+ * B4.1: /warteliste-abmelden?token= (GET, ohne Login). Setzt den Eintrag auf
+ * aktiv=false und zeigt eine kurze Seite. Unbekanntes Token: freundlicher
+ * Hinweis, kein Fehler, keine Preisgabe.
+ */
+async function wartelisteAbmeldenEndpunkt(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const token = new URL(r.url).searchParams.get("token") || "";
+  if (token && a.alertAbmelden) {
+    try { await a.alertAbmelden(token); } catch (fehler) { a.melden?.("warteliste-abmelden fehlgeschlagen", String(fehler)); }
+  }
+  const seite = `<!doctype html><html lang="de"><head><meta charset="utf-8">` +
+    `<meta name="viewport" content="width=device-width, initial-scale=1">` +
+    `<title>Vexfit.app</title><style>body{margin:0;background:#0a0a0a;color:#f5f5f0;` +
+    `font-family:Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}` +
+    `.k{max-width:420px;text-align:center}h1{color:#e8ff00;font-size:22px}a{color:#e8ff00}</style></head>` +
+    `<body><div class="k"><h1>Erledigt</h1><p>Du bekommst keine Benachrichtigung mehr, wenn Trainer in deiner Region starten. ` +
+    `Du kannst jederzeit wieder auf <a href="${VEXFIT_BASIS}/suche.html">Vexfit.app</a> nach Trainern suchen.</p></div></body></html>`;
   return new Response(seite, {
     status: 200,
     headers: { "Content-Type": "text/html; charset=utf-8", ...(herkunft ? { "Access-Control-Allow-Origin": herkunft } : {}) },

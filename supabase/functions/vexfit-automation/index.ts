@@ -477,6 +477,65 @@ const anschluesse: Anschluesse = {
     return Array.isArray(zeilen) && zeilen.length >= 1;
   },
 
+  // ── B4: Warteliste ("Benachrichtige mich" = trainer_alerts) ──
+  // B4.1: ein noch aktiver Eintrag einer E-Mail (optional auf eine PLZ begrenzt),
+  // inkl. Abmelde-Token – für die Bestätigungsmail. Fehlerkörper weitergeben,
+  // damit kern.ts eine fehlende Spalte (Migration) erkennt.
+  async alertFuerBestaetigung(email: string, plz: string) {
+    let filter = `trainer_alerts?kunden_email=ilike.${encodeURIComponent(email)}` +
+      `&aktiv=eq.true&select=id,kunden_email,kunden_name,plz,stadt,abmelde_token&limit=1`;
+    if (plz) filter += `&plz=eq.${encodeURIComponent(plz)}`;
+    const r = await fetch(restAdresse(filter), { headers: restKopf() });
+    if (!r.ok) { const t = await r.text().catch(() => ""); throw new Error(`alertFuerBestaetigung fehlgeschlagen: HTTP ${r.status} ${t}`); }
+    const zeilen = await r.json().catch(() => []);
+    return Array.isArray(zeilen) && zeilen[0] ? zeilen[0] : null;
+  },
+
+  // B4.2: offene (aktiv=true) Einträge einer PLZ.
+  async alertsOffeneFuerPlz(plz: string) {
+    const filter = `trainer_alerts?plz=eq.${encodeURIComponent(plz)}&aktiv=eq.true` +
+      `&select=id,kunden_email,kunden_name,plz,stadt,abmelde_token&limit=500`;
+    const r = await fetch(restAdresse(filter), { headers: restKopf() });
+    if (!r.ok) { const t = await r.text().catch(() => ""); throw new Error(`alertsOffeneFuerPlz fehlgeschlagen: HTTP ${r.status} ${t}`); }
+    const zeilen = await r.json().catch(() => []);
+    return Array.isArray(zeilen) ? zeilen : [];
+  },
+
+  // B4.2: EINEN Eintrag atomar schließen (aktiv=true -> false). 1 Zeile = beansprucht.
+  async alertSchliessen(id: string): Promise<boolean> {
+    const filter = `trainer_alerts?id=eq.${encodeURIComponent(id)}&aktiv=eq.true`;
+    const r = await fetch(restAdresse(filter), {
+      method: "PATCH",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify({ aktiv: false }),
+    });
+    if (!r.ok) throw new Error(`alertSchliessen fehlgeschlagen: HTTP ${r.status}`);
+    const zeilen = await r.json().catch(() => []);
+    return Array.isArray(zeilen) && zeilen.length >= 1;
+  },
+
+  // B4.1: Abmeldung per Token (ohne Login). Setzt aktiv=false, wo das Token passt.
+  async alertAbmelden(token: string): Promise<boolean> {
+    const filter = `trainer_alerts?abmelde_token=eq.${encodeURIComponent(token)}`;
+    const r = await fetch(restAdresse(filter), {
+      method: "PATCH",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify({ aktiv: false }),
+    });
+    if (!r.ok) throw new Error(`alertAbmelden fehlgeschlagen: HTTP ${r.status}`);
+    const zeilen = await r.json().catch(() => []);
+    return Array.isArray(zeilen) && zeilen.length >= 1;
+  },
+
+  // B4.2: PLZ eines Trainers per Kennung.
+  async trainerPlzNachId(id: string): Promise<string | null> {
+    const zeilen = await lesen<{ plz?: string | null }>(
+      `trainers?id=eq.${encodeURIComponent(id)}&select=plz`,
+    );
+    const p = zeilen[0]?.plz;
+    return p ? String(p) : null;
+  },
+
   // Admin-Aktion: loescht eine Zeile in trainers oder kunden (service_role).
   // Tabelle zusaetzlich hier abgesichert (nur diese zwei).
   async adminZeileLoeschen(tabelle: string, id: string): Promise<number> {

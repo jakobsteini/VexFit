@@ -732,6 +732,13 @@ async function benachrichtigeMich() {
     });
     if(!r.ok) throw new Error('Status ' + r.status);
     markBenachrichtigt();
+    // B4.1: Bestätigungsmail anstoßen (best effort). Die Edge Function liest die
+    // E-Mail aus dem Token und schickt die Bestätigung an den neuen Eintrag.
+    fetch(`${SB}/functions/v1/vexfit-automation/warteliste-bestaetigung`, {
+      method: 'POST', keepalive: true,
+      headers: authKopf({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ plz: lastSearch.plz, stadt: lastSearch.city || '' })
+    }).catch(()=>{});
   } catch(e) {
     console.error('benachrichtigeMich:', e && e.name);
     if(btn) { btn.disabled = false; btn.textContent = 'Benachrichtige mich'; }
