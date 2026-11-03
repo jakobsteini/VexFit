@@ -190,6 +190,22 @@ export function fehlendeProfilfelder(t) {
   return fehlt;
 }
 
+/** B2: die drei Pflichtangaben VOR der Freigabe – Foto, PLZ, Preis pro Stunde.
+ *  Entscheidung Jakob. Dieselbe Regel wie vexfit-pflicht.js (vexPflicht) im
+ *  Trainer-Bereich; die Übereinstimmung sichert verwaltung_logik_test.ts ab.
+ *  Freigeben bleibt trotzdem immer möglich – der Admin entscheidet allein. */
+export function pflichtVorFreigabe(t) {
+  t = t || {};
+  const foto = avatarVorhanden(t.avatar_url);
+  const plz = !!String(t.plz == null ? "" : t.plz).trim();
+  const preis = Number(t.preis_stunde) > 0;
+  const fehlt = [];
+  if (!foto) fehlt.push("Foto");
+  if (!plz) fehlt.push("PLZ");
+  if (!preis) fehlt.push("Preis");
+  return { foto, plz, preis, fehlt, vollstaendig: fehlt.length === 0 };
+}
+
 /** Freischalt-Mail: aus trainers.freischalt_mail_gesendet ablesen, ob (und wann)
  *  die Mail „Dein Profil ist freigeschaltet" an den Trainer ging. Ein Zeitstempel
  *  (String) oder true = gesendet. Fehlt die Spalte (Migration nicht eingespielt),
@@ -676,6 +692,14 @@ function starteVerwaltung() {
     return '<span class="badge badge-active">Aktiv</span>';
   }
   function datumKurz(s) { return s ? new Date(s).toLocaleDateString("de-AT") : "–"; }
+  // B2: kurzer Hinweis am Freigeben-Knopf, welche Pflichtangaben (Foto, PLZ,
+  // Preis) noch fehlen. Freigeben bleibt möglich – der Admin entscheidet allein.
+  function freigabeFehltHinweis(t) {
+    const fehlt = pflichtVorFreigabe(t).fehlt;
+    return fehlt.length
+      ? `<div class="freigabe-fehlt" style="font-size:11px;color:#ffaa00;margin:4px 0 2px">Fehlt für die Freigabe: ${escapeHtml(fehlt.join(", "))}</div>`
+      : "";
+  }
   function trainerKarte(t) {
     const neu = neueIds.trainer.has(String(t.id)) ? " karte-neu" : "";
     const ort = escapeHtml(nameFormatieren(t.stadt) || "Ort offen");
@@ -688,6 +712,7 @@ function starteVerwaltung() {
       <div class="karte-kopf"><div class="karte-name">${namePaarHtml(t.vorname, t.nachname)}</div>${statusChip(t)}</div>
       <div class="karte-zeile">${ort} · ${datumKurz(t.created_at)}${t.studio_standort_id ? " · Studio" : ""}</div>
       ${bal.html}
+      ${!t.aktiv ? freigabeFehltHinweis(t) : ""}
       <div class="karte-aktionen">${akt}${sperrBtn}<button class="btn-gefahr" data-aktion="kicken" data-art="trainer" data-id="${escapeHtml(t.id)}">Kicken</button></div>
     </div>`;
   }
@@ -709,6 +734,7 @@ function starteVerwaltung() {
       <div class="karte-kopf"><div class="karte-name">${namePaarHtml(t.vorname, t.nachname)}</div><span class="badge badge-offen">Wartet</span></div>
       <div class="karte-zeile">${ort} · ${datumKurz(t.created_at)}</div>
       ${bal.html}
+      ${freigabeFehltHinweis(t)}
       <div class="karte-aktionen"><button class="btn-ja" data-aktion="freigeben" data-id="${escapeHtml(t.id)}">Freigeben</button></div>
     </div>`;
   }
@@ -981,6 +1007,7 @@ function starteVerwaltung() {
     if (!t) { fehler("Trainer nicht gefunden. Bitte neu laden."); return; }
     const foto = avatarVorhanden(t.avatar_url) ? t.avatar_url : null;
     const fehlt = fehlendeProfilfelder(t);
+    const pflicht = pflichtVorFreigabe(t); // B2: Foto/PLZ/Preis vor der Freigabe
     const mailStatus = freischaltMailStatus(t);
     const spez = Array.isArray(t.spezialisierungen) && t.spezialisierungen.length
       ? `<div class="chiprow">${t.spezialisierungen.map((s) => `<span class="chip">${escapeHtml(s)}</span>`).join("")}</div>` : "";
@@ -1005,7 +1032,7 @@ function starteVerwaltung() {
           <div class="chiprow" style="margin-top:8px">${statusB}</div></div></div>
       ${df("Profil-Vollständigkeit", vollTxt)}
       ${df("Telefon", escapeHtml(t.telefon || ""), fehlt.includes("Telefon"))}
-      ${df("PLZ / Stadt", [t.plz, t.stadt].filter(Boolean).map(escapeHtml).join(" · "))}
+      ${df("PLZ / Stadt", [t.plz, t.stadt].filter(Boolean).map(escapeHtml).join(" · "), !pflicht.plz)}
       ${df("Trainingsart", escapeHtml(t.trainingsart || ""), fehlt.includes("Trainingsart"))}
       ${df("Trainingsort", escapeHtml(ortText(t.trainingsort)), fehlt.includes("Trainingsort"))}
       ${orte ? df("Weitere Trainingsorte", orte) : ""}
@@ -1027,8 +1054,8 @@ function starteVerwaltung() {
     const freigabe = !t.aktiv
       ? `<button class="btn-gross btn-ja" data-aktion="freigeben" data-id="${escapeHtml(t.id)}">Freigeben</button>`
       : `<button class="btn-gross btn-warn" data-aktion="freigabe-zurueck" data-id="${escapeHtml(t.id)}">Freigabe zurücknehmen</button>`;
-    const hinweis = (!t.aktiv && fehlt.length > 0)
-      ? `<div style="flex-basis:100%;font-size:12px;color:var(--text-muted)">Hinweis: unvollständiges Profil – Freigeben ist trotzdem möglich, du entscheidest.</div>` : "";
+    const hinweis = (!t.aktiv && pflicht.fehlt.length > 0)
+      ? `<div style="flex-basis:100%;font-size:12px;color:var(--text-muted)">Fehlt für die Freigabe: ${escapeHtml(pflicht.fehlt.join(", "))} – Freigeben ist trotzdem möglich, du entscheidest.</div>` : "";
     const freischaltKnopf = (t.aktiv && !mailStatus.gesendet)
       ? `<button class="btn-gross btn-neutral" data-aktion="freischalt-mail" data-id="${escapeHtml(t.id)}">Freischalt-Mail senden</button>` : "";
     const foot = `${freigabe}${hinweis}${freischaltKnopf}

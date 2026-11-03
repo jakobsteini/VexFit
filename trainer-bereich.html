@@ -298,8 +298,75 @@ try {
 </style>
 <style>/* Tippflaechen Handy Fusszeile (Fix 2 Nachtrag) */
 @media (max-width:640px){.cookie-widerruf a{min-height:44px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box}}</style>
+<style>/* B2: Einstieg in 3 Schritten (Foto · PLZ · Preis) + Pflicht-Hinweis */
+.einstieg-overlay{position:fixed;inset:0;z-index:1000;background:rgba(10,10,10,0.97);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom))}
+.einstieg-karte{width:100%;max-width:440px;margin:auto;background:var(--card,#161616);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:26px 22px}
+.einstieg-fortschritt{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent,#e8ff00);font-weight:700;margin-bottom:10px}
+.einstieg-balken{height:6px;border-radius:4px;background:rgba(255,255,255,0.1);overflow:hidden;margin-bottom:22px}
+.einstieg-balken-fill{height:100%;background:var(--accent,#e8ff00);border-radius:4px;transition:width .3s ease;width:33%}
+.einstieg-schritt{display:none}
+.einstieg-schritt.aktiv{display:block;animation:fadeUp .3s ease both}
+.einstieg-titel{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:1px;line-height:1.05;margin-bottom:6px}
+.einstieg-text{font-size:14px;color:rgba(245,245,240,0.6);line-height:1.6;margin-bottom:18px}
+.einstieg-karte input[type=text],.einstieg-karte input[type=number]{width:100%;box-sizing:border-box;padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.12);background:#0e0e0e;color:var(--white,#f5f5f0);font-size:16px;font-family:inherit}
+.einstieg-status{font-size:13px;color:rgba(245,245,240,0.7);min-height:20px;margin-top:10px;line-height:1.5}
+.einstieg-foto{display:flex;align-items:center;gap:16px;margin-bottom:8px}
+.einstieg-foto-vorschau{width:76px;height:76px;border-radius:50%;background:#0e0e0e center/cover no-repeat;border:1px solid rgba(255,255,255,0.12);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent,#e8ff00);flex:0 0 auto}
+.einstieg-btn{display:inline-flex;align-items:center;justify-content:center;width:100%;box-sizing:border-box;min-height:48px;margin-top:20px;padding:14px;border:none;border-radius:10px;background:var(--accent,#e8ff00);color:#0a0a0a;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit}
+.einstieg-btn:disabled{opacity:.5;cursor:default}
+.einstieg-btn-zweit{background:transparent;border:1px solid rgba(255,255,255,0.18);color:var(--white,#f5f5f0)}
+.einstieg-fehler{color:#ff8080;font-size:13px;margin-top:8px;min-height:18px}
+.einstieg-spaeter{display:block;text-align:center;margin-top:16px;font-size:13px;color:rgba(245,245,240,0.5);text-decoration:underline;cursor:pointer;background:none;border:none;width:100%;font-family:inherit}
+.einstieg-hinweis{background:rgba(232,255,0,0.08);border:1px solid rgba(232,255,0,0.28);border-radius:10px;padding:14px 16px;margin:0 auto 4px;max-width:900px;display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between}
+.einstieg-hinweis-text{font-size:13.5px;color:rgba(245,245,240,0.85);line-height:1.5;flex:1 1 220px}
+.einstieg-hinweis-knopf{background:var(--accent,#e8ff00);color:#0a0a0a;font-weight:700;font-size:13px;border:none;border-radius:8px;padding:10px 16px;cursor:pointer;min-height:40px;font-family:inherit;white-space:nowrap}
+.einstieg-plz-wahl{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.einstieg-plz-wahl button{background:#0e0e0e;border:1px solid rgba(255,255,255,0.18);color:var(--white,#f5f5f0);border-radius:8px;padding:9px 13px;font-size:13px;cursor:pointer;font-family:inherit}
+@media (max-width:640px){.einstieg-hinweis{border-radius:0;margin:0 0 8px}}</style>
 </head>
 <body>
+
+<!-- ═══════════ B2: Einstieg in 3 Schritten (Foto · PLZ · Preis) ═══════════ -->
+<div class="einstieg-overlay hidden" id="einstieg" role="dialog" aria-modal="true" aria-label="Profil-Einstieg">
+  <div class="einstieg-karte">
+    <div class="einstieg-fortschritt" id="einstiegFortschritt">Schritt 1 von 3</div>
+    <div class="einstieg-balken"><div class="einstieg-balken-fill" id="einstiegBalken" style="width:33%"></div></div>
+
+    <!-- Schritt 1: Foto -->
+    <div class="einstieg-schritt aktiv" id="einstiegSchritt1">
+      <div class="einstieg-titel">Zeig dein Gesicht</div>
+      <div class="einstieg-text">Ein Profilbild schafft Vertrauen – Kunden fragen Trainer mit Foto deutlich häufiger an.</div>
+      <div class="einstieg-foto">
+        <div class="einstieg-foto-vorschau" id="einstiegFotoVorschau"></div>
+        <button type="button" class="einstieg-btn-zweit einstieg-btn" style="margin-top:0;width:auto;padding:12px 18px" onclick="einstiegFotoWaehlen()">Bild auswählen</button>
+      </div>
+      <div class="einstieg-status" id="einstiegFotoStatus"></div>
+      <button type="button" class="einstieg-btn" id="einstiegFotoWeiter" onclick="einstiegWeiter()" disabled>Weiter →</button>
+      <button type="button" class="einstieg-spaeter" onclick="einstiegSpaeter()">Später erledigen</button>
+    </div>
+
+    <!-- Schritt 2: PLZ -->
+    <div class="einstieg-schritt" id="einstiegSchritt2">
+      <div class="einstieg-titel">Wo bist du?</div>
+      <div class="einstieg-text">Deine Postleitzahl – so finden dich Kunden in deiner Nähe. Bei vierstelliger PLZ wählst du noch das Land.</div>
+      <input type="text" id="einstiegPlz" placeholder="z.B. 5020" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="einstiegPlzGeaendert()">
+      <div class="einstieg-status" id="einstiegPlzStatus"></div>
+      <div class="einstieg-fehler" id="einstiegPlzFehler"></div>
+      <button type="button" class="einstieg-btn" id="einstiegPlzWeiter" onclick="einstiegPlzSpeichern()">Weiter →</button>
+      <button type="button" class="einstieg-spaeter" onclick="einstiegSpaeter()">Später erledigen</button>
+    </div>
+
+    <!-- Schritt 3: Preis -->
+    <div class="einstieg-schritt" id="einstiegSchritt3">
+      <div class="einstieg-titel">Dein Preis pro Stunde</div>
+      <div class="einstieg-text">Dein Stundensatz in Euro. Du kannst ihn später jederzeit im Profil ändern.</div>
+      <input type="number" id="einstiegPreis" placeholder="z.B. 60" min="1" max="999" inputmode="numeric">
+      <div class="einstieg-fehler" id="einstiegPreisFehler"></div>
+      <button type="button" class="einstieg-btn" id="einstiegPreisWeiter" onclick="einstiegPreisSpeichern()">Fertig ✓</button>
+      <button type="button" class="einstieg-spaeter" onclick="einstiegSpaeter()">Später erledigen</button>
+    </div>
+  </div>
+</div>
 
 <nav>
   <a href="index.html" class="logo" aria-label="Vexfit – zur Startseite"><svg viewBox="168 166 1265 1270" aria-hidden="true" style="height:0.7em;width:auto;vertical-align:0;margin-right:4px"><g transform="translate(800 800) translate(-1024.5 -1082.5)"><path fill="#E8FF00" fill-rule="evenodd" d="M914.3,1716.3C908.8,1701.1 867.1,1595.6 814.0,1462.5C803.5,1436.1 781.3,1380.5 764.8,1339.0C711.7,1205.5 681.3,1129.2 631.2,1003.5C604.3,935.9 566.9,842.0 548.2,795.0C511.9,703.7 445.4,538.0 437.4,519.0C429.8,500.7 417.2,481.4 402.3,465.0C394.6,456.6 392.1,452.5 393.8,450.8C394.6,450.0 399.9,449.3 408.3,448.9C426.0,448.0 685.1,448.0 705.9,448.9C721.8,449.6 722.4,449.7 723.9,452.0C727.9,458.2 770.3,508.1 807.0,550.0C814.4,558.5 826.2,572.0 833.0,580.0C839.9,588.0 851.8,601.7 859.5,610.4C877.5,630.9 886.5,641.2 901.0,658.5C907.4,666.2 922.9,684.2 935.4,698.5C947.9,712.8 970.0,738.3 984.6,755.2C1011.2,786.1 1018.5,793.6 1024.9,796.6C1031.0,799.5 1033.4,797.4 1059.5,766.6C1065.6,759.5 1080.0,742.8 1091.5,729.5C1103.0,716.2 1122.8,693.5 1135.5,678.9C1148.1,664.4 1162.0,648.4 1166.5,643.5C1170.9,638.5 1180.6,627.2 1188.1,618.5C1214.0,588.0 1252.4,543.4 1266.5,527.5C1274.2,518.7 1284.6,506.8 1289.5,501.0C1302.3,486.0 1312.4,474.6 1320.1,466.5C1323.7,462.6 1328.4,456.9 1330.4,453.7L1334.1,448.0L1495.6,448.0L1657.2,448.0L1656.5,452.2C1655.3,460.0 1653.8,463.1 1648.4,469.2C1641.6,476.8 1635.1,486.5 1630.0,496.6C1626.2,504.3 1596.4,577.4 1552.7,686.0C1540.9,715.4 1513.4,783.4 1491.7,837.0C1470.0,890.6 1437.6,970.7 1419.7,1015.0C1401.9,1059.3 1372.7,1131.7 1354.7,1176.0C1326.2,1246.6 1307.6,1292.5 1246.8,1443.0C1239.2,1462.0 1224.1,1499.3 1213.3,1526.0C1202.5,1552.7 1180.8,1606.7 1165.1,1646.0L1136.5,1717.5L1025.7,1717.8C920.9,1718.0 914.9,1717.9 914.3,1716.3ZM1034.7,1470.6C1037.4,1467.3 1056.2,1418.9 1122.5,1245.0C1142.5,1192.3 1161.3,1143.3 1191.0,1066.0C1225.3,976.5 1230.1,963.2 1228.7,959.6C1227.3,956.1 1224.1,958.2 1214.3,968.8C1201.7,982.3 1167.1,1021.6 1133.0,1061.0C1118.5,1077.8 1099.6,1099.4 1091.0,1109.0C1082.5,1118.7 1069.9,1133.1 1063.0,1141.0C1045.4,1161.5 1031.1,1176.0 1028.5,1176.0C1022.9,1176.0 1008.4,1162.3 986.5,1136.5C980.5,1129.3 969.2,1116.4 961.5,1107.6C953.8,1098.9 941.3,1084.5 933.6,1075.6C894.8,1030.6 852.0,982.7 848.5,980.4C845.3,978.3 844.0,979.3 844.0,983.8C844.0,989.7 845.7,994.6 866.8,1050.0C877.7,1078.9 896.9,1129.5 909.4,1162.5C921.9,1195.5 939.5,1241.8 948.5,1265.5C973.6,1331.6 983.2,1356.8 996.0,1391.0C1019.3,1452.7 1025.3,1467.3 1029.1,1471.1C1031.6,1473.6 1032.5,1473.5 1034.7,1470.6Z"/></g></svg><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap">V</span>EX<span>FIT</span></a>
@@ -319,6 +386,13 @@ try {
     <button class="btn-logout" onclick="logout()">Ausloggen</button>
   </div>
 </nav>
+
+<!-- B2: Pflicht-Hinweis, bis Foto, PLZ und Preis da sind. Gefuellt von
+     einstiegHinweisAktualisieren(). -->
+<div class="einstieg-hinweis hidden" id="einstiegHinweis">
+  <div class="einstieg-hinweis-text" id="einstiegHinweisText"></div>
+  <button type="button" class="einstieg-hinweis-knopf" onclick="einstiegOeffnen()">Profil fertigstellen</button>
+</div>
 
 <!-- ═══════════ DASHBOARD (Teil D) ═══════════ -->
 <div class="page-wrap" id="dashboardPage">
@@ -545,6 +619,8 @@ try {
 <script src="vexfit-escape.js"></script>
 <script src="vexfit-namen.js"></script>
 <script src="vexfit-video.js"></script>
+<script src="vexfit-plz.js"></script>
+<script src="vexfit-pflicht.js"></script>
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -739,6 +815,7 @@ async function loadTrainer(email) {
       fillForm(T);
       zeigeAvatar();
       updateDots();
+      einstiegStart();   // B2: Einstieg zeigen/Hinweis setzen, sobald T geladen ist
 
       // Teil D: Startseite ist jetzt das Dashboard (kein Sprung mehr direkt in
       // die Anfragen). Dashboard sofort zeichnen und die Zahlen nachladen.
@@ -892,6 +969,7 @@ async function uploadAvatar() {
     zeigeAvatar();
     showToast('✓ Profilbild gespeichert');
     updateDots();   // Profilstaerke sofort neu berechnen (Foto zaehlt mit)
+    einstiegSchrittErledigt('foto');   // B2: Einstieg (falls offen) weiterführen
   } catch(e) {
     console.error('uploadAvatar:', e);
     // Alte Vorschau zurueck (gespeichertes Bild oder Initialen) + bestehende Fehlermeldung.
@@ -901,6 +979,199 @@ async function uploadAvatar() {
     showToast('Das Bild konnte nicht gespeichert werden. Bitte versuche es erneut.', true);
   }
   avatarLaedtAn(false);
+}
+
+// ═══════════ B2: Einstieg in 3 Schritten (Foto · PLZ · Preis) ═══════════
+// Pflicht vor der Freigabe (Entscheidung Jakob): Foto, PLZ, Preis pro Stunde.
+// Jeder Schritt speichert sofort (gleicher PATCH-Weg wie der Foto-Upload).
+const einstiegPlzCache = new Map();
+let einstiegPlzStand = { plz: '', stadt: null, land: null };
+
+function einstiegPflicht() {
+  return (window.vexPflicht)
+    ? vexPflicht.pflichtVorFreigabe(T || {})
+    : { foto: false, plz: false, preis: false, fehlt: ['Foto', 'PLZ', 'Preis'], vollstaendig: false };
+}
+function einstiegOffen() {
+  const el = document.getElementById('einstieg');
+  return !!(el && !el.classList.contains('hidden'));
+}
+
+// Beim Laden: Overlay zeigen (direkt nach der Registrierung ?neu=1 oder beim
+// ersten Mal, solange eine der drei Angaben fehlt) und den Hinweis setzen.
+function einstiegStart() {
+  if (!T) return;
+  einstiegHinweisAktualisieren();
+  const p = einstiegPflicht();
+  if (p.vollstaendig) return;
+  const neu = new URLSearchParams(location.search).get('neu') === '1';
+  let gesehen = false;
+  try { gesehen = localStorage.getItem('vexfit_einstieg_gesehen') === '1'; } catch (e) {}
+  if (neu || !gesehen) einstiegOeffnen();
+}
+
+function einstiegOeffnen() {
+  const el = document.getElementById('einstieg');
+  if (!el) return;
+  if (T && T.plz) document.getElementById('einstiegPlz').value = T.plz;
+  if (T && Number(T.preis_stunde) > 0) document.getElementById('einstiegPreis').value = T.preis_stunde;
+  einstiegFotoVorschau();
+  const p = einstiegPflicht();
+  const start = !p.foto ? 1 : (!p.plz ? 2 : (!p.preis ? 3 : 1));
+  einstiegSchrittSetzen(start);
+  el.classList.remove('hidden');
+}
+function einstiegSchliessen() {
+  const el = document.getElementById('einstieg');
+  if (el) el.classList.add('hidden');
+  einstiegHinweisAktualisieren();
+}
+// "Später erledigen": kein erneutes automatisches Öffnen, Hinweis bleibt stehen.
+function einstiegSpaeter() {
+  try { localStorage.setItem('vexfit_einstieg_gesehen', '1'); } catch (e) {}
+  einstiegSchliessen();
+}
+
+function einstiegSchrittSetzen(n) {
+  for (let i = 1; i <= 3; i++) {
+    const s = document.getElementById('einstiegSchritt' + i);
+    if (s) s.classList.toggle('aktiv', i === n);
+  }
+  const f = document.getElementById('einstiegFortschritt');
+  if (f) f.textContent = 'Schritt ' + n + ' von 3';
+  const b = document.getElementById('einstiegBalken');
+  if (b) b.style.width = Math.round(n / 3 * 100) + '%';
+  if (n === 1) einstiegFotoVorschau();
+}
+
+// Zum nächsten noch fehlenden Schritt; sind alle drei da, Einstieg abschließen.
+function einstiegWeiter() {
+  const p = einstiegPflicht();
+  if (!p.foto) { einstiegSchrittSetzen(1); return; }
+  if (!p.plz) { einstiegSchrittSetzen(2); return; }
+  if (!p.preis) { einstiegSchrittSetzen(3); return; }
+  einstiegSchliessen();
+  showToast('✓ Profil fertig – der Admin kann dich jetzt freigeben.');
+}
+
+// ── Schritt 1: Foto (nutzt denselben Upload wie das Profilformular) ──
+function einstiegFotoWaehlen() { const i = document.getElementById('fAvatar'); if (i) i.click(); }
+function einstiegFotoVorschau() {
+  const el = document.getElementById('einstiegFotoVorschau');
+  if (!el) return;
+  const bild = T && avatarAdresse(T.avatar_url);
+  const weiter = document.getElementById('einstiegFotoWeiter');
+  const st = document.getElementById('einstiegFotoStatus');
+  if (bild) {
+    el.style.backgroundImage = "url('" + bild + "')";
+    el.textContent = '';
+    if (weiter) weiter.disabled = false;
+    if (st) st.textContent = 'Foto gespeichert ✓';
+  } else {
+    el.style.backgroundImage = '';
+    el.textContent = T ? ((T.vorname || '?')[0] + (T.nachname || '?')[0]).toUpperCase() : '';
+    if (weiter) weiter.disabled = true;
+    if (st) st.textContent = '';
+  }
+}
+// Aus uploadAvatar() nach erfolgreichem Speichern gerufen.
+function einstiegSchrittErledigt(feld) {
+  einstiegHinweisAktualisieren();
+  if (!einstiegOffen()) return;
+  if (feld === 'foto') { einstiegFotoVorschau(); einstiegWeiter(); }
+}
+
+// ── Schritt 2: PLZ (gemeinsames Modul vexfit-plz.js) ──
+function einstiegPlzGeaendert() {
+  document.getElementById('einstiegPlzFehler').textContent = '';
+  einstiegPlzStand = { plz: '', stadt: null, land: null };
+  document.getElementById('einstiegPlzStatus').textContent = '';
+}
+async function einstiegPlzErmitteln() {
+  const wert = document.getElementById('einstiegPlz').value.trim();
+  const statusEl = document.getElementById('einstiegPlzStatus');
+  if (!wert || wert.length < 4) return null;
+  if (einstiegPlzStand.plz === wert && einstiegPlzStand.stadt) return einstiegPlzStand.stadt;
+  statusEl.textContent = '📍 Ort wird ermittelt …';
+  const erg = await vexPlz.aufloesen(wert, { cache: einstiegPlzCache });
+  if (erg && erg.mehrdeutig) {
+    // 4-stellig (AT/CH): das Land über Knöpfe wählen.
+    return await new Promise(function (aufl) {
+      vexPlz.auswahlKnoepfe(erg.optionen, statusEl, function (ort) {
+        einstiegPlzStand = { plz: wert, stadt: ort.stadt, land: ort.land };
+        statusEl.textContent = '📍 ' + ort.stadt;
+        aufl(ort.stadt);
+      });
+    });
+  }
+  if (erg && erg.stadt) {
+    einstiegPlzStand = { plz: wert, stadt: erg.stadt, land: erg.land };
+    statusEl.textContent = '📍 ' + erg.stadt;
+    return erg.stadt;
+  }
+  statusEl.textContent = (erg && erg.netzfehler)
+    ? '⚠️ Standortdienst nicht erreichbar. Bitte später erneut versuchen.'
+    : '⚠️ PLZ nicht gefunden. Bitte prüfen.';
+  return null;
+}
+async function einstiegPlzSpeichern() {
+  const btn = document.getElementById('einstiegPlzWeiter');
+  const fehler = document.getElementById('einstiegPlzFehler');
+  fehler.textContent = '';
+  const wert = document.getElementById('einstiegPlz').value.trim();
+  if (!wert) { fehler.textContent = 'Bitte gib deine PLZ ein.'; return; }
+  btn.disabled = true;
+  const stadt = await einstiegPlzErmitteln();
+  if (!stadt) { btn.disabled = false; return; }
+  const body = { plz: wert, stadt: stadt };
+  if (einstiegPlzStand.land) body.land = einstiegPlzStand.land;
+  const ok = await einstiegFeldSpeichern(body);
+  btn.disabled = false;
+  if (!ok) { fehler.textContent = 'Konnte nicht gespeichert werden. Bitte erneut versuchen.'; return; }
+  if (T) { T.plz = wert; T.stadt = stadt; if (einstiegPlzStand.land) T.land = einstiegPlzStand.land; }
+  updateDots();
+  einstiegWeiter();
+}
+
+// ── Schritt 3: Preis ──
+async function einstiegPreisSpeichern() {
+  const btn = document.getElementById('einstiegPreisWeiter');
+  const fehler = document.getElementById('einstiegPreisFehler');
+  fehler.textContent = '';
+  const preis = Number(document.getElementById('einstiegPreis').value);
+  if (!(preis > 0)) { fehler.textContent = 'Bitte gib deinen Stundensatz ein (Zahl größer 0).'; return; }
+  btn.disabled = true;
+  const ok = await einstiegFeldSpeichern({ preis_stunde: preis });
+  btn.disabled = false;
+  if (!ok) { fehler.textContent = 'Konnte nicht gespeichert werden. Bitte erneut versuchen.'; return; }
+  if (T) T.preis_stunde = preis;
+  const fp = document.getElementById('fPreis'); if (fp) fp.value = preis;
+  updateDots();
+  einstiegWeiter();
+}
+
+// Eine einzelne Angabe sofort speichern (gleicher PATCH-Weg wie uploadAvatar).
+async function einstiegFeldSpeichern(body) {
+  try {
+    const r = await fetch(SB + '/rest/v1/trainers?email=ilike.' + encodeURIComponent(sess.email), {
+      method: 'PATCH',
+      headers: authKopf({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify(body)
+    });
+    if (istAbgemeldet(r)) return false;
+    return r.ok;
+  } catch (e) { console.error('einstiegFeldSpeichern:', e); return false; }
+}
+
+// Pflicht-Hinweis im Bereich, bis Foto, PLZ und Preis da sind.
+function einstiegHinweisAktualisieren() {
+  const box = document.getElementById('einstiegHinweis');
+  if (!box) return;
+  const p = einstiegPflicht();
+  if (!T || p.vollstaendig) { box.classList.add('hidden'); return; }
+  const txt = document.getElementById('einstiegHinweisText');
+  if (txt) txt.innerHTML = '<b>Profil noch nicht komplett.</b> Für die Freigabe fehlt noch: ' + vexEsc(p.fehlt.join(', ')) + '.';
+  box.classList.remove('hidden');
 }
 
 // Baut das aktuelle Profil aus Formular + geladenem Datensatz T zusammen und
