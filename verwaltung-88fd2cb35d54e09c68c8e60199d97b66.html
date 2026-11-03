@@ -11,7 +11,11 @@
      Logik liegt in vexfit-verwaltung.js, 'self'). Bilder nur von Supabase-
      Storage und data: (MFA-QR-Code). Verbindungen nur zu Supabase. -->
 <!-- Teil A: manifest-src und worker-src ergänzt (PWA + Service Worker, beides 'self'). -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co data:; font-src 'self'; connect-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co; manifest-src 'self'; worker-src 'self'">
+<!-- B3: Karte (Leaflet). Zusätzlich erlaubt, NUR für die Karten-Ansicht (lesend):
+     Leaflet von cdnjs (script/style), OpenStreetMap-Kacheln als Bilder und die
+     PLZ-Auflösung (api.zippopotam.us, via vexfit-plz.js). Schreibende
+     Admin-Aktionen laufen unverändert nur über die Edge-Function /admin-aktion. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co data: https://*.tile.openstreetmap.org; font-src 'self'; connect-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co https://api.zippopotam.us; manifest-src 'self'; worker-src 'self'">
 <title>Vexfit – Verwaltung</title>
 <link rel="icon" type="image/png" sizes="32x32" href="marke/favicon-32.png">
 <!-- Teil A: Homescreen-App nur für die Verwaltung. Manifest + Icons sind nur von
@@ -25,6 +29,8 @@
 <meta name="apple-mobile-web-app-title" content="Vexfit Admin">
 <meta name="theme-color" content="#0a0a0a">
 <link rel="stylesheet" href="fonts/vexfit-fonts.css">
+<!-- B3: Leaflet (feste Version von cdnjs) für die Admin-Karte. -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="">
 <style>
 :root{--black:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1e1e1e;--card:#161616;--text-muted:#777;--border:rgba(255,255,255,0.08)}
 *{margin:0;padding:0;box-sizing:border-box}
@@ -234,6 +240,38 @@ tr:last-child td{border-bottom:none}
   tbody tr td.leer-text::before{content:none}
 }
 </style>
+<style>/* B3: Heute zu tun, Karte, Herkunft */
+.heute-box{margin-bottom:22px}
+.heute-karte{background:var(--card,#161616);border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.heute-kopf{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-bottom:8px}
+.heute-zahl{background:var(--accent,#e8ff00);color:#0a0a0a;border-radius:999px;font-size:12px;font-weight:700;padding:1px 9px;min-width:20px;text-align:center}
+.heute-zahl.null{background:rgba(255,255,255,0.12);color:var(--text-muted,#9a9a9a)}
+.heute-liste{display:flex;flex-direction:column;gap:6px}
+.heute-zeile{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-size:13px;padding:6px 0;border-top:1px solid var(--border,rgba(255,255,255,0.06))}
+.heute-zeile:first-child{border-top:none}
+.heute-zeile a,.heute-zeile .heute-link{color:var(--accent,#e8ff00);text-decoration:none;font-weight:600;cursor:pointer}
+.heute-fehlt{color:#ffaa00;font-size:12px}
+.heute-leer{color:var(--text-muted,#9a9a9a);font-size:13px}
+.karte-leiste{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;margin-bottom:12px;font-size:13px}
+.karte-leiste label{display:flex;gap:6px;align-items:center;color:var(--text-muted,#9a9a9a)}
+.karte-leiste select{background:var(--card,#161616);color:var(--white,#f5f5f0);border:1px solid var(--border,rgba(255,255,255,0.14));border-radius:6px;padding:7px 9px;font-family:inherit}
+.karte-status{color:var(--text-muted,#9a9a9a)}
+.karte-flaeche{height:60vh;min-height:320px;width:100%;border-radius:10px;border:1px solid var(--border,rgba(255,255,255,0.1));background:#0e0e0e}
+.leaflet-container{background:#0e0e0e}
+.karte-legende{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:12px;font-size:12.5px;color:var(--text-muted,#9a9a9a)}
+.karte-legende span{display:flex;align-items:center;gap:6px}
+.karte-legende .pkt{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,0.4)}
+.leaflet-popup-content{font-size:13px;line-height:1.5}
+.leaflet-popup-content a{color:#2e6fff;font-weight:600}
+.herkunft-tag{margin-bottom:10px;border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:8px;overflow:hidden}
+.herkunft-tag-kopf{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;background:var(--card,#161616);font-weight:600;font-size:13px}
+.herkunft-tag-kopf .z{color:var(--text-muted,#9a9a9a);font-weight:400}
+.herkunft-tag table{width:100%;border-collapse:collapse}
+.herkunft-tag td{padding:6px 12px;font-size:12.5px;border-top:1px solid var(--border,rgba(255,255,255,0.06))}
+.herkunft-tag td:last-child{text-align:right;color:var(--text-muted,#9a9a9a)}
+.herkunft-hinweis{font-size:12px;color:var(--text-muted,#9a9a9a);margin-top:10px;line-height:1.6}
+@media (max-width:640px){.karte-flaeche{height:66vh}}
+</style>
 </head>
 <body>
 
@@ -312,6 +350,8 @@ tr:last-child td{border-bottom:none}
       <div class="tab-mehr-menu" id="tab-mehr-menu">
         <!-- Teil 1c: Griff + Titel nur im Blatt (am großen Bildschirm ausgeblendet) -->
         <div class="mehr-griff mehr-nur-handy" aria-hidden="true"></div>
+        <button class="tab" data-tab="karte">Karte</button>
+        <button class="tab" data-tab="herkunft">Herkunft</button>
         <button class="tab" data-tab="zahlungen">Zahlungen</button>
         <button class="tab" data-tab="studios">Studios</button>
         <button class="tab" data-tab="zertifikate">Zertifikate</button>
@@ -328,6 +368,8 @@ tr:last-child td{border-bottom:none}
 
     <!-- Übersicht -->
     <div class="tab-content active" id="tab-uebersicht">
+      <!-- B3.1: Heute zu tun (ganz oben, nur lesend). Gefüllt von renderHeuteZuTun(). -->
+      <div id="heute-zu-tun" class="heute-box"><div class="leer-text">Lade …</div></div>
       <!-- Teil A: Push-Mitteilungen auf diesem Gerät (mehrere Geräte möglich). -->
       <!-- Teil 1f: eingerichtet → nur eine kleine Zeile; sonst der große Kasten. -->
       <div class="push-kompakt-zeile verborgen" id="push-kompakt">
@@ -450,6 +492,32 @@ tr:last-child td{border-bottom:none}
       </table></div>
     </div>
 
+    <!-- B3.2: Karte (Leaflet + OpenStreetMap, nur lesend) -->
+    <div class="tab-content" id="tab-karte">
+      <div class="karte-leiste">
+        <label>Land
+          <select id="karte-land"><option value="">alle</option><option value="AT">AT</option><option value="DE">DE</option><option value="CH">CH</option></select>
+        </label>
+        <label>Zeitraum
+          <select id="karte-zeit"><option value="7">7 Tage</option><option value="30">30 Tage</option><option value="">alle</option></select>
+        </label>
+        <span class="karte-status" id="karte-status"></span>
+      </div>
+      <div id="karte" class="karte-flaeche"></div>
+      <div class="karte-legende" id="karte-legende">
+        <span><i class="pkt" style="background:#2e6fff"></i>Trainer freigegeben</span>
+        <span><i class="pkt" style="background:#7fb3ff"></i>Trainer wartet</span>
+        <span><i class="pkt" style="background:#ff5a5a"></i>Kunde</span>
+        <span><i class="pkt" style="background:#ff9f1a"></i>Warteliste</span>
+      </div>
+    </div>
+
+    <!-- B3.3: Zahlen nach Herkunft (letzte 14 Tage, nur lesend) -->
+    <div class="tab-content" id="tab-herkunft">
+      <div class="section-hinweis">Neue Trainer und Kunden je Tag, aufgeschlüsselt nach Herkunft (Werbekanal). „direkt/unbekannt" = ohne gespeicherte Herkunft.</div>
+      <div id="herkunft-inhalt"><div class="leer-text">Lade …</div></div>
+    </div>
+
     <!-- Protokoll -->
     <div class="tab-content" id="tab-protokoll">
       <div class="section-hinweis">Die letzten Admin-Aktionen (ohne Personendaten).</div>
@@ -491,6 +559,9 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- B3: Leaflet (Karte) + PLZ-Auflösung (vexfit-plz.js) vor dem Modul laden. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin=""></script>
+<script src="vexfit-plz.js"></script>
 <script type="module" src="vexfit-verwaltung.js"></script>
 </body>
 </html>

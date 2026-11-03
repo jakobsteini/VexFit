@@ -206,6 +206,75 @@ export function pflichtVorFreigabe(t) {
   return { foto, plz, preis, fehlt, vollstaendig: fehlt.length === 0 };
 }
 
+// ── B3: "Heute zu tun" und Zahlen nach Herkunft (reine Funktionen) ──
+
+/** B3.1a: Trainer, die auf Freigabe warten (freigegeben=false, nicht gesperrt),
+ *  je mit den fehlenden Pflichtangaben (Foto/PLZ/Preis) aus B2. */
+export function wartenAufFreigabe(trainers) {
+  return (trainers || [])
+    .filter((t) => !t.aktiv && !t.gesperrt)
+    .map((t) => ({
+      id: t.id, vorname: t.vorname, nachname: t.nachname,
+      stadt: t.stadt, plz: t.plz, fehlt: pflichtVorFreigabe(t).fehlt,
+    }));
+}
+
+/** B3.1b: Kundenanfragen ohne Trainer-Antwort seit mehr als 24 Stunden.
+ *  Beantwortet = Trigger-Zeitstempel beantwortet_am ODER Status angenommen/
+ *  abgelehnt. 24-Stunden-Grenze streng (> 24 h). */
+export function anfragenOhneAntwort(anfragen, jetzt = Date.now()) {
+  const grenze = jetzt - 24 * 60 * 60 * 1000;
+  return (anfragen || []).filter((a) => {
+    const beantwortet = !!a.beantwortet_am || a.status === "angenommen" || a.status === "abgelehnt";
+    if (beantwortet) return false;
+    const t = a.created_at ? new Date(a.created_at).getTime() : NaN;
+    return !isNaN(t) && t < grenze;
+  });
+}
+
+/** B3.3: Herkunft eines Datensatzes; leer/fehlend = "direkt/unbekannt". */
+export function herkunftVon(row) {
+  const h = row && row.herkunft != null ? String(row.herkunft).trim() : "";
+  return h || "direkt/unbekannt";
+}
+
+function tagSchluessel(ms) {
+  const d = new Date(ms);
+  const p = (n) => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+/** B3.3: Zahlen je Tag für die letzten `tage` Tage (neueste zuerst): neue
+ *  Trainer und Kunden, aufgeschlüsselt nach Herkunft, plus wie viele der
+ *  Trainer Foto+PLZ+Preis vollständig haben. Reine Funktion. */
+export function herkunftZusammenfassung(trainers, kunden, jetzt = Date.now(), tage = 14) {
+  const tageListe = [];
+  const index = {};
+  for (let i = 0; i < tage; i++) {
+    const key = tagSchluessel(jetzt - i * 86400000);
+    const eintrag = { datum: key, trainer: 0, kunde: 0, trainerVollstaendig: 0, herkuenfte: {} };
+    tageListe.push(eintrag);
+    index[key] = eintrag;
+  }
+  const hk = (e, quelle) => (e.herkuenfte[quelle] = e.herkuenfte[quelle] || { trainer: 0, kunde: 0 });
+  for (const t of trainers || []) {
+    if (!t.created_at) continue;
+    const e = index[tagSchluessel(new Date(t.created_at).getTime())];
+    if (!e) continue;
+    e.trainer++;
+    if (pflichtVorFreigabe(t).vollstaendig) e.trainerVollstaendig++;
+    hk(e, herkunftVon(t)).trainer++;
+  }
+  for (const k of kunden || []) {
+    if (!k.created_at) continue;
+    const e = index[tagSchluessel(new Date(k.created_at).getTime())];
+    if (!e) continue;
+    e.kunde++;
+    hk(e, herkunftVon(k)).kunde++;
+  }
+  return tageListe;
+}
+
 /** Freischalt-Mail: aus trainers.freischalt_mail_gesendet ablesen, ob (und wann)
  *  die Mail „Dein Profil ist freigeschaltet" an den Trainer ging. Ein Zeitstempel
  *  (String) oder true = gesendet. Fehlt die Spalte (Migration nicht eingespielt),
@@ -591,6 +660,7 @@ function starteVerwaltung() {
       zeitLabelAktualisieren();
       renderStats();
       renderFreigabe();
+      renderHeuteZuTun();
       renderTrainer();
       renderKunden();
       ladeAnfragen();
@@ -878,6 +948,175 @@ function starteVerwaltung() {
         </tr>`;
       }).join("");
     } catch { tb.innerHTML = '<tr><td colspan="6" class="leer-text">Anfragen konnten nicht geladen werden.</td></tr>'; }
+  }
+
+  // ══════════ B3.1: Heute zu tun (Übersicht, nur lesend) ══════════
+  async function renderHeuteZuTun() {
+    const box = $("heute-zu-tun");
+    if (!box) return;
+    const warten = wartenAufFreigabe(sichtbar(daten.trainers, zustand.testsAusTrainer));
+    const freigabeHtml = warten.length
+      ? warten.slice(0, 50).map((t) => {
+          const name = nameFormatieren(`${t.vorname || ""} ${t.nachname || ""}`.trim()) || "Trainer";
+          const ort = t.stadt ? escapeHtml(nameFormatieren(t.stadt)) : (t.plz ? escapeHtml(t.plz) : "");
+          const fehlt = t.fehlt.length
+            ? `<span class="heute-fehlt">fehlt: ${escapeHtml(t.fehlt.join(", "))}</span>`
+            : `<span class="heute-fehlt" style="color:var(--green,#4ade80)">vollständig</span>`;
+          return `<div class="heute-zeile"><span class="heute-link" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">${escapeHtml(name)}</span>${ort ? `<span>${ort}</span>` : ""}${fehlt}</div>`;
+        }).join("")
+      : '<div class="heute-leer">Nichts offen</div>';
+    box.innerHTML =
+      `<div class="heute-karte">
+         <div class="heute-kopf">🟡 Trainer warten auf Freigabe <span class="heute-zahl${warten.length ? "" : " null"}">${warten.length}</span></div>
+         <div class="heute-liste">${freigabeHtml}</div>
+       </div>
+       <div class="heute-karte">
+         <div class="heute-kopf">⏰ Anfragen ohne Antwort seit über 24 h <span class="heute-zahl null" id="heute-anfragen-zahl">…</span></div>
+         <div class="heute-liste" id="heute-anfragen"><div class="heute-leer">Lade …</div></div>
+       </div>`;
+    // Teil b (Anfragen > 24 h) asynchron nachladen.
+    try {
+      const r = await hole("anfragen?beantwortet_am=is.null&select=id,created_at,status,kunden_name,trainer_name,trainer_id&order=created_at.asc&limit=500");
+      const rows = r.ok ? await r.json() : [];
+      const offen = anfragenOhneAntwort(rows);
+      const liste = $("heute-anfragen"), zahl = $("heute-anfragen-zahl");
+      if (zahl) { zahl.textContent = String(offen.length); zahl.classList.toggle("null", offen.length === 0); }
+      if (liste) {
+        liste.innerHTML = offen.length
+          ? offen.slice(0, 50).map((a) => {
+              const std = unbeantwortetSeitStunden(a);
+              const kunde = escapeHtml(nameFormatieren(a.kunden_name)) || "Kunde";
+              const trainer = a.trainer_name ? ` → ${escapeHtml(nameFormatieren(a.trainer_name))}` : "";
+              return `<div class="heute-zeile"><span>${kunde}${trainer}</span><span class="heute-fehlt">${std == null ? "" : "seit " + std + " h"}</span></div>`;
+            }).join("")
+          : '<div class="heute-leer">Nichts offen</div>';
+      }
+    } catch {
+      const liste = $("heute-anfragen");
+      if (liste) liste.innerHTML = '<div class="heute-leer">Anfragen konnten nicht geladen werden.</div>';
+    }
+  }
+
+  // ══════════ B3.3: Zahlen nach Herkunft (letzte 14 Tage, nur lesend) ══════════
+  function renderHerkunft() {
+    const box = $("herkunft-inhalt");
+    if (!box) return;
+    const tr = sichtbar(daten.trainers, zustand.testsAusTrainer);
+    const ku = sichtbar(daten.kunden, zustand.testsAusKunden);
+    const tage = herkunftZusammenfassung(tr, ku, Date.now(), 14);
+    const zeilen = tage.map((d) => {
+      const quellen = Object.keys(d.herkuenfte).sort();
+      const herk = quellen.length
+        ? quellen.map((q) => `${escapeHtml(q)}: ${d.herkuenfte[q].trainer}T/${d.herkuenfte[q].kunde}K`).join(" · ")
+        : "–";
+      const datum = new Date(d.datum + "T00:00:00").toLocaleDateString("de-AT", { day: "2-digit", month: "2-digit" });
+      const trTxt = d.trainer ? `${d.trainer} (${d.trainerVollstaendig} vollständig)` : "0";
+      return `<tr><td data-label="Tag"><strong>${datum}</strong></td><td data-label="Trainer">${trTxt}</td><td data-label="Kunden">${d.kunde}</td><td data-label="Herkunft">${herk}</td></tr>`;
+    }).join("");
+    box.innerHTML =
+      `<div class="table-wrap"><table>
+         <thead><tr><th>Tag</th><th>Neue Trainer</th><th>Neue Kunden</th><th>nach Herkunft (T=Trainer, K=Kunden)</th></tr></thead>
+         <tbody>${zeilen}</tbody>
+       </table></div>
+       <div class="herkunft-hinweis">Wer Cookies ablehnt, wird trotzdem über den Link erkannt und hier gezählt; Meta selbst zählt diese Registrierungen nicht mit.</div>`;
+  }
+
+  // ══════════ B3.2: Karte (Leaflet + OpenStreetMap, nur lesend) ══════════
+  let karte = null, kartenEbene = null;
+  const geoCache = new Map(); // plz -> { lat, lng, land, stadt } (keine PLZ doppelt abfragen)
+
+  function kartenInit() {
+    if (karte) { setTimeout(() => karte.invalidateSize(), 60); kartenZeichnen(); return; }
+    if (typeof L === "undefined") {
+      const el = $("karte-status");
+      if (el) el.textContent = "Karte konnte nicht geladen werden.";
+      return;
+    }
+    karte = L.map("karte", { center: [47.6, 13.4], zoom: 6, scrollWheelZoom: false });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap-Mitwirkende',
+    }).addTo(karte);
+    kartenEbene = L.layerGroup().addTo(karte);
+    setTimeout(() => karte.invalidateSize(), 60);
+    kartenZeichnen();
+  }
+
+  // Koordinaten zu einer PLZ – gespeicherte zuerst, sonst über vexfit-plz.js mit
+  // gemeinsamem Zwischenspeicher (keine PLZ wird doppelt abgefragt).
+  async function kartenCoords(p) {
+    if (p && p.lat != null && p.lng != null) return { lat: Number(p.lat), lng: Number(p.lng), land: p.land || null, stadt: p.stadt || null };
+    const plz = p && p.plz ? String(p.plz).trim() : "";
+    if (!plz) return null;
+    if (geoCache.has(plz)) return geoCache.get(plz);
+    const vp = (typeof globalThis !== "undefined" && globalThis.vexPlz) ? globalThis.vexPlz : null;
+    if (!vp) return null;
+    let erg = null;
+    try { erg = await vp.aufloesen(plz, {}); } catch { erg = null; }
+    if (!erg || erg.netzfehler) { geoCache.set(plz, null); return null; }
+    const o = erg.mehrdeutig ? (erg.optionen && erg.optionen[0]) : erg;
+    const coords = o && o.lat != null ? { lat: Number(o.lat), lng: Number(o.lng), land: o.land || null, stadt: o.stadt || null } : null;
+    geoCache.set(plz, coords);
+    return coords;
+  }
+
+  function innerhalbTage(created_at, tage) {
+    if (!tage) return true;
+    if (!created_at) return false;
+    const t = Date.parse(created_at);
+    return !Number.isNaN(t) && t >= Date.now() - tage * 86400000;
+  }
+
+  async function kartenZeichnen() {
+    if (!karte || !kartenEbene) return;
+    const statusEl = $("karte-status");
+    if (statusEl) statusEl.textContent = "Orte werden ermittelt …";
+    kartenEbene.clearLayers();
+    const land = ($("karte-land") || {}).value || "";
+    const tage = Number(($("karte-zeit") || {}).value || 0);
+
+    // Punkte sammeln (Testkonten je nach Schalter raus).
+    const punkte = [];
+    for (const t of sichtbar(daten.trainers, zustand.testsAusTrainer)) {
+      if (!innerhalbTage(t.created_at, tage)) continue;
+      const aktiv = t.aktiv && !t.gesperrt;
+      if (t.gesperrt) continue;
+      punkte.push({ typ: "trainer", farbe: aktiv ? "#2e6fff" : "#7fb3ff", status: aktiv ? "Freigegeben" : "Wartet auf Freigabe", quelle: t, art: "trainer", id: t.id, name: `${t.vorname || ""} ${t.nachname || ""}`.trim() });
+    }
+    for (const k of sichtbar(daten.kunden, zustand.testsAusKunden)) {
+      if (!innerhalbTage(k.created_at, tage)) continue;
+      punkte.push({ typ: "kunde", farbe: "#ff5a5a", status: "Kunde", quelle: k, art: "kunde", id: k.id, name: `${k.vorname || ""} ${k.nachname || ""}`.trim() });
+    }
+    // Warteliste separat laden (nur aktive Einträge).
+    try {
+      const r = await hole("warteliste?select=plz,stadt,created_at,land,email&order=created_at.desc&limit=2000");
+      if (r.ok) {
+        for (const w of await r.json()) {
+          if (!innerhalbTage(w.created_at, tage)) continue;
+          punkte.push({ typ: "warteliste", farbe: "#ff9f1a", status: "Warteliste", quelle: w, name: w.stadt || w.plz || "Warteliste" });
+        }
+      }
+    } catch { /* Warteliste optional */ }
+
+    let gesetzt = 0;
+    const koords = [];
+    for (const p of punkte) {
+      const c = await kartenCoords(p.quelle);
+      if (!c) continue;
+      if (land && c.land && String(c.land).toUpperCase() !== land) continue;
+      const ortTxt = [p.quelle.plz, c.stadt || p.quelle.stadt].filter(Boolean).map((x) => escapeHtml(String(x))).join(" · ");
+      const nameTxt = escapeHtml(nameFormatieren(p.name) || p.status);
+      const link = (p.art && p.id)
+        ? `<br><span class="heute-link" data-aktion="detail" data-art="${p.art}" data-id="${escapeHtml(p.id)}">Eintrag öffnen →</span>`
+        : "";
+      const popup = `<b>${nameTxt}</b><br>${ortTxt || "Ort unbekannt"}<br><span style="color:#888">${p.status}</span>${link}`;
+      L.circleMarker([c.lat, c.lng], { radius: 7, color: "#fff", weight: 1, fillColor: p.farbe, fillOpacity: 0.9 })
+        .addTo(kartenEbene).bindPopup(popup);
+      koords.push([c.lat, c.lng]);
+      gesetzt++;
+    }
+    if (koords.length) { try { karte.fitBounds(koords, { padding: [30, 30], maxZoom: 11 }); } catch { /* ok */ } }
+    if (statusEl) statusEl.textContent = gesetzt ? `${gesetzt} Orte` : "Keine Orte für diese Auswahl";
   }
 
   async function ladeZahlungslinkOffen() {
@@ -1268,7 +1507,7 @@ function starteVerwaltung() {
     neuZeichnen(); ladeDaten();
   }
 
-  function neuZeichnen() { renderStats(); renderFreigabe(); renderTrainer(); renderKunden(); ladeZertifikate(); }
+  function neuZeichnen() { renderStats(); renderFreigabe(); renderHeuteZuTun(); renderTrainer(); renderKunden(); ladeZertifikate(); }
 
   // ── Zertifikat (signierte Adresse) ──
   async function zertifikatOeffnen(pfad) {
@@ -1359,6 +1598,10 @@ function starteVerwaltung() {
     for (const el of document.querySelectorAll(".tab")) el.classList.remove("active");
     const inhalt = $("tab-" + name); if (inhalt) inhalt.classList.add("active");
     const knopf = document.querySelector(`.tab[data-tab="${name}"]`); if (knopf) knopf.classList.add("active");
+    // B3: Karte und Herkunft erst beim Öffnen zeichnen (Karte braucht einen
+    // sichtbaren Container zum korrekten Einmessen).
+    if (name === "karte") kartenInit();
+    else if (name === "herkunft") renderHerkunft();
   }
 
   // Teil M: Deep-Link aus der Mail anspringen. #trainer-<id> / #kunde-<id>
@@ -1630,6 +1873,11 @@ function starteVerwaltung() {
       const el = e.target.closest('[data-aktion="studio-freigabe"]');
       if (el) studioRpc("studio_admin_freigabe", { p_studio_id: el.dataset.id, p_an: el.checked });
     });
+    // B3: Karten-Filter (Land / Zeitraum) neu zeichnen.
+    for (const id of ["karte-land", "karte-zeit"]) {
+      const el = $(id);
+      if (el) el.addEventListener("change", () => kartenZeichnen());
+    }
   }
 
   function aufSortieren(liste, feld) {
