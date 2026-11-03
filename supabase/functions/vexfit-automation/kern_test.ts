@@ -1013,10 +1013,12 @@ Deno.test("Stripe: dasselbe Ereignis zweimal → beim zweiten Mal keine Wirkung"
 
 Deno.test("Stripe: anderer Ereignistyp → 200 ohne Wirkung", async () => {
   const { anschluesse, auf } = bau();
+  // B5: invoice.paid/payment_failed/subscription.deleted werden jetzt verarbeitet;
+  // ein weiterhin NICHT abonnierter Typ (z. B. charge.refunded) bleibt wirkungslos.
   const a = await bearbeiten(
     await stripeAnfrage({
       id: "evt_x",
-      type: "invoice.paid",
+      type: "charge.refunded",
       data: { object: {} },
     }),
     anschluesse,

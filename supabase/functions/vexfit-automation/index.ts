@@ -159,6 +159,22 @@ const anschluesse: Anschluesse = {
     return zeilen[0] ?? null;
   },
 
+  // B5: Trainer über die gespeicherte Stripe-Kunden-ID. Fehlt die Spalte
+  // (Migration 2026-11-03-03 nicht eingespielt), null statt Fehler – dann greift
+  // der Rückfall auf die E-Mail-Suche.
+  async trainerNachStripeCustomer(customerId: string): Promise<Trainer | null> {
+    try {
+      const zeilen = await lesen<Trainer>(
+        `trainers?stripe_customer_id=eq.${
+          encodeURIComponent(customerId)
+        }&select=id,vorname,nachname,email,stripe_bezahlt&limit=1`,
+      );
+      return zeilen[0] ?? null;
+    } catch {
+      return null;
+    }
+  },
+
   // Teil 4: vollstaendige Profilzeile per E-Mail. select=* – fehlt die Spalte
   // freigabe_mail_gesendet (Migration nicht eingespielt), fehlt der Schluessel
   // im Ergebnis einfach; kern.ts erkennt das und sendet dann nicht.

@@ -47,8 +47,12 @@ export const LINK_ERSTE = "https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00";
 /** Zahlungslink aus "Email Trainer - WEITERE Anfrage 9,99€". */
 export const LINK_WEITERE = "https://buy.stripe.com/7sYbJ1fkl8sX8jxfxM2oE01";
 
-/** Der einzige Stripe-Ereignistyp, den der Workflow abonniert hatte. */
+/** Der Stripe-Ereignistyp der Erstzahlung (checkout). */
 export const STRIPE_EREIGNIS = "checkout.session.completed";
+/** B5: die zusätzlich verarbeiteten Abo-Ereignisse. */
+export const STRIPE_INVOICE_PAID = "invoice.paid";
+export const STRIPE_INVOICE_FAILED = "invoice.payment_failed";
+export const STRIPE_SUB_DELETED = "customer.subscription.deleted";
 
 /** Herkunft, die im Browser erlaubt ist. Beleg: CNAME enthaelt vexfit.app,
  *  und alle 58 Verweise im Repo lauten https://vexfit.app — kein www. */
@@ -198,6 +202,11 @@ export interface StripeSitzung {
   amount_total?: number | null;
   /** Vom Zahlungslink durchgereicht: die Trainer-Kennung (bevorzugte Zuordnung). */
   client_reference_id?: string | null;
+  /** B5: Stripe-Kunden-ID (checkout.session.completed, invoice- und
+   *  subscription-Ereignisse). Für die Zuordnung späterer Rechnungen. */
+  customer?: string | null;
+  /** B5: bei invoice.* steht die E-Mail als customer_email am Objekt. */
+  customer_email?: string | null;
 }
 
 export interface StripeEreignis {
@@ -238,6 +247,11 @@ export interface WartelistenEintrag {
 export interface Anschluesse {
   trainerNachId(id: string): Promise<Trainer | null>;
   trainerNachEmail(email: string): Promise<Trainer | null>;
+  /** B5: Trainer über die gespeicherte Stripe-Kunden-ID finden (für spätere
+   *  Rechnungen ohne client_reference_id). service_role. Fehlt die Spalte
+   *  stripe_customer_id (Migration 2026-11-03-03 nicht eingespielt), gibt es
+   *  null zurück (Rückfall auf die E-Mail-Suche). */
+  trainerNachStripeCustomer?(customerId: string): Promise<Trainer | null>;
   /** Die AELTESTE offene Anfrage des Trainers (E2), oder null. */
   aeltesteOffeneAnfrage(trainerId: string): Promise<Anfrage | null>;
   trainerBezahltMarkieren(email: string): Promise<void>;
@@ -951,6 +965,41 @@ export function mailKeinTrainer(
     knopfLink: ADMIN_LINK,
     grundZeile: "Interne Benachrichtigung.",
   });
+}
+
+/** B5: interne Mail an den Betreiber (office@) bei Zahlungsproblem/Kündigung. */
+export function mailAboEreignis(
+  trainer: Trainer,
+  art: "zahlung_fehlgeschlagen" | "gekuendigt",
+): Mail {
+  const name = nameFormatieren(`${w(trainer.vorname)} ${w(trainer.nachname)}`.trim()) || "Trainer";
+  const titel = art === "gekuendigt" ? "Abo gekündigt" : "Zahlung fehlgeschlagen";
+  const absatz = art === "gekuendigt"
+    ? "Das Stripe-Abo wurde gekündigt. Der Trainer wurde gesperrt und erscheint nicht " +
+      "mehr in der Suche; seine bereits bezahlten Kundenkontakte bleiben für ihn sichtbar."
+    : "Eine wiederkehrende Zahlung ist fehlgeschlagen. Der Trainer bleibt aktiv – " +
+      "du entscheidest, ob du nachfasst.";
+  return baueMail(BETREIBER, `${titel}: ${name}`, {
+    ueberschrift: titel,
+    absatz,
+    datenZeilen: [
+      { beschriftung: "Trainer", wert: name },
+      { beschriftung: "E-Mail", wert: w(trainer.email) },
+    ],
+    knopfText: "Im Admin öffnen",
+    knopfLink: verwaltungLink(w(trainer.id) ? `trainer-${w(trainer.id)}` : ""),
+    grundZeile: "Interne Benachrichtigung.",
+  });
+}
+
+/** B5: Admin-Push bei Zahlungsproblem/Kündigung. */
+export function pushAboEreignis(
+  trainer: Trainer,
+  art: "zahlung_fehlgeschlagen" | "gekuendigt",
+): PushNachricht {
+  const name = nameFormatieren(`${w(trainer.vorname)} ${w(trainer.nachname)}`.trim()) || "Trainer";
+  const titel = art === "gekuendigt" ? "❌ Abo gekündigt" : "⚠️ Zahlung fehlgeschlagen";
+  return { titel, text: name, url: verwaltungLink(w(trainer.id) ? `trainer-${w(trainer.id)}` : "") };
 }
 
 // ============================================================================
@@ -2565,6 +2614,24 @@ async function unbeantwortetePruefen(
  *     und nur sie wird markiert; die uebrigen bleiben offen. Frueher traf das
  *     Markieren alle offenen Anfragen des Trainers auf einmal.
  */
+/** B5: Abo-Felder best effort setzen; fehlt die Migration 2026-11-03-03, still
+ *  überspringen (die Zahlung ist dann über stripe_bezahlt/aktiv schon verbucht). */
+async function aboFelderSetzen(
+  a: Anschluesse,
+  trainerId: string,
+  felder: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await a.adminTrainerSetzen(trainerId, felder);
+  } catch (fehler) {
+    if (istMigrationFehlt(fehler)) {
+      a.melden?.("abo-status: Spalten fehlen (Migration 2026-11-03-03 nicht eingespielt)");
+      return;
+    }
+    a.melden?.("abo-status setzen fehlgeschlagen", String(fehler));
+  }
+}
+
 async function stripe(r: Request, a: Anschluesse): Promise<Response> {
   const rumpf = await r.text();
   const ereignis = await a.stripeEreignis(
@@ -2573,76 +2640,103 @@ async function stripe(r: Request, a: Anschluesse): Promise<Response> {
   );
   if (!ereignis) return antwort(400, { fehler: "Signatur nicht gueltig" });
 
-  if (ereignis.type !== STRIPE_EREIGNIS) {
+  const handhabbar = ereignis.type === STRIPE_EREIGNIS ||
+    ereignis.type === STRIPE_INVOICE_PAID ||
+    ereignis.type === STRIPE_INVOICE_FAILED ||
+    ereignis.type === STRIPE_SUB_DELETED;
+  if (!handhabbar) {
     return antwort(200, { ok: true, uebersprungen: "anderer Ereignistyp" });
   }
+  // B5: die bestehende Entdopplung gilt jetzt für ALLE verarbeiteten Ereignisse.
   if (await a.ereignisSchonVerarbeitet(ereignis.id)) {
     return antwort(200, { ok: true, uebersprungen: "schon verarbeitet" });
   }
 
   const sitzung = ereignis.data?.object ?? {};
   const refId = String(sitzung.client_reference_id ?? "");
-  const zahlerEmail = String(sitzung.customer_details?.email ?? "");
+  const custId = String(sitzung.customer ?? "");
+  // Bei checkout: customer_details.email; bei invoice.*: customer_email.
+  const zahlerEmail = String(sitzung.customer_details?.email ?? sitzung.customer_email ?? "");
 
-  // Zuordnung: zuerst ueber die mitgegebene Trainer-Kennung
-  // (client_reference_id aus dem Zahlungslink), sonst ueber die E-Mail. Die
-  // E-Mail-Suche ist in der Function ohne Gross-/Kleinschreibung umgesetzt
-  // (index.ts: ilike).
+  // Zuordnung wie bisher: client_reference_id, sonst Stripe-Kunden-ID, sonst
+  // E-Mail (ilike in der Function).
   let trainer: Trainer | null = null;
   if (refId) trainer = await a.trainerNachId(refId);
+  if (!trainer && custId && a.trainerNachStripeCustomer) {
+    try { trainer = await a.trainerNachStripeCustomer(custId); } catch { /* Rückfall E-Mail */ }
+  }
   if (!trainer && zahlerEmail) trainer = await a.trainerNachEmail(zahlerEmail);
+
+  // ── Erstzahlung (checkout.session.completed): unveränderter Ablauf ──
+  if (ereignis.type === STRIPE_EREIGNIS) {
+    if (!trainer) {
+      // Kein Treffer: Ereignis NICHT vermerken (Stripe stellt erneut zu) und
+      // Jakob mit Betrag, Ereignis-ID und eingegebener E-Mail benachrichtigen.
+      await sendeWennAdresseTaugt(
+        a,
+        mailKeinTrainer(zahlerEmail || "(keine)", ereignis.id, sitzung.amount_total),
+      );
+      a.melden?.("kein Trainer zu dieser Zahlung — gemeldet, nicht vermerkt");
+      return antwort(200, { ok: true, uebersprungen: "kein Trainer", gemeldet: true });
+    }
+    const zielEmail = zahlerEmail || w(trainer.email);
+    // E1: die Zahlung wird in jedem Fall verbucht.
+    await a.trainerBezahltMarkieren(zielEmail);
+    // B5: Stripe-Kunden-ID merken (für spätere Rechnungen) + Abo-Status aktiv.
+    await aboFelderSetzen(a, trainer.id, {
+      abo_status: "aktiv",
+      abo_status_am: new Date().toISOString(),
+      ...(custId ? { stripe_customer_id: custId } : {}),
+    });
+    // E2: genau die aelteste offene Anfrage (die Function laesst abgelehnte aus).
+    const anfrage = await a.aeltesteOffeneAnfrage(trainer.id);
+    let mails = 0;
+    if (anfrage) {
+      if (await sendeWennAdresseTaugt(a, mailKundenDaten(trainer, anfrage, zielEmail))) mails++;
+      await a.anfrageWeitergeleitetMarkieren(anfrage.id);
+    } else {
+      a.melden?.("Zahlung ohne offene Anfrage — verbucht, aber nichts weitergeleitet");
+    }
+    if (await sendeWennAdresseTaugt(a, mailZahlungAnJakob(trainer, zielEmail, sitzung.amount_total, Boolean(anfrage)))) mails++;
+    await a.ereignisVermerken(ereignis.id, ereignis.type);
+    return antwort(200, {
+      ok: true,
+      mails,
+      trainer_markiert: true,
+      anfrage_weitergeleitet: Boolean(anfrage),
+    });
+  }
+
+  // ── Abo-Lebenszyklus (invoice.paid / invoice.payment_failed / subscription.deleted) ──
   if (!trainer) {
-    // Kein Treffer: Ereignis NICHT vermerken (Stripe stellt erneut zu) und
-    // Jakob mit Betrag, Ereignis-ID und eingegebener E-Mail benachrichtigen.
-    await sendeWennAdresseTaugt(
-      a,
-      mailKeinTrainer(zahlerEmail || "(keine)", ereignis.id, sitzung.amount_total),
-    );
-    a.melden?.("kein Trainer zu dieser Zahlung — gemeldet, nicht vermerkt");
-    return antwort(200, { ok: true, uebersprungen: "kein Trainer", gemeldet: true });
+    // Nicht vermerken (Stripe stellt erneut zu). Kein Nutzerfehler.
+    a.melden?.(`kein Trainer zu Stripe-Ereignis ${ereignis.type} (${custId || zahlerEmail || "ohne Kennung"})`);
+    return antwort(200, { ok: true, uebersprungen: "kein Trainer" });
   }
-
-  // Zielzeile sicher ueber die E-Mail des gefundenen Trainers (bei Zuordnung per
-  // Kennung kann die eingetippte Zahler-E-Mail abweichen oder fehlen). Im
-  // Normalfall ist zahlerEmail gesetzt und gleich.
-  const zielEmail = zahlerEmail || w(trainer.email);
-
-  // E1: die Zahlung wird in jedem Fall verbucht.
-  await a.trainerBezahltMarkieren(zielEmail);
-
-  // E2: genau die aelteste offene Anfrage (die Function laesst abgelehnte aus).
-  const anfrage = await a.aeltesteOffeneAnfrage(trainer.id);
-
+  const jetzt = new Date().toISOString();
   let mails = 0;
-  if (anfrage) {
-    const ging = await sendeWennAdresseTaugt(
-      a,
-      mailKundenDaten(trainer, anfrage, zielEmail),
-    );
-    if (ging) mails++;
-    await a.anfrageWeitergeleitetMarkieren(anfrage.id);
-  } else {
-    a.melden?.(
-      "Zahlung ohne offene Anfrage — verbucht, aber nichts weitergeleitet",
-    );
+  let gesperrt = false;
+  if (ereignis.type === STRIPE_INVOICE_PAID) {
+    // Zahlung protokolliert; Trainer bleibt aktiv.
+    await aboFelderSetzen(a, trainer.id, {
+      abo_status: "aktiv",
+      abo_status_am: jetzt,
+      ...(custId ? { stripe_customer_id: custId } : {}),
+    });
+  } else if (ereignis.type === STRIPE_INVOICE_FAILED) {
+    await aboFelderSetzen(a, trainer.id, { abo_status: "zahlung_fehlgeschlagen", abo_status_am: jetzt });
+    if (await sendeWennAdresseTaugt(a, mailAboEreignis(trainer, "zahlung_fehlgeschlagen"))) mails++;
+    await pushBenachrichtigung(a, pushAboEreignis(trainer, "zahlung_fehlgeschlagen"));
+    // Bewusst NICHT sperren.
+  } else { // STRIPE_SUB_DELETED
+    // Sperren: keine neuen Anfragen, nicht mehr in der Suche. Bezahlte
+    // Kundenkontakte bleiben für ihn sichtbar (eigene anfragen-Zeilen).
+    await a.adminTrainerSetzen(trainer.id, { aktiv: false });
+    gesperrt = true;
+    await aboFelderSetzen(a, trainer.id, { abo_status: "gekuendigt", abo_status_am: jetzt });
+    if (await sendeWennAdresseTaugt(a, mailAboEreignis(trainer, "gekuendigt"))) mails++;
+    await pushBenachrichtigung(a, pushAboEreignis(trainer, "gekuendigt"));
   }
-
-  const anJakob = await sendeWennAdresseTaugt(
-    a,
-    mailZahlungAnJakob(
-      trainer,
-      zielEmail,
-      sitzung.amount_total,
-      Boolean(anfrage),
-    ),
-  );
-  if (anJakob) mails++;
-
   await a.ereignisVermerken(ereignis.id, ereignis.type);
-  return antwort(200, {
-    ok: true,
-    mails,
-    trainer_markiert: true,
-    anfrage_weitergeleitet: Boolean(anfrage),
-  });
+  return antwort(200, { ok: true, typ: ereignis.type, mails, gesperrt });
 }

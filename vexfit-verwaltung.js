@@ -275,6 +275,16 @@ export function herkunftZusammenfassung(trainers, kunden, jetzt = Date.now(), ta
   return tageListe;
 }
 
+/** B5.3: Anzeigetext für den Abo-Status eines Trainers. */
+export function aboStatusLabel(status) {
+  switch (status) {
+    case "aktiv": return "Aktiv";
+    case "zahlung_fehlgeschlagen": return "Zahlung fehlgeschlagen";
+    case "gekuendigt": return "Gekündigt";
+    default: return "–";
+  }
+}
+
 /** Freischalt-Mail: aus trainers.freischalt_mail_gesendet ablesen, ob (und wann)
  *  die Mail „Dein Profil ist freigeschaltet" an den Trainer ging. Ein Zeitstempel
  *  (String) oder true = gesendet. Fehlt die Spalte (Migration nicht eingespielt),
@@ -1119,6 +1129,26 @@ function starteVerwaltung() {
     if (statusEl) statusEl.textContent = gesetzt ? `${gesetzt} Orte` : "Keine Orte für diese Auswahl";
   }
 
+  // B5.3: Abo-Status je Trainer (aktiv / Zahlung fehlgeschlagen / gekündigt) mit Datum.
+  function renderAboStatus() {
+    const tb = $("abo-status-tbody");
+    if (!tb) return;
+    const liste = sichtbar(daten.trainers, zustand.testsAusTrainer)
+      .filter((t) => t.abo_status || t.stripe_bezahlt)
+      .sort((a, b) => String(b.abo_status_am || "").localeCompare(String(a.abo_status_am || "")));
+    if (!liste.length) { tb.innerHTML = '<tr><td colspan="3" class="leer-text">Noch keine Abo-Ereignisse.</td></tr>'; return; }
+    const farbe = (s) => s === "zahlung_fehlgeschlagen" ? "#ffaa00" : (s === "gekuendigt" ? "#ff6b6b" : "var(--green,#4ade80)");
+    tb.innerHTML = liste.map((t) => {
+      const status = t.abo_status || (t.stripe_bezahlt ? "aktiv" : "");
+      const seit = t.abo_status_am ? new Date(t.abo_status_am).toLocaleDateString("de-AT") : "–";
+      return `<tr>
+        <td data-label="Trainer"><strong>${namePaarHtml(t.vorname, t.nachname)}</strong></td>
+        <td data-label="Abo-Status"><span style="color:${farbe(status)}">${escapeHtml(aboStatusLabel(status))}</span></td>
+        <td data-label="seit">${escapeHtml(seit)}</td>
+      </tr>`;
+    }).join("");
+  }
+
   async function ladeZahlungslinkOffen() {
     const tb = $("zahlungslink-tbody");
     try {
@@ -1507,7 +1537,7 @@ function starteVerwaltung() {
     neuZeichnen(); ladeDaten();
   }
 
-  function neuZeichnen() { renderStats(); renderFreigabe(); renderHeuteZuTun(); renderTrainer(); renderKunden(); ladeZertifikate(); }
+  function neuZeichnen() { renderStats(); renderFreigabe(); renderHeuteZuTun(); renderTrainer(); renderKunden(); renderAboStatus(); ladeZertifikate(); }
 
   // ── Zertifikat (signierte Adresse) ──
   async function zertifikatOeffnen(pfad) {
@@ -1602,6 +1632,7 @@ function starteVerwaltung() {
     // sichtbaren Container zum korrekten Einmessen).
     if (name === "karte") kartenInit();
     else if (name === "herkunft") renderHerkunft();
+    else if (name === "zahlungen") renderAboStatus();
   }
 
   // Teil M: Deep-Link aus der Mail anspringen. #trainer-<id> / #kunde-<id>
