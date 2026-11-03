@@ -12,7 +12,7 @@
 //      (REST/Auth/Functions) werden nie abgefangen oder gecacht, damit nie
 //      veraltete oder fremde Daten erscheinen.
 
-const HUELLE_CACHE = "vexfit-admin-huelle-v2";
+const HUELLE_CACHE = "vexfit-admin-huelle-v3";
 
 self.addEventListener("install", (event) => {
   // Nur die Seiten-Hülle (das HTML selbst) vorhalten.

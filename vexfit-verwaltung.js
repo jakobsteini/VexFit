@@ -1142,10 +1142,11 @@ function starteVerwaltung() {
     }
     // Warteliste separat laden (nur aktive Einträge).
     try {
-      const r = await hole("warteliste?select=plz,stadt,created_at,land&order=created_at.desc&limit=2000");
+      // warteliste hat erstellt_am (nicht created_at) und KEIN land – nur echte Spalten lesen.
+      const r = await hole("warteliste?select=plz,stadt,erstellt_am&order=erstellt_am.desc&limit=2000");
       if (r.ok) {
         for (const w of await r.json()) {
-          if (!innerhalbTage(w.created_at, tage)) continue;
+          if (!innerhalbTage(w.erstellt_am, tage)) continue;
           punkte.push({ typ: "warteliste", farbe: "#ff9f1a", status: "Warteliste", quelle: w, name: w.stadt || w.plz || "Warteliste" });
         }
       }

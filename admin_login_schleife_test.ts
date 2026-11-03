@@ -71,13 +71,13 @@ Deno.test("401 meldet ab; bereicheLaden isoliert einen werfenden Bereich, die an
   assertEquals(gelaufen.sort(), ["a", "b", "wirft"]);
 });
 
-Deno.test("Verdrahtung: hole() prüft nur 401, Service-Worker-Cache v2", async () => {
+Deno.test("Verdrahtung: hole() prüft nur 401, Service-Worker-Cache vorhanden", async () => {
   const js = await lies("./vexfit-verwaltung.js");
   assertStringIncludes(js, "if (mussAbmelden(r.status))");
   assert(!js.includes("r.status === 401 || r.status === 403"), "403 darf nicht mehr abmelden");
   assertStringIncludes(js, "bereicheLaden([");
   const sw = await lies("./sw-verwaltung.js");
-  assertStringIncludes(sw, "vexfit-admin-huelle-v2");
+  assertStringIncludes(sw, "vexfit-admin-huelle-v"); // Version wird je Baustein hochgezählt
 });
 
 Deno.test("Migration 05: GRANT SELECT (beantwortet_am) auf anfragen, nur Datei", async () => {
