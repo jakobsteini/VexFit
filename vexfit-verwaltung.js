@@ -219,6 +219,35 @@ export function wartenAufFreigabe(trainers) {
     }));
 }
 
+// ── Login-Schleifen-Fix: HTTP-Status deuten, Bereiche voneinander isolieren ──
+// NUR 401 (abgelaufenes/ungültiges Token) beendet die Sitzung. 403 heißt
+// „kein Recht auf diesen Bereich" und darf NICHT abmelden – sonst wird aus
+// einer fehlenden Berechtigung ein Rauswurf (die beobachtete Login-Schleife).
+// Exportiert, damit ohne Browser prüfbar.
+export function mussAbmelden(status) {
+  return status === 401;
+}
+
+// Hinweistext für einen Bereich, der nicht geladen werden konnte: bei 403 der
+// klare Rechte-Hinweis, sonst ein allgemeiner Text.
+export const KEIN_RECHT_TEXT = "Keine Berechtigung für diesen Bereich";
+export function bereichFehlerText(status) {
+  return status === 403 ? KEIN_RECHT_TEXT : "konnte nicht geladen werden";
+}
+
+// Lädt mehrere Dashboard-Bereiche UNABHÄNGIG voneinander: ein fehlschlagender
+// Bereich wirft nie bis nach oben durch und blockiert die anderen nicht. Jede
+// laden()-Funktion zeigt ihren Zustand (inkl. Fehlermeldung) selbst an. Gibt je
+// Bereich true/false zurück, ob er fehlerfrei durchlief. Exportiert, prüfbar.
+export async function bereicheLaden(bereiche) {
+  const ergebnis = {};
+  await Promise.all((bereiche || []).map(async (b) => {
+    try { await b.laden(); ergebnis[b.name] = true; }
+    catch { ergebnis[b.name] = false; }
+  }));
+  return ergebnis;
+}
+
 /** B3.1b: Kundenanfragen ohne Trainer-Antwort seit mehr als 24 Stunden.
  *  Beantwortet = Trigger-Zeitstempel beantwortet_am ODER Status angenommen/
  *  abgelehnt. 24-Stunden-Grenze streng (> 24 h). */
@@ -634,7 +663,9 @@ function starteVerwaltung() {
   // ── Datenabruf ──
   async function hole(pfad, extra) {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/${pfad}`, { headers: { ...authKopf(auth.token), ...(extra || {}) } });
-    if (r.status === 401 || r.status === 403) { abmelden("Sitzung abgelaufen. Bitte neu anmelden."); throw new Error("abgemeldet"); }
+    // Nur 401 beendet die Sitzung; 403 (fehlendes Recht auf einen Bereich) wird
+    // an den Aufrufer zurückgegeben, der im Bereich einen Hinweis zeigt.
+    if (mussAbmelden(r.status)) { abmelden("Sitzung abgelaufen. Bitte neu anmelden."); throw new Error("abgemeldet"); }
     return r;
   }
   async function zaehle(pfad) {
@@ -670,16 +701,21 @@ function starteVerwaltung() {
       zeitLabelAktualisieren();
       renderStats();
       renderFreigabe();
-      renderHeuteZuTun();
       renderTrainer();
       renderKunden();
-      ladeAnfragen();
-      ladeZahlungslinkOffen();
-      ladeZahlungen();
-      ladeZertifikate();
-      ladeStudios();
-      ladeNachfrage();
-      ladeProtokoll();
+      // Login-Schleifen-Fix: jeder Bereich lädt unabhängig. Ein 403 (fehlendes
+      // Recht) zeigt nur im Bereich einen Hinweis, meldet NICHT ab und
+      // blockiert die übrigen Bereiche nicht.
+      bereicheLaden([
+        { name: "heute", laden: renderHeuteZuTun },
+        { name: "anfragen", laden: ladeAnfragen },
+        { name: "zahlungslink", laden: ladeZahlungslinkOffen },
+        { name: "zahlungen", laden: ladeZahlungen },
+        { name: "zertifikate", laden: ladeZertifikate },
+        { name: "studios", laden: ladeStudios },
+        { name: "nachfrage", laden: ladeNachfrage },
+        { name: "protokoll", laden: ladeProtokoll },
+      ]);
       // Teil M: Deep-Link aus der Benachrichtigungs-Mail (#trainer-/#kunde-/
       // #anfrage-<id>) nach dem ersten Laden genau einmal anspringen.
       if (!hashSprungGemacht) { hashSprungGemacht = true; springeZuHash(); }
@@ -941,7 +977,7 @@ function starteVerwaltung() {
     const tb = $("anfragen-tbody");
     try {
       const r = await hole("anfragen?select=created_at,trainer_id,trainer_name,kunden_name,status,weitergeleitet&order=created_at.desc&limit=100");
-      if (!r.ok) throw new Error("HTTP " + r.status);
+      if (!r.ok) { tb.innerHTML = `<tr><td colspan="6" class="leer-text">${escapeHtml(bereichFehlerText(r.status))}</td></tr>`; return; }
       const rows = await r.json();
       if (!rows.length) { tb.innerHTML = '<tr><td colspan="6" class="leer-text">Noch keine Anfragen.</td></tr>'; return; }
       tb.innerHTML = rows.map((a) => {
@@ -987,9 +1023,16 @@ function starteVerwaltung() {
     // Teil b (Anfragen > 24 h) asynchron nachladen.
     try {
       const r = await hole("anfragen?beantwortet_am=is.null&select=id,created_at,status,kunden_name,trainer_name,trainer_id&order=created_at.asc&limit=500");
-      const rows = r.ok ? await r.json() : [];
-      const offen = anfragenOhneAntwort(rows);
       const liste = $("heute-anfragen"), zahl = $("heute-anfragen-zahl");
+      if (!r.ok) {
+        // Kein Recht (403) o. ä.: nur diesen Bereich als nicht ladbar anzeigen;
+        // nicht abmelden, die übrige Übersicht bleibt stehen.
+        if (zahl) { zahl.textContent = "–"; zahl.classList.add("null"); }
+        if (liste) liste.innerHTML = `<div class="heute-leer">${escapeHtml(bereichFehlerText(r.status))}</div>`;
+        return;
+      }
+      const rows = await r.json();
+      const offen = anfragenOhneAntwort(rows);
       if (zahl) { zahl.textContent = String(offen.length); zahl.classList.toggle("null", offen.length === 0); }
       if (liste) {
         liste.innerHTML = offen.length

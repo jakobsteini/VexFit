@@ -1,0 +1,46 @@
+-- ============================================================================
+-- Vexfit – Admin-Login-Schleife beheben: Leserecht auf anfragen.beantwortet_am
+-- Erzeugt am 03.11.2026. NICHT eingespielt (nur Datei).
+--
+-- BEFUND (live gemessen):
+--   Nach dem Admin-Login lief die B3-Abfrage „Heute zu tun" in 403:
+--     GET /rest/v1/anfragen?beantwortet_am=is.null&select=id,created_at,status,
+--         kunden_name,trainer_name,trainer_id
+--     {"code":"42501","message":"permission denied for table anfragen",
+--      "hint":"GRANT SELECT ON public.anfragen TO authenticated;"}
+--   Ursache: 2026-10-26-01-zugriffsschutz.sql hat das tabellenweite SELECT auf
+--   anfragen entzogen und spaltenweise nur bestimmte Spalten wieder erlaubt.
+--   Die Spalte beantwortet_am kam erst danach dazu (2026-10-31-04-vertrauen.sql)
+--   und war deshalb nie im Leserecht. Schon das FILTERN auf beantwortet_am
+--   (is.null) verlangt das SELECT-Recht auf diese Spalte -> 403.
+--
+-- ENTSCHEIDUNG: Spalten-GRANT (kein SECURITY-DEFINER-Umweg).
+--   Ein Spalten-GRANT vergibt KEIN Zeilenrecht – welche Zeilen jemand sieht,
+--   entscheidet weiterhin allein der Zeilenschutz (RLS):
+--     * anfragen_nur_beteiligte_lesen: Kunde (eigene E-Mail) / beteiligter
+--       Trainer sehen ihre eigenen Zeilen.
+--     * anfragen_admin_alles_lesen (public.ist_vexfit_admin()): das Admin-Konto
+--       sieht alle.
+--   beantwortet_am ist nur ein Zeitstempel (wann geantwortet wurde), nicht
+--   sensibel wie kunden_email (das bewusst ausgespart bleibt). Das Recht zeigt
+--   also NIEMANDEM eine Zeile, die er heute nicht schon sieht – es ergänzt nur
+--   eine Spalte auf ohnehin sichtbaren Zeilen. Eine Admin-only-Funktion wäre
+--   unnötig, da ein Spaltenrecht den Admin technisch nicht vom übrigen
+--   authenticated unterscheiden kann und hier auch nicht muss.
+--
+-- UMFANG: nur diese eine Spalte fehlt. Abgeglichen wurden alle Admin-Abfragen
+--   in vexfit-verwaltung.js gegen die Spalten-GRANTs:
+--     * anfragen: gelesen/gefiltert werden id, created_at, trainer_id,
+--       trainer_name, kunden_name, status, weitergeleitet, ziel (alle bereits
+--       erlaubt) und NEU beantwortet_am (hier ergänzt).
+--     * trainers/kunden: tabellenweites SELECT (select=*) – B5 abo_status und
+--       B3 herkunft sind damit abgedeckt, kein GRANT nötig.
+--   Keine weitere SELECT-Rechtelücke gefunden. (Die Karte liest zusätzlich
+--   warteliste.created_at/land – das sind FEHLENDE SPALTEN, kein Rechteproblem;
+--   siehe Abschluss, bewusst NICHT hier gelöst.)
+--
+-- Mehrfach ausführbar (GRANT ist idempotent).
+-- RÜCKNAHME: migrations/ruecknahmen/2026-11-03-05-anfragen-beantwortet-am-lesen-ruecknahme.sql
+-- ============================================================================
+
+GRANT SELECT (beantwortet_am) ON public.anfragen TO authenticated;
