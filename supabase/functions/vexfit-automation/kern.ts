@@ -402,6 +402,14 @@ export interface Anschluesse {
   alertAbmelden?(token: string): Promise<boolean>;
   /** B4.2: PLZ eines Trainers per Kennung (service_role). */
   trainerPlzNachId?(id: string): Promise<string | null>;
+
+  // ── B7: Abendbericht ──
+  /** B7: alle Zahlen für den Abendbericht in einem Rutsch (service_role).
+   *  Einzelne nicht lesbare Teile (fehlende Migration) zählen als 0/leer. */
+  abendberichtZahlen?(): Promise<AbendberichtZahlen>;
+  /** B7 (nur Test): aktuelle Zeit injizieren, um die 16-Uhr-Prüfung zu testen.
+   *  In Produktion nicht gesetzt → new Date(). */
+  jetzt?(): Date;
 }
 
 // ============================================================================
@@ -1379,6 +1387,8 @@ export async function bearbeiten(
         return await unbeantwortetePruefen(anfrageObjekt, a, herkunft);
       case "erinnerungen":
         return await erinnerungenPruefen(anfrageObjekt, a, herkunft);
+      case "abendbericht":
+        return await abendberichtPruefen(anfrageObjekt, a, herkunft);
       case "erinnerung-abmelden":
         return await erinnerungAbmeldenEndpunkt(anfrageObjekt, a, herkunft);
       case "warteliste-bestaetigung":
@@ -2453,6 +2463,113 @@ async function wartelisteAbmeldenEndpunkt(
     status: 200,
     headers: { "Content-Type": "text/html; charset=utf-8", ...(herkunft ? { "Access-Control-Allow-Origin": herkunft } : {}) },
   });
+}
+
+// ============================================================================
+// B7: Abendbericht um 16:00 (Wiener Zeit)
+// ============================================================================
+
+/** B7: aktuelle Stunde (0–23) in Wiener Zeit (Europe/Vienna). Zwei UTC-Zeitpläne
+ *  (14:00 und 15:00 UTC) rufen den Bericht; nur der, der auf 16 Uhr Wien fällt,
+ *  sendet – so ganzjährig genau einmal, egal ob Sommer- oder Winterzeit. */
+export function wienerStunde(datum: Date = new Date()): number {
+  try {
+    const s = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Vienna", hour: "2-digit", hour12: false,
+    }).format(datum);
+    const n = parseInt(s, 10);
+    if (Number.isNaN(n)) return -1;
+    return n === 24 ? 0 : n;
+  } catch {
+    return -1;
+  }
+}
+
+export interface AbendberichtZahlen {
+  neueTrainer: number;
+  neueTrainerHerkunft: { quelle: string; anzahl: number }[];
+  neueKunden: number;
+  wartenNamen: string[];
+  anfragenOffen: number;
+  warteliste: number;
+  bezahlt: number;
+  zahlungFehlgeschlagen: number;
+  gekuendigt: number;
+}
+
+/** B7: nichts Nennenswertes passiert? */
+export function abendberichtLeer(z: AbendberichtZahlen): boolean {
+  return z.neueTrainer === 0 && z.neueKunden === 0 && z.wartenNamen.length === 0 &&
+    z.anfragenOffen === 0 && z.warteliste === 0 &&
+    (z.bezahlt + z.zahlungFehlgeschlagen + z.gekuendigt) === 0;
+}
+
+function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert: string }[] {
+  const herk = z.neueTrainerHerkunft.length
+    ? z.neueTrainerHerkunft.map((h) => `${h.quelle}: ${h.anzahl}`).join(", ")
+    : "–";
+  return [
+    { beschriftung: "Neue Trainer (24 h)", wert: `${z.neueTrainer}${z.neueTrainer ? ` (${herk})` : ""}` },
+    { beschriftung: "Neue Kunden (24 h)", wert: String(z.neueKunden) },
+    { beschriftung: "Warten auf Freigabe", wert: z.wartenNamen.length ? `${z.wartenNamen.length} (${z.wartenNamen.join(", ")})` : "0" },
+    { beschriftung: "Anfragen ohne Antwort > 24 h", wert: String(z.anfragenOffen) },
+    { beschriftung: "Wartelisten-Einträge ohne Trainer", wert: String(z.warteliste) },
+    { beschriftung: "Zahlungen (24 h)", wert: `bezahlt ${z.bezahlt}, fehlgeschlagen ${z.zahlungFehlgeschlagen}, gekündigt ${z.gekuendigt}` },
+  ];
+}
+
+/** B7: der ausführliche Abendbericht an office@ (Mail = alles). */
+export function mailAbendbericht(z: AbendberichtZahlen): Mail {
+  const leer = abendberichtLeer(z);
+  return baueMail(BETREIBER, "Vexfit – Abendbericht", {
+    ueberschrift: "Abendbericht",
+    absatz: leer ? "Heute nichts Neues." : "Die Zahlen des Tages:",
+    datenZeilen: leer ? [] : abendberichtZeilen(z),
+    knopfText: "Im Admin öffnen",
+    knopfLink: verwaltungLink(),
+    grundZeile: "Interne Benachrichtigung.",
+  });
+}
+
+/** B7: Admin-Push = Kurzfassung in einer Zeile. */
+export function pushAbendbericht(z: AbendberichtZahlen): PushNachricht {
+  if (abendberichtLeer(z)) {
+    return { titel: "Vexfit – Abendbericht", text: "Heute nichts Neues.", url: verwaltungLink() };
+  }
+  return {
+    titel: "Vexfit – Abendbericht",
+    text: `${z.neueTrainer} Trainer · ${z.neueKunden} Kunden · ${z.wartenNamen.length} warten · ${z.anfragenOffen} offen`,
+    url: verwaltungLink(),
+  };
+}
+
+/**
+ * B7: vom Zeitplan (pg_cron, 14:00 und 15:00 UTC) gerufen. Prüft den eigenen
+ * Schlüssel (x-vexfit-cron / VEXFIT_CRON_KEY, wie die Erinnerungen), sendet aber
+ * NUR, wenn es gerade 16 Uhr Wiener Zeit ist (so genau einmal pro Tag). Mail an
+ * office@ (alles) + Admin-Push (Kurzfassung).
+ */
+async function abendberichtPruefen(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const geheim = a.cronGeheimnis?.();
+  const mitgeschickt = r.headers.get("x-vexfit-cron");
+  if (!geheim || !mitgeschickt || mitgeschickt !== geheim) {
+    return antwort(401, { fehler: "nicht berechtigt" }, herkunft);
+  }
+  const jetzt = a.jetzt ? a.jetzt() : new Date();
+  if (wienerStunde(jetzt) !== 16) {
+    return antwort(200, { ok: true, gesendet: false, uebersprungen: "nicht 16 Uhr Wien" }, herkunft);
+  }
+  if (!a.abendberichtZahlen) {
+    return antwort(200, { ok: true, gesendet: false, uebersprungen: "nicht verdrahtet" }, herkunft);
+  }
+  const z = await a.abendberichtZahlen();
+  const mailGesendet = await sendeWennAdresseTaugt(a, mailAbendbericht(z));
+  await pushBenachrichtigung(a, pushAbendbericht(z));
+  return antwort(200, { ok: true, gesendet: true, mail: mailGesendet, zahlen: z }, herkunft);
 }
 
 /**
