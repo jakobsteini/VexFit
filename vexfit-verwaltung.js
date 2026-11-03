@@ -1099,7 +1099,7 @@ function starteVerwaltung() {
     }
     // Warteliste separat laden (nur aktive Einträge).
     try {
-      const r = await hole("warteliste?select=plz,stadt,created_at,land,email&order=created_at.desc&limit=2000");
+      const r = await hole("warteliste?select=plz,stadt,created_at,land&order=created_at.desc&limit=2000");
       if (r.ok) {
         for (const w of await r.json()) {
           if (!innerhalbTage(w.created_at, tage)) continue;

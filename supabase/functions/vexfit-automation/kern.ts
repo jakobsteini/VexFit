@@ -2430,10 +2430,14 @@ async function wartelisteAufFreigabe(
   }
   let mails = 0;
   for (const e of eintraege) {
-    const gesendet = await sendeWennAdresseTaugt(a, mailTrainerDa(e));
-    if (!gesendet) continue; // Versand gescheitert -> offen lassen (später erneut)
-    try { await a.alertSchliessen(e.id); } catch { /* best effort */ }
-    mails++;
+    // Erst ATOMAR beanspruchen (aktiv true->false): nur wer den Eintrag bekommt,
+    // sendet. So nie doppelt – auch nicht bei paralleler Freigabe derselben PLZ.
+    // Schlägt das Beanspruchen fehl, wird NICHT gesendet (der Eintrag bleibt für
+    // einen späteren Lauf offen statt eine doppelte Mail zu riskieren).
+    let beansprucht = false;
+    try { beansprucht = await a.alertSchliessen(e.id); } catch { continue; }
+    if (!beansprucht) continue;
+    if (await sendeWennAdresseTaugt(a, mailTrainerDa(e))) mails++;
   }
   return { mails };
 }
