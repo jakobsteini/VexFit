@@ -132,13 +132,13 @@ async function aufloesen(s){
   return { studio: null, standort: '' };
 }
 
-function trainerKarten(trainer, slug, studioName){
+function trainerKarten(trainer, slug, studioName, studioSlug){
   return trainer.map(t=>{
     const initialen = vexEsc(((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase());
     const tags = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="ctag">${vexEsc(s)}</span>`).join('');
     const knopf = angemeldet
       ? `<a href="profil.html?id=${encodeURIComponent(t.id)}" class="btn-anmelden">Profil &amp; Anfrage</a>`
-      : `<a href="registrieren.html?typ=kunde&standort=${encodeURIComponent(slug)}" class="btn-anmelden">Anmelden und anfragen</a>`;
+      : `<a href="registrieren.html?typ=kunde&s=${encodeURIComponent(studioSlug)}&standort=${encodeURIComponent(slug)}" class="btn-anmelden">Anmelden und anfragen</a>`;
     return `<div class="tc">
       <div class="ci"><div class="cav">${initialen}</div>${t.verifiziert === true ? '<div class="cbadge">Verifiziert ✓</div>' : ''}</div>
       <div class="cb">
@@ -160,16 +160,16 @@ function adresseHtml(a){
   return teile.join('<br>');
 }
 
-function standortBlock(a, studioName){
+function standortBlock(a, studioName, studioSlug){
   const echte = a.trainer || [];
   const inhalt = echte.length
-    ? `<div class="grid">${trainerKarten(echte, a.slug, studioName)}</div>`
-    : `<div class="leer">Für diesen Standort sind bald Trainer verfügbar. <a href="registrieren.html?typ=kunde&standort=${encodeURIComponent(a.slug)}" style="color:var(--accent)">Jetzt vormerken →</a></div>`;
+    ? `<div class="grid">${trainerKarten(echte, a.slug, studioName, studioSlug)}</div>`
+    : `<div class="leer">Für diesen Standort sind bald Trainer verfügbar. <a href="registrieren.html?typ=kunde&s=${encodeURIComponent(studioSlug)}&standort=${encodeURIComponent(a.slug)}" style="color:var(--accent)">Jetzt vormerken →</a></div>`;
   return `<div class="standort" id="standort-${vexEsc(a.slug)}">
     <div class="standort-kopf">
       <div class="standort-name">${vexEsc(a.name)}</div>
       <div class="standort-adresse">${adresseHtml(a)}</div>
-      <a class="standort-cta" href="registrieren.html?typ=kunde&standort=${encodeURIComponent(a.slug)}">Trainer anfragen</a>
+      <a class="standort-cta" href="registrieren.html?typ=kunde&s=${encodeURIComponent(studioSlug)}&standort=${encodeURIComponent(a.slug)}">Trainer anfragen</a>
     </div>
     ${inhalt}
   </div>`;
@@ -208,7 +208,7 @@ async function laden(){
         }));
       } catch(e) {}
     }
-    const html = zeigen.map(a => standortBlock(a, studio.name)).join('');
+    const html = zeigen.map(a => standortBlock(a, studio.name, studio.slug)).join('');
     document.getElementById('inhalt').innerHTML = html || '<div class="leer">Noch keine Standorte hinterlegt.</div>';
   } catch(e){
     console.error(e);

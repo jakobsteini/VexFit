@@ -1370,7 +1370,12 @@ async function neuerKunde(
   }
   const gesendet = await sendeWennAdresseTaugt(a, mailNeuerKunde(body, profil));
   await pushBenachrichtigung(a, pushNeuerKunde(body, profil));
-  return antwort(200, { ok: true, mails: gesendet ? 1 : 0 }, herkunft);
+  // B6c: CompleteRegistration auch fuer den Kunden-Pfad serverseitig an die Meta
+  // Conversions API, mit derselben event_id wie das Browser-Pixel (Entdopplung).
+  // Genau wie beim Trainer-Pfad: nur bei Zustimmung UND vorhandener event_id;
+  // der Wartelisten-Aufruf (/neuer-kunde ohne event_id, suche.html) sendet nichts.
+  const capi = await sendeMetaConversion(a, body);
+  return antwort(200, { ok: true, mails: gesendet ? 1 : 0, capi }, herkunft);
 }
 
 /**

@@ -91,7 +91,7 @@ Deno.test("registrieren.html: Zustimmung schaltet den Pixel frei; CompleteRegist
   assertStringIncludes(s, "function pixelRegistrierungFertig(");
   assertStringIncludes(s, "fbq('track','CompleteRegistration'");
   assertStringIncludes(s, "pixelRegistrierungFertig('trainer'");
-  assertStringIncludes(s, "pixelRegistrierungFertig('kunde')");
+  assertStringIncludes(s, "pixelRegistrierungFertig('kunde', capiEventId)");
   // Das alte, falsche Lead-Ereignis ist weg.
   assert(!s.includes("fbq('track','Lead'"), "altes Lead-Ereignis noch vorhanden");
 });

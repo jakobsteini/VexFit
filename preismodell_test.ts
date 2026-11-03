@@ -51,6 +51,6 @@ Deno.test("der Meta-Pixel bleibt unveraendert (ID 1034036285801133, keine neue I
   assertStringIncludes(html, "=== 'zugestimmt') vexfitPixelLaden()");
   assertStringIncludes(html, "fbq('track','CompleteRegistration'");
   assertStringIncludes(html, "pixelRegistrierungFertig('trainer'");
-  assertStringIncludes(html, "pixelRegistrierungFertig('kunde')");
+  assertStringIncludes(html, "pixelRegistrierungFertig('kunde', capiEventId)");
   assert(!html.includes("fbq('track','Lead'"), "altes Lead-Ereignis noch vorhanden");
 });

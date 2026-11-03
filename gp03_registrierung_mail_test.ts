@@ -35,7 +35,7 @@ Deno.test("CompleteRegistration feuert zustimmungsgebunden über den Helfer (Tei
   assertStringIncludes(helfer, "typeof fbq !== 'function'");
   assertStringIncludes(helfer, "fbq('track','CompleteRegistration'");
   assertStringIncludes(reg, "pixelRegistrierungFertig('trainer'");
-  assertStringIncludes(reg, "pixelRegistrierungFertig('kunde')");
+  assertStringIncludes(reg, "pixelRegistrierungFertig('kunde', capiEventId)");
   assert(!reg.includes("fbq('track','Lead'"), "altes Lead-Ereignis darf nicht mehr auftauchen");
   // Exakt die kampagnenrelevante ID, kein Umbau.
   assert(!reg.includes("1105307262121912"), "alte/falsche Pixel-ID darf nicht auftauchen");

@@ -26,7 +26,7 @@ Deno.test("Teil 1: ein gemeinsamer, zustimmungsgebundener Helfer feuert Complete
 Deno.test("Teil 1: Trainer und Kunde rufen den Helfer genau einmal mit dem richtigen Namen", async () => {
   const s = await lies("./registrieren.html");
   assertEquals((s.match(/pixelRegistrierungFertig\('trainer'/g) || []).length, 1, "Trainer-Aufruf nicht genau 1×");
-  assertEquals((s.match(/pixelRegistrierungFertig\('kunde'\)/g) || []).length, 1, "Kunde-Aufruf nicht genau 1×");
+  assertEquals((s.match(/pixelRegistrierungFertig\('kunde'/g) || []).length, 1, "Kunde-Aufruf nicht genau 1×");
   // fbq('track','CompleteRegistration' steht ausschließlich im Helfer (mit/ohne
   // eventID), nicht in den Submit-Handlern selbst.
   assert(s.includes("fbq('track','CompleteRegistration'"), "CompleteRegistration fehlt");
@@ -42,7 +42,7 @@ Deno.test("Teil 1: Pixel feuert NUR im Erfolgszweig (nach dem Insert-Guard), nic
   const s = await lies("./registrieren.html");
   for (const [start, tabelle, aufruf] of [
     ["async function submitTrainer(", "rest/v1/trainers", "pixelRegistrierungFertig('trainer'"],
-    ["async function submitClient(", "rest/v1/kunden", "pixelRegistrierungFertig('kunde')"],
+    ["async function submitClient(", "rest/v1/kunden", "pixelRegistrierungFertig('kunde', capiEventId)"],
   ] as const) {
     const b = s.slice(s.indexOf(start), s.indexOf(start) + 5000);
     const guard = b.indexOf("if(!ir.ok)");

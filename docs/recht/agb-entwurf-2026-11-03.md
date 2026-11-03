@@ -80,9 +80,8 @@ Die Nutzung ist für den Trainer kostenlos, solange er keinen Kundenkontakt übe
 Vexfit freigeschaltet hat. Mit der **Freischaltung des ersten Kundenkontakts
 (Zahlung)** wird das Trainer-Abonnement von **49,99 € pro Monat** fällig. Jeder
 weitere über Vexfit freigeschaltete Kundenkontakt kostet **einmalig 9,99 €**.
-Zahlungen werden über Stripe abgewickelt. **[USt-Status: Kleinunternehmer gem.
-§ 6 Abs. 1 Z 27 UStG – kein USt-Ausweis – ODER Regelbesteuerung „inkl. 20 % USt";
-mit Steuerberater festlegen.]**
+Zahlungen werden über Stripe abgewickelt.
+**Kein Ausweis der Umsatzsteuer – Kleinunternehmer gem. § 6 Abs. 1 Z 27 UStG.**
 > *Kommentar — wichtige Korrektur gegenüber der aktuellen AGB:* Die aktuelle AGB
 > knüpft die Zahlungspflicht an die Schaltfläche **„Annehmen"**. Technisch löst
 > „Annehmen" aber **keine** Zahlung aus – der Zahlungslink kommt beim Eingang der
