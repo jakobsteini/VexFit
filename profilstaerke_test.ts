@@ -44,10 +44,14 @@ Deno.test("trainer-bereich.html: Profilstaerke mit 8 Punkten, Tipps und Mindests
   assertStringIncludes(html, 'id="pctLabel"'); // die bestehende Anzeige bleibt
 });
 
-Deno.test("suche.html: Mindeststaerke-Filter wird auf die Liste angewendet", async () => {
+Deno.test("suche.html: KEIN Mindeststaerke-Filter mehr (B1, Admin entscheidet allein)", async () => {
   const html = await lies("./suche.html");
-  assertStringIncludes(html, "function mindeststaerkeErfuellt(t)");
-  assertStringIncludes(html, "daten.filter(mindeststaerkeErfuellt)");
+  // B1 (2026-11-03): der Mindeststaerke-Filter widersprach der Entscheidung
+  // "Admin entscheidet allein" und ist entfernt – auch auf dem angemeldeten
+  // Pfad. Freigegebene Trainer ohne Foto erscheinen jetzt in der Suche.
+  assert(!html.includes("function mindeststaerkeErfuellt(t)"), "Mindeststaerke-Funktion noch da");
+  assert(!html.includes("daten.filter(mindeststaerkeErfuellt)"), "Mindeststaerke-Filter noch da");
+  assertStringIncludes(html, "allTrainers = daten;");
 });
 
 Deno.test("Blitz-Registrierung: Trainerformular verlangt nur die Pflichtfelder", async () => {

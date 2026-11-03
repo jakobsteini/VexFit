@@ -268,8 +268,10 @@ export interface Anschluesse {
   anfrageNachId?(id: string): Promise<AnfrageVoll | null>;
   /** B4e: ein Trainer mit den fuer die Zuordnung noetigen Feldern. */
   trainerVollNachId?(id: string): Promise<TrainerVoll | null>;
-  /** B4e: alle freigeschalteten, verifizierten Trainer (Kandidaten). */
-  aktiveVerifizierteTrainer?(): Promise<TrainerVoll[]>;
+  /** B4e: alle freigegebenen, nicht gesperrten Trainer (Kandidaten fuer die
+   *  Alternativen). Verifizierung ist KEINE Bedingung ("Admin entscheidet
+   *  allein", Migration 2026-10-31-10). */
+  aktiveTrainerFuerAlternativen?(): Promise<TrainerVoll[]>;
   /** Teil 4: Trainer mit allen Profilfeldern per E-Mail (service_role). */
   trainerProfilNachEmail?(email: string): Promise<TrainerProfil | null>;
   /** Teil 4 (Erinnerungen): noch nicht freigegebene, nicht gesperrte, nicht
@@ -2222,7 +2224,7 @@ async function passtNicht(
   const anfrageId = String(body.anfrage_id ?? "");
   if (!anfrageId) return antwort(400, { fehler: "anfrage_id fehlt" }, herkunft);
 
-  if (!a.anfrageNachId || !a.trainerVollNachId || !a.aktiveVerifizierteTrainer) {
+  if (!a.anfrageNachId || !a.trainerVollNachId || !a.aktiveTrainerFuerAlternativen) {
     return antwort(200, { ok: true, mails: 0, uebersprungen: "nicht verdrahtet" }, herkunft);
   }
 
@@ -2247,7 +2249,7 @@ async function passtNicht(
   const original = await a.trainerVollNachId(String(anfrage.trainer_id ?? ""));
   if (!original) return antwort(200, { ok: true, mails: 0 }, herkunft);
 
-  const kandidaten = await a.aktiveVerifizierteTrainer();
+  const kandidaten = await a.aktiveTrainerFuerAlternativen();
   const alternativen = alternativenFinden(original, kandidaten);
   if (!alternativen.length) {
     if (a.alternativenVermerken) await a.alternativenVermerken(anfrageId);
@@ -2287,7 +2289,7 @@ async function unbeantwortetePruefen(
   }
 
   if (
-    !a.offeneAnfragenVor || !a.trainerVollNachId || !a.aktiveVerifizierteTrainer
+    !a.offeneAnfragenVor || !a.trainerVollNachId || !a.aktiveTrainerFuerAlternativen
   ) {
     return antwort(
       200,
@@ -2305,7 +2307,7 @@ async function unbeantwortetePruefen(
   }
 
   // Kandidaten nur einmal laden, nicht je Anfrage.
-  const kandidaten = await a.aktiveVerifizierteTrainer();
+  const kandidaten = await a.aktiveTrainerFuerAlternativen();
   let mails = 0;
   let bearbeitet = 0;
   for (const anfrage of faellig) {

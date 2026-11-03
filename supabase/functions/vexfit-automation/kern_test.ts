@@ -207,7 +207,7 @@ function bau(opt: {
     // B4e: Ports fuer den "Passt nicht"-Pfad (aus opt gespeist).
     anfrageNachId: (id) => Promise.resolve(opt.b4Anfrage ?? (id ? null : null)),
     trainerVollNachId: () => Promise.resolve(opt.b4Original ?? null),
-    aktiveVerifizierteTrainer: () => Promise.resolve(opt.b4Kandidaten ?? []),
+    aktiveTrainerFuerAlternativen: () => Promise.resolve(opt.b4Kandidaten ?? []),
     alternativenVermerken: (id) => { auf.alternativenVermerkt.push(id); return Promise.resolve(); },
     // B4e, 48-Stunden-Fall: Zeitplan-Pfad.
     offeneAnfragenVor: () => Promise.resolve(opt.b4Faellig ?? []),

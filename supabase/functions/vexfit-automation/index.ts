@@ -627,8 +627,12 @@ const anschluesse: Anschluesse = {
       : null;
   },
 
-  // B4e: freigeschaltete, verifizierte Trainer als Kandidaten.
-  async aktiveVerifizierteTrainer() {
+  // B4e: freigegebene, nicht gesperrte Trainer als Kandidaten fuer die
+  // "Passt nicht?"-/48-Stunden-Alternativen. "Admin entscheidet allein"
+  // (Migration 2026-10-31-10): sichtbar/vorschlagbar = aktiv=true UND nicht
+  // gesperrt; verifiziert ist KEINE Bedingung - sonst bekaemen frisch
+  // freigegebene, noch nicht verifizierte Trainer nie eine Empfehlung.
+  async aktiveTrainerFuerAlternativen() {
     return await lesen<{
       id: string;
       vorname?: string | null;
@@ -636,7 +640,7 @@ const anschluesse: Anschluesse = {
       stadt?: string | null;
       spezialisierungen?: string[] | null;
     }>(
-      `trainers?aktiv=eq.true&verifiziert=eq.true` +
+      `trainers?aktiv=eq.true&gesperrt=is.false` +
         `&select=id,vorname,nachname,stadt,spezialisierungen`,
     );
   },

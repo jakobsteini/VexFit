@@ -70,7 +70,7 @@ function baueAnschluss(opt: { smtpFehler?: boolean } = {}): {
     adminZeileLoeschen: unbenutzt("adminZeileLoeschen"),
     anfrageNachId: unbenutzt("anfrageNachId"),
     trainerVollNachId: unbenutzt("trainerVollNachId"),
-    aktiveVerifizierteTrainer: unbenutzt("aktiveVerifizierteTrainer"),
+    aktiveTrainerFuerAlternativen: unbenutzt("aktiveTrainerFuerAlternativen"),
     alternativenVermerken: unbenutzt("alternativenVermerken"),
     offeneAnfragenVor: unbenutzt("offeneAnfragenVor"),
     cronGeheimnis: () => undefined,

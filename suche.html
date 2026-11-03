@@ -343,14 +343,6 @@ async function ladeOeffentlich(fetchImpl, basisUrl, apikey) {
 let allTrainers = [];
 let activeFilter = 'alle';
 
-// Baustein 3c: Mindeststaerke eines Profils fuer die Suche.
-function mindeststaerkeErfuellt(t) {
-  const foto = typeof avatarAdresse === 'function' ? !!avatarAdresse(t.avatar_url) : !!t.avatar_url;
-  const bio = (t.bio || '').trim().length > 0;
-  const spez = Array.isArray(t.spezialisierungen) && t.spezialisierungen.length > 0;
-  return foto && bio && spez;
-}
-
 // Als Profilbild gilt nur eine Adresse aus dem eigenen Bilder-Behaelter;
 // alles andere (leer, fremde Adresse) faellt auf die Initialen zurueck.
 const AVATAR_PREFIX = SUPABASE_URL + '/storage/v1/object/public/avatars/';
@@ -516,7 +508,11 @@ async function loadTrainers() {
     let daten;
     if(angemeldet) {
       // Fuer Angemeldete unveraendert: die Tabelle trainers mit Nutzer-Token.
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,sprachen,trainingsorte,verifiziert,verfuegbarkeit&order=created_at.desc`, {
+      // Wie die oeffentliche Sicht: aktiv=true UND nicht gesperrt. "Anmeldung
+      // sperren" (login_sperren) setzt gesperrt=true, ohne aktiv zu aendern;
+      // ohne diesen Filter saehe ein angemeldeter Kunde einen so gesperrten
+      // Trainer, den Nichtangemeldete (ueber die Sicht) nicht sehen.
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&gesperrt=is.false&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,sprachen,trainingsorte,verifiziert,verfuegbarkeit&order=created_at.desc`, {
         headers: authKopf()
       });
       if(istAbgemeldet(res)) return;
@@ -527,13 +523,14 @@ async function loadTrainers() {
       // Ohne Sitzung: oeffentliche Sicht, nur freigeschaltete Trainer, keine Kontaktdaten.
       daten = await ladeOeffentlich(fetch, SUPABASE_URL, SUPABASE_KEY);
     }
-    // "Admin entscheidet allein" (Migration 2026-10-31-10): die oeffentliche
-    // Sicht entscheidet die Sichtbarkeit bereits allein (aktiv & nicht gesperrt);
-    // Foto/Kurztext/Spezialisierung sind KEINE Bedingung mehr. Deshalb auf dem
-    // oeffentlichen Pfad NICHT noch einmal nach Mindeststaerke filtern - sonst
-    // verschwaenden freigegebene Trainer ohne Foto wieder aus der Suche.
-    // Der angemeldete Pfad liest die Tabelle direkt und behaelt die Mindeststaerke.
-    allTrainers = angemeldet ? daten.filter(mindeststaerkeErfuellt) : daten;
+    // "Admin entscheidet allein" (Migration 2026-10-31-10): sichtbar ist, wer
+    // freigegeben (aktiv=true) und nicht gesperrt ist. Foto/Kurztext/
+    // Spezialisierung sind KEINE Bedingung. BEIDE Pfade (oeffentliche Sicht und
+    // angemeldete Tabellen-Abfrage) begrenzen schon auf genau diese Bedingung;
+    // deshalb hier NICHT zusaetzlich nach Mindeststaerke filtern - sonst saehe
+    // ein angemeldeter Kunde neue, noch unvollstaendige Trainer nicht und
+    // koennte sie nicht anfragen.
+    allTrainers = daten;
     spracheOptionenAufbauen();
     renderTrainers(allTrainers);
   } catch(e) {

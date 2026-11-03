@@ -399,7 +399,7 @@ async function loadProfile() {
     // Sicht trainers_oeffentlich - dort gibt es keine Kontaktdaten (weder
     // E-Mail noch Telefon noch Calendly), damit nichts davon im HTML/JSON landet.
     const res = angemeldet
-      ? await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis,verfuegbarkeit`, { headers: authKopf() })
+      ? await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&gesperrt=is.false&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis,verfuegbarkeit`, { headers: authKopf() })
       : await fetch(`${SUPABASE_URL}/rest/v1/trainers_oeffentlich?id=eq.${id}&select=id,created_at,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis,verfuegbarkeit`, { headers: authKopf() });
     if(istAbgemeldet(res)) return;
     if(!res.ok) throw new Error('Profil laden fehlgeschlagen: ' + res.status);
