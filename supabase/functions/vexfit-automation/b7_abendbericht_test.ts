@@ -34,11 +34,12 @@ const VOLL: AbendberichtZahlen = {
   zahlungFehlgeschlagen: 1,
   gekuendigt: 0,
   fehler: [],
+  cronHinweise: [],
 };
 const LEER: AbendberichtZahlen = {
   neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
   anfragenOffen: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
-  fehler: [],
+  fehler: [], cronHinweise: [],
 };
 // Wie VOLL, aber trainer_alerts lieferte 404 (Wartelisten-Zahl fehlt).
 const TEILWEISE: AbendberichtZahlen = {
@@ -257,4 +258,22 @@ Deno.test("abendberichtZahlenHolen: ein 404 beim Zählen bricht nicht ab, wird a
   assertEquals(z.fehler.length, 1);
   assertEquals(z.fehler[0].feld, "Wartelisten-Einträge ohne Trainer");
   assertEquals(z.fehler[0].grund, "HTTP 404");
+});
+
+Deno.test("Abendbericht: fehlgeschlagene Cron-Läufe (24 h) erscheinen unter Technische Hinweise", async () => {
+  const lesenStub = <T>(_p: string): Promise<T[]> => Promise.resolve([] as T[]);
+  const zaehlenStub = (_p: string): Promise<number> => Promise.resolve(0);
+  // Aus admin_protokoll: nur teilweise/fehlgeschlagen zählen, „erfolgreich" nicht.
+  const protokollStub = (_seitISO: string) => Promise.resolve([
+    { aktion: "erinnerungen", ergebnis: "teilweise (1 von 3 fehlgeschlagen: SMTP dicht)" },
+    { aktion: "unbeantwortet", ergebnis: "erfolgreich: 2 Mail(s)" },
+    { aktion: "abendbericht", ergebnis: "fehlgeschlagen (HTTP 500)" },
+  ]);
+  const z = await abendberichtZahlenHolen(lesenStub, zaehlenStub, Date.now(), protokollStub);
+  assertEquals(z.cronHinweise.length, 2); // erfolgreich wird herausgefiltert
+  const m = mailAbendbericht(z);
+  const inhalt = m.text + m.html;
+  assertStringIncludes(inhalt, "Technische Hinweise");
+  assertStringIncludes(inhalt, "Cron-Läufe mit Fehler (24 h)");
+  assertStringIncludes(inhalt, "teilweise (1 von 3");
 });

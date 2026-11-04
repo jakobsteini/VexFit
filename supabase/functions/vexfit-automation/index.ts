@@ -558,7 +558,13 @@ const anschluesse: Anschluesse = {
   // echten REST-Helfer lesen/zaehlen hineingeben. Ein einzelner fehlgeschlagener
   // Zählwert (z. B. HTTP 404 auf trainer_alerts) bricht den Bericht nicht mehr ab.
   async abendberichtZahlen() {
-    return await abendberichtZahlenHolen(lesen, zaehlen);
+    // Zusätzlich: fehlgeschlagene/teilweise Cron-Läufe der letzten 24 h aus
+    // admin_protokoll (erinnerungen/unbeantwortet/abendbericht) für den Abschnitt
+    // „Technische Hinweise". Gefiltert wird in abendberichtZahlenHolen.
+    return await abendberichtZahlenHolen(lesen, zaehlen, Date.now(), (seitISO) =>
+      lesen<{ aktion: string; ergebnis: string | null }>(
+        `admin_protokoll?aktion=in.(erinnerungen,unbeantwortet,abendbericht)&zeitpunkt=gt.${encodeURIComponent(seitISO)}&select=aktion,ergebnis&order=zeitpunkt.desc&limit=50`,
+      ).then((r) => r.map((x) => ({ aktion: x.aktion, ergebnis: String(x.ergebnis ?? "") }))));
   },
 
   // Admin-Aktion: loescht eine Zeile in trainers oder kunden (service_role).

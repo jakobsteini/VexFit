@@ -2270,36 +2270,60 @@ async function erinnerungenPruefen(
       a.melden?.("erinnerungen: Spalten fehlen (Migration 2026-11-02 nicht eingespielt)");
       return antwort(200, { ok: true, geprueft: 0, mails: 0, uebersprungen: "migration fehlt" }, herkunft);
     }
-    throw fehler;
+    // Bulk-Load gescheitert: ganzen Lauf als fehlgeschlagen protokollieren, aber
+    // sauber (HTTP 200) antworten – der Zeitplan soll nicht als Fehler gelten.
+    const grund = abendberichtGrund(fehler);
+    a.melden?.("erinnerungen: Laden fehlgeschlagen", grund);
+    await a.protokoll?.({ aktion: "erinnerungen", ergebnis: `fehlgeschlagen (${grund})` });
+    return antwort(200, { ok: true, geprueft: 0, mails: 0, fehlgeschlagen: grund }, herkunft);
   }
   const jetzt = Date.now();
   let mails = 0;
+  let behandelt = 0;
+  const fehlerListe: string[] = [];
   for (const t of kandidaten) {
     const stufe = erinnerungStufeFaellig(t, jetzt);
     if (!stufe) continue;
     const vorher = Number(t.erinnerung_stufe) || 0;
+    const kurz = String(t.id).slice(0, 8);
     // Atomar beanspruchen: nur wer die Stufe bekommt, sendet (ein Lauf = eine
     // Mail je Trainer; keine Doppelung bei Überlappung).
     let beansprucht = false;
     try {
       beansprucht = await a.erinnerungStufeBeanspruchen(t.id, stufe);
     } catch (fehler) {
-      a.melden?.("erinnerungen: Beanspruchen fehlgeschlagen", String(fehler));
+      // Dieses Element scheitert, die übrigen laufen weiter.
+      behandelt++;
+      fehlerListe.push(`${kurz}: Beanspruchen ${abendberichtGrund(fehler)}`);
       continue;
     }
     if (!beansprucht) continue;
-    const gesendet = await sendeWennAdresseTaugt(
-      a,
-      mailErinnerung(t, stufe, w(t.erinnerung_token)),
-    );
-    if (gesendet) mails++;
-    else {
-      // Versand fehlgeschlagen -> Stufe auf den Stand vor dem Anspruch
-      // zurücksetzen, damit ein späterer Lauf es erneut versuchen darf.
+    behandelt++;
+    try {
+      const gesendet = await sendeWennAdresseTaugt(a, mailErinnerung(t, stufe, w(t.erinnerung_token)));
+      if (gesendet) mails++;
+      else {
+        // Ungültige Adresse: Stufe auf den Stand vor dem Anspruch zurück, damit
+        // ein späterer Lauf es erneut versuchen darf (kein Doppelversand, da die
+        // Stufe zurückgesetzt wird).
+        try { await a.adminTrainerSetzen(t.id, { erinnerung_stufe: vorher }); } catch { /* best effort */ }
+      }
+    } catch (fehler) {
+      // Versandfehler (z. B. SMTP): dieses Element zählt als Fehler, Stufe zurück
+      // (kein Doppelversand, späterer Neuversuch möglich), der Rest läuft weiter.
+      fehlerListe.push(`${kurz}: Versand ${abendberichtGrund(fehler)}`);
       try { await a.adminTrainerSetzen(t.id, { erinnerung_stufe: vorher }); } catch { /* best effort */ }
     }
   }
-  return antwort(200, { ok: true, geprueft: kandidaten.length, mails }, herkunft);
+  // Protokoll nur, wenn etwas passiert ist oder ein Fehler auftrat (kein
+  // 15-Minuten-Rauschen bei leerem Lauf).
+  if (behandelt > 0 || fehlerListe.length > 0) {
+    await a.protokoll?.({
+      aktion: "erinnerungen",
+      ergebnis: cronLaufErgebnis(behandelt, fehlerListe, `${mails} Mail(s) verschickt`),
+    });
+  }
+  return antwort(200, { ok: true, geprueft: kandidaten.length, mails, fehler: fehlerListe.length }, herkunft);
 }
 
 /**
@@ -2526,6 +2550,10 @@ export interface AbendberichtZahlen {
   gekuendigt: number;
   /** Zählwerte, die nicht geladen werden konnten (leer = alles ok). */
   fehler: AbendberichtFehler[];
+  /** Fehlgeschlagene/teilweise Cron-Läufe der letzten 24 h aus admin_protokoll
+   *  (erinnerungen/unbeantwortet/abendbericht) – erscheinen unter „Technische
+   *  Hinweise". Leer = kein Cron-Lauf meldete einen Fehler. */
+  cronHinweise: { aktion: string; ergebnis: string }[];
 }
 
 /** B7: kurzer Grund aus einem Fehler (bevorzugt "HTTP <code>", sonst gekürzt). */
@@ -2535,19 +2563,35 @@ export function abendberichtGrund(e: unknown): string {
   return t ? t[0] : (m.length > 120 ? m.slice(0, 120) : m);
 }
 
+/**
+ * Cron-Routen (erinnerungen/unbeantwortet): Protokolltext aus den Zählern eines
+ * Laufs. Alle Elemente ok → „erfolgreich: …", sonst „teilweise (x von y
+ * fehlgeschlagen: Gründe)". Der Bulk-Load-Ausfall wird vom Aufrufer gesondert
+ * als „fehlgeschlagen (Grund)" protokolliert.
+ */
+export function cronLaufErgebnis(behandelt: number, fehler: string[], erfolgText: string): string {
+  if (!fehler.length) return `erfolgreich: ${erfolgText}`;
+  return `teilweise (${fehler.length} von ${behandelt} fehlgeschlagen: ${fehler.join("; ")})`;
+}
+
+/** Zeigt ein admin_protokoll-Ergebnis einen fehlgeschlagenen/teilweisen Lauf an? */
+export function istFehlerErgebnis(ergebnis: string | null | undefined): boolean {
+  return /^(teilweise|fehlgeschlagen|Fehler)\b/.test(String(ergebnis ?? ""));
+}
+
 /** B7: leere Zahlen (Grundwert bzw. Rückfall, wenn nichts geladen werden kann). */
 export function leereAbendberichtZahlen(): AbendberichtZahlen {
   return {
     neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
     anfragenOffen: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
-    fehler: [],
+    fehler: [], cronHinweise: [],
   };
 }
 
-/** B7: nichts Nennenswertes passiert? Nur wenn alle Werte 0 sind UND keiner
- *  fehlte (ein Fehlwert ist kein „nichts Neues", er muss sichtbar bleiben). */
+/** B7: nichts Nennenswertes passiert? Nur wenn alle Werte 0 sind UND kein
+ *  Zählwert fehlte UND kein Cron-Lauf (24 h) einen Fehler meldete. */
 export function abendberichtLeer(z: AbendberichtZahlen): boolean {
-  return z.fehler.length === 0 &&
+  return z.fehler.length === 0 && z.cronHinweise.length === 0 &&
     z.neueTrainer === 0 && z.neueKunden === 0 && z.wartenNamen.length === 0 &&
     z.anfragenOffen === 0 && z.warteliste === 0 &&
     (z.bezahlt + z.zahlungFehlgeschlagen + z.gekuendigt) === 0;
@@ -2573,13 +2617,19 @@ function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert
   ];
 }
 
-/** B7: Abschnitt „Technische Hinweise" – nur wenn Zählwerte fehlten. */
+/** B7: Abschnitt „Technische Hinweise" – nur wenn Zählwerte fehlten ODER ein
+ *  Cron-Lauf der letzten 24 h einen Fehler meldete. */
 function abendberichtHinweisZeilen(z: AbendberichtZahlen): { beschriftung: string; wert: string }[] {
-  if (!z.fehler.length) return [];
-  return [
-    { beschriftung: "— Technische Hinweise —", wert: `${z.fehler.length} Wert(e) konnten nicht geladen werden:` },
+  if (!z.fehler.length && !z.cronHinweise.length) return [];
+  const zeilen: { beschriftung: string; wert: string }[] = [
+    { beschriftung: "— Technische Hinweise —", wert: `${z.fehler.length} Wert(e) nicht geladen, ${z.cronHinweise.length} Cron-Fehler (24 h):` },
     ...z.fehler.map((f) => ({ beschriftung: f.feld, wert: f.grund })),
   ];
+  if (z.cronHinweise.length) {
+    zeilen.push({ beschriftung: "Cron-Läufe mit Fehler (24 h)", wert: String(z.cronHinweise.length) });
+    for (const h of z.cronHinweise) zeilen.push({ beschriftung: h.aktion, wert: h.ergebnis });
+  }
+  return zeilen;
 }
 
 /** B7: der ausführliche Abendbericht an office@ (Mail = alles). Fehlende
@@ -2626,6 +2676,7 @@ export async function abendberichtZahlenHolen(
   lesenFn: <T>(pfad: string) => Promise<T[]>,
   zaehlenFn: (pfad: string) => Promise<number>,
   jetztMs: number = Date.now(),
+  protokollFehlerFn?: (seitISO: string) => Promise<{ aktion: string; ergebnis: string }[]>,
 ): Promise<AbendberichtZahlen> {
   const seit = new Date(jetztMs - 24 * 60 * 60 * 1000).toISOString();
   const z = leereAbendberichtZahlen();
@@ -2684,6 +2735,15 @@ export async function abendberichtZahlenHolen(
       else if (t.abo_status === "gekuendigt") z.gekuendigt++;
     }
   } catch (e) { merkeFehler("Zahlungen (24 h)", e); }
+
+  // Fehlgeschlagene/teilweise Cron-Läufe der letzten 24 h (aus admin_protokoll).
+  if (protokollFehlerFn) {
+    try {
+      const zeilen = await protokollFehlerFn(seit);
+      z.cronHinweise = zeilen.filter((h) => istFehlerErgebnis(h.ergebnis))
+        .map((h) => ({ aktion: h.aktion, ergebnis: h.ergebnis }));
+    } catch (e) { merkeFehler("Cron-Läufe (24 h)", e); }
+  }
 
   return z;
 }
@@ -2888,41 +2948,60 @@ async function unbeantwortetePruefen(
   const grenzeISO = new Date(
     Date.now() - ALTERNATIVEN_NACH_STUNDEN * 60 * 60 * 1000,
   ).toISOString();
-  const faellig = await a.offeneAnfragenVor(grenzeISO);
-  if (!faellig.length) {
-    return antwort(200, { ok: true, geprueft: 0, mails: 0 }, herkunft);
+  let faellig: Awaited<ReturnType<NonNullable<Anschluesse["offeneAnfragenVor"]>>>;
+  let kandidaten: Awaited<ReturnType<NonNullable<Anschluesse["aktiveTrainerFuerAlternativen"]>>>;
+  try {
+    faellig = await a.offeneAnfragenVor(grenzeISO);
+    if (!faellig.length) {
+      return antwort(200, { ok: true, geprueft: 0, mails: 0 }, herkunft);
+    }
+    // Kandidaten nur einmal laden, nicht je Anfrage.
+    kandidaten = await a.aktiveTrainerFuerAlternativen();
+  } catch (fehler) {
+    // Bulk-Load gescheitert: ganzen Lauf als fehlgeschlagen protokollieren, aber
+    // sauber (HTTP 200) antworten.
+    const grund = abendberichtGrund(fehler);
+    a.melden?.("unbeantwortet: Laden fehlgeschlagen", grund);
+    await a.protokoll?.({ aktion: "unbeantwortet", ergebnis: `fehlgeschlagen (${grund})` });
+    return antwort(200, { ok: true, geprueft: 0, mails: 0, fehlgeschlagen: grund }, herkunft);
   }
 
-  // Kandidaten nur einmal laden, nicht je Anfrage.
-  const kandidaten = await a.aktiveTrainerFuerAlternativen();
   let mails = 0;
-  let bearbeitet = 0;
+  let behandelt = 0;
+  const fehlerListe: string[] = [];
   for (const anfrage of faellig) {
     // Doppelte Sicherheit gegen einen falsch gefuellten Port.
     if (anfrage.alternativen_gesendet === true) continue;
-
-    const original = await a.trainerVollNachId(String(anfrage.trainer_id ?? ""));
-    const kundenEmail = String(anfrage.kunden_email ?? "");
-    const alternativen = original
-      ? alternativenFinden(original, kandidaten)
-      : [];
-
-    if (original && alternativen.length && adresseGueltig(kundenEmail)) {
-      const gesendet = await sendeWennAdresseTaugt(
-        a,
-        mailAlternativen(kundenEmail, anfrage.kunden_name, alternativen),
-      );
-      if (gesendet) mails++;
+    behandelt++;
+    const kurz = String(anfrage.id).slice(0, 8);
+    try {
+      // Zuerst vermerken (beanspruchen), DANN senden: so wird eine Anfrage nie
+      // doppelt angeschrieben, auch wenn der Versand danach scheitert (sie bleibt
+      // dann unbeantwortet, wird aber nicht erneut angestoßen).
+      if (a.alternativenVermerken) await a.alternativenVermerken(String(anfrage.id));
+      const original = await a.trainerVollNachId(String(anfrage.trainer_id ?? ""));
+      const kundenEmail = String(anfrage.kunden_email ?? "");
+      const alternativen = original ? alternativenFinden(original, kandidaten) : [];
+      if (original && alternativen.length && adresseGueltig(kundenEmail)) {
+        if (await sendeWennAdresseTaugt(a, mailAlternativen(kundenEmail, anfrage.kunden_name, alternativen))) {
+          mails++;
+        }
+      }
+    } catch (fehler) {
+      // Dieses Element scheitert, die übrigen werden weiter verarbeitet.
+      fehlerListe.push(`${kurz}: ${abendberichtGrund(fehler)}`);
     }
-    // In jedem Fall vermerken: nicht jede Stunde erneut versuchen.
-    if (a.alternativenVermerken) {
-      await a.alternativenVermerken(String(anfrage.id));
-    }
-    bearbeitet++;
+  }
+  // Protokoll nur, wenn etwas passiert ist oder ein Fehler auftrat.
+  if (behandelt > 0 || fehlerListe.length > 0) {
+    await a.protokoll?.({
+      aktion: "unbeantwortet",
+      ergebnis: cronLaufErgebnis(behandelt, fehlerListe, `${mails} Mail(s), ${behandelt} Anfrage(n) bearbeitet`),
+    });
   }
   return antwort(
     200,
-    { ok: true, geprueft: faellig.length, bearbeitet, mails },
+    { ok: true, geprueft: faellig.length, bearbeitet: behandelt, mails, fehler: fehlerListe.length },
     herkunft,
   );
 }
