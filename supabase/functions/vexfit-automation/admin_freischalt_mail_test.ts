@@ -163,7 +163,7 @@ Deno.test("Mailtext: vollstaendiges Profil -> Satz 'Dein Profil ist vollständig
   assertStringIncludes(mail.text, "Dein Profil ist vollständig – perfekt.");
   assert(!mail.text.includes("login.html"), "kein Vervollständigen-Link bei vollständigem Profil");
   assertStringIncludes(mail.betreff, "freigeschaltet");
-  assertStringIncludes(mail.text, "Bis zu deinem ersten Kunden bleibt alles kostenlos");
+  assertStringIncludes(mail.text, "Erst mit der Annahme deiner ersten Kundenanfrage über Vexfit beginnt die Zahlungspflicht");
 });
 
 Deno.test("Ohne trainerProfilNachId-Anschluss: Freigabe läuft, Mail nicht verfügbar", async () => {

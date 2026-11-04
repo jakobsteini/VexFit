@@ -124,7 +124,7 @@ try {
     <ul>
       <li>Trainer registrieren sich <strong>kostenlos</strong></li>
       <li>Du schaltest ihr Profil manuell frei</li>
-      <li>Sobald ein Trainer seinen ersten Kunden bekommt → schickst du ihm den Stripe Link</li>
+      <li>Sobald ein Trainer die erste Kundenanfrage über Vexfit annimmt → schickst du ihm den Stripe Link</li>
       <li>Ab dann zahlt er <strong>49,99 €/Monat</strong> automatisch</li>
     </ul>
   </div>
@@ -175,8 +175,8 @@ try {
           <div class="email-body">
 Hi [Vorname],<br><br>
 Dein Vexfit Profil ist jetzt aktiv und für Kunden sichtbar!<br><br>
-Du kannst ab sofort Anfragen erhalten. Sobald du deinen<br>
-ersten Kunden über Vexfit gewinnst, melden wir uns bei dir.<br><br>
+Du kannst ab sofort Anfragen erhalten. Sobald du die erste<br>
+Kundenanfrage über Vexfit annimmst, melden wir uns bei dir.<br><br>
 Dein Profil: vexfit.app/suche.html<br><br>
 Bei Fragen: office@vexfit.app<br><br>
 Viel Erfolg! 💪<br>
@@ -192,7 +192,7 @@ Jakob von Vexfit
     <div class="step-card">
       <div class="step-num">04</div>
       <div class="step-content">
-        <div class="step-title">WANN HAT EIN TRAINER SEINEN ERSTEN KUNDEN?</div>
+        <div class="step-title">WANN BEGINNT DIE ZAHLUNGSPFLICHT?</div>
         <p class="step-text">So erkennst du es:</p>
         <ul style="margin-left:18px;margin-bottom:12px">
           <li style="font-size:14px;color:rgba(245,245,240,0.65);line-height:1.8;margin-bottom:4px">📊 <strong>Supabase Dashboard</strong> → Tabelle "kunden" → schau ob die Stadt/das Ziel zu einem deiner Trainer passt</li>
@@ -210,13 +210,13 @@ Jakob von Vexfit
       <div class="step-num">05</div>
       <div class="step-content">
         <div class="step-title">STRIPE LINK SCHICKEN</div>
-        <p class="step-text">Sobald ein Trainer seinen ersten Kunden hatte → schicke ihm diese E-Mail:</p>
+        <p class="step-text">Sobald ein Trainer die erste Kundenanfrage über Vexfit angenommen hat → schicke ihm diese E-Mail:</p>
         <div class="email-template">
-          <div class="email-subject">📧 Betreff: 🎉 Dein erster Vexfit Kunde – Zeit fürs Abo!</div>
+          <div class="email-subject">📧 Betreff: 🎉 Erste Anfrage angenommen – Zeit fürs Abo!</div>
           <div class="email-body">
 Hi [Vorname],<br><br>
-Herzlichen Glückwunsch! Du hast deinen ersten Kunden<br>
-über Vexfit gewonnen. Das ist der Beginn von mehr! 🚀<br><br>
+Herzlichen Glückwunsch! Du hast deine erste Kundenanfrage<br>
+über Vexfit angenommen. Das ist der Beginn von mehr! 🚀<br><br>
 Wie vereinbart wird das Vexfit Abo jetzt aktiv.<br>
 Aktiviere dein Abonnement hier:<br><br>
 👉 https://buy.stripe.com/eVqdR9gopdNhczNbhw2oE00<br><br>
@@ -263,7 +263,7 @@ Jakob von Vexfit
       <div class="flow-item"><div class="flow-arrow">▶</div>Trainer registriert sich auf vexfit.app → Supabase speichert Daten</div>
       <div class="flow-item"><div class="flow-arrow">▼</div>Du prüfst Admin Dashboard → klickst "Aktivieren"</div>
       <div class="flow-item"><div class="flow-arrow">▼</div>Du schickst Willkommens-E-Mail an Trainer</div>
-      <div class="flow-item"><div class="flow-arrow">▼</div>Trainer bekommt ersten Kunden über Vexfit</div>
+      <div class="flow-item"><div class="flow-arrow">▼</div>Trainer nimmt erste Kundenanfrage über Vexfit an</div>
       <div class="flow-item"><div class="flow-arrow">▼</div>Du schickst Stripe Link per E-Mail</div>
       <div class="flow-item"><div class="flow-arrow">▼</div>Trainer zahlt 49,99 €/Monat → Geld auf deinem Konto</div>
       <div class="flow-item"><div class="flow-arrow">▼</div>Du markierst als "Bezahlt" in Supabase</div>

@@ -66,10 +66,10 @@ Deno.test("die Preise stimmen zwischen AGB, index.html und registrieren.html ueb
     assertStringIncludes(registrieren, betrag, `registrieren.html ohne ${betrag}`);
   }
   // index.html nennt dieselbe Gratis-Regel (neue, einheitliche Schreibweise).
-  assertStringIncludes(index, "Kostenlos bis zum ersten Kunden · danach 49,99 €/Monat");
+  assertStringIncludes(index, "Kostenlos bis zur ersten angenommenen Kundenanfrage · danach 49,99 €/Monat");
   // registrieren.html wirbt mit der Gratis-Phase UND nennt direkt beim Knopf
   // ehrlich den Monatspreis und den Preis je weiterem Kunden.
-  assertStringIncludes(registrieren, "Gratis bis zu deinem 1. Kunden");
+  assertStringIncludes(registrieren, "Gratis bis zur 1. angenommenen Anfrage");
   assertStringIncludes(registrieren, "49,99 €/Monat");
   // Einheitliche Schreibweise: kein "€49,99" (€ vor der Zahl) auf der
   // Registrierseite.

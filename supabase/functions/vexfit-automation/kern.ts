@@ -2083,8 +2083,9 @@ export function mailFreischaltung(t: TrainerProfil): Mail {
     `Hallo ${nameFormatieren(w(t.vorname))}, gute Nachrichten: Dein Profil auf Vexfit ist ab sofort ` +
     "freigeschaltet und für Kundinnen und Kunden in deiner Nähe sichtbar. Wir suchen " +
     `jetzt Kunden für dich in deiner Region. ${hinweis} Sobald jemand anfragt, ` +
-    "bekommst du eine Mail – du entscheidest selbst, ob du annimmst. Bis zu deinem " +
-    "ersten Kunden bleibt alles kostenlos. Bei Fragen einfach auf diese Mail " +
+    "bekommst du eine Mail – du entscheidest selbst, ob du sie annimmst. Erst mit der " +
+    "Annahme deiner ersten Kundenanfrage über Vexfit beginnt die Zahlungspflicht – bis " +
+    "dahin bleibt alles kostenlos. Bei Fragen einfach auf diese Mail " +
     "antworten. Liebe Grüße, Jakob – Vexfit · office@vexfit.app · +43 660 3675175";
   return baueMail(w(t.email), "Dein Vexfit-Profil ist freigeschaltet", {
     ueberschrift: "Dein Profil ist freigeschaltet",

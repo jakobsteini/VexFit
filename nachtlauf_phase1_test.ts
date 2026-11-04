@@ -79,5 +79,5 @@ Deno.test("5. Kosten stehen vollstaendig und ehrlich direkt beim Trainer-Knopf",
   assertStringIncludes(umfeld, "49,99 €/Monat");
   assertStringIncludes(umfeld, "monatlich kündbar");
   assertStringIncludes(umfeld, "9,99 €");
-  assertStringIncludes(umfeld, "ersten Kunden");
+  assertStringIncludes(umfeld, "Kundenanfrage");
 });

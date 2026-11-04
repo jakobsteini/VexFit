@@ -148,7 +148,7 @@ Deno.test("Teil 5a: Kachel zeigt 'Kostenlos' statt '0 €'", async () => {
   const block = html.slice(i, i + 400);
   assert(block.includes("'Kostenlos'"), "Kachel nennt nicht 'Kostenlos'");
   assert(!block.includes("'0 €'"), "Kachel zeigt noch '0 €' (liest sich wie Umsatz)");
-  assert(block.includes("bis zu deinem 1. Kunden"), "Erklärungstext fehlt");
+  assert(block.includes("bis zur 1. angenommenen Anfrage"), "Erklärungstext fehlt");
 });
 
 Deno.test("Teil 5b: Ring hat sichtbare Hintergrundspur + sanfte Animation (reduced-motion beachtet)", async () => {

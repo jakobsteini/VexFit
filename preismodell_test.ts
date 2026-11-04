@@ -38,7 +38,7 @@ Deno.test("Trainer-Ansicht: kein nacktes '✓ Kostenlos' mehr neben 'Monatlich k
 
 Deno.test("Trainer-Ansicht: die praezisierten Texte sind da, DACH-Region bleibt", () => {
   const t = trainerAnsicht();
-  assertStringIncludes(t, "Gratis bis zu deinem 1. Kunden");
+  assertStringIncludes(t, "Gratis bis zur 1. angenommenen Anfrage");
   assertStringIncludes(t, "Danach monatlich kündbar");
   assertStringIncludes(t, "DACH-Region");
 });

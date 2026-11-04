@@ -1386,7 +1386,7 @@ function renderDashboard() {
   let kostenNum, kostenLabel;
   if(istStudio) { kostenNum = 'Kostenlos'; kostenLabel = 'Studio-Trainer'; }
   else if(T && T.stripe_bezahlt) { kostenNum = 'Aktiv'; kostenLabel = 'Abo läuft'; }
-  else { kostenNum = 'Kostenlos'; kostenLabel = 'bis zu deinem 1. Kunden'; }
+  else { kostenNum = 'Kostenlos'; kostenLabel = 'bis zur 1. angenommenen Anfrage'; }
   const kacheln = [
     { num: offen, label: 'Offene Anfragen' },
     { num: angenommen, label: 'Angenommene Kunden' },
