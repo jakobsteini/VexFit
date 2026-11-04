@@ -43,6 +43,7 @@ import {
   aalAusToken,
   ABSENDER,
   type Anfrage,
+  abendberichtZahlenHolen,
   type Anschluesse,
   bearbeiten,
   type Mail,
@@ -552,67 +553,12 @@ const anschluesse: Anschluesse = {
     return p ? String(p) : null;
   },
 
-  // B7: alle Zahlen für den Abendbericht. Jede Teilabfrage ist für sich
-  // abgesichert – fehlt eine Spalte/Tabelle (Migration nicht eingespielt), zählt
-  // der Teil als 0/leer, der Rest kommt trotzdem.
+  // B7: alle Zahlen für den Abendbericht. Die Logik (jeder Zählwert einzeln
+  // abgesichert, Fehler werden gesammelt) liegt testbar in kern.ts; hier nur die
+  // echten REST-Helfer lesen/zaehlen hineingeben. Ein einzelner fehlgeschlagener
+  // Zählwert (z. B. HTTP 404 auf trainer_alerts) bricht den Bericht nicht mehr ab.
   async abendberichtZahlen() {
-    const seit = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const z = {
-      neueTrainer: 0,
-      neueTrainerHerkunft: [] as { quelle: string; anzahl: number }[],
-      neueKunden: 0,
-      wartenNamen: [] as string[],
-      anfragenOffen: 0,
-      warteliste: 0,
-      bezahlt: 0,
-      zahlungFehlgeschlagen: 0,
-      gekuendigt: 0,
-    };
-    // Neue Trainer (24 h) + Herkunft.
-    try {
-      let zeilen: { herkunft?: string | null }[];
-      try {
-        zeilen = await lesen<{ herkunft?: string | null }>(`trainers?created_at=gt.${encodeURIComponent(seit)}&select=herkunft`);
-      } catch {
-        // herkunft-Spalte fehlt: nur zählen (herkunft bleibt leer).
-        zeilen = await lesen<{ herkunft?: string | null }>(`trainers?created_at=gt.${encodeURIComponent(seit)}&select=id`);
-      }
-      z.neueTrainer = zeilen.length;
-      const proQuelle: Record<string, number> = {};
-      for (const t of zeilen) {
-        const q = (t.herkunft != null && String(t.herkunft).trim()) ? String(t.herkunft).trim() : "direkt/unbekannt";
-        proQuelle[q] = (proQuelle[q] || 0) + 1;
-      }
-      z.neueTrainerHerkunft = Object.keys(proQuelle).sort().map((q) => ({ quelle: q, anzahl: proQuelle[q] }));
-    } catch (e) { console.error("abendbericht: neueTrainer", e); }
-    // Neue Kunden (24 h).
-    try { z.neueKunden = await zaehlen(`kunden?created_at=gt.${encodeURIComponent(seit)}&select=id`); } catch (e) { console.error("abendbericht: neueKunden", e); }
-    // Warten auf Freigabe (mit Namen).
-    try {
-      let zeilen: { vorname?: string | null; nachname?: string | null }[];
-      try {
-        zeilen = await lesen<{ vorname?: string | null; nachname?: string | null }>(`trainers?aktiv=eq.false&gesperrt=eq.false&select=vorname,nachname&order=created_at.desc&limit=100`);
-      } catch {
-        zeilen = await lesen<{ vorname?: string | null; nachname?: string | null }>(`trainers?aktiv=eq.false&select=vorname,nachname&order=created_at.desc&limit=100`);
-      }
-      z.wartenNamen = zeilen.map((t) => `${t.vorname ?? ""} ${t.nachname ?? ""}`.trim()).filter(Boolean);
-    } catch (e) { console.error("abendbericht: warten", e); }
-    // Anfragen ohne Antwort > 24 h.
-    try {
-      z.anfragenOffen = await zaehlen(`anfragen?beantwortet_am=is.null&created_at=lt.${encodeURIComponent(seit)}&or=(status.is.null,status.not.in.(angenommen,abgelehnt))&select=id`);
-    } catch (e) { console.error("abendbericht: anfragenOffen", e); }
-    // Wartelisten-Einträge ohne Trainer (offene „Benachrichtige mich").
-    try { z.warteliste = await zaehlen(`trainer_alerts?aktiv=eq.true&select=id`); } catch (e) { console.error("abendbericht: warteliste", e); }
-    // Zahlungsereignisse (24 h) aus B5.
-    try {
-      const zeilen = await lesen<{ abo_status?: string | null }>(`trainers?abo_status_am=gt.${encodeURIComponent(seit)}&select=abo_status`);
-      for (const t of zeilen) {
-        if (t.abo_status === "aktiv") z.bezahlt++;
-        else if (t.abo_status === "zahlung_fehlgeschlagen") z.zahlungFehlgeschlagen++;
-        else if (t.abo_status === "gekuendigt") z.gekuendigt++;
-      }
-    } catch (e) { console.error("abendbericht: zahlungen", e); }
-    return z;
+    return await abendberichtZahlenHolen(lesen, zaehlen);
   },
 
   // Admin-Aktion: loescht eine Zeile in trainers oder kunden (service_role).

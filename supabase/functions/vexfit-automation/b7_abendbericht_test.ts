@@ -11,6 +11,7 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
   type AbendberichtZahlen,
+  abendberichtZahlenHolen,
   ADMIN_ID,
   type Anschluesse,
   bearbeiten,
@@ -32,10 +33,18 @@ const VOLL: AbendberichtZahlen = {
   bezahlt: 2,
   zahlungFehlgeschlagen: 1,
   gekuendigt: 0,
+  fehler: [],
 };
 const LEER: AbendberichtZahlen = {
   neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
   anfragenOffen: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
+  fehler: [],
+};
+// Wie VOLL, aber trainer_alerts lieferte 404 (Wartelisten-Zahl fehlt).
+const TEILWEISE: AbendberichtZahlen = {
+  ...VOLL,
+  warteliste: 0,
+  fehler: [{ feld: "Wartelisten-Einträge ohne Trainer", grund: "HTTP 404" }],
 };
 
 Deno.test("wienerStunde: ganzjährig trifft genau ein UTC-Zeitplan 16 Uhr Wien", () => {
@@ -140,14 +149,14 @@ Deno.test("Leerer Tag um 16 Uhr: Bericht geht trotzdem raus und wird protokollie
   assertStringIncludes(b.mails[0].text + b.mails[0].html, "Heute nichts Neues");
   assertEquals(b.prot.length, 1);
   assertEquals(b.prot[0].aktion, "abendbericht");
-  assertStringIncludes(b.prot[0].ergebnis ?? "", "gesendet (zeitplan)");
+  assertStringIncludes(b.prot[0].ergebnis ?? "", "erfolgreich (zeitplan)");
 });
 
 Deno.test("Jeder Lauf schreibt einen Protokolleintrag (Versand UND Übersprungen)", async () => {
   const gesendet = baue({ jetzt: new Date("2026-07-01T14:00:00Z") }); // 16 Uhr Wien
   await bearbeiten(req("geheim"), gesendet.a);
   assertEquals(gesendet.prot.length, 1);
-  assertStringIncludes(gesendet.prot[0].ergebnis ?? "", "gesendet (zeitplan)");
+  assertStringIncludes(gesendet.prot[0].ergebnis ?? "", "erfolgreich (zeitplan)");
 
   const uebersprungen = baue({ jetzt: new Date("2026-07-01T15:00:00Z") }); // 17 Uhr Wien
   await bearbeiten(req("geheim"), uebersprungen.a);
@@ -188,7 +197,7 @@ Deno.test("Test-Auslöser: Admin mit aal2 sendet sofort, ohne 16-Uhr-Prüfung", 
   assertEquals(b.mails.length, 1);
   assertEquals(b.prot.length, 1);
   assertEquals(b.prot[0].admin_id, ADMIN_ID);
-  assertStringIncludes(b.prot[0].ergebnis ?? "", "gesendet (admin)");
+  assertStringIncludes(b.prot[0].ergebnis ?? "", "erfolgreich (admin)");
 });
 
 Deno.test("Test-Auslöser verlangt zweiten Faktor: aal1 -> 403, kein Versand, kein Protokoll", async () => {
@@ -204,4 +213,48 @@ Deno.test("Test-Auslöser: Nicht-Admin -> 403", async () => {
   const res = await bearbeiten(adminReq({ aktion: "abendbericht_jetzt" }), b.a);
   assertEquals(res.status, 403);
   assertEquals(b.mails.length, 0);
+});
+
+// ── Fix-Baustein 2026-11-04b: eine einzelne 404-Zahl darf den Bericht nicht kippen ──
+
+Deno.test("(a) trainer_alerts 404: Bericht geht raus, zeigt 'nicht verfügbar' + Technische Hinweise, Protokoll 'teilweise'", async () => {
+  const b = baue({ jetzt: new Date("2026-07-01T14:00:00Z"), zahlen: TEILWEISE }); // 16 Uhr Wien
+  const d = await (await bearbeiten(req("geheim"), b.a)).json();
+  assertEquals(d.gesendet, true);
+  assertEquals(b.mails.length, 1);
+  const inhalt = b.mails[0].text + b.mails[0].html;
+  assertStringIncludes(inhalt, "nicht verfügbar (Fehler: HTTP 404)");
+  assertStringIncludes(inhalt, "Technische Hinweise");
+  assertEquals(b.prot.length, 1);
+  assertStringIncludes(b.prot[0].ergebnis ?? "", "teilweise (zeitplan)");
+  assertStringIncludes(b.prot[0].ergebnis ?? "", "HTTP 404");
+});
+
+Deno.test("(b) alle Werte ok: kein Hinweis-Abschnitt, Protokoll 'erfolgreich'", async () => {
+  const b = baue({ jetzt: new Date("2026-07-01T14:00:00Z"), zahlen: VOLL }); // 16 Uhr Wien
+  await (await bearbeiten(req("geheim"), b.a)).json();
+  const inhalt = b.mails[0].text + b.mails[0].html;
+  assert(!inhalt.includes("Technische Hinweise"), "kein Hinweis-Abschnitt erwartet");
+  assert(!inhalt.includes("nicht verfügbar"), "kein 'nicht verfügbar' erwartet");
+  assertStringIncludes(b.prot[0].ergebnis ?? "", "erfolgreich (zeitplan)");
+});
+
+Deno.test("abendberichtZahlenHolen: ein 404 beim Zählen bricht nicht ab, wird als fehler erfasst", async () => {
+  const lesenStub = <T>(pfad: string): Promise<T[]> => {
+    if (pfad.startsWith("trainers?created_at")) return Promise.resolve([{ herkunft: "meta" }] as T[]);
+    return Promise.resolve([] as T[]); // warten + zahlungen: leer
+  };
+  const zaehlenStub = (pfad: string): Promise<number> => {
+    if (pfad.startsWith("trainer_alerts")) {
+      return Promise.reject(new Error("Zaehlen von trainer_alerts fehlgeschlagen: HTTP 404"));
+    }
+    return Promise.resolve(0); // kunden + anfragen
+  };
+  const z = await abendberichtZahlenHolen(lesenStub, zaehlenStub, Date.now());
+  // Der 404 landet als Fehler, der Rest ist da (kein Abbruch, kein throw).
+  assertEquals(z.neueTrainer, 1);
+  assertEquals(z.warteliste, 0);
+  assertEquals(z.fehler.length, 1);
+  assertEquals(z.fehler[0].feld, "Wartelisten-Einträge ohne Trainer");
+  assertEquals(z.fehler[0].grund, "HTTP 404");
 });

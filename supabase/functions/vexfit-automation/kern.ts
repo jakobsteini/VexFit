@@ -2507,6 +2507,13 @@ export function wienerStunde(datum: Date = new Date()): number {
   }
 }
 
+/** B7: ein einzelner Zählwert, der nicht geladen werden konnte (Feld + Grund,
+ *  z. B. "HTTP 404"). So bricht kein Fehlwert den ganzen Bericht ab. */
+export interface AbendberichtFehler {
+  feld: string;
+  grund: string;
+}
+
 export interface AbendberichtZahlen {
   neueTrainer: number;
   neueTrainerHerkunft: { quelle: string; anzahl: number }[];
@@ -2517,11 +2524,31 @@ export interface AbendberichtZahlen {
   bezahlt: number;
   zahlungFehlgeschlagen: number;
   gekuendigt: number;
+  /** Zählwerte, die nicht geladen werden konnten (leer = alles ok). */
+  fehler: AbendberichtFehler[];
 }
 
-/** B7: nichts Nennenswertes passiert? */
+/** B7: kurzer Grund aus einem Fehler (bevorzugt "HTTP <code>", sonst gekürzt). */
+export function abendberichtGrund(e: unknown): string {
+  const m = String((e as { message?: string })?.message ?? e);
+  const t = m.match(/HTTP \d{3}/);
+  return t ? t[0] : (m.length > 120 ? m.slice(0, 120) : m);
+}
+
+/** B7: leere Zahlen (Grundwert bzw. Rückfall, wenn nichts geladen werden kann). */
+export function leereAbendberichtZahlen(): AbendberichtZahlen {
+  return {
+    neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
+    anfragenOffen: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
+    fehler: [],
+  };
+}
+
+/** B7: nichts Nennenswertes passiert? Nur wenn alle Werte 0 sind UND keiner
+ *  fehlte (ein Fehlwert ist kein „nichts Neues", er muss sichtbar bleiben). */
 export function abendberichtLeer(z: AbendberichtZahlen): boolean {
-  return z.neueTrainer === 0 && z.neueKunden === 0 && z.wartenNamen.length === 0 &&
+  return z.fehler.length === 0 &&
+    z.neueTrainer === 0 && z.neueKunden === 0 && z.wartenNamen.length === 0 &&
     z.anfragenOffen === 0 && z.warteliste === 0 &&
     (z.bezahlt + z.zahlungFehlgeschlagen + z.gekuendigt) === 0;
 }
@@ -2530,23 +2557,45 @@ function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert
   const herk = z.neueTrainerHerkunft.length
     ? z.neueTrainerHerkunft.map((h) => `${h.quelle}: ${h.anzahl}`).join(", ")
     : "–";
+  // Konnte ein Feld nicht geladen werden, steht an seiner Stelle „nicht
+  // verfügbar (Fehler: …)" statt einer irreführenden 0.
+  const zeile = (beschriftung: string, wert: string) => {
+    const f = z.fehler.find((x) => x.feld === beschriftung);
+    return { beschriftung, wert: f ? `nicht verfügbar (Fehler: ${f.grund})` : wert };
+  };
   return [
-    { beschriftung: "Neue Trainer (24 h)", wert: `${z.neueTrainer}${z.neueTrainer ? ` (${herk})` : ""}` },
-    { beschriftung: "Neue Kunden (24 h)", wert: String(z.neueKunden) },
-    { beschriftung: "Warten auf Freigabe", wert: z.wartenNamen.length ? `${z.wartenNamen.length} (${z.wartenNamen.join(", ")})` : "0" },
-    { beschriftung: "Anfragen ohne Antwort > 24 h", wert: String(z.anfragenOffen) },
-    { beschriftung: "Wartelisten-Einträge ohne Trainer", wert: String(z.warteliste) },
-    { beschriftung: "Zahlungen (24 h)", wert: `bezahlt ${z.bezahlt}, fehlgeschlagen ${z.zahlungFehlgeschlagen}, gekündigt ${z.gekuendigt}` },
+    zeile("Neue Trainer (24 h)", `${z.neueTrainer}${z.neueTrainer ? ` (${herk})` : ""}`),
+    zeile("Neue Kunden (24 h)", String(z.neueKunden)),
+    zeile("Warten auf Freigabe", z.wartenNamen.length ? `${z.wartenNamen.length} (${z.wartenNamen.join(", ")})` : "0"),
+    zeile("Anfragen ohne Antwort > 24 h", String(z.anfragenOffen)),
+    zeile("Wartelisten-Einträge ohne Trainer", String(z.warteliste)),
+    zeile("Zahlungen (24 h)", `bezahlt ${z.bezahlt}, fehlgeschlagen ${z.zahlungFehlgeschlagen}, gekündigt ${z.gekuendigt}`),
   ];
 }
 
-/** B7: der ausführliche Abendbericht an office@ (Mail = alles). */
+/** B7: Abschnitt „Technische Hinweise" – nur wenn Zählwerte fehlten. */
+function abendberichtHinweisZeilen(z: AbendberichtZahlen): { beschriftung: string; wert: string }[] {
+  if (!z.fehler.length) return [];
+  return [
+    { beschriftung: "— Technische Hinweise —", wert: `${z.fehler.length} Wert(e) konnten nicht geladen werden:` },
+    ...z.fehler.map((f) => ({ beschriftung: f.feld, wert: f.grund })),
+  ];
+}
+
+/** B7: der ausführliche Abendbericht an office@ (Mail = alles). Fehlende
+ *  Zählwerte stehen als „nicht verfügbar" drin und werden unten unter
+ *  „Technische Hinweise" gesammelt – der Bericht geht trotzdem raus. */
 export function mailAbendbericht(z: AbendberichtZahlen): Mail {
   const leer = abendberichtLeer(z);
+  const absatz = leer
+    ? "Heute nichts Neues."
+    : (z.fehler.length
+      ? "Die Zahlen des Tages (einige Werte waren nicht abrufbar – siehe Technische Hinweise):"
+      : "Die Zahlen des Tages:");
   return baueMail(BETREIBER, "Vexfit – Abendbericht", {
     ueberschrift: "Abendbericht",
-    absatz: leer ? "Heute nichts Neues." : "Die Zahlen des Tages:",
-    datenZeilen: leer ? [] : abendberichtZeilen(z),
+    absatz,
+    datenZeilen: leer ? [] : [...abendberichtZeilen(z), ...abendberichtHinweisZeilen(z)],
     knopfText: "Im Admin öffnen",
     knopfLink: verwaltungLink(),
     grundZeile: "Interne Benachrichtigung.",
@@ -2558,11 +2607,85 @@ export function pushAbendbericht(z: AbendberichtZahlen): PushNachricht {
   if (abendberichtLeer(z)) {
     return { titel: "Vexfit – Abendbericht", text: "Heute nichts Neues.", url: verwaltungLink() };
   }
+  const warn = z.fehler.length ? ` · ⚠️ ${z.fehler.length} Wert(e) fehlen` : "";
   return {
     titel: "Vexfit – Abendbericht",
-    text: `${z.neueTrainer} Trainer · ${z.neueKunden} Kunden · ${z.wartenNamen.length} warten · ${z.anfragenOffen} offen`,
+    text: `${z.neueTrainer} Trainer · ${z.neueKunden} Kunden · ${z.wartenNamen.length} warten · ${z.anfragenOffen} offen${warn}`,
     url: verwaltungLink(),
   };
+}
+
+/**
+ * B7: alle Zählwerte für den Abendbericht – jeder EINZELN abgesichert. `lesenFn`
+ * und `zaehlenFn` werden injiziert (in Produktion die REST-Helfer aus index.ts,
+ * im Test Attrappen), damit diese Logik ohne Netz prüfbar ist. Schlägt ein
+ * Zählwert fehl, wird er in `fehler` vermerkt (Feld + kurzer Grund) und der Rest
+ * trotzdem geliefert – nie ein Abbruch wegen einer einzelnen Zahl.
+ */
+export async function abendberichtZahlenHolen(
+  lesenFn: <T>(pfad: string) => Promise<T[]>,
+  zaehlenFn: (pfad: string) => Promise<number>,
+  jetztMs: number = Date.now(),
+): Promise<AbendberichtZahlen> {
+  const seit = new Date(jetztMs - 24 * 60 * 60 * 1000).toISOString();
+  const z = leereAbendberichtZahlen();
+  const merkeFehler = (feld: string, e: unknown) => z.fehler.push({ feld, grund: abendberichtGrund(e) });
+
+  // Neue Trainer (24 h) + Herkunft (innerer Rückfall ohne herkunft-Spalte ist
+  // kein Fehler; erst wenn auch das Zählen scheitert, wird es vermerkt).
+  try {
+    let zeilen: { herkunft?: string | null }[];
+    try {
+      zeilen = await lesenFn<{ herkunft?: string | null }>(`trainers?created_at=gt.${encodeURIComponent(seit)}&select=herkunft`);
+    } catch {
+      zeilen = await lesenFn<{ herkunft?: string | null }>(`trainers?created_at=gt.${encodeURIComponent(seit)}&select=id`);
+    }
+    z.neueTrainer = zeilen.length;
+    const proQuelle: Record<string, number> = {};
+    for (const t of zeilen) {
+      const q = (t.herkunft != null && String(t.herkunft).trim()) ? String(t.herkunft).trim() : "direkt/unbekannt";
+      proQuelle[q] = (proQuelle[q] || 0) + 1;
+    }
+    z.neueTrainerHerkunft = Object.keys(proQuelle).sort().map((q) => ({ quelle: q, anzahl: proQuelle[q] }));
+  } catch (e) { merkeFehler("Neue Trainer (24 h)", e); }
+
+  // Neue Kunden (24 h).
+  try {
+    z.neueKunden = await zaehlenFn(`kunden?created_at=gt.${encodeURIComponent(seit)}&select=id`);
+  } catch (e) { merkeFehler("Neue Kunden (24 h)", e); }
+
+  // Warten auf Freigabe (mit Namen).
+  try {
+    let zeilen: { vorname?: string | null; nachname?: string | null }[];
+    try {
+      zeilen = await lesenFn<{ vorname?: string | null; nachname?: string | null }>(`trainers?aktiv=eq.false&gesperrt=eq.false&select=vorname,nachname&order=created_at.desc&limit=100`);
+    } catch {
+      zeilen = await lesenFn<{ vorname?: string | null; nachname?: string | null }>(`trainers?aktiv=eq.false&select=vorname,nachname&order=created_at.desc&limit=100`);
+    }
+    z.wartenNamen = zeilen.map((t) => `${t.vorname ?? ""} ${t.nachname ?? ""}`.trim()).filter(Boolean);
+  } catch (e) { merkeFehler("Warten auf Freigabe", e); }
+
+  // Anfragen ohne Antwort > 24 h.
+  try {
+    z.anfragenOffen = await zaehlenFn(`anfragen?beantwortet_am=is.null&created_at=lt.${encodeURIComponent(seit)}&or=(status.is.null,status.not.in.(angenommen,abgelehnt))&select=id`);
+  } catch (e) { merkeFehler("Anfragen ohne Antwort > 24 h", e); }
+
+  // Wartelisten-Einträge ohne Trainer (offene „Benachrichtige mich").
+  try {
+    z.warteliste = await zaehlenFn(`trainer_alerts?aktiv=eq.true&select=id`);
+  } catch (e) { merkeFehler("Wartelisten-Einträge ohne Trainer", e); }
+
+  // Zahlungsereignisse (24 h) aus B5.
+  try {
+    const zeilen = await lesenFn<{ abo_status?: string | null }>(`trainers?abo_status_am=gt.${encodeURIComponent(seit)}&select=abo_status`);
+    for (const t of zeilen) {
+      if (t.abo_status === "aktiv") z.bezahlt++;
+      else if (t.abo_status === "zahlung_fehlgeschlagen") z.zahlungFehlgeschlagen++;
+      else if (t.abo_status === "gekuendigt") z.gekuendigt++;
+    }
+  } catch (e) { merkeFehler("Zahlungen (24 h)", e); }
+
+  return z;
 }
 
 /** B7: die Zahlen als eine Zeile fürs Protokoll (ohne Personen-Klartext). */
@@ -2573,47 +2696,52 @@ function abendberichtKurz(z: AbendberichtZahlen): string {
     `Zahlungen ${z.bezahlt}/${z.zahlungFehlgeschlagen}/${z.gekuendigt}`;
 }
 
-/** B7: leere Zahlen (falls abendberichtZahlen nicht verdrahtet ist). */
-function leereAbendberichtZahlen(): AbendberichtZahlen {
-  return {
-    neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
-    anfragenOffen: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
-  };
-}
-
 /**
  * B7 Kern: Zahlen holen, Abendbericht an BETREIBER (office@) mailen + Admin-Push,
- * und den Lauf im admin_protokoll festhalten – Erfolg wie Fehler mit Grund, so
- * dass im Admin unter „Protokoll" sichtbar wird, ob und was gesendet wurde.
+ * und den Lauf im admin_protokoll festhalten. Ergebnis ist „erfolgreich", wenn
+ * alle Werte geladen wurden, „teilweise", wenn einzelne Zählwerte fehlten (der
+ * Bericht geht trotzdem raus), und „Fehler", wenn der Versand selbst scheiterte.
  * Auch bei 0 Ereignissen geht die Mail hinaus („Heute nichts Neues").
  *
  * Wird vom Zeitplan (nach der 16-Uhr-Prüfung) und vom Admin-Test-Auslöser
  * (sofort) genutzt. `quelle` nur fürs Protokoll ("zeitplan" bzw. "admin").
  * Schlägt der Versand fehl, steht der Grund im Protokoll und der Fehler wird
- * weitergeworfen (Aufrufer antwortet mit 500) – nie still verschluckt.
+ * weitergeworfen (Aufrufer antwortet mit 500) – nie still verschluckt. Das
+ * Zahlen-Holen selbst ist zusätzlich abgesichert, damit es den Lauf nicht
+ * abbricht, falls eine Attrappe/Implementierung doch wirft.
  */
 async function abendberichtSenden(
   a: Anschluesse,
   quelle: string,
   adminId?: string,
 ): Promise<{ mail: boolean; zahlen: AbendberichtZahlen }> {
-  const z = a.abendberichtZahlen ? await a.abendberichtZahlen() : leereAbendberichtZahlen();
+  let z: AbendberichtZahlen;
+  try {
+    z = a.abendberichtZahlen ? await a.abendberichtZahlen() : leereAbendberichtZahlen();
+  } catch (e) {
+    z = leereAbendberichtZahlen();
+    z.fehler.push({ feld: "Alle Zahlen", grund: abendberichtGrund(e) });
+  }
   let mailGesendet = false;
-  let fehler: string | null = null;
+  let sendeFehler: string | null = null;
   try {
     mailGesendet = await sendeWennAdresseTaugt(a, mailAbendbericht(z));
     await pushBenachrichtigung(a, pushAbendbericht(z));
   } catch (f) {
-    fehler = String((f as { message?: string })?.message ?? f);
+    sendeFehler = abendberichtGrund(f);
   }
+  const status = z.fehler.length ? "teilweise" : "erfolgreich";
+  const fehlendTxt = z.fehler.length
+    ? ` – fehlend: ${z.fehler.map((f) => `${f.feld} (${f.grund})`).join("; ")}`
+    : "";
   await a.protokoll?.({
     ...(adminId ? { admin_id: adminId } : {}),
     aktion: "abendbericht",
-    ergebnis: fehler
-      ? `Fehler (${quelle}): ${fehler}`
-      : `gesendet (${quelle}): Mail an ${BETREIBER} ${mailGesendet ? "ok" : "nicht zugestellt"} – ${abendberichtKurz(z)}`,
+    ergebnis: sendeFehler
+      ? `Fehler (${quelle}): ${sendeFehler}`
+      : `${status} (${quelle}): Mail an ${BETREIBER} ${mailGesendet ? "ok" : "nicht zugestellt"} – ${abendberichtKurz(z)}${fehlendTxt}`,
   });
-  if (fehler) throw new Error(fehler);
+  if (sendeFehler) throw new Error(sendeFehler);
   return { mail: mailGesendet, zahlen: z };
 }
 
