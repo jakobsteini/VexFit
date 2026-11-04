@@ -354,8 +354,10 @@ export interface Anschluesse {
    *  (Fremddaten bleiben erhalten). */
   zeileLoeschenOderAnonymisieren?(tabelle: "trainers" | "kunden", id: string): Promise<{ geloescht: boolean; anonymisiert: boolean }>;
   /** Schreibt einen Protokolleintrag (Zeitpunkt/Admin/Aktion/Ziel/Ergebnis).
-   *  Keine Klartext-Personendaten. Best effort. */
-  protokoll?(eintrag: { admin_id: string; aktion: string; ziel_tabelle: string; ziel_id: string; ergebnis?: string }): Promise<void>;
+   *  Keine Klartext-Personendaten. Best effort. admin_id/ziel_* sind optional,
+   *  damit auch nicht-Admin-Läufe (z. B. der Abendbericht vom Zeitplan) einen
+   *  Eintrag ohne Admin/Ziel schreiben können (DB-Spalten sind nullable). */
+  protokoll?(eintrag: { admin_id?: string; aktion: string; ziel_tabelle?: string; ziel_id?: string; ergebnis?: string }): Promise<void>;
 
   // ── Admin-Dashboard neu, Teil 3: Kicken (endgueltig loeschen, vollstaendig) ──
   /** Die Speicher-Dateien einer Person: avatars/galerie (public) und zertifikate
@@ -1749,6 +1751,21 @@ async function adminAktion(
   if (aktion.startsWith("push_")) {
     return await adminPushAktion(aktion, body, a, nutzer.id, herkunft);
   }
+  // B7: Test-Auslöser „Abendbericht jetzt senden" (Reiter Protokoll). Kein
+  // ziel_id – vor der ziel_id-Pflicht. Läuft über dieselbe Admin-Prüfung
+  // (Admin-Konto + aal2, oben) wie alle Aktionen und schickt den Bericht sofort,
+  // ohne die 16-Uhr-Prüfung. Jeder Versuch landet im admin_protokoll.
+  if (aktion === "abendbericht_jetzt") {
+    try {
+      const erg = await abendberichtSenden(a, "admin", nutzer.id);
+      return antwort(200, { ok: true, gesendet: true, mail: erg.mail, zahlen: erg.zahlen }, herkunft);
+    } catch (fehler) {
+      return antwort(500, {
+        fehler: "Abendbericht konnte nicht gesendet werden.",
+        grund: String((fehler as { message?: string })?.message ?? fehler),
+      }, herkunft);
+    }
+  }
   const zielId = String(body.ziel_id ?? "");
   if (!zielId) return antwort(400, { fehler: "ziel_id fehlt" }, herkunft);
   // Eingaben begrenzen (Typ/Laenge): Kennungen sind UUIDs/kurze Strings.
@@ -2548,11 +2565,68 @@ export function pushAbendbericht(z: AbendberichtZahlen): PushNachricht {
   };
 }
 
+/** B7: die Zahlen als eine Zeile fürs Protokoll (ohne Personen-Klartext). */
+function abendberichtKurz(z: AbendberichtZahlen): string {
+  if (abendberichtLeer(z)) return "Heute nichts Neues";
+  return `${z.neueTrainer} Trainer, ${z.neueKunden} Kunden, ${z.wartenNamen.length} warten, ` +
+    `${z.anfragenOffen} offen, Warteliste ${z.warteliste}, ` +
+    `Zahlungen ${z.bezahlt}/${z.zahlungFehlgeschlagen}/${z.gekuendigt}`;
+}
+
+/** B7: leere Zahlen (falls abendberichtZahlen nicht verdrahtet ist). */
+function leereAbendberichtZahlen(): AbendberichtZahlen {
+  return {
+    neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
+    anfragenOffen: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
+  };
+}
+
+/**
+ * B7 Kern: Zahlen holen, Abendbericht an BETREIBER (office@) mailen + Admin-Push,
+ * und den Lauf im admin_protokoll festhalten – Erfolg wie Fehler mit Grund, so
+ * dass im Admin unter „Protokoll" sichtbar wird, ob und was gesendet wurde.
+ * Auch bei 0 Ereignissen geht die Mail hinaus („Heute nichts Neues").
+ *
+ * Wird vom Zeitplan (nach der 16-Uhr-Prüfung) und vom Admin-Test-Auslöser
+ * (sofort) genutzt. `quelle` nur fürs Protokoll ("zeitplan" bzw. "admin").
+ * Schlägt der Versand fehl, steht der Grund im Protokoll und der Fehler wird
+ * weitergeworfen (Aufrufer antwortet mit 500) – nie still verschluckt.
+ */
+async function abendberichtSenden(
+  a: Anschluesse,
+  quelle: string,
+  adminId?: string,
+): Promise<{ mail: boolean; zahlen: AbendberichtZahlen }> {
+  const z = a.abendberichtZahlen ? await a.abendberichtZahlen() : leereAbendberichtZahlen();
+  let mailGesendet = false;
+  let fehler: string | null = null;
+  try {
+    mailGesendet = await sendeWennAdresseTaugt(a, mailAbendbericht(z));
+    await pushBenachrichtigung(a, pushAbendbericht(z));
+  } catch (f) {
+    fehler = String((f as { message?: string })?.message ?? f);
+  }
+  await a.protokoll?.({
+    ...(adminId ? { admin_id: adminId } : {}),
+    aktion: "abendbericht",
+    ergebnis: fehler
+      ? `Fehler (${quelle}): ${fehler}`
+      : `gesendet (${quelle}): Mail an ${BETREIBER} ${mailGesendet ? "ok" : "nicht zugestellt"} – ${abendberichtKurz(z)}`,
+  });
+  if (fehler) throw new Error(fehler);
+  return { mail: mailGesendet, zahlen: z };
+}
+
 /**
  * B7: vom Zeitplan (pg_cron, 14:00 und 15:00 UTC) gerufen. Prüft den eigenen
  * Schlüssel (x-vexfit-cron / VEXFIT_CRON_KEY, wie die Erinnerungen), sendet aber
  * NUR, wenn es gerade 16 Uhr Wiener Zeit ist (so genau einmal pro Tag). Mail an
  * office@ (alles) + Admin-Push (Kurzfassung).
+ *
+ * Jeder Lauf, der sich korrekt ausgewiesen hat, hinterlässt eine Spur in
+ * admin_protokoll: der sendende Aufruf über abendberichtSenden, der übersprungene
+ * (nicht 16 Uhr) mit eigener Zeile – so ist im Admin erkennbar, dass der
+ * Zeitplan überhaupt ausgelöst hat.
  */
 async function abendberichtPruefen(
   r: Request,
@@ -2562,19 +2636,28 @@ async function abendberichtPruefen(
   const geheim = a.cronGeheimnis?.();
   const mitgeschickt = r.headers.get("x-vexfit-cron");
   if (!geheim || !mitgeschickt || mitgeschickt !== geheim) {
+    // Kein Protokoll vor der Prüfung: der Pfad ist öffentlich (ohne JWT), ein
+    // Eintrag je unberechtigtem Aufruf wäre von außen flutbar.
     return antwort(401, { fehler: "nicht berechtigt" }, herkunft);
   }
   const jetzt = a.jetzt ? a.jetzt() : new Date();
-  if (wienerStunde(jetzt) !== 16) {
+  const stunde = wienerStunde(jetzt);
+  if (stunde !== 16) {
+    await a.protokoll?.({
+      aktion: "abendbericht",
+      ergebnis: `übersprungen (zeitplan): nicht 16 Uhr Wien (${stunde} Uhr) – kein Versand`,
+    });
     return antwort(200, { ok: true, gesendet: false, uebersprungen: "nicht 16 Uhr Wien" }, herkunft);
   }
-  if (!a.abendberichtZahlen) {
-    return antwort(200, { ok: true, gesendet: false, uebersprungen: "nicht verdrahtet" }, herkunft);
+  try {
+    const erg = await abendberichtSenden(a, "zeitplan");
+    return antwort(200, { ok: true, gesendet: true, mail: erg.mail, zahlen: erg.zahlen }, herkunft);
+  } catch (fehler) {
+    return antwort(500, {
+      fehler: "Abendbericht konnte nicht gesendet werden.",
+      grund: String((fehler as { message?: string })?.message ?? fehler),
+    }, herkunft);
   }
-  const z = await a.abendberichtZahlen();
-  const mailGesendet = await sendeWennAdresseTaugt(a, mailAbendbericht(z));
-  await pushBenachrichtigung(a, pushAbendbericht(z));
-  return antwort(200, { ok: true, gesendet: true, mail: mailGesendet, zahlen: z }, herkunft);
 }
 
 /**

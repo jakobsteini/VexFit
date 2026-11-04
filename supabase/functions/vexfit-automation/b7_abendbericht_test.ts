@@ -11,8 +11,10 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
   type AbendberichtZahlen,
+  ADMIN_ID,
   type Anschluesse,
   bearbeiten,
+  ERLAUBTE_HERKUNFT,
   type Mail,
   mailAbendbericht,
   type PushNachricht,
@@ -63,20 +65,28 @@ Deno.test("Leerer Tag: trotzdem 'Heute nichts Neues'", () => {
   assertStringIncludes(pushAbendbericht(LEER).text, "Heute nichts Neues");
 });
 
-function baue(opt: { geheim?: string; jetzt?: Date; zahlen?: AbendberichtZahlen } = {}) {
+type Protokolleintrag = { admin_id?: string; aktion: string; ergebnis?: string };
+
+function baue(opt: { geheim?: string; jetzt?: Date; zahlen?: AbendberichtZahlen; mailFehler?: boolean } = {}) {
   const mails: Mail[] = [];
   const pushes: PushNachricht[] = [];
+  const prot: Protokolleintrag[] = [];
   const base: Record<string, unknown> = {
     cronGeheimnis: () => opt.geheim ?? "geheim",
     jetzt: () => opt.jetzt ?? new Date("2026-07-01T14:00:00Z"), // 16 Uhr Wien
     abendberichtZahlen: () => Promise.resolve(opt.zahlen ?? VOLL),
-    mailSenden: (m: Mail) => { mails.push(m); return Promise.resolve(); },
+    mailSenden: (m: Mail) => {
+      if (opt.mailFehler) return Promise.reject(new Error("SMTP kaputt"));
+      mails.push(m);
+      return Promise.resolve();
+    },
     vapidVorhanden: () => true,
     pushAbosLesen: () => Promise.resolve([{ endpoint: "https://push/x", p256dh: "k", auth: "a" }]),
     pushEinzelSenden: (_abo: unknown, n: PushNachricht) => { pushes.push(n); return Promise.resolve(201); },
+    protokoll: (e: Protokolleintrag) => { prot.push(e); return Promise.resolve(); },
     melden: () => {},
   };
-  return { a: base as unknown as Anschluesse, mails, pushes };
+  return { a: base as unknown as Anschluesse, mails, pushes, prot };
 }
 
 function req(key: string | null): Request {
@@ -118,4 +128,80 @@ Deno.test("B7: Migration legt zwei Zeitpläne an (nur Datei)", async () => {
   assertStringIncludes(sql, "/vexfit-automation/abendbericht");
   assertStringIncludes(sql, "vexfit_cron_key");
   assertStringIncludes(sql, "NICHT eingespielt");
+});
+
+// ── Fix-Baustein 2026-11-04: Lauf sichtbar machen + Admin-Test-Auslöser ──
+
+Deno.test("Leerer Tag um 16 Uhr: Bericht geht trotzdem raus und wird protokolliert", async () => {
+  const b = baue({ jetzt: new Date("2026-07-01T14:00:00Z"), zahlen: LEER }); // 16 Uhr Wien
+  const d = await (await bearbeiten(req("geheim"), b.a)).json();
+  assertEquals(d.gesendet, true);
+  assertEquals(b.mails.length, 1);
+  assertStringIncludes(b.mails[0].text + b.mails[0].html, "Heute nichts Neues");
+  assertEquals(b.prot.length, 1);
+  assertEquals(b.prot[0].aktion, "abendbericht");
+  assertStringIncludes(b.prot[0].ergebnis ?? "", "gesendet (zeitplan)");
+});
+
+Deno.test("Jeder Lauf schreibt einen Protokolleintrag (Versand UND Übersprungen)", async () => {
+  const gesendet = baue({ jetzt: new Date("2026-07-01T14:00:00Z") }); // 16 Uhr Wien
+  await bearbeiten(req("geheim"), gesendet.a);
+  assertEquals(gesendet.prot.length, 1);
+  assertStringIncludes(gesendet.prot[0].ergebnis ?? "", "gesendet (zeitplan)");
+
+  const uebersprungen = baue({ jetzt: new Date("2026-07-01T15:00:00Z") }); // 17 Uhr Wien
+  await bearbeiten(req("geheim"), uebersprungen.a);
+  assertEquals(uebersprungen.prot.length, 1);
+  assertStringIncludes(uebersprungen.prot[0].ergebnis ?? "", "übersprungen");
+  assertEquals(uebersprungen.mails.length, 0);
+});
+
+Deno.test("Versandfehler wird nicht verschluckt: Fehler im Protokoll, Antwort 500", async () => {
+  const b = baue({ jetzt: new Date("2026-07-01T14:00:00Z"), mailFehler: true });
+  const res = await bearbeiten(req("geheim"), b.a);
+  assertEquals(res.status, 500);
+  assertEquals(b.prot.length, 1);
+  assertStringIncludes(b.prot[0].ergebnis ?? "", "Fehler (zeitplan)");
+});
+
+function baueAdmin(opt: { aal?: string; nutzerId?: string; zahlen?: AbendberichtZahlen } = {}) {
+  const b = baue({ zahlen: opt.zahlen });
+  (b.a as unknown as Record<string, unknown>).benutzerAusToken = (_t: string) =>
+    Promise.resolve({ id: opt.nutzerId ?? ADMIN_ID, email: "admin@vexfit.app", aal: opt.aal ?? "aal2" });
+  return b;
+}
+function adminReq(payload: Record<string, unknown>): Request {
+  return new Request(
+    "https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/admin-aktion",
+    { method: "POST", headers: { "Content-Type": "application/json", Origin: ERLAUBTE_HERKUNFT, Authorization: "Bearer test" }, body: JSON.stringify(payload) },
+  );
+}
+
+Deno.test("Test-Auslöser: Admin mit aal2 sendet sofort, ohne 16-Uhr-Prüfung", async () => {
+  const b = baueAdmin({ zahlen: LEER });
+  // Uhrzeit absichtlich NICHT 16 Uhr Wien – der Knopf ignoriert sie.
+  (b.a as unknown as Record<string, unknown>).jetzt = () => new Date("2026-07-01T09:00:00Z");
+  const res = await bearbeiten(adminReq({ aktion: "abendbericht_jetzt" }), b.a);
+  const d = await res.json();
+  assertEquals(res.status, 200);
+  assertEquals(d.gesendet, true);
+  assertEquals(b.mails.length, 1);
+  assertEquals(b.prot.length, 1);
+  assertEquals(b.prot[0].admin_id, ADMIN_ID);
+  assertStringIncludes(b.prot[0].ergebnis ?? "", "gesendet (admin)");
+});
+
+Deno.test("Test-Auslöser verlangt zweiten Faktor: aal1 -> 403, kein Versand, kein Protokoll", async () => {
+  const b = baueAdmin({ aal: "aal1" });
+  const res = await bearbeiten(adminReq({ aktion: "abendbericht_jetzt" }), b.a);
+  assertEquals(res.status, 403);
+  assertEquals(b.mails.length, 0);
+  assertEquals(b.prot.length, 0);
+});
+
+Deno.test("Test-Auslöser: Nicht-Admin -> 403", async () => {
+  const b = baueAdmin({ nutzerId: "nicht-admin", aal: "aal2" });
+  const res = await bearbeiten(adminReq({ aktion: "abendbericht_jetzt" }), b.a);
+  assertEquals(res.status, 403);
+  assertEquals(b.mails.length, 0);
 });

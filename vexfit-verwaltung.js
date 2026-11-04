@@ -1295,6 +1295,25 @@ function starteVerwaltung() {
     } catch { tb.innerHTML = `<tr><td colspan="4" class="leer-text">${escapeHtml(hinweis)}</td></tr>`; }
   }
 
+  // B7: Test-Auslöser „Abendbericht jetzt senden". Läuft über /admin-aktion mit
+  // derselben Admin-Prüfung (aal2) wie die übrigen Aktionen und schickt den
+  // Bericht sofort (ohne 16-Uhr-Prüfung). Danach das Protokoll neu laden, damit
+  // der Lauf sichtbar wird.
+  async function abendberichtJetzt() {
+    const btn = $("btn-abendbericht-jetzt");
+    if (btn) { btn.disabled = true; btn.textContent = "Wird gesendet …"; }
+    try {
+      const d = await adminEdge({ aktion: "abendbericht_jetzt" });
+      if (d && d.ok) {
+        erfolg(d.mail ? "Abendbericht an office@vexfit.app gesendet." : "Abendbericht ausgelöst, aber die Mail wurde nicht zugestellt – siehe Protokoll.");
+      }
+      // adminEdge meldet einen Fehler bereits selbst.
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "Abendbericht jetzt senden"; }
+      ladeProtokoll();
+    }
+  }
+
   // ── Detailansicht ──
   function df(label, wert, fehltMarke) {
     const leer = wert === null || wert === undefined || wert === "" || (Array.isArray(wert) && wert.length === 0);
@@ -1937,6 +1956,7 @@ function starteVerwaltung() {
       if (akt === "kicken") { kicken(art, id); return; }
       if (akt === "zertifikat") { zertifikatOeffnen(a.dataset.pfad); return; }
       if (akt === "push-entfernen") { pushGeraetEntfernen(id); return; }
+      if (akt === "abendbericht-jetzt") { abendberichtJetzt(); return; }
       if (akt === "kopieren") { navigator.clipboard && navigator.clipboard.writeText(a.dataset.text).then(() => erfolg("Kopiert."), () => {}); return; }
       if (akt === "studio-freigabe") { studioRpc("studio_admin_freigabe", { p_studio_id: id, p_an: a.checked }); return; }
       if (akt === "studio-anlegen") { studioAnlegen(); return; }
