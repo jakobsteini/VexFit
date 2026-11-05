@@ -165,10 +165,43 @@ export function istTestkonto(email, liste = []) {
   return liste.map((x) => String(x).toLowerCase()).includes(e);
 }
 
-/** Liste ggf. um Testkonten bereinigen. */
+/** Liste ggf. um Testkonten bereinigen. Blendet sowohl die serverseitig
+ *  markierten (p.ist_test) als auch die per Heuristik (E-Mail-Alias) erkannten
+ *  aus – aber nur, wenn „Tests ausblenden" aktiv ist. */
 export function sichtbar(liste, testsAus, testListe = []) {
   const arr = Array.isArray(liste) ? liste : [];
-  return testsAus ? arr.filter((p) => !istTestkonto(p.email, testListe)) : arr;
+  return testsAus ? arr.filter((p) => p.ist_test !== true && !istTestkonto(p.email, testListe)) : arr;
+}
+
+/** B7: Vorschläge (NICHT automatisch) für Test-/Spam-Konten. Gründe: E-Mail mit
+ *  Plus-Alias (z. B. name+test@…), auffälliger Name (Tastatur-Muster, keine
+ *  Vokale, Wörter wie „test"/„asdf"), doppelter Name. Schon markierte Konten
+ *  (ist_test) werden nicht erneut vorgeschlagen. Reine Funktion. */
+export function testSpamVerdacht(trainers) {
+  const arr = Array.isArray(trainers) ? trainers : [];
+  const norm = (t) => `${(t.vorname || "").trim()} ${(t.nachname || "").trim()}`.trim().toLowerCase();
+  const zaehler = {};
+  for (const t of arr) { const n = norm(t); if (n) zaehler[n] = (zaehler[n] || 0) + 1; }
+  const auffaellig = (t) => {
+    const n = norm(t);
+    if (!n) return false;
+    if (/\b(test|asdf|qwert|wasd|xxx|abc|fake|spam|lorem)\b/.test(n)) return true;
+    const buchst = n.replace(/[^a-zäöü]/gi, "");
+    if (buchst.length >= 3 && !/[aeiouäöü]/i.test(buchst)) return true; // keine Vokale
+    if (/(.)\1\1\1/.test(buchst)) return true; // vierfacher gleicher Buchstabe
+    return false;
+  };
+  const funde = [];
+  for (const t of arr) {
+    if (t.ist_test === true) continue;
+    const gruende = [];
+    const lokal = String(t.email || "").split("@")[0] || "";
+    if (lokal.includes("+")) gruende.push("E-Mail-Alias (+)");
+    if (auffaellig(t)) gruende.push("auffälliger Name");
+    if (zaehler[norm(t)] > 1) gruende.push("doppelter Name");
+    if (gruende.length) funde.push({ id: t.id, name: norm(t), email: t.email || "", gruende: gruende });
+  }
+  return funde;
 }
 
 /** Avatar-Adresse nur gelten lassen, wenn sie aus dem Avatar-Bucket kommt. */
@@ -867,7 +900,7 @@ function starteVerwaltung() {
       <div class="karte-zeile">${ort} · ${datumKurz(t.created_at)}${t.studio_standort_id ? " · Studio" : ""}</div>
       ${bal.html}
       ${!t.aktiv ? freigabeFehltHinweis(t) : ""}
-      <div class="karte-aktionen">${akt}${sperrBtn}<button class="btn-gefahr" data-aktion="kicken" data-art="trainer" data-id="${escapeHtml(t.id)}">Kicken</button></div>
+      <div class="karte-aktionen">${akt}${sperrBtn}<button class="btn-neutral" data-aktion="${t.ist_test ? "test-aufheben" : "test-markieren"}" data-id="${escapeHtml(t.id)}">${t.ist_test ? "Test-Markierung weg" : "Als Test/Spam"}</button><button class="btn-gefahr" data-aktion="kicken" data-art="trainer" data-id="${escapeHtml(t.id)}">Kicken</button></div>
     </div>`;
   }
   function kundeKarte(k) {
@@ -967,6 +1000,7 @@ function starteVerwaltung() {
   function renderTrainer() {
     const tb = $("trainer-tbody");
     const karten = $("trainer-karten");
+    renderTestVerdacht();
     const liste = aktuelleTrainerliste();
     if (!liste.length) {
       tb.innerHTML = '<tr><td colspan="8" class="leer-text">Keine Treffer.</td></tr>';
@@ -987,6 +1021,25 @@ function starteVerwaltung() {
         <td data-label="Registriert">${t.created_at ? new Date(t.created_at).toLocaleDateString("de-AT") : "–"}</td>
       </tr>`;
     }).join("");
+  }
+
+  // B7: Vorschlagskasten für mögliche Test-/Spam-Konten (nicht automatisch).
+  // Der Admin entscheidet je Konto per Knopf. Schon markierte tauchen hier nicht
+  // mehr auf.
+  function renderTestVerdacht() {
+    const box = $("test-verdacht");
+    if (!box) return;
+    const funde = testSpamVerdacht(daten.trainers);
+    if (!funde.length) { box.innerHTML = ""; box.style.display = "none"; return; }
+    box.style.display = "";
+    const zeilen = funde.slice(0, 20).map((f) =>
+      `<div class="verdacht-zeile">
+         <div><strong>${escapeHtml(f.name || "ohne Namen")}</strong> <span class="verdacht-mail">${escapeHtml(f.email)}</span><br>
+           <span class="verdacht-grund">${escapeHtml(f.gruende.join(" · "))}</span></div>
+         <button class="btn-klein" data-aktion="test-markieren" data-id="${escapeHtml(f.id)}">Als Test markieren</button>
+       </div>`).join("");
+    box.innerHTML =
+      `<div class="verdacht-kopf">Mögliche Test-/Spam-Konten (${funde.length}) – Vorschlag, du entscheidest je Konto.</div>${zeilen}`;
   }
 
   function renderKunden() {
@@ -1453,6 +1506,7 @@ function starteVerwaltung() {
     const foot = `${freigabe}${hinweis}${freischaltKnopf}
       ${t.verifiziert ? `<button class="btn-gross btn-neutral" data-aktion="entverifizieren" data-id="${escapeHtml(t.id)}">Verifizierung zurück</button>` : `<button class="btn-gross btn-neutral" data-aktion="verifizieren" data-id="${escapeHtml(t.id)}">Verifizieren</button>`}
       <button class="btn-gross btn-warn" data-aktion="sperren" data-art="trainer" data-id="${escapeHtml(t.id)}">${t.gesperrt ? "Entsperren" : "Sperren (Login)"}</button>
+      <button class="btn-gross btn-neutral" data-aktion="${t.ist_test ? "test-aufheben" : "test-markieren"}" data-id="${escapeHtml(t.id)}">${t.ist_test ? "Test-Markierung aufheben" : "Als Test/Spam markieren"}</button>
       <button class="btn-gross btn-gefahr" data-aktion="kicken" data-art="trainer" data-id="${escapeHtml(t.id)}">Kicken</button>`;
     detailOeffnen(nameFormatieren(`${t.vorname || ""} ${t.nachname || ""}`.trim()) || "Trainer", body, foot);
     ladeDetailAnfragen("trainer_id=eq." + encodeURIComponent(t.id), "an ", "kunden_name");
@@ -1636,6 +1690,27 @@ function starteVerwaltung() {
     if (!d || !d.ok) return;
     if (p) p.gesperrt = !ent;
     erfolg(ent ? "Entsperrt." : "Gesperrt.");
+    detailSchliessen(); neuZeichnen(); ladeDaten();
+  }
+
+  // B7: Trainer als Test/Spam markieren bzw. die Markierung aufheben. Nichts
+  // wird gelöscht; markierte Konten werden ausgeblendet, bekommen keine
+  // Erinnerungen und zählen nicht im Abendbericht.
+  async function testMarkieren(id, an) {
+    const t = daten.trainers.find((x) => String(x.id) === String(id));
+    const name = t ? nameFormatieren(`${t.vorname || ""} ${t.nachname || ""}`.trim()) : "";
+    const ja = await bestaetige({
+      titel: an ? "Als Test/Spam markieren" : "Markierung aufheben",
+      text: an
+        ? `${name || "Dieses Konto"} als Test-/Spam-Konto markieren? Es wird ausgeblendet, bekommt keine Erinnerungs-Mails und zählt nicht im Abendbericht. Nichts wird gelöscht.`
+        : `Die Test-/Spam-Markierung von ${name || "diesem Konto"} wieder aufheben?`,
+      okText: an ? "Markieren" : "Aufheben", okArt: "btn-neutral",
+    });
+    if (!ja) return;
+    const d = await adminEdge({ aktion: an ? "trainer_test_markieren" : "trainer_test_aufheben", ziel_id: id });
+    if (!d || !d.ok) return;
+    if (t) t.ist_test = an;
+    erfolg(an ? "Als Test/Spam markiert und ausgeblendet." : "Markierung aufgehoben.");
     detailSchliessen(); neuZeichnen(); ladeDaten();
   }
 
@@ -2013,6 +2088,8 @@ function starteVerwaltung() {
       if (akt === "verifizieren") { verifizieren(id, true); return; }
       if (akt === "entverifizieren") { verifizieren(id, false); return; }
       if (akt === "sperren") { sperren(art, id); return; }
+      if (akt === "test-markieren") { testMarkieren(id, true); return; }
+      if (akt === "test-aufheben") { testMarkieren(id, false); return; }
       if (akt === "kicken") { kicken(art, id); return; }
       if (akt === "zertifikat") { zertifikatOeffnen(a.dataset.pfad); return; }
       if (akt === "push-entfernen") { pushGeraetEntfernen(id); return; }

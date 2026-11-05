@@ -468,14 +468,25 @@ const anschluesse: Anschluesse = {
   // 2026-11-02 nicht eingespielt), antwortet PostgREST mit Fehler → "migration fehlt".
   async trainerFuerErinnerung(): Promise<TrainerProfil[]> {
     const seit = new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString();
-    const spalten = "id,vorname,email,created_at,avatar_url,trainingsart,trainingsort,preis_stunde,bio,erfahrung,spezialisierungen,telefon,aktiv,gesperrt,erinnerung_stufe,erinnerungen_aus,erinnerung_token";
-    const pfad = `trainers?select=${spalten}` +
-      `&aktiv=eq.false&gesperrt=eq.false&erinnerungen_aus=eq.false` +
-      `&created_at=gte.${encodeURIComponent(seit)}&order=created_at.desc&limit=500`;
-    const a = await fetch(restAdresse(pfad), { headers: restKopf() });
-    if (!a.ok) throw new Error(`trainerFuerErinnerung fehlgeschlagen: HTTP ${a.status}`);
-    const zeilen = await a.json().catch(() => []);
-    return Array.isArray(zeilen) ? zeilen as TrainerProfil[] : [];
+    const basis = "id,vorname,email,created_at,avatar_url,trainingsart,trainingsort,preis_stunde,bio,erfahrung,spezialisierungen,telefon,aktiv,gesperrt,erinnerung_stufe,erinnerungen_aus,erinnerung_token";
+    // B7: Test-/Spam-Konten (ist_test) ausschließen. Zuerst MIT Spalte/Filter;
+    // schlägt das fehl, weil die Migration 2026-11-06-02 noch nicht eingespielt
+    // ist (Spalte fehlt → HTTP 400), ohne ist_test erneut versuchen. So bleiben
+    // die Erinnerungen in jedem Fall funktionsfähig.
+    for (const spalten of [basis + ",ist_test", basis]) {
+      const filter = spalten.includes("ist_test") ? "&ist_test=not.is.true" : "";
+      const pfad = `trainers?select=${spalten}` +
+        `&aktiv=eq.false&gesperrt=eq.false&erinnerungen_aus=eq.false${filter}` +
+        `&created_at=gte.${encodeURIComponent(seit)}&order=created_at.desc&limit=500`;
+      const a = await fetch(restAdresse(pfad), { headers: restKopf() });
+      if (a.ok) {
+        const zeilen = await a.json().catch(() => []);
+        return Array.isArray(zeilen) ? zeilen as TrainerProfil[] : [];
+      }
+      if (a.status !== 400) throw new Error(`trainerFuerErinnerung fehlgeschlagen: HTTP ${a.status}`);
+      // 400: wahrscheinlich fehlende Spalte – nächster Versuch ohne ist_test.
+    }
+    throw new Error("trainerFuerErinnerung fehlgeschlagen: auch ohne ist_test HTTP 400");
   },
 
   // Teil 4: Erinnerungsstufe atomar beanspruchen (bedingter PATCH, nur wenn die

@@ -186,6 +186,10 @@ export interface TrainerProfil {
   erinnerungen_aus?: boolean | null;
   /** Migration 2026-11-02: geheimes Token für den Abmelde-Link (ohne Login). */
   erinnerung_token?: string | null;
+  /** B7 (Migration 2026-11-06-02): vom Admin als Test-/Spam-Konto markiert –
+   *  keine Erinnerungen, nicht im Abendbericht. Fehlt die Spalte, ist das Feld
+   *  undefined (altes Verhalten). */
+  ist_test?: boolean | null;
 }
 
 export interface Mail {
@@ -1835,6 +1839,19 @@ async function adminAktion(
     case "trainer_sperren":
       geaendert = await a.adminTrainerSetzen(zielId, { aktiv: false });
       break;
+    // B7: Test-/Spam-Konto markieren bzw. die Markierung aufheben. Nichts wird
+    // gelöscht; markierte Konten werden ausgeblendet, bekommen keine
+    // Erinnerungen und zählen nicht im Abendbericht. Fehlt die Spalte ist_test
+    // (Migration 2026-11-06-02 noch nicht eingespielt), kommt ein klarer Hinweis.
+    case "trainer_test_markieren":
+    case "trainer_test_aufheben":
+      try {
+        geaendert = await a.adminTrainerSetzen(zielId, { ist_test: aktion === "trainer_test_markieren" });
+      } catch (fehler) {
+        if (istMigrationFehlt(fehler)) return antwort(400, { fehler: MIGRATION_HINWEIS }, herkunft);
+        throw fehler;
+      }
+      break;
     case "trainer_bezahlt":
       geaendert = await a.adminTrainerSetzen(zielId, { stripe_bezahlt: true });
       break;
@@ -2158,6 +2175,7 @@ export function erinnerungStufeFaellig(
 ): number | null {
   if (t.aktiv === true) return null;
   if (t.gesperrt === true) return null;
+  if (t.ist_test === true) return null; // B7: Test-/Spam-Konten bekommen keine Erinnerung
   if (t.erinnerungen_aus === true) return null;
   if (profilVollstaendig(t)) return null;
   const ms = t.created_at ? Date.parse(String(t.created_at)) : NaN;
