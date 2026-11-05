@@ -61,8 +61,8 @@ Deno.test("B4: keine genaue Geschäftsadresse, nur Salzburg/Österreich", async 
   assert(!s.toLowerCase().includes("fuschl"), "Wohnort auf der Landingpage");
 });
 
-Deno.test("B4: schnell – Hauptschrift vorab geladen, keine schweren Bibliotheken", async () => {
+Deno.test("B4: schnell – Supabase vorverbunden, keine schweren Bibliotheken", async () => {
   const s = await lies("./trainer.html");
-  assertStringIncludes(s, 'rel="preload"');
+  assertStringIncludes(s, 'rel="preconnect"');
   assert(!/<script[^>]+src=/.test(s), "externes Skript auf der Landingpage");
 });

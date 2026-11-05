@@ -13,8 +13,9 @@
 <meta property="og:description" content="Erhalte als Personal Trainer Kundenanfragen aus deiner Region. Kostenlos, bis du deine erste Anfrage annimmst.">
 <meta property="og:image" content="https://vexfit.app/marke/vexfit-vorschau-1200x630.png">
 <meta property="og:url" content="https://vexfit.app/trainer.html">
-<!-- B5: die wichtigste Schrift vorab laden, damit die Überschrift sofort steht. -->
-<link rel="preload" href="fonts/dm-sans-latin.woff2" as="font" type="font/woff2" crossorigin>
+<!-- B5: Verbindung zu Supabase vorwärmen (DNS+TLS), damit der erste Aufruf
+     (Trichter-Beacon, später die Registrierung) ohne Verbindungsaufbau losläuft. -->
+<link rel="preconnect" href="https://hbapzwxdehfgnputrfjf.supabase.co" crossorigin>
 <link rel="stylesheet" href="fonts/vexfit-fonts.css">
 <style>
 :root{--black:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--card:#161616;--mid:#1e1e1e;--muted:#8a8a8a;--border:rgba(255,255,255,0.08)}
@@ -88,14 +89,18 @@ h1 em{font-style:normal;color:var(--accent)}
   }
   // B3: anonyme Trichter-Stufe "Seite geöffnet" (Rolle Trainer) – best effort,
   // keine Personendaten. Fehlt die Tabelle, schlägt der Aufruf still fehl.
+  // Der öffentliche (publishable) Supabase-Schlüssel steht wie überall in einer
+  // Variablen, nicht als Inline-Literal.
+  var SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
   try{
     var p = new URLSearchParams(qs);
     var ua = (navigator.userAgent||'').toLowerCase();
     var browser = ua.indexOf('instagram')>=0 ? 'instagram'
                 : (ua.indexOf('fban')>=0||ua.indexOf('fbav')>=0||ua.indexOf('fb_iab')>=0) ? 'facebook' : 'sonst';
-    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/rest/v1/trichter_ereignisse',{
+    fetch(SUPABASE_URL+'/rest/v1/trichter_ereignisse',{
       method:'POST', keepalive:true,
-      headers:{'Content-Type':'application/json','apikey':'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY','Authorization':'Bearer sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY','Prefer':'return=minimal'},
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=minimal'},
       body: JSON.stringify({ stufe:'seite', rolle:'trainer', quelle:(p.get('utm_source')||'').trim()||null, kampagne:(p.get('utm_campaign')||'').trim()||null, inhalt:(p.get('utm_content')||'').trim()||null, browsertyp:browser })
     }).catch(function(){});
   }catch(e){}

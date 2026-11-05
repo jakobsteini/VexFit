@@ -1,3 +1,9 @@
 # Zustand der Supabase-CLI (verknuepftes Projekt, Zwischenstaende) — nichts davon gehoert ins Repo.
 supabase/.temp/
 .DS_Store
+
+# Mess-Werkzeug (B5): Playwright nur lokal, nicht ins Repo.
+node_modules/
+package.json
+package-lock.json
+rundgang/ladezeit-*.json
