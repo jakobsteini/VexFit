@@ -132,6 +132,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;height:calc(56px + env(safe-
 .staerke-text b{color:var(--white)}
 .staerke-tipp{color:var(--muted);font-size:12px;line-height:1.5}
 .staerke-tipp a{color:var(--accent);text-decoration:none}
+.staerke-cta{display:block;width:100%;text-align:center;background:var(--accent,#e8ff00);color:#0a0a0a;font-weight:700;font-size:14px;padding:13px;border:none;border-radius:6px;text-decoration:none;cursor:pointer;margin-bottom:14px;font-family:inherit}
 .ub-hinweis a{color:var(--accent);text-decoration:none}
 
 /* Mini-Banner in Anfragen */
@@ -697,6 +698,60 @@ function profilAuswertung(p) {
     inSuche: noetigFehlt.length === 0,   // alle Pflichtpunkte erfuellt
     vollstaendig: prozent >= 100
   };
+}
+
+// B6 (05./06.11.): die acht Kernangaben – deckungsgleich mit Admin
+// (fehlendeProfilfelder) und den Erinnerungs-Mails (freischaltFehlendeFelder).
+// Dient der klaren Anzeige „x von 8" und dem Sprung zur nächsten fehlenden
+// Angabe. Reihenfolge wie dort (Foto zuerst, mobil zuerst auszufüllen).
+const ACHT_ANKER = {
+  'Trainingsart': 'profil-bearbeiten.html#fTrainingsart',
+  'Trainingsort': 'profil-bearbeiten.html#dotTrainingsort',
+  'Preis pro Stunde': 'profil-bearbeiten.html#fPreis',
+  'Über mich': 'profil-bearbeiten.html#fBio',
+  'Erfahrung': 'profil-bearbeiten.html#fErfahrung',
+  'Spezialisierungen': 'profil-bearbeiten.html#chipWrap',
+  'Telefon': 'profil-bearbeiten.html#fTelefon'
+};
+function achtAngaben(p) {
+  p = p || {};
+  const text = (v) => (v == null ? '' : String(v)).trim();
+  const liste = (v) => Array.isArray(v) ? v : [];
+  const felder = [
+    { name: 'Foto', ok: !!p.foto, foto: true },
+    { name: 'Trainingsart', ok: !!text(p.trainingsart) },
+    { name: 'Trainingsort', ok: !!text(p.trainingsort) },
+    { name: 'Preis pro Stunde', ok: Number(p.preis_stunde) > 0 },
+    { name: 'Über mich', ok: text(p.bio).length >= 10 },
+    { name: 'Erfahrung', ok: !!text(p.erfahrung) },
+    { name: 'Spezialisierungen', ok: liste(p.spezialisierungen).length > 0 },
+    { name: 'Telefon', ok: !!text(p.telefon) }
+  ];
+  const fehlt = felder.filter((f) => !f.ok);
+  return { felder: felder, erfuellt: felder.length - fehlt.length, gesamt: 8, fehlt: fehlt, erstesFehlend: fehlt[0] || null };
+}
+
+// B3-Trichter: meldet einmalig „Profil >=5/8" (anonym, nur Kampagnen-Kennungen
+// aus dem eigenen Datensatz T). Best effort; fehlt die Tabelle, passiert nichts.
+let profil5Gemeldet = false;
+function trichterProfil5() {
+  if (profil5Gemeldet) return;
+  const a = achtAngaben(aktuellesProfil());
+  if (a.erfuellt < 5) return;
+  profil5Gemeldet = true;
+  try {
+    fetch(SB + '/rest/v1/trichter_ereignisse', {
+      method: 'POST', keepalive: true,
+      headers: { 'Content-Type': 'application/json', apikey: KEY, Authorization: 'Bearer ' + KEY, Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        stufe: 'profil5', rolle: 'trainer',
+        quelle: (T && T.herkunft_quelle) || null,
+        kampagne: (T && T.herkunft_kampagne) || null,
+        inhalt: (T && T.herkunft_inhalt) || null,
+        browsertyp: (T && T.herkunft_browser) || 'sonst'
+      })
+    }).catch(() => {});
+  } catch (e) {}
 }
 // ==KERN-ENDE==
 
@@ -1317,11 +1372,21 @@ function renderProfilstaerke() {
     const tipp = i.ok ? '' : `<div class="staerke-tipp">${vexEsc(tippText)}${ziel}</div>`;
     return `<div class="staerke-item"><div class="staerke-haken ${i.ok ? 'ok' : 'no'}">${i.ok ? '✓' : ''}</div><div><div class="staerke-text"><b>${vexEsc(i.name)}</b></div>${tipp}</div></div>`;
   };
-  let html = `<div class="staerke-kopf"><div class="staerke-titel">Profilstärke</div><div class="staerke-pct">${a.prozent}%</div></div>`;
-  if(a.noetigFehlt.length) {
-    // Teil R: keine Behauptung mehr, Foto/Kurztext/Spezialisierung seien
-    // Bedingung für die Suche. Freigabe entscheidet; Vollständigkeit bringt mehr Anfragen.
-    html += `<div class="staerke-warnung"><b>Dein Profil wird von uns geprüft und freigeschaltet.</b> Ein vollständiges Profil bekommt mehr Anfragen. Es fehlt noch: ${vexEsc(a.noetigFehlt.join(', '))}.</div>`;
+  // B6: „x von 8" – die acht Kernangaben wie in Admin und Erinnerungs-Mails.
+  const acht = achtAngaben(aktuellesProfil());
+  let html = `<div class="staerke-kopf"><div class="staerke-titel">Profilstärke</div><div class="staerke-pct">${acht.erfuellt} von 8</div></div>`;
+  if(acht.erstesFehlend) {
+    // B6: geführt zur NÄCHSTEN fehlenden Angabe (Foto im eigenen Bereich, die
+    // übrigen im Profilformular). Ehrlich formuliert: Freigabe entscheidet über
+    // die Sichtbarkeit; ohne Trainingsart/-ort findet dich die gezielte Suche
+    // aber kaum, und ein volles Profil bekommt mehr Anfragen.
+    const ef = acht.erstesFehlend;
+    const cta = ef.foto
+      ? `<button type="button" class="staerke-cta" onclick="showPage('profil',event)">Nächste Angabe: Foto hinzufügen →</button>`
+      : `<a class="staerke-cta" href="${ACHT_ANKER[ef.name] || STAERKE_BEARB}">Nächste Angabe: ${vexEsc(ef.name)} →</a>`;
+    html += `<div class="staerke-warnung"><b>Noch ${8 - acht.erfuellt} von 8 Angaben offen.</b> Dein Profil wird von uns geprüft und freigeschaltet. Ein vollständiges Profil wird in der Suche besser gefunden und bekommt mehr Anfragen. Als Nächstes fehlt: ${vexEsc(ef.name)}.</div>${cta}`;
+  } else {
+    html += `<div class="staerke-warnung" style="background:rgba(74,222,128,0.1);border-color:rgba(74,222,128,0.3)"><b>Alle 8 Angaben sind da – stark!</b> Dein Profil wirkt vollständig und überzeugend.</div>`;
   }
   html += '<div class="staerke-gruppe">Zuerst ausfüllen</div>';
   html += '<div class="staerke-liste">' + a.noetig.map(zeile).join('') + '</div>';
@@ -1329,6 +1394,7 @@ function renderProfilstaerke() {
   html += '<div class="staerke-liste">' + a.stark.map(zeile).join('') + '</div>';
   karte.innerHTML = html;
   karte.classList.remove('hidden');
+  trichterProfil5();
 }
 
 // ──── DASHBOARD (Teil D) ────
