@@ -2570,6 +2570,16 @@ export interface AbendberichtFehler {
   grund: string;
 }
 
+/** B8: Trichter einer Herkunft über 24 h (die fünf anonymen Stufen). */
+export interface TrichterQuelle {
+  quelle: string;
+  seite: number;
+  formular: number;
+  abgesendet: number;
+  bestaetigt: number;
+  profil5: number;
+}
+
 export interface AbendberichtZahlen {
   neueTrainer: number;
   neueTrainerHerkunft: { quelle: string; anzahl: number }[];
@@ -2580,6 +2590,11 @@ export interface AbendberichtZahlen {
   bezahlt: number;
   zahlungFehlgeschlagen: number;
   gekuendigt: number;
+  /** B8: Trichter der letzten 24 h nach Herkunft (anonym, aus trichter_ereignisse). */
+  trichter24h: TrichterQuelle[];
+  /** B8: freigegebene bzw. in Prüfung befindliche Trainer mit < 5/8 Angaben,
+   *  ohne als Test/Spam markierte Konten. */
+  profileUnter5: number;
   /** Zählwerte, die nicht geladen werden konnten (leer = alles ok). */
   fehler: AbendberichtFehler[];
   /** Fehlgeschlagene/teilweise Cron-Läufe der letzten 24 h aus admin_protokoll
@@ -2616,8 +2631,14 @@ export function leereAbendberichtZahlen(): AbendberichtZahlen {
   return {
     neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
     anfragenOffen: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
+    trichter24h: [], profileUnter5: 0,
     fehler: [], cronHinweise: [],
   };
+}
+
+/** B8: Summe aller Trichter-Ereignisse (24 h) über alle Herkünfte/Stufen. */
+export function trichterSumme(t: TrichterQuelle[]): number {
+  return (t || []).reduce((n, q) => n + q.seite + q.formular + q.abgesendet + q.bestaetigt + q.profil5, 0);
 }
 
 /** B7: nichts Nennenswertes passiert? Nur wenn alle Werte 0 sind UND kein
@@ -2626,7 +2647,8 @@ export function abendberichtLeer(z: AbendberichtZahlen): boolean {
   return z.fehler.length === 0 && z.cronHinweise.length === 0 &&
     z.neueTrainer === 0 && z.neueKunden === 0 && z.wartenNamen.length === 0 &&
     z.anfragenOffen === 0 && z.warteliste === 0 &&
-    (z.bezahlt + z.zahlungFehlgeschlagen + z.gekuendigt) === 0;
+    (z.bezahlt + z.zahlungFehlgeschlagen + z.gekuendigt) === 0 &&
+    trichterSumme(z.trichter24h) === 0 && z.profileUnter5 === 0;
 }
 
 function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert: string }[] {
@@ -2639,14 +2661,28 @@ function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert
     const f = z.fehler.find((x) => x.feld === beschriftung);
     return { beschriftung, wert: f ? `nicht verfügbar (Fehler: ${f.grund})` : wert };
   };
-  return [
+  const basis = [
     zeile("Neue Trainer (24 h)", `${z.neueTrainer}${z.neueTrainer ? ` (${herk})` : ""}`),
     zeile("Neue Kunden (24 h)", String(z.neueKunden)),
     zeile("Warten auf Freigabe", z.wartenNamen.length ? `${z.wartenNamen.length} (${z.wartenNamen.join(", ")})` : "0"),
     zeile("Anfragen ohne Antwort > 24 h", String(z.anfragenOffen)),
     zeile("Wartelisten-Einträge ohne Trainer", String(z.warteliste)),
     zeile("Zahlungen (24 h)", `bezahlt ${z.bezahlt}, fehlgeschlagen ${z.zahlungFehlgeschlagen}, gekündigt ${z.gekuendigt}`),
+    // B8: Profile mit < 5/8 Angaben (ohne Test-/Spam-Konten).
+    zeile("Trainerprofile < 5/8 Angaben", String(z.profileUnter5)),
   ];
+  // B8: Trichter der letzten 24 h nach Herkunft (anonym). Eine Zeile je
+  // Herkunft mit den fünf Stufen; fehlt die Tabelle, steht „nicht verfügbar".
+  const trichterFehler = z.fehler.find((x) => x.feld === "Trichter (24 h)");
+  if (trichterFehler) {
+    basis.push({ beschriftung: "Trichter (24 h)", wert: `nicht verfügbar (Fehler: ${trichterFehler.grund})` });
+  } else if (z.trichter24h.length) {
+    basis.push({ beschriftung: "— Trichter (24 h) nach Herkunft —", wert: "Seite → Formular → Abgeschickt → Bestätigt → Profil≥5" });
+    for (const q of z.trichter24h) {
+      basis.push({ beschriftung: q.quelle, wert: `${q.seite} · ${q.formular} · ${q.abgesendet} · ${q.bestaetigt} · ${q.profil5}` });
+    }
+  }
+  return basis;
 }
 
 /** B7: Abschnitt „Technische Hinweise" – nur wenn Zählwerte fehlten ODER ein
@@ -2776,6 +2812,39 @@ export async function abendberichtZahlenHolen(
         .map((h) => ({ aktion: h.aktion, ergebnis: h.ergebnis }));
     } catch (e) { merkeFehler("Cron-Läufe (24 h)", e); }
   }
+
+  // B8: Trichter der letzten 24 h nach Herkunft (anonym, aus trichter_ereignisse).
+  // Fehlt die Tabelle (Migration 2026-11-06-01 nicht eingespielt), wird es als
+  // „nicht verfügbar" vermerkt – der Bericht geht trotzdem raus.
+  try {
+    const ev = await lesenFn<{ stufe: string; quelle?: string | null }>(
+      `trichter_ereignisse?erstellt_am=gt.${encodeURIComponent(seit)}&select=stufe,quelle&limit=5000`,
+    );
+    const map: Record<string, TrichterQuelle> = {};
+    for (const e of ev) {
+      const q = (e.quelle != null && String(e.quelle).trim()) ? String(e.quelle).trim() : "direkt/unbekannt";
+      const o = map[q] || (map[q] = { quelle: q, seite: 0, formular: 0, abgesendet: 0, bestaetigt: 0, profil5: 0 });
+      if (e.stufe === "seite") o.seite++;
+      else if (e.stufe === "formular") o.formular++;
+      else if (e.stufe === "abgesendet") o.abgesendet++;
+      else if (e.stufe === "bestaetigt") o.bestaetigt++;
+      else if (e.stufe === "profil5") o.profil5++;
+    }
+    z.trichter24h = Object.keys(map).sort().map((q) => map[q]);
+  } catch (e) { merkeFehler("Trichter (24 h)", e); }
+
+  // B8: Trainerprofile mit < 5/8 Angaben, ohne als Test/Spam markierte Konten.
+  // Rückfall ohne ist_test-Spalte (Migration 2026-11-06-02 nicht eingespielt).
+  try {
+    const felder = "avatar_url,trainingsart,trainingsort,preis_stunde,bio,erfahrung,spezialisierungen,telefon";
+    let zeilen: TrainerProfil[];
+    try {
+      zeilen = await lesenFn<TrainerProfil>(`trainers?ist_test=not.is.true&select=${felder},ist_test&limit=2000`);
+    } catch {
+      zeilen = await lesenFn<TrainerProfil>(`trainers?select=${felder}&limit=2000`);
+    }
+    z.profileUnter5 = zeilen.filter((t) => t.ist_test !== true && (8 - freischaltFehlendeFelder(t).length) < 5).length;
+  } catch (e) { merkeFehler("Trainerprofile < 5/8 Angaben", e); }
 
   return z;
 }
