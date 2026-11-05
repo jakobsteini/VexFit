@@ -268,6 +268,36 @@ if(EINLADUNG){
 else if(urlType==='trainer')selectType('trainer');
 else if(urlType==='kunde'||urlType==='client')selectType('client');
 
+// ── B1/B3: Werbe-Herkunft robust erfassen ──────────────────────────────────
+// Die UTM-Parameter (utm_source/campaign/content/medium/term) werden EINMAL
+// beim Laden gelesen und best effort in sessionStorage abgelegt. So überleben
+// sie jeden Schritt bis zum tatsächlich gespeicherten Datensatz – auch wenn der
+// In-App-Browser von Facebook/Instagram die Seite ohne Query neu lädt (etwa
+// nachdem ein Rechtstext in einem neuen Tab geöffnet wurde) oder der Nutzer
+// vor-/zurückblättert. Kein Personenbezug: reine Kampagnen-Kennungen.
+const VEXFIT_WERBUNG=(function(){
+  const p=new URLSearchParams(location.search);
+  const schluessel=['utm_source','utm_campaign','utm_content','utm_medium','utm_term'];
+  const w={};
+  for(const k of schluessel){ const v=(p.get(k)||'').trim(); if(v) w[k]=v; }
+  try{
+    const alt=JSON.parse(sessionStorage.getItem('vexfit_werbung')||'null');
+    if(alt&&typeof alt==='object'){ for(const k of schluessel){ if(!w[k]&&alt[k]) w[k]=alt[k]; } }
+  }catch(e){}
+  try{ if(Object.keys(w).length) sessionStorage.setItem('vexfit_werbung', JSON.stringify(w)); }catch(e){}
+  return w;
+})();
+
+// B3: In-App-Browser von Facebook/Instagram grob am User-Agent erkennen. Dient
+// allein der anonymen Trichter-Auswertung – kein Personenbezug, nichts am
+// Ablauf hängt davon ab.
+function vexfitBrowserTyp(){
+  const ua=(navigator.userAgent||'').toLowerCase();
+  if(ua.includes('instagram')) return 'instagram';
+  if(ua.includes('fban')||ua.includes('fbav')||ua.includes('fb_iab')) return 'facebook';
+  return 'sonst';
+}
+
 // B6d (Studio-Randfall, konzeptpruefung Punkt 7): Wurde die Studio-Seite OHNE
 // ?standort geoeffnet, setzt sie vexfit_studio noch nicht. Klickt der Kunde dann
 // auf einen Trainer-Knopf, steht nur ?standort=<standort-slug>&s=<studio-slug> in
@@ -487,10 +517,11 @@ function weiterNach(url){ setTimeout(function(){ window.location.href = url; }, 
 // B3: Werbekanal (utm) am eigenen Datensatz vermerken – best effort. Fehlt die
 // Spalte herkunft (Migration 2026-11-03-01 noch nicht eingespielt) oder gibt es
 // keine Sitzung, bleibt die Registrierung unberührt.
-function herkunftText(src, camp){
-  const s = (src||'').trim(), c = (camp||'').trim();
-  if(s && c) return s + ' – ' + c;
-  return s || c || '';
+function herkunftText(w){
+  w = w || {};
+  const s = (w.utm_source||'').trim(), c = (w.utm_campaign||'').trim(), ct = (w.utm_content||'').trim();
+  const haupt = (s && c) ? (s + ' – ' + c) : (s || c || '');
+  return ct ? (haupt ? haupt + ' / ' + ct : ct) : haupt;
 }
 async function herkunftNachtragen(tabelle, email, herkunft, token){
   if(!herkunft || !token) return;
@@ -518,8 +549,11 @@ async function submitTrainer(){
   // falls die DB sie trotzdem ablehnt, siehe migrations/2026-11-01-03-registrierung-kurz.sql.
   const td={vorname:fn,nachname:ln,email,telefon:'',stadt:'',plz:'',trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
   // Herkunft der Anzeige (für die sofortige Meldung an office@vexfit.app).
-  const utm=new URLSearchParams(location.search).get('utm_campaign')||'';
-  const utmSrc=new URLSearchParams(location.search).get('utm_source')||'';
+  // Robuste Erfassung aus VEXFIT_WERBUNG (überlebt In-App-Browser-Neuladen).
+  const utm=VEXFIT_WERBUNG.utm_campaign||'';
+  const utmSrc=VEXFIT_WERBUNG.utm_source||'';
+  const utmCont=VEXFIT_WERBUNG.utm_content||'';
+  const browserTyp=vexfitBrowserTyp();
   try{
     const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
     const ad=await ar.json();
@@ -541,9 +575,9 @@ async function submitTrainer(){
     try { zugestimmt = localStorage.getItem('vexfit_consent') === 'zugestimmt'; } catch(e) {}
     // Fix 7b: angemeldeter Pfad - Zugangs-Token mitschicken (die Function verlangt
     // es fuer nicht-anonyme Aufrufe). Ohne Sitzung wird keine interne Mail ausgeloest.
-    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-trainer',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...td, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_source: utmSrc, utm_campaign: utm, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
+    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-trainer',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...td, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_source: utmSrc, utm_campaign: utm, utm_content: utmCont, browsertyp: browserTyp, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
     pixelRegistrierungFertig('trainer', capiEventId);
-    herkunftNachtragen('trainers', email, herkunftText(utmSrc, utm), ad.access_token);
+    herkunftNachtragen('trainers', email, herkunftText(VEXFIT_WERBUNG), ad.access_token);
     // Ohne Sitzung (E-Mail-Bestaetigung aktiv) kann der Trainerbereich nicht
     // geoeffnet werden - dann Hinweis statt Weiterleitung.
     if(ad.access_token){
@@ -583,8 +617,10 @@ async function submitClient(){
   if(!document.getElementById('c-agb').checked){showError('c-error','Bitte AGB akzeptieren!');return}
   const btn=document.getElementById('c-submit-btn');imVersand.c=true;btn.disabled=true;btn.textContent='Wird gespeichert...';
   const cd={vorname:fn,nachname:ln,email,stadt:'',plz:'',ziel:'',erwartungen:''};
-  const utm=new URLSearchParams(location.search).get('utm_campaign')||'';
-  const utmSrc=new URLSearchParams(location.search).get('utm_source')||'';
+  const utm=VEXFIT_WERBUNG.utm_campaign||'';
+  const utmSrc=VEXFIT_WERBUNG.utm_source||'';
+  const utmCont=VEXFIT_WERBUNG.utm_content||'';
+  const browserTyp=vexfitBrowserTyp();
   try{
     const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
     const ad=await ar.json();
@@ -605,10 +641,10 @@ async function submitClient(){
     try { zugestimmt = localStorage.getItem('vexfit_consent') === 'zugestimmt'; } catch(e) {}
     // Fix 7b: angemeldeter Pfad - Zugangs-Token mitschicken (die Function verlangt
     // es fuer nicht-anonyme Aufrufe). Ohne Sitzung wird keine interne Mail ausgeloest.
-    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-kunde',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...cd, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_source: utmSrc, utm_campaign: utm, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
+    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-kunde',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...cd, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_source: utmSrc, utm_campaign: utm, utm_content: utmCont, browsertyp: browserTyp, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
     if(ad.access_token){try{localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,refresh_token:ad.refresh_token||null,user_id:userId,email,role:'kunde'}));}catch(e){console.warn('localStorage blockiert:',e);}}
     pixelRegistrierungFertig('kunde', capiEventId);
-    herkunftNachtragen('kunden', email, herkunftText(utmSrc, utm), ad.access_token);
+    herkunftNachtragen('kunden', email, herkunftText(VEXFIT_WERBUNG), ad.access_token);
     if(ad.access_token){ showSuccess('successClient'); }
     else { showError('c-error','Konto erstellt! Bitte bestätige deine E-Mail-Adresse, dann kannst du dich anmelden.'); imVersand.c=false;btn.disabled=false;btn.textContent='Trainer finden →'; }
   }catch(e){showError('c-error','Verbindungsfehler. Bitte prüfe deine Internetverbindung.');imVersand.c=false;btn.disabled=false;btn.textContent='Trainer finden →';}
@@ -632,8 +668,12 @@ zielChipsAufbauen();
 <style>
 .cookie-widerruf{text-align:center;padding:20px;font-size:13px}
 .cookie-widerruf a{color:#666;text-decoration:none;margin:0 8px}
-.cookie-banner{position:fixed;bottom:0;left:0;right:0;z-index:10000;background:#141414;border-top:1px solid rgba(255,255,255,0.07);padding:16px 20px;display:none;flex-direction:column;gap:12px;animation:vxSlideUp 0.5s ease both;font-family:'DM Sans',sans-serif}
+.cookie-banner{position:fixed;bottom:0;left:0;right:0;z-index:10000;background:#141414;border-top:1px solid rgba(255,255,255,0.07);padding:16px 20px calc(16px + env(safe-area-inset-bottom)) 20px;display:none;flex-direction:column;gap:12px;animation:vxSlideUp 0.5s ease both;font-family:'DM Sans',sans-serif}
 .cookie-banner.show{display:flex}
+/* B1: Platz unter dem Formular, solange der Cookie-Banner sichtbar ist – sonst
+   verdeckt der unten fixierte Banner auf kleinen In-App-Browser-Fenstern den
+   Absenden-Knopf. */
+body.cookie-banner-offen .page-wrap{padding-bottom:220px}
 .cookie-text{font-size:13px;color:#666;line-height:1.6}
 .cookie-text a{color:#e8ff00;text-decoration:none}
 .cookie-actions{display:flex;gap:10px}
@@ -660,6 +700,10 @@ function vexfitBannerZeigen(){
   var b = document.getElementById('cookieBanner');
   if(!b) return;
   b.classList.add('show');
+  // B1: Solange der Banner unten klebt, darf er auf dem (oft niedrigen)
+  // In-App-Browser-Fenster den Absenden-Knopf nicht verdecken. Wir schaffen
+  // zusätzlichen Platz unter dem Formular, bis der Banner geschlossen ist.
+  try { document.body.classList.add('cookie-banner-offen'); } catch(e){}
   vexfitWhatsappZeigen(false);
 }
 function vexfitBannerSchliessen(){
@@ -669,6 +713,7 @@ function vexfitBannerSchliessen(){
     b.style.transform = 'translateY(100%)';
     setTimeout(function(){ b.classList.remove('show'); }, 400);
   }
+  try { document.body.classList.remove('cookie-banner-offen'); } catch(e){}
   vexfitWhatsappZeigen(true);
 }
 function vexfitEinstellungenOeffnen(){

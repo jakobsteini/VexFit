@@ -34,7 +34,11 @@ Deno.test("Meldung sofort: neuer-trainer/neuer-kunde werden direkt nach dem Erst
   assertStringIncludes(html, "vexfit-automation/neuer-trainer");
   assertStringIncludes(html, "vexfit-automation/neuer-kunde");
   assertStringIncludes(html, "utm_campaign: utm");
-  assertStringIncludes(html, "get('utm_campaign')");
+  // B1 (05.11.): UTM werden nicht mehr erst beim Abschicken aus location.search
+  // gelesen (fragil im In-App-Browser), sondern einmal beim Laden robust in
+  // VEXFIT_WERBUNG erfasst und von dort weitergereicht.
+  assertStringIncludes(html, "const VEXFIT_WERBUNG=(function(){");
+  assertStringIncludes(html, "utm_campaign: utm");
 });
 
 Deno.test("kern.ts: neuer-Trainer-Mail nennt Herkunft und Registrierzeit (Teil M)", async () => {
