@@ -43,7 +43,8 @@ Deno.test("B1: utm_content und browsertyp gehen für Trainer UND Kunde an die Fu
   // beim Laden gefüllten robusten Speicher.
   assert(!s.includes("new URLSearchParams(location.search).get('utm_campaign')"),
     "UTM wird noch fragil beim Abschicken aus location.search gelesen");
-  assertEquals((s.match(/VEXFIT_WERBUNG\.utm_campaign/g) || []).length, 2);
+  // Beide Submit-Pfade lesen die Kampagne aus dem robusten Speicher.
+  assertEquals((s.match(/const utm=VEXFIT_WERBUNG\.utm_campaign\|\|''/g) || []).length, 2);
 });
 
 Deno.test("B1: herkunftText berücksichtigt utm_content", async () => {

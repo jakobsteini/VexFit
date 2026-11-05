@@ -304,6 +304,37 @@ export function herkunftZusammenfassung(trainers, kunden, jetzt = Date.now(), ta
   return tageListe;
 }
 
+// ── B3 (05./06.11.): Trichter nach Herkunft (anonyme Stufen) ──
+/** Die fünf Trichter-Stufen in Reihenfolge. */
+export const TRICHTER_STUFEN = ["seite", "formular", "abgesendet", "bestaetigt", "profil5"];
+export const TRICHTER_LABEL = {
+  seite: "Seite geöffnet",
+  formular: "Formular begonnen",
+  abgesendet: "Abgeschickt",
+  bestaetigt: "Bestätigt",
+  profil5: "Profil ≥5/8",
+};
+
+/** Zählt anonyme Trichter-Ereignisse der letzten `tage` Tage je Herkunft und
+ *  Stufe. Reine Funktion (keine Personendaten in den Ereignissen). Gibt
+ *  { gesamt: {stufe->n}, quellen: { quelle -> {stufe->n} } } zurück. */
+export function trichterNachQuelle(ereignisse, jetzt = Date.now(), tage = 7) {
+  const grenze = jetzt - tage * 86400000;
+  const leer = () => { const o = {}; for (const s of TRICHTER_STUFEN) o[s] = 0; return o; };
+  const gesamt = leer();
+  const quellen = {};
+  for (const e of ereignisse || []) {
+    if (!e || !TRICHTER_STUFEN.includes(e.stufe)) continue;
+    const t = e.erstellt_am ? new Date(e.erstellt_am).getTime() : NaN;
+    if (isNaN(t) || t < grenze) continue;
+    const q = (e.quelle != null && String(e.quelle).trim()) || "direkt/unbekannt";
+    quellen[q] = quellen[q] || leer();
+    quellen[q][e.stufe]++;
+    gesamt[e.stufe]++;
+  }
+  return { gesamt, quellen };
+}
+
 /** B5.3: Anzeigetext für den Abo-Status eines Trainers. */
 export function aboStatusLabel(status) {
   switch (status) {
@@ -451,7 +482,7 @@ if (typeof document !== "undefined") {
 function starteVerwaltung() {
   const $ = (id) => document.getElementById(id);
   const auth = { token: null, refresh: null, user: null, factorId: null, challengeId: null };
-  const daten = { trainers: [], kunden: [] };
+  const daten = { trainers: [], kunden: [], trichter: [] };
   const zustand = {
     testsAusTrainer: true, testsAusKunden: true,
     trainerSort: { feld: "created_at", ab: true },
@@ -688,6 +719,13 @@ function starteVerwaltung() {
       if (!kuRes.ok) throw new Error("Kunden laden: HTTP " + kuRes.status);
       daten.trainers = await trRes.json();
       daten.kunden = await kuRes.json();
+      // B3: anonyme Trichter-Ereignisse (nur Admin liest sie). Best effort:
+      // fehlt die Tabelle (Migration 2026-11-06-01 noch nicht eingespielt),
+      // bleibt der Trichter leer und das Dashboard läuft normal weiter.
+      try {
+        const trichRes = await hole("trichter_ereignisse?select=stufe,quelle,kampagne,inhalt,browsertyp,rolle,erstellt_am&order=erstellt_am.desc&limit=5000");
+        daten.trichter = trichRes.ok ? await trichRes.json() : [];
+      } catch { daten.trichter = []; }
       // Teil 1a: bekannte IDs und Signaturen setzen (beim ersten Laden ohne
       // Hervorhebung), Zeitstempel merken.
       for (const p of daten.trainers) if (p.id != null) bekannt.trainer.add(String(p.id));
@@ -1066,8 +1104,30 @@ function starteVerwaltung() {
       const trTxt = d.trainer ? `${d.trainer} (${d.trainerVollstaendig} vollständig)` : "0";
       return `<tr><td data-label="Tag"><strong>${datum}</strong></td><td data-label="Trainer">${trTxt}</td><td data-label="Kunden">${d.kunde}</td><td data-label="Herkunft">${herk}</td></tr>`;
     }).join("");
+    // B3 (05./06.11.): Trichter der letzten 7 Tage je Herkunft – anonyme
+    // Stufen (Seite geöffnet → Formular begonnen → abgeschickt → bestätigt →
+    // Profil ≥5/8). Fehlt die Trichter-Tabelle, ist daten.trichter leer.
+    const trichter = trichterNachQuelle(daten.trichter || [], Date.now(), 7);
+    const stufenKopf = TRICHTER_STUFEN.map((s) => `<th>${escapeHtml(TRICHTER_LABEL[s])}</th>`).join("");
+    const trichterZeile = (name, z) =>
+      `<tr><td data-label="Herkunft"><strong>${escapeHtml(name)}</strong></td>` +
+      TRICHTER_STUFEN.map((s) => `<td data-label="${escapeHtml(TRICHTER_LABEL[s])}">${z[s]}</td>`).join("") +
+      `</tr>`;
+    const quellNamen = Object.keys(trichter.quellen).sort();
+    const gesamtSumme = TRICHTER_STUFEN.reduce((n, s) => n + trichter.gesamt[s], 0);
+    const trichterKoerper = quellNamen.length
+      ? quellNamen.map((q) => trichterZeile(q, trichter.quellen[q])).join("") + trichterZeile("Gesamt", trichter.gesamt)
+      : `<tr><td colspan="${TRICHTER_STUFEN.length + 1}" class="leer-text">Noch keine Trichter-Daten (oder Tabelle noch nicht eingespielt).</td></tr>`;
+
     box.innerHTML =
-      `<div class="table-wrap"><table>
+      `<h3 style="font-size:14px;margin:4px 0 10px">Trichter · letzte 7 Tage · nach Herkunft</h3>
+       <div class="table-wrap"><table>
+         <thead><tr><th>Herkunft</th>${stufenKopf}</tr></thead>
+         <tbody>${trichterKoerper}</tbody>
+       </table></div>
+       <div class="herkunft-hinweis">Anonyme Zählung ohne Personendaten. „Bestätigt" = Konto mit sofortiger Sitzung; „Profil ≥5/8" zählt erst, sobald der Trainer-Bereich die Stufe meldet.${gesamtSumme ? "" : " Noch keine Ereignisse."}</div>
+       <h3 style="font-size:14px;margin:22px 0 10px">Registrierungen je Tag · letzte 14 Tage</h3>
+       <div class="table-wrap"><table>
          <thead><tr><th>Tag</th><th>Neue Trainer</th><th>Neue Kunden</th><th>nach Herkunft (T=Trainer, K=Kunden)</th></tr></thead>
          <tbody>${zeilen}</tbody>
        </table></div>

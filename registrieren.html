@@ -298,6 +298,63 @@ function vexfitBrowserTyp(){
   return 'sonst';
 }
 
+// B3: anonyme Trichter-Zählung – keine Personendaten, best effort. Jede Stufe
+// (seite/formular/abgesendet/bestaetigt) wird pro Seitenaufruf nur einmal
+// gemeldet. Fehlt die Tabelle (Migration 2026-11-06-01 noch nicht eingespielt),
+// schlägt der Aufruf still fehl und die Registrierung läuft unberührt weiter.
+const trichterGemeldet={};
+function trichterBeacon(stufe, rolle){
+  const schluessel=stufe+'|'+(rolle||'');
+  if(trichterGemeldet[schluessel]) return;
+  trichterGemeldet[schluessel]=true;
+  try{
+    fetch(SUPABASE_URL+'/rest/v1/trichter_ereignisse',{
+      method:'POST', keepalive:true,
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Prefer':'return=minimal'},
+      body: JSON.stringify({
+        stufe: stufe,
+        rolle: rolle||null,
+        quelle: VEXFIT_WERBUNG.utm_source||null,
+        kampagne: VEXFIT_WERBUNG.utm_campaign||null,
+        inhalt: VEXFIT_WERBUNG.utm_content||null,
+        browsertyp: vexfitBrowserTyp()
+      })
+    }).catch(()=>{});
+  }catch(e){}
+}
+
+// B3: strukturierte Herkunft (Quelle/Kampagne/Inhalt/Browser) am eigenen
+// Datensatz vermerken – getrennt vom Freitext herkunft, damit ein fehlender
+// Spaltensatz (Migration nicht eingespielt) den Freitext-Nachtrag nicht
+// mitreißt. Best effort.
+async function herkunftStrukturNachtragen(tabelle, email, token){
+  if(!token) return;
+  const koerper={ herkunft_browser: vexfitBrowserTyp() };
+  if(VEXFIT_WERBUNG.utm_source)  koerper.herkunft_quelle   = VEXFIT_WERBUNG.utm_source;
+  if(VEXFIT_WERBUNG.utm_campaign)koerper.herkunft_kampagne = VEXFIT_WERBUNG.utm_campaign;
+  if(VEXFIT_WERBUNG.utm_content) koerper.herkunft_inhalt   = VEXFIT_WERBUNG.utm_content;
+  try{
+    await fetch(SUPABASE_URL+'/rest/v1/'+tabelle+'?email=ilike.'+encodeURIComponent(email),{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+token,'Prefer':'return=minimal'},
+      body: JSON.stringify(koerper)
+    });
+  }catch(e){}
+}
+
+// B3: Trichter-Stufen am Seitenanfang auslösen. "Seite geöffnet" sofort (Rolle
+// aus ?typ, sonst offen), "Formular begonnen" beim ersten Tippen im jeweiligen
+// Formular.
+(function(){
+  const rolleAusTyp = urlType==='trainer' ? 'trainer' : (urlType==='kunde'||urlType==='client') ? 'kunde' : null;
+  trichterBeacon('seite', rolleAusTyp);
+  ['formTrainer','formClient'].forEach(function(id){
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('input', function(){ trichterBeacon('formular', id==='formTrainer'?'trainer':'kunde'); }, { once:true });
+  });
+})();
+
 // B6d (Studio-Randfall, konzeptpruefung Punkt 7): Wurde die Studio-Seite OHNE
 // ?standort geoeffnet, setzt sie vexfit_studio noch nicht. Klickt der Kunde dann
 // auf einen Trainer-Knopf, steht nur ?standort=<standort-slug>&s=<studio-slug> in
@@ -578,6 +635,9 @@ async function submitTrainer(){
     fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-trainer',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...td, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_source: utmSrc, utm_campaign: utm, utm_content: utmCont, browsertyp: browserTyp, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
     pixelRegistrierungFertig('trainer', capiEventId);
     herkunftNachtragen('trainers', email, herkunftText(VEXFIT_WERBUNG), ad.access_token);
+    herkunftStrukturNachtragen('trainers', email, ad.access_token);
+    trichterBeacon('abgesendet', 'trainer');
+    if(ad.access_token) trichterBeacon('bestaetigt', 'trainer');
     // Ohne Sitzung (E-Mail-Bestaetigung aktiv) kann der Trainerbereich nicht
     // geoeffnet werden - dann Hinweis statt Weiterleitung.
     if(ad.access_token){
@@ -645,6 +705,9 @@ async function submitClient(){
     if(ad.access_token){try{localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,refresh_token:ad.refresh_token||null,user_id:userId,email,role:'kunde'}));}catch(e){console.warn('localStorage blockiert:',e);}}
     pixelRegistrierungFertig('kunde', capiEventId);
     herkunftNachtragen('kunden', email, herkunftText(VEXFIT_WERBUNG), ad.access_token);
+    herkunftStrukturNachtragen('kunden', email, ad.access_token);
+    trichterBeacon('abgesendet', 'kunde');
+    if(ad.access_token) trichterBeacon('bestaetigt', 'kunde');
     if(ad.access_token){ showSuccess('successClient'); }
     else { showError('c-error','Konto erstellt! Bitte bestätige deine E-Mail-Adresse, dann kannst du dich anmelden.'); imVersand.c=false;btn.disabled=false;btn.textContent='Trainer finden →'; }
   }catch(e){showError('c-error','Verbindungsfehler. Bitte prüfe deine Internetverbindung.');imVersand.c=false;btn.disabled=false;btn.textContent='Trainer finden →';}
