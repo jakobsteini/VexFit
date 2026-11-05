@@ -1155,6 +1155,20 @@ async function sendeWennAdresseTaugt(
 
 /** SHA-256 als Hex-String. Rein (crypto.subtle, kein Netz) – für die
  *  Nutzerdaten der Conversions API (E-Mail klein/getrimmt, dann gehasht). */
+/**
+ * B2 (05.11.2026): Freigabe-Schalter für die serverseitige Meta Conversions
+ * API. Auch wenn der Zugriffsschlüssel (META_CAPI_TOKEN) gesetzt ist, darf
+ * NICHTS an Meta gesendet werden, solange die Datenschutzerklärung die
+ * serverseitige Übermittlung (gehashte E-Mail, Drittlandübermittlung USA) nicht
+ * ausdrücklich nennt. Der Betreiber schaltet erst frei, wenn der Rechtstext live
+ * ist – über META_CAPI_AKTIV = "ja" (bzw. "true"/"1"). Standard: aus.
+ * Siehe docs/recht/entwurf-meta-capi-2026-11-06.md.
+ */
+export function capiFreigeschaltet(aktivWert: string | undefined | null): boolean {
+  const v = (aktivWert ?? "").trim().toLowerCase();
+  return v === "ja" || v === "true" || v === "1";
+}
+
 export async function sha256Hex(text: string): Promise<string> {
   const roh = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return [...new Uint8Array(roh)].map((b) => b.toString(16).padStart(2, "0")).join("");

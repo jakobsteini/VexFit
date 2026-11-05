@@ -46,6 +46,7 @@ import {
   abendberichtZahlenHolen,
   type Anschluesse,
   bearbeiten,
+  capiFreigeschaltet,
   type Mail,
   type MetaEreignis,
   type PushAbo,
@@ -209,6 +210,17 @@ const anschluesse: Anschluesse = {
   // kommt NUR aus META_CAPI_TOKEN. Fehlt er, macht die Funktion nichts und loggt
   // genau einen Hinweis (kein Fehler) – die Registrierung laeuft weiter.
   async metaConversion(ereignis: MetaEreignis): Promise<{ gesendet: boolean; grund?: string }> {
+    // B2: Freigabe-Schalter. Ohne ausdrückliche Freigabe (META_CAPI_AKTIV) wird
+    // NICHTS an Meta gesendet – auch wenn der Token gesetzt ist. Erst freischalten,
+    // wenn die Datenschutzerklärung die serverseitige Übermittlung nennt
+    // (docs/recht/entwurf-meta-capi-2026-11-06.md).
+    if (!capiFreigeschaltet(Deno.env.get("META_CAPI_AKTIV"))) {
+      if (!capiHinweisGeloggt) {
+        capiHinweisGeloggt = true;
+        console.log("vexfit-automation: META_CAPI_AKTIV nicht gesetzt – Conversions API bleibt aus (Datenschutz-Freigabe fehlt).");
+      }
+      return { gesendet: false, grund: "nicht freigeschaltet" };
+    }
     const token = Deno.env.get("META_CAPI_TOKEN");
     if (!token) {
       if (!capiHinweisGeloggt) {
