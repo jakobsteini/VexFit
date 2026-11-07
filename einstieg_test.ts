@@ -57,8 +57,10 @@ Deno.test("kunden-bereich.html: CSS-Fix und 2-Fragen-Umbau", async () => {
   // Ort-Frage mit drei Knoepfen inkl. Beides; Umkreis per Tipp.
   assertStringIncludes(html, "einOrtTipp('beides')");
   assertStringIncludes(html, "einUmkreisTipp(25)");
-  // Befund C: Nutzer-PLZ wird bei gesetztem Land ohne Rueckfrage aufgeloest.
-  assertStringIncludes(html, "ermittleNutzerCoords(plz, status, K && K.land)");
+  // Befund C / Land eindeutig (07.11.2026): Nutzer-PLZ wird mit dem gewaehlten
+  // bzw. gespeicherten Land ohne Rueckfrage aufgeloest.
+  assertStringIncludes(html, "ermittleNutzerCoords(plz, status, land)");
+  assertStringIncludes(html, "const land = gewaehltesLand() || (K && vexPlz.landNormal(K.land)) || null;");
   // Befund D: szText wird aus vexEinstieg.szTextBauen gefuellt.
   assertStringIncludes(html, "vexEinstieg.szTextBauen");
 });

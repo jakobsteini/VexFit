@@ -494,6 +494,13 @@ tr:last-child td{border-bottom:none}
 
     <!-- Nachfrage -->
     <div class="tab-content" id="tab-nachfrage">
+      <!-- Land eindeutig (07.11.2026): Datensätze mit PLZ, aber ohne Land. -->
+      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">PLZ ohne Land · bitte zuordnen</h3>
+      <div class="section-hinweis">Trainer und Kunden mit Postleitzahl, aber ohne Land (AT/DE/CH). Bei 4-stelliger PLZ ist der Ort ohne Land nicht eindeutig (z.&nbsp;B. 5020 in Salzburg und in der Schweiz). Antippen ordnet das Land zu (protokolliert).</div>
+      <div class="table-wrap" style="margin-bottom:22px"><table>
+        <thead><tr><th>Art</th><th>Name</th><th>PLZ / Stadt</th><th>Land zuordnen</th></tr></thead>
+        <tbody id="plz-ohne-land-tbody"><tr><td colspan="4" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
       <!-- K6: Stadt-/PLZ-Übersicht. Spalten klickbar zum Sortieren. -->
       <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Stadt-Übersicht · wo ist Nachfrage, wo fehlen Trainer</h3>
       <div class="section-hinweis">Freigegebene Trainer (ohne Test/Spam), davon Profil ≥5/8, Kundensuchen 7/30 Tage, Vormerkungen, Anfragen. Spaltenüberschrift antippen zum Sortieren.</div>

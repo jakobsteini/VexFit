@@ -531,11 +531,15 @@ const anschluesse: Anschluesse = {
     return Array.isArray(zeilen) && zeilen[0] ? zeilen[0] : null;
   },
 
-  // B4.2: offene (aktiv=true) Einträge einer PLZ.
+  // B4.2: offene (aktiv=true) Einträge einer PLZ – mit land (Rückfall ohne land,
+  // falls Migration 2026-11-07-02 noch nicht eingespielt).
   async alertsOffeneFuerPlz(plz: string) {
-    const filter = `trainer_alerts?plz=eq.${encodeURIComponent(plz)}&aktiv=eq.true` +
-      `&select=id,kunden_email,kunden_name,plz,stadt,abmelde_token&limit=500`;
-    const r = await fetch(restAdresse(filter), { headers: restKopf() });
+    const basis = `trainer_alerts?plz=eq.${encodeURIComponent(plz)}&aktiv=eq.true`;
+    const spalten = "id,kunden_email,kunden_name,plz,stadt,abmelde_token";
+    let r = await fetch(restAdresse(`${basis}&select=${spalten},land&limit=500`), { headers: restKopf() });
+    if (!r.ok && r.status === 400) {
+      r = await fetch(restAdresse(`${basis}&select=${spalten}&limit=500`), { headers: restKopf() });
+    }
     if (!r.ok) { const t = await r.text().catch(() => ""); throw new Error(`alertsOffeneFuerPlz fehlgeschlagen: HTTP ${r.status} ${t}`); }
     const zeilen = await r.json().catch(() => []);
     return Array.isArray(zeilen) ? zeilen : [];
@@ -574,6 +578,19 @@ const anschluesse: Anschluesse = {
     );
     const p = zeilen[0]?.plz;
     return p ? String(p) : null;
+  },
+
+  // Land eindeutig: Land eines Trainers per Kennung. Fehlt die Spalte land
+  // (HTTP 400), null -> es wird nicht nach Land gefiltert (Verhalten wie zuvor).
+  async trainerLandNachId(id: string): Promise<string | null> {
+    const r = await fetch(
+      restAdresse(`trainers?id=eq.${encodeURIComponent(id)}&select=land`),
+      { headers: restKopf() },
+    );
+    if (!r.ok) return null;
+    const zeilen = await r.json().catch(() => []);
+    const l = Array.isArray(zeilen) && zeilen[0] ? zeilen[0].land : null;
+    return l ? String(l) : null;
   },
 
   // B7: alle Zahlen für den Abendbericht. Die Logik (jeder Zählwert einzeln
@@ -651,6 +668,24 @@ const anschluesse: Anschluesse = {
     if (!a.ok) {
       const txt = await a.text().catch(() => "");
       throw new Error(`personGesperrtSetzen fehlgeschlagen: HTTP ${a.status} ${txt}`);
+    }
+    const zeilen = await a.json().catch(() => []);
+    return Array.isArray(zeilen) ? zeilen.length : 0;
+  },
+
+  // Land eindeutig (07.11.2026): die Spalte land einer trainers/kunden-Zeile
+  // setzen – fuer die Admin-Zuordnung „PLZ ohne Land". Der Antwort-Rumpf traegt
+  // bei fehlender Spalte den Postgres-Fehlercode, den kern.ts in einen Hinweis
+  // uebersetzt.
+  async adminLandSetzen(tabelle, id, land) {
+    const a = await fetch(restAdresse(`${tabelle}?id=eq.${encodeURIComponent(id)}`), {
+      method: "PATCH",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify({ land }),
+    });
+    if (!a.ok) {
+      const txt = await a.text().catch(() => "");
+      throw new Error(`adminLandSetzen fehlgeschlagen: HTTP ${a.status} ${txt}`);
     }
     const zeilen = await a.json().catch(() => []);
     return Array.isArray(zeilen) ? zeilen.length : 0;

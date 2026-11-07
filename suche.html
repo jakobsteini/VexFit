@@ -156,7 +156,13 @@ try {
   <div class="sh-label">Trainer finden</div>
   <div class="sh-title">FINDE DEINEN<br>PERFEKTEN TRAINER</div>
   <div class="search-bar">
-    <input class="s-input" type="text" placeholder="Deine PLZ (z.B. 5026)" id="plzInput" maxlength="5" inputmode="numeric" autocomplete="postal-code" onkeydown="if(event.key==='Enter'){event.preventDefault();searchByPLZ()}">
+    <input class="s-input" type="text" placeholder="Deine PLZ (z.B. 5026)" id="plzInput" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="plzLandAbgleich()" onkeydown="if(event.key==='Enter'){event.preventDefault();searchByPLZ()}">
+    <select class="s-input" id="landInput" style="max-width:110px;cursor:pointer" aria-label="Land" title="Land">
+      <option value="">Land</option>
+      <option value="AT">Österreich</option>
+      <option value="DE">Deutschland</option>
+      <option value="CH">Schweiz</option>
+    </select>
     <select class="s-input" id="radiusInput" style="max-width:130px;cursor:pointer">
       <option value="10">10 km</option>
       <option value="25" selected>25 km</option>
@@ -358,6 +364,7 @@ let allTrainers = [];
 // K1: Kunden-Trichter. Letzte gesuchte PLZ merken (für die Stufen suche/treffer/
 // profil), und „Seite geöffnet" einmal melden. Anonym, best effort.
 let letztePlz = '';
+let letztesLand = '';
 try { if (typeof vexfitTrichter === 'function') vexfitTrichter('seite', { rolle: 'kunde' }); } catch (e) {}
 let activeFilter = 'alle';
 
@@ -385,33 +392,38 @@ const bgColors = [
 const plzCache = new Map();
 
 // Koordinaten fuer einen Trainer. Mit gesetztem Feld t.land ('AT'/'DE'/'CH')
-// wird nur dieses eine Land abgefragt (direkte Abfrage, eigener Cache-Schluessel);
-// ohne land loest vexPlz.aufloesen wie fuer die Nutzer-PLZ auf (bei mehrdeutiger
-// 4-stelliger PLZ reicht fuer Trainer-Koordinaten der erste Treffer, keine
-// Nutzerwahl noetig). Rueckgabe {stadt,lat,lng} oder null.
+// wird GEZIELT nur dieses eine Land aufgeloest (eindeutig, eigener land-bewusster
+// Cache-Schluessel in vexPlz). Ohne land loest vexPlz.aufloesen wie bisher auf
+// (bei mehrdeutiger 4-stelliger PLZ reicht fuer Trainer-Koordinaten der erste
+// Treffer, keine Nutzerwahl noetig). Rueckgabe {stadt,lat,lng} oder null.
 async function trainerCoords(t) {
   const plz = t.plz;
   if(!plz) return null;
-  if(t.land) {
-    const land = String(t.land).toLowerCase();
-    const key = land + ':' + plz;
-    if(plzCache.has(key)) return plzCache.get(key);
-    try {
-      const r = await fetch(`https://api.zippopotam.us/${land}/${plz}`);
-      if(r.ok) {
-        const d = await r.json();
-        if(d.places && d.places.length > 0) {
-          const coords = { stadt: d.places[0]['place name'], lat: parseFloat(d.places[0].latitude), lng: parseFloat(d.places[0].longitude) };
-          plzCache.set(key, coords);
-          return coords;
-        }
-      }
-    } catch(e) {}
-    return null;
-  }
-  const o = await vexPlz.aufloesen(plz, { cache: plzCache });
+  const land = vexPlz.landNormal(t.land);
+  const o = await vexPlz.aufloesen(plz, { cache: plzCache, land: land });
   if(!o || o.netzfehler) return null;
   return o.mehrdeutig ? o.optionen[0] : o;
+}
+
+// Land-Auswahl neben dem PLZ-Feld. Vorgabe aus Kontext (ohne zu raten):
+// expliziter ?land=, sonst letzte Wahl (localStorage), sonst Browser-Sprachraum.
+// Bleibt immer sichtbar und aenderbar.
+function landFeld() { return document.getElementById('landInput'); }
+function gewaehltesLand() { const el = landFeld(); return el ? vexPlz.landNormal(el.value) : null; }
+try {
+  var _landVorgabe = vexPlz.standardLand({
+    ausUrl: new URLSearchParams(location.search).get('land'),
+    gespeichert: (function(){ try { return localStorage.getItem('vexfit_land'); } catch(e){ return null; } })(),
+    sprache: (navigator.languages && navigator.languages[0]) || navigator.language || '',
+  });
+  if (_landVorgabe && landFeld()) landFeld().value = _landVorgabe;
+} catch (e) {}
+
+// 5-stellige PLZ ist eindeutig Deutschland: Land-Auswahl automatisch auf DE.
+function plzLandAbgleich() {
+  const plz = (document.getElementById('plzInput').value || '').trim();
+  const el = landFeld();
+  if (el && /^\d{5}$/.test(plz)) el.value = 'DE';
 }
 
 function calcDistance(lat1, lng1, lat2, lng2) {
@@ -442,7 +454,7 @@ function vorschauFilter(liste) {
 // K1: Profil-Öffnen zählen (anonym), dann zur Profilseite. keepalive im Beacon
 // sorgt dafür, dass die Meldung die Navigation überlebt.
 function oeffneProfil(id) {
-  try { vexfitTrichter('profil', { rolle: 'kunde', plz: letztePlz, einmal: false }); } catch(e) {}
+  try { vexfitTrichter('profil', { rolle: 'kunde', plz: letztePlz, land: letztesLand, einmal: false }); } catch(e) {}
   window.location = 'profil.html?id=' + id;
 }
 
@@ -463,19 +475,33 @@ async function searchByPLZ() {
     status.textContent = '⚠️ Bitte gültige PLZ eingeben';
     return;
   }
+  // 5-stellig -> automatisch DE; damit stimmt die Land-Auswahl zur PLZ.
+  plzLandAbgleich();
+  const land = gewaehltesLand();
+  // Bei 4-stelliger PLZ ohne Land NICHT raten (5020 gibt es in AT und CH):
+  // im Formular nachfragen.
+  if(/^\d{4}$/.test(plz) && !land) {
+    status.textContent = '⚠️ Bitte wähle das Land (Österreich, Deutschland oder Schweiz).';
+    const el = landFeld(); if(el) el.focus();
+    return;
+  }
+  // Letzte Wahl merken, damit der nächste Besuch sie vorschlägt.
+  try { if(land) localStorage.setItem('vexfit_land', land); } catch(e) {}
   // K1: Suche ausgeführt (mit grobem PLZ-Bereich). PLZ für die weiteren Stufen merken.
   letztePlz = plz;
-  try { vexfitTrichter('suche', { rolle: 'kunde', plz: plz, einmal: false }); } catch(e) {}
+  letztesLand = land || '';
+  try { vexfitTrichter('suche', { rolle: 'kunde', plz: plz, land: land, einmal: false }); } catch(e) {}
 
   status.textContent = '📍 Standort wird ermittelt...';
-  const ergebnis = await vexPlz.aufloesen(plz, { cache: plzCache });
+  const ergebnis = await vexPlz.aufloesen(plz, { cache: plzCache, land: land });
   if(!ergebnis || ergebnis.netzfehler) {
     status.textContent = (ergebnis && ergebnis.netzfehler)
       ? '⚠️ Standortdienst nicht erreichbar. Bitte später erneut versuchen.'
       : '⚠️ PLZ nicht gefunden. Bitte prüfen.';
     return;
   }
-  // 4-stellige PLZ kann in AT und CH liegen: Nutzer waehlt den Ort.
+  // Sicherheitsnetz: nur falls doch ohne Land aufgelöst (sollte durch die
+  // Land-Pflicht oben nicht vorkommen) – Nutzer wählt den Ort.
   if(ergebnis.mehrdeutig) {
     vexPlz.auswahlKnoepfe(ergebnis.optionen, status, (ort) => umkreisSuche(ort, radius, status));
     return;
@@ -512,7 +538,7 @@ async function umkreisSuche(coords, radius, status) {
     status.textContent = `📍 ${coords.stadt} · ${imUmkreis.length} Trainer in ${radius} km gefunden`;
     naeheHinweisAus();
     renderTrainersWithDistance(imUmkreis);
-    try { vexfitTrichter('treffer', { rolle: 'kunde', plz: letztePlz, einmal: false }); } catch(e) {}
+    try { vexfitTrichter('treffer', { rolle: 'kunde', plz: letztePlz, land: letztesLand, einmal: false }); } catch(e) {}
     return;
   }
 
@@ -875,13 +901,18 @@ async function submitNotify() {
   document.getElementById('notifySuccess').style.display = 'block';
 }
 
-// K5: Stadtseite kann die Suche vorausfüllen (?plz=5020) und direkt starten.
+// K5: Stadtseite kann die Suche vorausfüllen (?plz=5020&land=AT) und direkt
+// starten. Das Land aus der Adresse wird in die Auswahl übernommen, damit 5020
+// eindeutig als Salzburg (AT) aufgelöst wird und kein Schweizer Ort erscheint.
 loadTrainers().then(function() {
   try {
-    var vorgabe = new URLSearchParams(location.search).get('plz');
+    var q = new URLSearchParams(location.search);
+    var vorgabe = q.get('plz');
+    var landVorgabe = vexPlz.landNormal(q.get('land'));
+    if (landVorgabe && landFeld()) landFeld().value = landVorgabe;
     if (vorgabe && /^\d{4,5}$/.test(vorgabe.trim())) {
       var feld = document.getElementById('plzInput');
-      if (feld) { feld.value = vorgabe.trim(); searchByPLZ(); }
+      if (feld) { feld.value = vorgabe.trim(); plzLandAbgleich(); searchByPLZ(); }
     }
   } catch (e) {}
 });

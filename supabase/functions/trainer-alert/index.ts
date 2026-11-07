@@ -89,20 +89,42 @@ async function lesen<T>(pfad: string): Promise<T[]> {
   return await antwort.json() as T[];
 }
 
+/** Liest mit `land` in der Spaltenliste; fehlt die Spalte noch (Migration
+ *  2026-11-07-02 nicht eingespielt -> HTTP 400 "land"), wird OHNE land erneut
+ *  gelesen. So faellt zwischen Deploy und Migration nichts aus; die Zuordnung
+ *  behandelt fehlendes Land ohnehin als vertraeglich. */
+async function lesenMitLandRueckfall<T>(
+  pfadMitLand: string,
+  pfadOhneLand: string,
+): Promise<T[]> {
+  const antwort = await fetch(restAdresse(pfadMitLand), { headers: restKopf() });
+  if (antwort.ok) return await antwort.json() as T[];
+  if (antwort.status === 400) return await lesen<T>(pfadOhneLand);
+  throw new Error(
+    `Lesen von ${pfadMitLand.split("?")[0]} fehlgeschlagen: HTTP ${antwort.status}`,
+  );
+}
+
 const anschluesse: Anschluesse = {
-  // Node "Neue aktive Trainer holen"
+  // Node "Neue aktive Trainer holen" (mit land, Rueckfall ohne land).
   trainerLesen: () =>
-    lesen<Trainer>(
+    lesenMitLandRueckfall<Trainer>(
       `trainers?aktiv=eq.true&alert_sent=eq.false&select=${TRAINER_SPALTEN}`,
+      `trainers?aktiv=eq.true&alert_sent=eq.false&select=${TRAINER_SPALTEN.replace(",land", "")}`,
     ),
 
-  // Node "Aktive Alerts holen"
+  // Node "Aktive Alerts holen" (mit land, Rueckfall ohne land).
   alertsLesen: () =>
-    lesen<Alert>(`trainer_alerts?aktiv=eq.true&select=${ALERT_SPALTEN}`),
+    lesenMitLandRueckfall<Alert>(
+      `trainer_alerts?aktiv=eq.true&select=${ALERT_SPALTEN}`,
+      `trainer_alerts?aktiv=eq.true&select=${ALERT_SPALTEN.replace(",land", "")}`,
+    ),
 
-  // Der Code-Node fragte zippopotam der Reihe nach fuer at, de, ch.
-  async koordinaten(plz: string): Promise<Koordinate | null> {
-    for (const land of LAENDER) {
+  // Mit `land` gezielt EIN Land; sonst der Reihe nach at, de, ch (wie im Node).
+  async koordinaten(plz: string, land?: string | null): Promise<Koordinate | null> {
+    const l = String(land ?? "").trim().toLowerCase();
+    const laender = (l === "at" || l === "de" || l === "ch") ? [l] : LAENDER;
+    for (const land of laender) {
       try {
         const antwort = await fetch(`https://api.zippopotam.us/${land}/${plz}`);
         if (!antwort.ok) continue;

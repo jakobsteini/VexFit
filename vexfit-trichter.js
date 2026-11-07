@@ -47,6 +47,12 @@
     var s = String(plz == null ? "" : plz).replace(/\D/g, "");
     return s.length >= 2 ? s.slice(0, 2) : null;
   }
+  // Land normalisieren: nur 'AT'|'DE'|'CH', sonst null. So wird derselbe PLZ-
+  // Bereich (z. B. "50") je Land getrennt sichtbar (AT-Salzburg vs. CH).
+  function landNormal(x) {
+    var s = String(x == null ? "" : x).trim().toUpperCase();
+    return (s === "AT" || s === "DE" || s === "CH") ? s : null;
+  }
 
   var gemeldet = {};
   function vexfitTrichter(stufe, opt) {
@@ -71,6 +77,11 @@
     if (opt.plz != null && String(opt.plz).trim() !== "") {
       koerper.plz_bereich = plzBereich(opt.plz);
     }
+    // Land (07.11.2026) nur mitsenden, wenn eindeutig – damit "50" in AT nicht
+    // mit "50" in der Schweiz vermischt wird. Fehlt die Spalte (Migration noch
+    // nicht eingespielt), schlägt der Beacon still fehl, wie bei plz_bereich.
+    var land = landNormal(opt.land);
+    if (land) koerper.land = land;
     try {
       global.fetch(SUPABASE_URL + "/rest/v1/trichter_ereignisse", {
         method: "POST",
@@ -84,6 +95,6 @@
   global.vexfitTrichter = vexfitTrichter;
   // Für Tests ohne Browser.
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { plzBereich: plzBereich, browserTyp: browserTyp };
+    module.exports = { plzBereich: plzBereich, browserTyp: browserTyp, landNormal: landNormal };
   }
 })(typeof window !== "undefined" ? window : globalThis);

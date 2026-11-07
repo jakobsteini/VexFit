@@ -20,7 +20,9 @@ import {
   betreffSaeubern,
   entfernung,
   istProbelauf,
+  koordKey,
   type Koordinate,
+  landKompatibel,
   mailBetreff,
   mailHtml,
   mailText,
@@ -111,9 +113,9 @@ const A_WIEN: Alert = {
 Deno.test("Spaltenlisten und Absender stehen unveraendert wie im Workflow", () => {
   assertEquals(
     TRAINER_SPALTEN,
-    "id,vorname,nachname,email,stadt,plz,trainingsart,preis_stunde,bio,spezialisierungen",
+    "id,vorname,nachname,email,stadt,plz,land,trainingsart,preis_stunde,bio,spezialisierungen",
   );
-  assertEquals(ALERT_SPALTEN, "id,kunden_email,kunden_name,plz,stadt,radius");
+  assertEquals(ALERT_SPALTEN, "id,kunden_email,kunden_name,plz,stadt,radius,land");
   // Teil M: Versand über Workspace, sichtbarer Absender office@vexfit.app.
   assertEquals(ABSENDER, "office@vexfit.app");
 });
@@ -212,6 +214,45 @@ Deno.test("nur ungleiche PLZ-Paare muessen aufgeloest werden", () => {
     plz: "1200",
   }]).sort();
   assertEquals(gemischt, ["1010", "1200"]);
+});
+
+// --------------------------------------------------- Land eindeutig (07.11.2026)
+Deno.test("gleiche PLZ in verschiedenen Laendern ist KEIN Direkttreffer", () => {
+  // 5020 gibt es in AT (Salzburg) und CH (Wettingen). Ein CH-Trainer darf einen
+  // AT-Alert mit derselben PLZ NICHT ueber die gleiche PLZ treffen.
+  const chTrainer: Trainer = { ...T_WIEN, id: "t-ch", plz: "5020", land: "CH" };
+  const atAlert: Alert = { ...A_WIEN, id: "a-at", plz: "5020", land: "AT", radius: 25 };
+  // benoetigtePlz liefert land-bewusste Schluessel (kein Direkttreffer).
+  assertEquals(benoetigtePlz([chTrainer], [atAlert]).sort(), ["at:5020", "ch:5020"]);
+  const koordinaten = new Map<string, Koordinate | null>([
+    ["ch:5020", { lat: 47.4667, lng: 8.3167 }], // Wettingen/CH
+    ["at:5020", { lat: 47.8095, lng: 13.0550 }], // Salzburg/AT, ~290 km
+  ]);
+  // Ueber die Koordinaten liegen sie weit auseinander -> kein Treffer in 25 km.
+  assertEquals(zuordnen([chTrainer], [atAlert], koordinaten).mails.length, 0);
+});
+
+Deno.test("gleiche PLZ im gleichen Land trifft weiterhin ohne PLZ-Dienst", () => {
+  const atTrainer: Trainer = { ...T_WIEN, id: "t-at", plz: "5020", land: "AT" };
+  const atAlert: Alert = { ...A_WIEN, id: "a-at2", plz: "5020", land: "AT" };
+  assertEquals(benoetigtePlz([atTrainer], [atAlert]), []);
+  assertEquals(zuordnen([atTrainer], [atAlert], new Map()).mails.length, 1);
+});
+
+Deno.test("fehlendes Land bleibt vertraeglich (Alt-Daten treffen wie bisher)", () => {
+  assertEquals(landKompatibel(null, "AT"), true);
+  assertEquals(landKompatibel("AT", null), true);
+  assertEquals(landKompatibel("AT", "AT"), true);
+  assertEquals(landKompatibel("AT", "CH"), false);
+  assertEquals(koordKey("5020"), "5020");
+  assertEquals(koordKey("5020", "CH"), "ch:5020");
+  // Trainer ohne Land, Alert mit Land, gleiche PLZ -> weiterhin Direkttreffer.
+  const z = zuordnen(
+    [{ ...T_WIEN, plz: "5020", land: null }],
+    [{ ...A_WIEN, plz: "5020", land: "AT" }],
+    new Map(),
+  );
+  assertEquals(z.mails.length, 1);
 });
 
 Deno.test("ohne aktive Alerts passiert nichts — auch kein Markieren", async () => {

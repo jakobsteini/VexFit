@@ -22,12 +22,13 @@
 // Spaltenlisten — genau die aus dem Workflow, Reihenfolge unveraendert
 // ============================================================================
 
-/** `select` des Nodes "Neue aktive Trainer holen". */
+/** `select` des Nodes "Neue aktive Trainer holen". Um `land` ergaenzt (07.11.2026),
+ *  damit 4-stellige PLZ eindeutig einem Land zugeordnet werden (5020 AT vs. CH). */
 export const TRAINER_SPALTEN =
-  "id,vorname,nachname,email,stadt,plz,trainingsart,preis_stunde,bio,spezialisierungen";
+  "id,vorname,nachname,email,stadt,plz,land,trainingsart,preis_stunde,bio,spezialisierungen";
 
-/** `select` des Nodes "Aktive Alerts holen". */
-export const ALERT_SPALTEN = "id,kunden_email,kunden_name,plz,stadt,radius";
+/** `select` des Nodes "Aktive Alerts holen". Um `land` ergaenzt (07.11.2026). */
+export const ALERT_SPALTEN = "id,kunden_email,kunden_name,plz,stadt,radius,land";
 
 /** Absender des Nodes "Alert-Mail senden". */
 // Teil M: sichtbarer Absender und Reply-To ist das Workspace-Postfach. Die
@@ -52,6 +53,7 @@ export interface Trainer {
   email?: string | null;
   stadt?: string | null;
   plz?: string | null;
+  land?: string | null;
   trainingsart?: string | null;
   preis_stunde?: number | string | null;
   bio?: string | null;
@@ -65,6 +67,7 @@ export interface Alert {
   plz?: string | null;
   stadt?: string | null;
   radius?: number | null;
+  land?: string | null;
 }
 
 export interface Koordinate {
@@ -115,7 +118,9 @@ export interface Zuordnung {
 export interface Anschluesse {
   trainerLesen(): Promise<Trainer[]>;
   alertsLesen(): Promise<Alert[]>;
-  koordinaten(plz: string): Promise<Koordinate | null>;
+  /** Koordinaten einer PLZ. Mit `land` ('AT'|'DE'|'CH') wird gezielt nur dieses
+   *  Land abgefragt; ohne Land wie bisher at,de,ch der Reihe nach. */
+  koordinaten(plz: string, land?: string | null): Promise<Koordinate | null>;
   mailSenden(mail: Alertmail): Promise<void>;
   alsVerarbeitetMarkieren(trainerId: string): Promise<void>;
   melden?(text: string, mehr?: unknown): void;
@@ -155,6 +160,34 @@ export function schluesselGueltig(
 // Entfernung und Zuordnung
 // ============================================================================
 
+/** Land normalisieren: 'AT'|'DE'|'CH' oder null (alles andere). */
+export function landNorm(x: unknown): "AT" | "DE" | "CH" | null {
+  const s = String(x ?? "").trim().toUpperCase();
+  return (s === "AT" || s === "DE" || s === "CH") ? s : null;
+}
+
+/** Sind zwei Laender vertraeglich? Nur zwei BEKANNTE, VERSCHIEDENE Laender sind
+ *  es NICHT (z. B. AT vs. CH bei PLZ 5020). Ist eines leer, bleibt es wie bisher
+ *  vertraeglich (keine Verschaerfung fuer Alt-Daten ohne Land). */
+export function landKompatibel(a: unknown, b: unknown): boolean {
+  const la = landNorm(a), lb = landNorm(b);
+  return !la || !lb || la === lb;
+}
+
+/** Schluessel fuer den Koordinaten-Zwischenspeicher. MIT Land land-bewusst
+ *  ('ch:5020' != 'at:5020'), OHNE Land die blanke PLZ (so bleiben bestehende
+ *  Aufrufer/Tests ohne Land unveraendert). */
+export function koordKey(plz: string, land?: unknown): string {
+  const l = landNorm(land);
+  return l ? l.toLowerCase() + ":" + plz : plz;
+}
+
+/** Zerlegt einen koordKey wieder in PLZ und (optionales) Land. */
+export function schluesselTeilen(key: string): { plz: string; land: string | null } {
+  const m = /^(at|de|ch):(.+)$/i.exec(key);
+  return m ? { plz: m[2], land: m[1].toUpperCase() } : { plz: key, land: null };
+}
+
 /** Haversine, Erdradius 6371 km — Rechenweg wie im Code-Node. */
 export function entfernung(a: Koordinate, b: Koordinate): number {
   const R = 6371;
@@ -167,17 +200,20 @@ export function entfernung(a: Koordinate, b: Koordinate): number {
 }
 
 /**
- * Welche Postleitzahlen muessen aufgeloest werden? Nur die aus Paaren mit
- * UNGLEICHER PLZ — bei gleicher PLZ passt der Workflow ohne Koordinaten.
+ * Welche Orte muessen (land-bewusst) aufgeloest werden? Nur Paare, die NICHT
+ * schon ueber die gleiche PLZ IM GLEICHEN LAND passen — bei denen passt der
+ * Workflow ohne Koordinaten. Gleiche PLZ in VERSCHIEDENEN Laendern (5020 AT vs.
+ * CH) ist KEIN Direkttreffer mehr und wird ueber die Koordinaten geprueft.
+ * Rueckgabe sind koordKey-Schluessel ('5020' bzw. 'ch:5020').
  */
 export function benoetigtePlz(trainer: Trainer[], alerts: Alert[]): string[] {
   const raus = new Set<string>();
   for (const t of trainer) {
     for (const a of alerts) {
       if (!t.plz || !a.plz) continue;
-      if (t.plz === a.plz) continue;
-      raus.add(t.plz);
-      raus.add(a.plz);
+      if (t.plz === a.plz && landKompatibel(t.land, a.land)) continue;
+      raus.add(koordKey(t.plz, t.land));
+      raus.add(koordKey(a.plz, a.land));
     }
   }
   return [...raus];
@@ -209,12 +245,14 @@ export function zuordnen(
     const treffer: { alert: Alert; km: number | null }[] = [];
     for (const a of alerts) {
       if (!t.plz || !a.plz) continue;
-      if (t.plz === a.plz) {
+      // Gleiche PLZ zaehlt nur als Direkttreffer, wenn das Land vertraeglich ist
+      // (5020 in AT trifft NICHT 5020 in CH – das lief frueher faelschlich zu).
+      if (t.plz === a.plz && landKompatibel(t.land, a.land)) {
         treffer.push({ alert: a, km: null });
         continue;
       }
-      const tk = koordinaten.get(t.plz) ?? null;
-      const ak = koordinaten.get(a.plz) ?? null;
+      const tk = koordinaten.get(koordKey(t.plz, t.land)) ?? null;
+      const ak = koordinaten.get(koordKey(a.plz, a.land)) ?? null;
       if (!tk || !ak) continue;
       const km = entfernung(tk, ak);
       if (km <= (a.radius || RADIUS_STANDARD)) {
@@ -426,9 +464,12 @@ export async function bearbeiten(
 
   const alerts = await a.alertsLesen();
 
-  const plz = benoetigtePlz(trainer, alerts);
+  const schluessel = benoetigtePlz(trainer, alerts);
   const koordinaten = new Map<string, Koordinate | null>();
-  for (const p of plz) koordinaten.set(p, await a.koordinaten(p));
+  for (const key of schluessel) {
+    const { plz, land } = schluesselTeilen(key);
+    koordinaten.set(key, await a.koordinaten(plz, land));
+  }
 
   const { mails, proben, mitEmpfaenger, ohneEmpfaenger } = zuordnen(
     trainer,

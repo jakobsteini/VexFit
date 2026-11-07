@@ -245,7 +245,20 @@ export interface WartelistenEintrag {
   kunden_name?: string | null;
   plz?: string | null;
   stadt?: string | null;
+  land?: string | null;
   abmelde_token?: string | null;
+}
+
+/** Land normalisieren: 'AT'|'DE'|'CH' oder null. */
+function landNorm(x: unknown): "AT" | "DE" | "CH" | null {
+  const s = String(x ?? "").trim().toUpperCase();
+  return (s === "AT" || s === "DE" || s === "CH") ? s : null;
+}
+
+/** Zwei Laender vertraeglich? Nur zwei BEKANNTE, VERSCHIEDENE sind es nicht. */
+function landVertraeglich(a: unknown, b: unknown): boolean {
+  const la = landNorm(a), lb = landNorm(b);
+  return !la || !lb || la === lb;
 }
 
 export interface Anschluesse {
@@ -353,6 +366,10 @@ export interface Anschluesse {
   /** Setzt die Spalte gesperrt einer trainers/kunden-Zeile (service_role).
    *  Gibt die Zahl geaenderter Zeilen zurueck. */
   personGesperrtSetzen?(tabelle: "trainers" | "kunden", id: string, gesperrt: boolean): Promise<number>;
+  /** Setzt die Spalte land ('AT'|'DE'|'CH') einer trainers/kunden-Zeile
+   *  (service_role) – fuer die Admin-Zuordnung „PLZ ohne Land". Gibt die Zahl
+   *  geaenderter Zeilen zurueck. */
+  adminLandSetzen?(tabelle: "trainers" | "kunden", id: string, land: "AT" | "DE" | "CH"): Promise<number>;
   /** Loescht die Zeile; verhindert ein Fremdschluessel (z. B. Anfragen) das
    *  Loeschen, werden stattdessen die personenbezogenen Felder anonymisiert
    *  (Fremddaten bleiben erhalten). */
@@ -408,6 +425,10 @@ export interface Anschluesse {
   alertAbmelden?(token: string): Promise<boolean>;
   /** B4.2: PLZ eines Trainers per Kennung (service_role). */
   trainerPlzNachId?(id: string): Promise<string | null>;
+  /** Land ('AT'|'DE'|'CH') eines Trainers per Kennung (service_role). Fehlt die
+   *  Spalte land (Migration nicht eingespielt), null – dann wird nicht nach Land
+   *  gefiltert (Verhalten wie zuvor). */
+  trainerLandNachId?(id: string): Promise<string | null>;
 
   // ── B7: Abendbericht ──
   /** B7: alle Zahlen für den Abendbericht in einem Rutsch (service_role).
@@ -1957,6 +1978,28 @@ async function adminAktion(
       }
     }
 
+    // ── Land eindeutig (07.11.2026): fehlendes Land einer Person von Hand
+    // zuordnen. Fuer die Admin-Liste „PLZ ohne Land". Nur 'AT'/'DE'/'CH'. ──
+    case "land_setzen": {
+      const tabelle = artTabelle(body.art);
+      if (!tabelle) return antwort(400, { fehler: "art fehlt (trainer/kunde)" }, herkunft);
+      const land = String(body.land ?? "").trim().toUpperCase();
+      if (land !== "AT" && land !== "DE" && land !== "CH") {
+        return antwort(400, { fehler: "land muss AT, DE oder CH sein" }, herkunft);
+      }
+      if (!a.adminLandSetzen) {
+        return antwort(501, { fehler: "Land-Zuordnung ist in dieser Fassung nicht verfuegbar" }, herkunft);
+      }
+      try {
+        const n = await a.adminLandSetzen(tabelle, zielId, land as "AT" | "DE" | "CH");
+        await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: tabelle, ziel_id: zielId, ergebnis: `land=${land} geaendert=${n}` });
+        return antwort(200, { ok: true, geaendert: n, land }, herkunft);
+      } catch (fehler) {
+        if (istMigrationFehlt(fehler)) return antwort(400, { fehler: MIGRATION_HINWEIS }, herkunft);
+        throw fehler;
+      }
+    }
+
     default:
       return antwort(400, { fehler: "unbekannte Aktion" }, herkunft);
   }
@@ -2492,6 +2535,13 @@ async function wartelisteAufFreigabe(
   let plz: string | null = null;
   try { plz = await a.trainerPlzNachId(trainerId); } catch { return { mails: 0 }; }
   if (!w(plz)) return { mails: 0 };
+  // Land eindeutig (07.11.2026): nur Vormerkungen im GLEICHEN Land benachrichtigen
+  // (5020 in AT trifft nicht 5020 in CH). Fehlt das Land irgendwo, bleibt es wie
+  // bisher vertraeglich. trainerLandNachId ist best effort (null -> kein Filter).
+  let trainerLand: string | null = null;
+  if (a.trainerLandNachId) {
+    try { trainerLand = await a.trainerLandNachId(trainerId); } catch { trainerLand = null; }
+  }
   let eintraege: WartelistenEintrag[] = [];
   try {
     eintraege = await a.alertsOffeneFuerPlz(w(plz));
@@ -2502,6 +2552,7 @@ async function wartelisteAufFreigabe(
     }
     throw fehler;
   }
+  eintraege = eintraege.filter((e) => landVertraeglich(trainerLand, e.land));
   let mails = 0;
   for (const e of eintraege) {
     // Erst ATOMAR beanspruchen (aktiv true->false): nur wer den Eintrag bekommt,

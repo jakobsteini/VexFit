@@ -18,7 +18,9 @@ Deno.test("K5: Kunden-Nutzen, 3 Schritte, CTA in die Suche (Salzburg vorausgefü
   const s = await lies("./personal-trainer-salzburg.html");
   assertStringIncludes(s, "Für Kunden kostenlos");
   assert((s.match(/class="schritt"/g) || []).length === 3, "nicht genau drei Schritte");
-  assertStringIncludes(s, 'href="suche.html?plz=5020"');
+  // Land eindeutig (07.11.2026): der Link trägt jetzt das Land mit (5020 = AT),
+  // damit die Suche nicht als Schweizer Ort auflöst.
+  assertStringIncludes(s, 'href="suche.html?plz=5020&land=AT"');
 });
 
 Deno.test("K5: UTM-Weitergabe + Kunden-Trichter-Beacon", async () => {
@@ -43,10 +45,13 @@ Deno.test("K5: keine erfundenen Zahlen/Bewertungen/Testimonials, keine Adresse",
   assert(!/\b5\d{3}\b/.test(text), "Postleitzahl im Text (keine genaue Adresse)");
 });
 
-Deno.test("K5: suche.html füllt ?plz= vor und sucht", async () => {
+Deno.test("K5: suche.html füllt ?plz= und ?land= vor und sucht", async () => {
   const s = await lies("./suche.html");
-  assertStringIncludes(s, "new URLSearchParams(location.search).get('plz')");
-  assertStringIncludes(s, "feld.value = vorgabe.trim(); searchByPLZ();");
+  assertStringIncludes(s, "new URLSearchParams(location.search)");
+  assertStringIncludes(s, "q.get('plz')");
+  // Land aus der Adresse wird in die Auswahl übernommen, dann gesucht.
+  assertStringIncludes(s, "vexPlz.landNormal(q.get('land'))");
+  assertStringIncludes(s, "feld.value = vorgabe.trim(); plzLandAbgleich(); searchByPLZ();");
 });
 
 Deno.test("K5: Generator lässt die handgemachte Seite in Ruhe", async () => {

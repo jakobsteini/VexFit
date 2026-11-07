@@ -49,7 +49,7 @@ h1 em{font-style:normal;color:var(--accent)}
   <h1>Personal Trainer in <em>Salzburg</em> finden.</h1>
   <p class="lead">Vor Ort oder online. Sag uns dein Ziel, wir bringen dich mit passenden Personal Trainern aus deiner Region zusammen.</p>
 
-  <a href="suche.html?plz=5020" class="cta" id="cta">Trainer in Salzburg finden →</a>
+  <a href="suche.html?plz=5020&land=AT" class="cta" id="cta">Trainer in Salzburg finden →</a>
   <div class="cta-sub">In 2 Minuten – ganz ohne Verpflichtung</div>
 
   <div class="frei"><strong>Für Kunden kostenlos.</strong> Suchen, Profile ansehen und anfragen kostet dich nichts. Du zahlst nur dein Training direkt beim Trainer.</div>
@@ -61,7 +61,7 @@ h1 em{font-style:normal;color:var(--accent)}
     <div class="schritt"><div class="n">3</div><div class="t"><strong>Trainieren</strong><span>Der Trainer meldet sich bei dir, ihr vereinbart Termin und Ablauf.</span></div></div>
   </div>
 
-  <a href="suche.html?plz=5020" class="cta" id="cta2">Jetzt passenden Trainer suchen →</a>
+  <a href="suche.html?plz=5020&land=AT" class="cta" id="cta2">Jetzt passenden Trainer suchen →</a>
 
   <div class="fuss">
     <a href="rechtliches.html">Impressum</a><a href="rechtliches.html#datenschutz">Datenschutz</a><a href="rechtliches.html#agb">AGB</a>
@@ -81,7 +81,7 @@ h1 em{font-style:normal;color:var(--accent)}
       a.href = a.getAttribute('href') + '&' + qs.replace(/^\?/,'');
     });
   }
-  try { if(typeof vexfitTrichter === 'function') vexfitTrichter('seite', { rolle: 'kunde', plz: '5020' }); } catch(e){}
+  try { if(typeof vexfitTrichter === 'function') vexfitTrichter('seite', { rolle: 'kunde', plz: '5020', land: 'AT' }); } catch(e){}
 })();
 </script>
 </body>

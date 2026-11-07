@@ -1542,6 +1542,42 @@ function starteVerwaltung() {
       const ziele = Object.entries(zz).sort((a, b) => b[1] - a[1]);
       zb.innerHTML = ziele.map(([z, n]) => `<tr><td><strong>${escapeHtml(z)}</strong></td><td>${n}</td></tr>`).join("") || '<tr><td colspan="2" class="leer-text">Noch keine Ziele.</td></tr>';
     } catch { zeige(hinweis); }
+    // Land eindeutig: Liste „PLZ ohne Land" mitladen (best effort, eigener try).
+    try { await ladePlzOhneLand(); } catch { /* still */ }
+  }
+
+  // Land eindeutig (07.11.2026): Trainer und Kunden mit PLZ, aber ohne Land. Je
+  // Zeile drei Knöpfe (AT/DE/CH) → /admin-aktion „land_setzen" (aal2, Protokoll).
+  async function ladePlzOhneLand() {
+    const tb = $("plz-ohne-land-tbody");
+    if (!tb) return;
+    const hinweis = "Die Liste braucht die Spalte land (Migration 2026-11-07-02 bzw. 2026-10-26-02 einspielen).";
+    try {
+      const [tr, ku] = await Promise.all([
+        hole("trainers?plz=not.is.null&land=is.null&select=id,vorname,nachname,plz,stadt&order=plz.asc&limit=500"),
+        hole("kunden?plz=not.is.null&land=is.null&select=id,vorname,nachname,plz,stadt&order=plz.asc&limit=500"),
+      ]);
+      if (!tr.ok || !ku.ok) { tb.innerHTML = `<tr><td colspan="4" class="leer-text">${escapeHtml(hinweis)}</td></tr>`; return; }
+      const zeilen = [];
+      for (const t of await tr.json()) zeilen.push({ art: "trainer", ...t });
+      for (const k of await ku.json()) zeilen.push({ art: "kunde", ...k });
+      if (!zeilen.length) { tb.innerHTML = '<tr><td colspan="4" class="leer-text">Alle Datensätze mit PLZ haben ein Land. 👍</td></tr>'; return; }
+      tb.innerHTML = zeilen.map((z) => {
+        const name = `${z.vorname || ""} ${z.nachname || ""}`.trim() || "—";
+        const ortPlz = z.stadt ? `${escapeHtml(z.plz)} ${escapeHtml(z.stadt)}` : escapeHtml(z.plz);
+        const artLabel = z.art === "trainer" ? "Trainer" : "Kunde";
+        const knopf = (land) => `<button class="btn-klein" data-aktion="land-setzen" data-art="${z.art}" data-id="${escapeHtml(z.id)}" data-land="${land}">${land}</button>`;
+        return `<tr><td data-label="Art">${artLabel}</td><td data-label="Name"><strong>${escapeHtml(name)}</strong></td><td data-label="PLZ / Stadt">${ortPlz}</td><td data-label="Land zuordnen">${knopf("AT")} ${knopf("DE")} ${knopf("CH")}</td></tr>`;
+      }).join("");
+    } catch { tb.innerHTML = `<tr><td colspan="4" class="leer-text">${escapeHtml(hinweis)}</td></tr>`; }
+  }
+
+  async function landSetzen(art, id, land) {
+    const d = await adminEdge({ aktion: "land_setzen", art, ziel_id: id, land });
+    if (!d) return; // Fehler schon gemeldet
+    if (d.geaendert > 0) erfolg(`Land ${land} zugeordnet.`);
+    else fehler("Zuordnung fehlgeschlagen (keine Zeile geändert).");
+    ladePlzOhneLand();
   }
 
   async function ladeProtokoll() {
@@ -2255,6 +2291,7 @@ function starteVerwaltung() {
       if (akt === "studio-anlegen") { studioAnlegen(); return; }
       if (akt === "standort-anlegen") { standortAnlegen(id); return; }
       if (akt === "standort-bearbeiten") { standortBearbeiten(id); return; }
+      if (akt === "land-setzen") { landSetzen(art, id, a.dataset.land); return; }
     });
     // Checkbox der Studio-Freigabe (change statt click)
     document.addEventListener("change", (e) => {

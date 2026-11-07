@@ -252,7 +252,14 @@ try {
       <div class="ein-frage">In welchem <span>Umkreis?</span></div>
       <div class="ein-feld hidden" id="einPlzFeld">
         <label>Deine PLZ</label>
-        <input type="text" id="einPlz" placeholder="Deine PLZ (z.B. 5026)" maxlength="5" inputmode="numeric" autocomplete="postal-code">
+        <input type="text" id="einPlz" placeholder="Deine PLZ (z.B. 5026)" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="plzLandAbgleich('einPlz','einLand')">
+        <label style="margin-top:8px">Land</label>
+        <select id="einLand" aria-label="Land">
+          <option value="">Bitte wählen</option>
+          <option value="AT">Österreich</option>
+          <option value="DE">Deutschland</option>
+          <option value="CH">Schweiz</option>
+        </select>
       </div>
       <div class="ein-ort-zeile hidden" id="einOrtZeile"></div>
       <div class="ein-hint hidden" id="einPlzHint"></div>
@@ -273,7 +280,13 @@ try {
   <div class="search-page-title">TRAINER IN DEINER NÄHE</div>
   <p class="search-page-sub">PLZ eingeben und Umkreis wählen · Online-Trainer werden zusätzlich gezeigt</p>
   <div class="search-bar">
-    <input type="text" id="plzInput" placeholder="Deine PLZ (z.B. 5026)" maxlength="5" inputmode="numeric" autocomplete="postal-code">
+    <input type="text" id="plzInput" placeholder="Deine PLZ (z.B. 5026)" maxlength="5" inputmode="numeric" autocomplete="postal-code" oninput="plzLandAbgleich('plzInput','landInput')">
+    <select id="landInput" aria-label="Land" title="Land">
+      <option value="">Land</option>
+      <option value="AT">Österreich</option>
+      <option value="DE">Deutschland</option>
+      <option value="CH">Schweiz</option>
+    </select>
     <select id="radiusInput">
       <option value="10">10 km</option>
       <option value="25" selected>25 km</option>
@@ -337,7 +350,7 @@ const EINSTIEG_KEY = 'vexfit_einstieg';
 let einSchritte = ['ort', 'umkreis']; // dynamische Fragenfolge (ziel nur fuer Altkonten)
 let einIndex = 0;
 let einPlzFeldNoetig = false;
-let einAuswahl = { spezialisierungen: [], ort: '', plz: '', umkreis: 25 };
+let einAuswahl = { spezialisierungen: [], ort: '', plz: '', land: '', umkreis: 25 };
 
 // Als Profilbild gilt nur eine Adresse aus dem eigenen Bilder-Behaelter;
 // alles andere (leer, fremde Adresse) faellt auf die Initialen zurueck.
@@ -433,6 +446,9 @@ async function loadKunde() {
       }
     }
   } catch(e) { console.error(e); }
+  // Land-Auswahl mit der Vorgabe vorbelegen (kunden.land, sonst letzte Wahl /
+  // Browser-Sprachraum). Immer sichtbar und aenderbar.
+  try { landAuswahlVorbelegen(); } catch(e) {}
 }
 
 // "Trainer in meiner Nähe": wer den Einstieg schon abgeschlossen hat, kommt
@@ -454,6 +470,35 @@ function toggleSearch(e) {
 // Seitenaufruf nur einmal abgefragt. Schluessel ist die PLZ; bei Landbegrenzung
 // (Trainer mit gesetztem Land) zusaetzlich mit Land-Praefix ('at:5026').
 const plzCache = new Map();
+
+// ──── LAND (AT/DE/CH) eindeutig fuehren ────
+// Auswahl neben dem PLZ-Feld, immer sichtbar und aenderbar. Vorgabe ohne Raten:
+// gespeichertes kunden.land, sonst letzte Wahl, sonst Browser-Sprachraum.
+function landFeld() { return document.getElementById('landInput'); }
+function gewaehltesLand() { const el = landFeld(); return el ? vexPlz.landNormal(el.value) : null; }
+function landVorgabe() {
+  return vexPlz.standardLand({
+    ausUrl: null,
+    gespeichert: (K && K.land) || (function(){ try { return localStorage.getItem('vexfit_land'); } catch(e){ return null; } })(),
+    sprache: (navigator.languages && navigator.languages[0]) || navigator.language || '',
+  });
+}
+// Setzt beide Land-Auswahlen (Suchleiste + Einstieg) auf die Vorgabe, sofern der
+// Nutzer noch nichts gewaehlt hat. Wird nach dem Laden von K aufgerufen.
+function landAuswahlVorbelegen() {
+  const v = landVorgabe();
+  if(!v) return;
+  ['landInput','einLand'].forEach(function(id){
+    const el = document.getElementById(id);
+    if(el && !vexPlz.landNormal(el.value)) el.value = v;
+  });
+}
+// 5-stellige PLZ ist eindeutig Deutschland: Land-Auswahl automatisch auf DE.
+function plzLandAbgleich(plzId, landId) {
+  const plz = ((document.getElementById(plzId)||{}).value || '').trim();
+  const el = document.getElementById(landId);
+  if(el && /^\d{5}$/.test(plz)) el.value = 'DE';
+}
 
 // Nutzer-PLZ ueber das gemeinsame Modul aufloesen. Bei Mehrdeutigkeit
 // (4-stellig in AT und CH) erscheinen zwei Wahlknoepfe im Status-Element; die
@@ -554,17 +599,31 @@ async function searchByPLZ() {
   const ort = einstiegOrt || 'beides';
   if(!allT.length) await loadTrainer();
 
+  // 5-stellig -> automatisch DE; Land aus der Auswahl (sonst gespeichertes
+  // kunden.land). Immer sichtbar und aenderbar.
+  plzLandAbgleich('plzInput','landInput');
+  const land = gewaehltesLand() || (K && vexPlz.landNormal(K.land)) || null;
+
   // Online: keine PLZ noetig, Entfernung spielt keine Rolle.
   if(ort === 'online') {
     letzteTreffer = allT.map(t => ({ ...t, _dist: null }));
-    lastSearch = { plz: plz || (K && K.plz) || '', city: '', radius: 0, ort: 'online' };
+    lastSearch = { plz: plz || (K && K.plz) || '', land: land, city: '', radius: 0, ort: 'online' };
     renderErgebnis();
     return;
   }
 
   if(!plz || plz.length < 4) { status.textContent = '⚠️ Bitte gültige PLZ eingeben'; return; }
+  // 4-stellige PLZ ohne Land NICHT raten (5020 gibt es in AT und CH).
+  if(/^\d{4}$/.test(plz) && !land) {
+    status.textContent = '⚠️ Bitte wähle das Land (Österreich, Deutschland oder Schweiz).';
+    const el = landFeld(); if(el) el.focus();
+    return;
+  }
+  try { if(land) localStorage.setItem('vexfit_land', land); } catch(e) {}
+  // kunden.land nachtragen, wenn noch leer (einmalig, best effort).
+  if(land && K && K.id && !vexPlz.landNormal(K.land)) landSpeichern(land);
   status.textContent = '📍 Standort wird ermittelt...';
-  const coords = await ermittleNutzerCoords(plz, status, K && K.land);
+  const coords = await ermittleNutzerCoords(plz, status, land);
   if(coords && coords.netzfehler) { status.textContent = '⚠️ Standort konnte nicht ermittelt werden. Bitte später erneut versuchen.'; return; }
   if(!coords) { status.textContent = '⚠️ PLZ nicht gefunden'; return; }
   status.textContent = `📍 ${coords.city} · Suche läuft...`;
@@ -578,7 +637,7 @@ async function searchByPLZ() {
     mitDist.push({ ...t, _dist: dist });
   }
   letzteTreffer = mitDist;
-  lastSearch = { plz, city: coords.city, radius: Number.isFinite(radius) ? radius : 0, ort };
+  lastSearch = { plz, land: land, city: coords.city, radius: Number.isFinite(radius) ? radius : 0, ort };
   renderErgebnis();
 }
 
@@ -726,6 +785,7 @@ async function benachrichtigeMich() {
         kunden_email: sess.email,
         kunden_name: K ? `${K.vorname||''} ${K.nachname||''}`.trim() : '',
         plz: lastSearch.plz,
+        land: vexPlz.landNormal(lastSearch.land) || null,
         stadt: lastSearch.city || '',
         radius: lastSearch.radius || 0,
         aktiv: true
@@ -769,7 +829,7 @@ async function benachrichtigungStatusPruefen() {
 function openModal(t) {
   selT = t;
   // K1: Anfrage begonnen (anonym, grober PLZ-Bereich des Kunden).
-  try { vexfitTrichter('anfrage_start', { rolle: 'kunde', plz: (K && K.plz) || '', einmal: false }); } catch(e) {}
+  try { vexfitTrichter('anfrage_start', { rolle: 'kunde', plz: (K && K.plz) || '', land: (K && K.land) || (lastSearch && lastSearch.land) || '', einmal: false }); } catch(e) {}
   document.getElementById('modalInfo').textContent = `${t.vorname} ${t.nachname} · ${t.trainingsart||''} · ${t.stadt||''}`;
   document.getElementById('modalMsg').value = '';
   document.getElementById('overlay').classList.add('open');
@@ -814,7 +874,7 @@ async function sendAnfrage() {
     try { const neu = await r.json(); if(Array.isArray(neu) && neu[0] && neu[0].id) anfrageId = neu[0].id; } catch(e) {}
     fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neue-anfrage',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(sess&&sess.access_token||'')},body:JSON.stringify({...body, anfrage_id: anfrageId})}).catch(()=>{});
     // K1: Anfrage abgeschickt (anonym).
-    try { vexfitTrichter('anfrage', { rolle: 'kunde', plz: (K && K.plz) || '', einmal: false }); } catch(e) {}
+    try { vexfitTrichter('anfrage', { rolle: 'kunde', plz: (K && K.plz) || '', land: (K && K.land) || (lastSearch && lastSearch.land) || '', einmal: false }); } catch(e) {}
     document.getElementById('overlay').classList.remove('open');
     selT = null;
     document.getElementById('welcomePage').classList.remove('hidden');
@@ -861,6 +921,7 @@ async function activateAlert() {
         kunden_email: sess.email,
         kunden_name: K ? `${K.vorname||''} ${K.nachname||''}`.trim() : '',
         plz: lastSearch.plz,
+        land: vexPlz.landNormal(lastSearch.land) || null,
         stadt: lastSearch.city || '',
         radius: lastSearch.radius || 25,
         aktiv: true
@@ -913,6 +974,7 @@ async function vormerken() {
   btn.disabled = true; btn.textContent = 'Wird vorgemerkt...';
   const koerper = {
     plz: lastSearch.plz,
+    land: vexPlz.landNormal(lastSearch.land) || null,
     stadt: lastSearch.city || null,
     ziel: aktuellesZiel(),
     umkreis: Number.isFinite(lastSearch.radius) ? lastSearch.radius
@@ -1012,8 +1074,18 @@ function einUmkreisTipp(km) {
       hint.classList.remove('hidden');
       return;
     }
+    plzLandAbgleich('einPlz','einLand');
+    const einLand = document.getElementById('einLand');
+    const land = einLand ? vexPlz.landNormal(einLand.value) : null;
+    // Bei 4-stelliger PLZ ohne Land NICHT raten (5020 gibt es in AT und CH).
+    if(/^\d{4}$/.test(wert) && !land) {
+      hint.textContent = 'Bitte wähle das Land (Österreich, Deutschland oder Schweiz).';
+      hint.classList.remove('hidden');
+      return;
+    }
     hint.classList.add('hidden');
     einAuswahl.plz = wert;
+    einAuswahl.land = land || '';
   }
   einAuswahl.umkreis = km;
   einstiegAbschluss();
@@ -1098,9 +1170,16 @@ function zeigeZusammenfassung() {
 async function einstiegAbschluss() {
   document.getElementById('plzInput').value = einAuswahl.plz;
   document.getElementById('radiusInput').value = String(einAuswahl.umkreis);
+  // Land in die Suchleisten-Auswahl uebernehmen (Einstieg-Wahl, sonst Vorgabe).
+  const landEl = landFeld();
+  if(landEl) {
+    const l = vexPlz.landNormal(einAuswahl.land) || landVorgabe();
+    if(l) landEl.value = l;
+  }
   einstiegFilterSetzen();
   await zielSpeichernWennGeaendert();
   await plzSpeichernWennGeaendert();
+  if(einAuswahl.land) await landSpeichern(einAuswahl.land);
   document.getElementById('einstieg').classList.add('hidden');
   document.getElementById('welcomePage').classList.add('hidden');
   document.getElementById('searchPage').classList.remove('hidden');
@@ -1156,6 +1235,23 @@ async function plzSpeichernWennGeaendert() {
     else console.error('PLZ speichern fehlgeschlagen:', r.status);
   } catch(e) { console.error('plzSpeichernWennGeaendert:', e); }
 }
+// Speichert kunden.land der eigenen Zeile (AT/DE/CH). Wird beim Suchen und im
+// Einstieg aufgerufen, wenn ein Land gewaehlt wurde. Schlaegt es fehl (z.B.
+// Migration noch nicht eingespielt), merkt der Kunde nichts - die Suche laeuft
+// weiter. Deshalb bewusst KEIN istAbgemeldet/Redirect.
+async function landSpeichern(land) {
+  land = vexPlz.landNormal(land);
+  if(!K || !K.id || !land || land === vexPlz.landNormal(K.land)) return;
+  try {
+    const r = await fetch(`${SB}/rest/v1/kunden?id=eq.${encodeURIComponent(K.id)}`, {
+      method: 'PATCH',
+      headers: authKopf({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify({ land: land })
+    });
+    if(r.ok) K.land = land;
+    else console.error('Land speichern fehlgeschlagen:', r.status);
+  } catch(e) { console.error('landSpeichern:', e && e.name); }
+}
 // Fuehrt die gemerkte Suche beim naechsten Besuch direkt aus. Stellt die
 // gemerkten Werte wieder her, damit Filter und Zusammenfassung stimmen.
 async function starteGemerkteSuche() {
@@ -1184,6 +1280,7 @@ async function einstiegSpeichern(treffer) {
     spezialisierungen: einAuswahl.spezialisierungen,
     trainingsart: null,  // Frage 2 ist jetzt der Ort; such_eingaben hat dafuer (noch) keine Spalte
     plz: einAuswahl.plz || null,
+    land: vexPlz.landNormal(einAuswahl.land) || null,
     umkreis: Number.isFinite(einAuswahl.umkreis) ? einAuswahl.umkreis : null,
     anzahl_treffer: treffer
   };
@@ -1241,7 +1338,7 @@ async function entwurfAbschicken() {
     let anfrageId = '';
     try { const neu = await r.json(); if(Array.isArray(neu) && neu[0] && neu[0].id) anfrageId = neu[0].id; } catch(_) {}
     fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neue-anfrage',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(sess&&sess.access_token||'')},body:JSON.stringify({...body, anfrage_id: anfrageId})}).catch(()=>{});
-    try { if(typeof vexfitTrichter === 'function') vexfitTrichter('anfrage', { rolle: 'kunde', plz: (K && K.plz) || '', einmal: false }); } catch(_) {}
+    try { if(typeof vexfitTrichter === 'function') vexfitTrichter('anfrage', { rolle: 'kunde', plz: (K && K.plz) || '', land: (K && K.land) || (lastSearch && lastSearch.land) || '', einmal: false }); } catch(_) {}
     try { alert('Deine Anfrage an ' + (e.trainer_name || 'den Trainer') + ' ist unterwegs!'); } catch(_) {}
   } catch(_) {}
 }
