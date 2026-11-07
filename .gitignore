@@ -7,3 +7,6 @@ node_modules/
 package.json
 package-lock.json
 rundgang/ladezeit-*.json
+
+# K7: erzeugte Briefe (PDF) gehoeren nicht ins Repo.
+briefe-ausgabe/
