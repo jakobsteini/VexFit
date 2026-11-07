@@ -207,6 +207,14 @@ export interface TrainerVoll {
   nachname?: string | null;
   stadt?: string | null;
   spezialisierungen?: string[] | null;
+  // S4: zusaetzliche Felder fuer Land-/Mindeststaerke-/Test-Filter der Alternativen.
+  land?: string | null;
+  avatar_url?: string | null;
+  trainingsart?: string | null;
+  trainingsort?: string | null;
+  preis_stunde?: number | string | null;
+  bio?: string | null;
+  ist_test?: boolean | null;
 }
 
 /** Teil 4: ein Trainer mit allen Feldern, die fuer die Vollstaendigkeits-Pruefung
@@ -1106,7 +1114,7 @@ export function pushAboEreignis(
 }
 
 // ============================================================================
-// B4e - "Passt nicht?": zwei passende Alternativen
+// B4e - "Passt nicht?": bis zu drei passende Alternativen (S4)
 // ============================================================================
 
 /** Profiladresse eines Trainers (die einzige Adresse in der Alternativen-Mail). */
@@ -1114,20 +1122,41 @@ function profilAdresse(id: string): string {
   return `${ERLAUBTE_HERKUNFT}/profil.html?id=${encodeURIComponent(id)}`;
 }
 
+/** S4: Profil „stark genug" (Naeherung an >= 5/8, wie vexfit-vorschau.vorschauReif):
+ *  Foto Pflicht plus mindestens vier erfuellte der sichtbaren Felder. */
+export function trainerReif(t: TrainerVoll): boolean {
+  const txt = (v: unknown) => String(v ?? "").trim();
+  const foto = typeof t.avatar_url === "string" &&
+    t.avatar_url.indexOf("/storage/v1/object/public/avatars/") >= 0;
+  const felder = [
+    foto,
+    !!txt(t.trainingsart),
+    !!txt(t.trainingsort),
+    Number(t.preis_stunde) > 0,
+    txt(t.bio).length >= 10,
+    Array.isArray(t.spezialisierungen) && t.spezialisierungen.length > 0,
+  ];
+  return foto && felder.filter(Boolean).length >= 4;
+}
+
 /**
- * Waehlt bis zu zwei Alternativen zu einer Anfrage: andere Trainer mit
- * mindestens einer gemeinsamen Spezialisierung. Gleiche Stadt zuerst, der Rest
- * danach. Der urspruengliche Trainer wird ausgeschlossen. Reine Funktion (die
- * Kandidatenliste kommt von aussen), damit ohne Netz pruefbar.
+ * S4: Waehlt bis zu `max` (Standard 3) Alternativen zu einer Anfrage. Nur
+ * Trainer mit mindestens einer gemeinsamen Spezialisierung, GLEICHEM Land
+ * (soweit bekannt), Profil >= 5/8 (trainerReif) und KEIN Test/Spam-Konto; der
+ * urspruengliche Trainer faellt raus. Gleiche Stadt zuerst. Reine Funktion.
  */
 export function alternativenFinden(
   original: TrainerVoll,
   kandidaten: TrainerVoll[],
+  max = 3,
 ): TrainerVoll[] {
   const spez = new Set((original.spezialisierungen ?? []).map((s) => s.toLowerCase()));
   const stadt = (original.stadt ?? "").trim().toLowerCase();
   const passend = kandidaten.filter((t) =>
     t.id !== original.id &&
+    t.ist_test !== true &&
+    landVertraeglich(original.land, t.land) &&
+    trainerReif(t) &&
     (t.spezialisierungen ?? []).some((s) => spez.has(s.toLowerCase()))
   );
   passend.sort((a, b) => {
@@ -1135,21 +1164,30 @@ export function alternativenFinden(
     const bStadt = (b.stadt ?? "").trim().toLowerCase() === stadt ? 0 : 1;
     return aStadt - bStadt;
   });
-  return passend.slice(0, 2);
+  return passend.slice(0, Math.max(0, max));
 }
 
-/** Mail an den Kunden mit zwei vorgeschlagenen Trainern. */
+/** Mail an den Kunden mit bis zu drei vorgeschlagenen Trainern (S4). Wortlaut
+ *  passt sich der Anzahl an; KEINE erfundenen Zahlen/Antwortzeiten. */
 export function mailAlternativen(
   kundenEmail: string,
   kundenName: string | null | undefined,
   alternativen: TrainerVoll[],
 ): Mail {
   const anrede = kundenName ? `Hallo ${nameFormatieren(kundenName)}, ` : "Hallo, ";
+  const n = alternativen.length;
+  const wortzahl = n === 1 ? "einen passenden Trainer" : `${n === 2 ? "zwei" : "drei"} passende Trainer`;
+  // Weitere Profile (ab dem zweiten) als Links im Zusatzabsatz.
+  const weitere = alternativen.slice(1).map((t, i) =>
+    `Vorschlag ${i + 2}: ${nameFormatieren(`${w(t.vorname)} ${w(t.nachname)}`.trim())}` +
+    (t.stadt ? ` (${w(t.stadt)})` : "") + " – " + profilAdresse(t.id)
+  ).join("\n");
   return baueMail(kundenEmail, "Passende Trainer für dich auf Vexfit", {
-    ueberschrift: "Zwei passende Trainer für dich",
+    ueberschrift: n === 1 ? "Ein passender Trainer für dich" : `${n} passende Trainer für dich`,
     absatz:
-      `${anrede}deine letzte Anfrage hat leider nicht geklappt. Damit du ` +
-      "trotzdem schnell weiterkommst, haben wir zwei passende Trainer für dich herausgesucht.",
+      `${anrede}deine letzte Anfrage hat nicht geklappt. Damit du trotzdem ` +
+      `schnell weiterkommst, haben wir ${wortzahl} in deiner Region herausgesucht. ` +
+      "Jeder entscheidet selbst, ob und wie er antwortet.",
     datenZeilen: alternativen.map((t, i) => ({
       beschriftung: `Vorschlag ${i + 1}`,
       wert: nameFormatieren(`${w(t.vorname)} ${w(t.nachname)}`.trim()) +
@@ -1157,9 +1195,7 @@ export function mailAlternativen(
     })),
     knopfText: alternativen[0] ? "Erstes Profil ansehen" : undefined,
     knopfLink: alternativen[0] ? profilAdresse(alternativen[0].id) : undefined,
-    bioAbsatz: alternativen[1]
-      ? `Zweiter Vorschlag: ${profilAdresse(alternativen[1].id)}`
-      : "",
+    bioAbsatz: weitere,
     grundZeile:
       "Du erhältst diese E-Mail, weil deine Anfrage auf Vexfit nicht angenommen wurde.",
   });
@@ -3260,7 +3296,7 @@ async function passtNicht(
  * B4e, 48-Stunden-Fall: der zeitgesteuerte Gegenpart zu "Passt nicht?".
  *
  * Findet offene Anfragen, die der Trainer seit mehr als 48 Stunden nicht
- * beantwortet hat, und schickt dem Kunden dieselben zwei Vorschlaege. Je
+ * beantwortet hat, und schickt dem Kunden dieselben (bis zu drei) Vorschlaege. Je
  * Anfrage nur einmal (alternativen_gesendet wird immer gesetzt, auch wenn keine
  * Alternative gefunden wurde - sonst liefe der Fall jede Stunde neu an).
  *

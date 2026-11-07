@@ -118,8 +118,9 @@ function baueUnbeantwortet(opt: { faellig?: Faellig[]; ladeWirft?: unknown; send
     cronGeheimnis: () => "geheim",
     offeneAnfragenVor: () => opt.ladeWirft ? Promise.reject(opt.ladeWirft) : Promise.resolve(opt.faellig ?? []),
     aktiveTrainerFuerAlternativen: () => Promise.resolve([
-      { id: "t-2", vorname: "Anna", nachname: "B", stadt: "Wien", spezialisierungen: ["Yoga"] },
-      { id: "t-3", vorname: "Max", nachname: "C", stadt: "Graz", spezialisierungen: ["Yoga"] },
+      // S4: muessen „reif" sein (Profil >= 5/8), sonst fallen sie aus den Alternativen.
+      { id: "t-2", vorname: "Anna", nachname: "B", stadt: "Wien", spezialisierungen: ["Yoga"], avatar_url: "https://x/storage/v1/object/public/avatars/a.png", trainingsart: "EMS", trainingsort: "vor_ort", preis_stunde: 50, bio: "genug langer text" },
+      { id: "t-3", vorname: "Max", nachname: "C", stadt: "Graz", spezialisierungen: ["Yoga"], avatar_url: "https://x/storage/v1/object/public/avatars/b.png", trainingsart: "EMS", trainingsort: "vor_ort", preis_stunde: 50, bio: "genug langer text" },
     ]),
     trainerVollNachId: (_id: string) => Promise.resolve({ id: "t-1", stadt: "Wien", spezialisierungen: ["Yoga"] }),
     alternativenVermerken: (id: string) => { vermerkt.push(id); return Promise.resolve(); },

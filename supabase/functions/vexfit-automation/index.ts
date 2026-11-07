@@ -801,11 +801,15 @@ const anschluesse: Anschluesse = {
 
   // B4e: ein Trainer mit den Feldern fuer die Zuordnung.
   async trainerVollNachId(id: string) {
-    const zeilen = await lesen<Record<string, unknown>>(
-      `trainers?id=eq.${encodeURIComponent(id)}` +
-        `&select=id,vorname,nachname,stadt,spezialisierungen`,
-    );
-    const z = zeilen[0];
+    // S4: land zusaetzlich (fuer den Gleiches-Land-Filter der Alternativen),
+    // mit Rueckfall ohne land, falls die Spalte fehlt.
+    const basis = `trainers?id=eq.${encodeURIComponent(id)}`;
+    const sp = "id,vorname,nachname,stadt,spezialisierungen";
+    let r = await fetch(restAdresse(`${basis}&select=${sp},land`), { headers: restKopf() });
+    if (!r.ok && r.status === 400) r = await fetch(restAdresse(`${basis}&select=${sp}`), { headers: restKopf() });
+    if (!r.ok) throw new Error(`trainerVollNachId fehlgeschlagen: HTTP ${r.status}`);
+    const zeilen = await r.json().catch(() => []);
+    const z = Array.isArray(zeilen) ? zeilen[0] : null;
     return z
       ? {
         id: String(z.id),
@@ -813,6 +817,7 @@ const anschluesse: Anschluesse = {
         nachname: z.nachname as string | null,
         stadt: z.stadt as string | null,
         spezialisierungen: z.spezialisierungen as string[] | null,
+        land: (z.land ?? null) as string | null,
       }
       : null;
   },
@@ -823,16 +828,29 @@ const anschluesse: Anschluesse = {
   // gesperrt; verifiziert ist KEINE Bedingung - sonst bekaemen frisch
   // freigegebene, noch nicht verifizierte Trainer nie eine Empfehlung.
   async aktiveTrainerFuerAlternativen() {
-    return await lesen<{
+    // S4: zusaetzliche Felder fuer Land-/Mindeststaerke-/Test-Filter in kern.ts.
+    // ist_test wird mitgelesen, damit Test/Spam-Konten NICHT vorgeschlagen werden;
+    // fehlt die Spalte (Migration 2026-11-06-02 nicht eingespielt), Rueckfall ohne.
+    const basis = `trainers?aktiv=eq.true&gesperrt=is.false`;
+    const sp = "id,vorname,nachname,stadt,spezialisierungen,land,avatar_url,trainingsart,trainingsort,preis_stunde,bio";
+    let r = await fetch(restAdresse(`${basis}&select=${sp},ist_test`), { headers: restKopf() });
+    if (!r.ok && r.status === 400) r = await fetch(restAdresse(`${basis}&select=${sp}`), { headers: restKopf() });
+    if (!r.ok) throw new Error(`aktiveTrainerFuerAlternativen fehlgeschlagen: HTTP ${r.status}`);
+    const zeilen = await r.json().catch(() => []);
+    return (Array.isArray(zeilen) ? zeilen : []) as {
       id: string;
       vorname?: string | null;
       nachname?: string | null;
       stadt?: string | null;
       spezialisierungen?: string[] | null;
-    }>(
-      `trainers?aktiv=eq.true&gesperrt=is.false` +
-        `&select=id,vorname,nachname,stadt,spezialisierungen`,
-    );
+      land?: string | null;
+      avatar_url?: string | null;
+      trainingsart?: string | null;
+      trainingsort?: string | null;
+      preis_stunde?: number | string | null;
+      bio?: string | null;
+      ist_test?: boolean | null;
+    }[];
   },
 
   // B4e: vermerkt, dass Alternativen verschickt wurden (einmal je Anfrage).

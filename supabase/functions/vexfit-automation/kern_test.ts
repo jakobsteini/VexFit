@@ -70,6 +70,15 @@ const A_STANDARD: Anfrage = {
   created_at: "2026-09-20T10:00:00Z",
 };
 
+// S4: Felder, die ein Trainer fuer die Alternativen braucht (Profil >= 5/8).
+const REIF = {
+  avatar_url: "https://x/storage/v1/object/public/avatars/a.png",
+  trainingsart: "EMS",
+  trainingsort: "vor_ort",
+  preis_stunde: 50,
+  bio: "ein ausreichend langer Beschreibungstext",
+};
+
 function bau(opt: {
   trainer?: Trainer | null;
   anfrage?: Anfrage | null;
@@ -1441,13 +1450,33 @@ Deno.test("B4c: Admin kann verifizieren und entverifizieren", async () => {
 Deno.test("B4e: alternativenFinden - gleiche Spezialisierung, gleiche Stadt zuerst, ohne Original", () => {
   const original = { id: "o", stadt: "Wien", spezialisierungen: ["Yoga", "Pilates"] };
   const kandidaten = [
-    { id: "o", stadt: "Wien", spezialisierungen: ["Yoga"] }, // = Original, raus
-    { id: "a", stadt: "Graz", spezialisierungen: ["Yoga"] }, // passt, andere Stadt
-    { id: "b", stadt: "Wien", spezialisierungen: ["Pilates"] }, // passt, gleiche Stadt
-    { id: "c", stadt: "Wien", spezialisierungen: ["Boxen"] }, // keine gemeinsame Spez
+    { id: "o", stadt: "Wien", spezialisierungen: ["Yoga"], ...REIF }, // = Original, raus
+    { id: "a", stadt: "Graz", spezialisierungen: ["Yoga"], ...REIF }, // passt, andere Stadt
+    { id: "b", stadt: "Wien", spezialisierungen: ["Pilates"], ...REIF }, // passt, gleiche Stadt
+    { id: "c", stadt: "Wien", spezialisierungen: ["Boxen"], ...REIF }, // keine gemeinsame Spez
   ];
   const r = alternativenFinden(original, kandidaten);
   assertEquals(r.map((t) => t.id), ["b", "a"]); // b (gleiche Stadt) vor a
+});
+
+Deno.test("B4e/S4: schwache Profile (<5/8) und Test-Konten fallen raus", () => {
+  const original = { id: "o", stadt: "Wien", spezialisierungen: ["Yoga"] };
+  const r = alternativenFinden(original, [
+    { id: "schwach", stadt: "Wien", spezialisierungen: ["Yoga"] }, // kein Foto -> raus
+    { id: "test", stadt: "Wien", spezialisierungen: ["Yoga"], ...REIF, ist_test: true }, // Test -> raus
+    { id: "gut", stadt: "Wien", spezialisierungen: ["Yoga"], ...REIF }, // bleibt
+  ]);
+  assertEquals(r.map((t) => t.id), ["gut"]);
+});
+
+Deno.test("B4e/S4: nur gleiches Land (5020 AT nicht mit CH mischen)", () => {
+  const original = { id: "o", stadt: "Salzburg", land: "AT", spezialisierungen: ["Yoga"] };
+  const r = alternativenFinden(original, [
+    { id: "ch", stadt: "Zug", land: "CH", spezialisierungen: ["Yoga"], ...REIF },
+    { id: "at", stadt: "Hallein", land: "AT", spezialisierungen: ["Yoga"], ...REIF },
+    { id: "egal", stadt: "Wien", spezialisierungen: ["Yoga"], ...REIF }, // Land unbekannt -> erlaubt
+  ]);
+  assertEquals(r.map((t) => t.id).sort(), ["at", "egal"]);
 });
 
 Deno.test("B4e: /passt-nicht - beteiligter Trainer loest aus, Kunde bekommt zwei Vorschlaege", async () => {
@@ -1457,8 +1486,8 @@ Deno.test("B4e: /passt-nicht - beteiligter Trainer loest aus, Kunde bekommt zwei
     b4Anfrage: { id: "an-1", trainer_id: "t-1", kunden_email: "kundin@beispiel.at", kunden_name: "Kundin", alternativen_gesendet: false },
     b4Original: { id: "t-1", stadt: "Wien", spezialisierungen: ["Yoga"] },
     b4Kandidaten: [
-      { id: "t-2", vorname: "Anna", nachname: "B", stadt: "Wien", spezialisierungen: ["Yoga"] },
-      { id: "t-3", vorname: "Max", nachname: "C", stadt: "Graz", spezialisierungen: ["Yoga"] },
+      { id: "t-2", vorname: "Anna", nachname: "B", stadt: "Wien", spezialisierungen: ["Yoga"], ...REIF },
+      { id: "t-3", vorname: "Max", nachname: "C", stadt: "Graz", spezialisierungen: ["Yoga"], ...REIF },
     ],
   });
   const a = await bearbeiten(anfrage("passt-nicht", { anfrage_id: "an-1" }, MIT_TOKEN), anschluesse);
@@ -1502,8 +1531,8 @@ Deno.test("B4e-48h: faellige Anfrage -> Kunde bekommt zwei Vorschlaege, Anfrage 
     ],
     b4Original: { id: "t-1", stadt: "Wien", spezialisierungen: ["Yoga"] },
     b4Kandidaten: [
-      { id: "t-2", vorname: "Anna", nachname: "B", stadt: "Wien", spezialisierungen: ["Yoga"] },
-      { id: "t-3", vorname: "Max", nachname: "C", stadt: "Graz", spezialisierungen: ["Yoga"] },
+      { id: "t-2", vorname: "Anna", nachname: "B", stadt: "Wien", spezialisierungen: ["Yoga"], ...REIF },
+      { id: "t-3", vorname: "Max", nachname: "C", stadt: "Graz", spezialisierungen: ["Yoga"], ...REIF },
     ],
   });
   const a = await bearbeiten(anfrage("unbeantwortet-pruefen", {}, VOM_ZEITPLAN), anschluesse);
@@ -1547,7 +1576,7 @@ Deno.test("B4e-48h: keine Alternative gefunden -> keine Mail, aber trotzdem verm
     ],
     b4Original: { id: "t-1", stadt: "Wien", spezialisierungen: ["Pilates"] },
     b4Kandidaten: [
-      { id: "t-2", vorname: "Anna", nachname: "B", stadt: "Wien", spezialisierungen: ["Yoga"] },
+      { id: "t-2", vorname: "Anna", nachname: "B", stadt: "Wien", spezialisierungen: ["Yoga"], ...REIF },
     ],
   });
   const a = await bearbeiten(anfrage("unbeantwortet-pruefen", {}, VOM_ZEITPLAN), anschluesse);
