@@ -235,3 +235,22 @@ D6: **erledigt.**
   nebeneinander, nur lokal) – im eingebauten Browser geprüft.
 
 D7: **erledigt.**
+
+## D8 – Service-Worker und Cache
+
+**Entscheidung: keine Cache-Version hochzuzählen.** Begründung:
+- Die **öffentlichen** Seiten (index/suche/profil/personal-trainer-salzburg/
+  registrieren/login) registrieren **keinen** Service Worker und werden nicht per
+  SW gecacht. Der einzige SW ist `sw-verwaltung.js`, registriert allein in
+  `vexfit-verwaltung.js` (Admin-App), mit engem Geltungsbereich: er cacht nur die
+  Verwaltungs-Hülle und **keine** öffentliche Seite und **keine** Supabase-Daten.
+- D1–D7 ändern keine Datei, die dieser SW cacht (die Admin-Hülle blieb unberührt).
+  Ein Hochzählen von `vexfit-admin-huelle-v3` würde nur die Admin-Hülle grundlos
+  verwerfen und die öffentlichen Änderungen **nicht** schneller ausliefern.
+- Die öffentlichen Änderungen kommen über den normalen HTTP-Cache von GitHub Pages
+  (kurze max-age) an; `vexfit-abschnitte.js` ist eine **neue** Adresse (kein
+  Cache), und die neue `suche.html` referenziert sie erst, wenn sie selbst frisch
+  geladen ist – kein Misch-Zustand.
+
+Invariante abgesichert durch `d8_cache_test.ts` (2). Suite **763 grün**.
+D8: **erledigt** (kein Versionssprung – bewusst).
