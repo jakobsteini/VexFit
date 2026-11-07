@@ -214,3 +214,24 @@ D5: **erledigt.**
 
 Test `d6_seo_test.ts` (2). Suite **761 grün**, check+lint grün.
 D6: **erledigt.**
+
+## D7 – Gesamttest
+
+- Alle Deno-Tests: **761 grün** (`deno test --allow-read --allow-run --allow-env`),
+  `deno check` grün, `deno lint` **30** (Baseline, keine neuen).
+- NACHHER-Screenshots in `docs/screenshots/2026-11-08/nachher/` (gleiche 5 Fälle
+  × 375/1440 px, Cookie-Banner ausgeblendet für klare Sicht).
+- Automatische Browser-Prüfungen `rundgang/pruef-suche.mjs` (Playwright, gemockt),
+  **alle grün** bei 375 und 1440 px:
+  - 4-Fragen-Knopf Kontrast **17,66 ≥ 4,5:1**,
+  - Überschrift sichtbar (label-Oberkante ≥ Kopfzeilen-Unterkante),
+  - Kartenfoto zentriert (Bildmitte = Kartenmitte **± 0 px**), object-fit cover,
+    object-position oben (50% 0%),
+  - kein waagrechter Scroll bei 375 px,
+  - **kein voller Nachname im DOM** (Kanarienwert „LECKNACHNAME" taucht nie auf),
+    Kartennamen sind „Vorname N.", und **keine anon-Abfrage** wählt den vollen
+    Nachnamen aus.
+- Vergleichsseite `docs/screenshots/2026-11-08/vergleich.html` (vorher/nachher
+  nebeneinander, nur lokal) – im eingebauten Browser geprüft.
+
+D7: **erledigt.**

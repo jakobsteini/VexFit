@@ -115,6 +115,8 @@ const browser = await chromium.launch();
 for (const b of BREITEN) {
   for (const f of FAELLE) {
     const ctx = await browser.newContext({ viewport: { width: b, height: 900 } });
+    // Cookie-Banner nicht aufklappen (verdeckt sonst den oberen Abschnitt).
+    await ctx.addInitScript(() => { try { localStorage.setItem('vexfit_consent', 'abgelehnt'); } catch { /* kein localStorage */ } });
     await ctx.route("**/*", mock());
     const page = await ctx.newPage();
     page.setDefaultTimeout(9000);

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suche – Vorher/Nachher (08.11.2026)</title>
+<style>
+  :root{--accent:#e8ff00;--bg:#0a0a0a;--card:#161616;--muted:#8a8a8a;--border:rgba(255,255,255,0.12)}
+  body{background:var(--bg);color:#f5f5f0;font-family:system-ui,-apple-system,"DM Sans",sans-serif;margin:0;padding:24px}
+  h1{font-size:22px;margin:0 0 4px}
+  p.hint{color:var(--muted);font-size:14px;margin:0 0 24px;max-width:720px;line-height:1.6}
+  .fall{margin-bottom:40px}
+  .fall h2{font-size:16px;letter-spacing:1px;text-transform:uppercase;color:var(--accent);margin:0 0 12px;border-bottom:1px solid var(--border);padding-bottom:6px}
+  .paar{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .spalte{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px}
+  .spalte .lab{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+  .spalte img{width:100%;height:auto;border-radius:4px;display:block;background:#000}
+  @media(max-width:720px){.paar{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+  <h1>suche.html – Vorher / Nachher</h1>
+  <p class="hint">Dauerlauf 08.11.2026 (D0–D7). Nicht angemeldet, gemocktes Backend.
+    Links der Stand vor dem Lauf (mit eingeblendetem Cookie-Banner – echter
+    Erstbesuch), rechts nach D1–D6 (Banner zur besseren Sicht ausgeblendet).
+    Sichtbar: zwei Abschnitte „vor Ort"/„Online · aus …" (D2), zentriertes
+    Kartenfoto (D3), gefüllter 4-Fragen-Knopf (D4), aufgeräumte Karten (D5).</p>
+  <div id="inhalt"></div>
+  <script>
+    const FAELLE = [
+      ["5020-at", "PLZ 5020 · AT (Salzburg)"],
+      ["5330-at", "PLZ 5330 · AT"],
+      ["80331-de", "PLZ 80331 · DE (München)"],
+      ["8001-ch", "PLZ 8001 · CH (Zürich)"],
+      ["ohne-param", "ohne Parameter"],
+    ];
+    const BREITEN = [375, 1440];
+    const el = document.getElementById("inhalt");
+    let html = "";
+    for (const [key, titel] of FAELLE) {
+      for (const b of BREITEN) {
+        html += `<div class="fall"><h2>${titel} · ${b} px</h2><div class="paar">
+          <div class="spalte"><div class="lab">Vorher</div><img loading="lazy" src="vorher/suche-${key}-${b}.png" alt="vorher ${titel} ${b}"></div>
+          <div class="spalte"><div class="lab">Nachher</div><img loading="lazy" src="nachher/suche-${key}-${b}.png" alt="nachher ${titel} ${b}"></div>
+        </div></div>`;
+      }
+    }
+    el.innerHTML = html;
+  </script>
+</body>
+</html>
