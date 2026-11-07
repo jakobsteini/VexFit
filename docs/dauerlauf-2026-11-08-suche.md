@@ -175,3 +175,21 @@ D2: **erledigt.** D3: **erledigt.**
 
 Test `d4_kontrast_test.ts` (3, inkl. WCAG-Rechner). Suite grün, lint 30 Baseline.
 D4: **erledigt.**
+
+## D5 – Karten und Seite aufräumen
+
+Die einheitliche Karte wurde bereits in D2/D3 eingeführt (`trainerKarteHtml`) und
+speist Standard-, Filter-, Matching- UND Abschnitts-Ansicht. Damit sind die
+D5-Punkte erfüllt:
+- Karte: Foto / „Vorname N." / Ort bzw. „Online · aus …" / Entfernung / Preis
+  (sonst „Auf Anfrage") / Schwerpunkte / Abzeichen / „Anmelden und anfragen"
+  (nicht angemeldet) bzw. klickbare Karte (angemeldet).
+- Abzeichen „Neu" (erste 30 Tage) unverändert erhalten.
+- Leere Felder sauber ausgeblendet: Ort-Zeile filtert leere Teile, Schwerpunkte
+  nur wenn vorhanden, Preis fällt auf „Auf Anfrage" – kein „undefined"/„null".
+- Filterleiste am Handy: **kein waagrechter Scroll** bei 375 px (sogar 320 px),
+  live geprüft (`document.documentElement.scrollWidth == clientWidth`).
+  Ladezustand (#loading / plzStatus) und Fehlermeldung (Grid-Fehlertext) sichtbar.
+
+Test `d5_karten_test.ts` (4). Suite **759 grün**, check+lint grün (30 Baseline).
+D5: **erledigt.**
