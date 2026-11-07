@@ -85,6 +85,14 @@ export const SPAM_PRO_EMAIL_24H = 1;
 /** Fix 7b: hoechstens 20 anonyme Eintraege je IP-Adresse in 1 h. */
 export const SPAM_PRO_IP_1H = 20;
 
+// S6 (07./08.11.2026): Salzburg-Ziel. „Umkreis" wird ueber den PLZ-Praefix
+// angenaehert, weil in der Datenbank KEINE Koordinaten liegen (ein km-Umkreis
+// ist ohne Geodaten nicht umsetzbar – 25 km waere nur ein Platzhalter, siehe
+// Abschluss/Entscheidung). SALZBURG_ZIEL ist die Zielzahl freigegebener,
+// starker (>= 5/8) Trainer in der Region.
+export const SALZBURG_PLZ_PRAEFIX = "50";
+export const SALZBURG_ZIEL = 8;
+
 // ============================================================================
 // S3 (07./08.11.2026): Missbrauchsverdacht einer Anfrage (reine Logik).
 // Verdaechtige Anfragen werden MARKIERT (zur Pruefung), NICHT hart geblockt:
@@ -2823,8 +2831,17 @@ export interface AbendberichtZahlen {
   gekuendigt: number;
   /** K1: Kunden-Trichter der letzten 24 h (anonym, Summen je Stufe). */
   kundenTrichter24h: KundeTrichter24h;
-  /** K8: kurze Stadt-Übersicht Salzburg (PLZ 50xx). null = nicht geladen. */
-  salzburg: { trainerFrei: number; suchen7: number; vorm: number } | null;
+  /** K8/S6: Stadt-Übersicht Salzburg (PLZ 50xx). null = nicht geladen. */
+  salzburg:
+    | {
+      trainerFrei: number;
+      trainerReif: number;
+      suchen7: number;
+      vorm: number;
+      anfragen7: number;
+      annahmen7: number;
+    }
+    | null;
   /** B8: Trichter der letzten 24 h nach Herkunft (anonym, aus trichter_ereignisse). */
   trichter24h: TrichterQuelle[];
   /** B8: freigegebene bzw. in Prüfung befindliche Trainer mit < 5/8 Angaben,
@@ -2926,9 +2943,14 @@ function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert
     basis.push({ beschriftung: "— Kunden-Trichter (24 h) —", wert: "Seite → Suche → Treffer → Profil → Anfrage begonnen → abgeschickt" });
     basis.push({ beschriftung: "Kunden", wert: `${k.seite} · ${k.suche} · ${k.treffer} · ${k.profil} · ${k.anfrage_start} · ${k.anfrage}` });
   }
-  // K8: kurze Stadt-Übersicht Salzburg.
+  // K8/S6: Stadt-Übersicht Salzburg (Ziel: SALZBURG_ZIEL starke Trainer).
   if (z.salzburg) {
-    basis.push({ beschriftung: "Salzburg (50xx)", wert: `${z.salzburg.trainerFrei} freigegebene Trainer · ${z.salzburg.suchen7} Suchen (7 T) · ${z.salzburg.vorm} Vormerkungen` });
+    basis.push({
+      beschriftung: "Salzburg (50xx)",
+      wert: `${z.salzburg.trainerReif}/${SALZBURG_ZIEL} Trainer ≥5/8 (${z.salzburg.trainerFrei} freigegeben) · ` +
+        `${z.salzburg.suchen7} Suchen · ${z.salzburg.vorm} Vormerkungen · ` +
+        `${z.salzburg.anfragen7} Anfragen · ${z.salzburg.annahmen7} Annahmen (7 T)`,
+    });
   }
   return basis;
 }
@@ -3116,14 +3138,27 @@ export async function abendberichtZahlenHolen(
   // eine Tabelle/Spalte, bleibt salzburg einfach null (keine Zeile, kein Fehler).
   try {
     const seit7 = new Date(jetztMs - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const trainer = await lesenFn<{ ist_test?: boolean | null }>(
-      `trainers?plz=like.50*&aktiv=eq.true&gesperrt=not.is.true&select=id,ist_test`,
-    ).catch(() => lesenFn<{ ist_test?: boolean | null }>(`trainers?plz=like.50*&aktiv=eq.true&select=id`));
-    const trainerFrei = trainer.filter((t) => t.ist_test !== true).length;
-    let suchen7 = 0, vorm = 0;
-    try { suchen7 = (await lesenFn<unknown>(`such_eingaben?plz=like.50*&erstellt_am=gte.${seit7}&select=plz`)).length; } catch { /* Tabelle fehlt */ }
-    try { vorm = (await lesenFn<unknown>(`warteliste?plz=like.50*&select=plz`)).length; } catch { /* Tabelle fehlt */ }
-    z.salzburg = { trainerFrei, suchen7, vorm };
+    const like = `plz=like.${SALZBURG_PLZ_PRAEFIX}*`;
+    const felder = "id,ist_test,avatar_url,trainingsart,trainingsort,preis_stunde,bio,erfahrung,spezialisierungen,telefon";
+    const trainer = await lesenFn<TrainerProfil & { id: string }>(
+      `trainers?${like}&aktiv=eq.true&gesperrt=not.is.true&select=${felder}`,
+    ).catch(() => lesenFn<TrainerProfil & { id: string }>(`trainers?${like}&aktiv=eq.true&select=${felder}`));
+    const frei = trainer.filter((t) => t.ist_test !== true);
+    const trainerFrei = frei.length;
+    // Profil >= 5/8 (dieselbe Zählung wie profileUnter5, nur umgekehrt).
+    const trainerReif = frei.filter((t) => (8 - freischaltFehlendeFelder(t).length) >= 5).length;
+    let suchen7 = 0, vorm = 0, anfragen7 = 0, annahmen7 = 0;
+    try { suchen7 = (await lesenFn<unknown>(`such_eingaben?${like}&erstellt_am=gte.${seit7}&select=plz`)).length; } catch { /* Tabelle fehlt */ }
+    try { vorm = (await lesenFn<unknown>(`warteliste?${like}&select=plz`)).length; } catch { /* Tabelle fehlt */ }
+    // Anfragen/Annahmen der letzten 7 Tage für Trainer in der Region. anfragen
+    // trägt keine PLZ – daher über die Trainer-Kennungen der Region.
+    const ids = frei.map((t) => t.id).filter(Boolean);
+    if (ids.length) {
+      const inListe = `(${ids.map((i) => encodeURIComponent(i)).join(",")})`;
+      try { anfragen7 = (await lesenFn<unknown>(`anfragen?trainer_id=in.${inListe}&created_at=gte.${seit7}&select=id`)).length; } catch { /* best effort */ }
+      try { annahmen7 = (await lesenFn<unknown>(`anfragen?trainer_id=in.${inListe}&status=eq.angenommen&created_at=gte.${seit7}&select=id`)).length; } catch { /* best effort */ }
+    }
+    z.salzburg = { trainerFrei, trainerReif, suchen7, vorm, anfragen7, annahmen7 };
   } catch (e) { merkeFehler("Stadt-Übersicht Salzburg", e); }
 
   return z;

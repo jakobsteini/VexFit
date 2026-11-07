@@ -502,6 +502,11 @@ tr:last-child td{border-bottom:none}
 
     <!-- Nachfrage -->
     <div class="tab-content" id="tab-nachfrage">
+      <!-- S6: Salzburg-Ziel (Region = PLZ 50xx). -->
+      <div id="salzburg-karte" style="border:1px solid var(--bi,rgba(255,255,255,0.12));border-radius:10px;padding:14px 16px;margin-bottom:22px">
+        <div class="feld-label" style="font-size:12px;margin-bottom:8px">🎯 Salzburg (PLZ 50xx)</div>
+        <div id="salzburg-inhalt" class="section-hinweis">Lade …</div>
+      </div>
       <!-- Land eindeutig (07.11.2026): Datensätze mit PLZ, aber ohne Land. -->
       <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">PLZ ohne Land · bitte zuordnen</h3>
       <div class="section-hinweis">Trainer und Kunden mit Postleitzahl, aber ohne Land (AT/DE/CH). Bei 4-stelliger PLZ ist der Ort ohne Land nicht eindeutig (z.&nbsp;B. 5020 in Salzburg und in der Schweiz). Antippen ordnet das Land zu (protokolliert).</div>

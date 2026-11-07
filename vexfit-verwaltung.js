@@ -1582,6 +1582,41 @@ function starteVerwaltung() {
     } catch { zeige(hinweis); }
     // Land eindeutig: Liste „PLZ ohne Land" mitladen (best effort, eigener try).
     try { await ladePlzOhneLand(); } catch { /* still */ }
+    // S6: Salzburg-Karte mitladen (best effort, eigener try).
+    try { await renderSalzburgKarte(); } catch { /* still */ }
+  }
+
+  // S6: Salzburg-Ziel (Region über PLZ-Präfix 50, keine Koordinaten in der DB).
+  // Ziel 8 starke Trainer; dazu Suchen/Vormerkungen/Anfragen/Annahmen (7 Tage).
+  const SALZBURG_PRAEFIX = "50";
+  const SALZBURG_ZIEL = 8;
+  async function renderSalzburgKarte() {
+    const el = $("salzburg-inhalt");
+    if (!el) return;
+    const inRegion = (plz) => String(plz || "").startsWith(SALZBURG_PRAEFIX);
+    const jetzt = Date.now(), seit7ms = jetzt - 7 * 86400000;
+    const trainer50 = sichtbar(daten.trainers || [], zustand.testsAusTrainer)
+      .filter((t) => inRegion(t.plz) && t.aktiv && !t.gesperrt);
+    const trainerFrei = trainer50.length;
+    const trainerReif = trainer50.filter((t) => (8 - fehlendeProfilfelder(t).length) >= 5).length;
+    const suchen7 = (stadtZustand.suchen || []).filter((s) => inRegion(s.plz) && s.erstellt_am && new Date(s.erstellt_am).getTime() >= seit7ms).length;
+    const vorm = (stadtZustand.warteliste || []).filter((w) => inRegion(w.plz)).length;
+    let anfragen7 = 0, annahmen7 = 0;
+    const ids = trainer50.map((t) => t.id).filter(Boolean);
+    if (ids.length) {
+      try {
+        const seit7 = new Date(seit7ms).toISOString();
+        const r = await hole(`anfragen?trainer_id=in.(${ids.map(encodeURIComponent).join(",")})&created_at=gte.${seit7}&select=id,status`);
+        if (r.ok) { const rows = await r.json(); anfragen7 = rows.length; annahmen7 = rows.filter((a) => a.status === "angenommen").length; }
+      } catch { /* best effort */ }
+    }
+    const warnung = trainerReif < SALZBURG_ZIEL
+      ? ` <span class="badge badge-unpaid">${SALZBURG_ZIEL - trainerReif} bis zum Ziel</span>`
+      : ' <span class="badge badge-paid">Ziel erreicht</span>';
+    el.innerHTML =
+      `<strong>${trainerReif}/${SALZBURG_ZIEL}</strong> Trainer mit Profil ≥5/8${warnung}<br>` +
+      `${trainerFrei} freigegebene Trainer · ${suchen7} Kundensuchen (7 T) · ${vorm} Vormerkungen · ` +
+      `${anfragen7} Anfragen · ${annahmen7} Annahmen (7 T)`;
   }
 
   // Land eindeutig (07.11.2026): Trainer und Kunden mit PLZ, aber ohne Land. Je

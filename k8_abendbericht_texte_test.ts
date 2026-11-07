@@ -26,11 +26,13 @@ Deno.test("K8: Abendbericht enthält die Stadt-Übersicht Salzburg", async () =>
   const z = await abendberichtZahlenHolen(leser, async () => 1, JETZT);
   assert(z.salzburg, "Salzburg-Übersicht fehlt");
   assertEquals(z.salzburg.trainerFrei, 2); // Test-Konto ausgenommen
+  assertEquals(z.salzburg.trainerReif, 0); // ohne Profilfelder < 5/8
   assertEquals(z.salzburg.suchen7, 2);
   assertEquals(z.salzburg.vorm, 1);
   const text = mailAbendbericht(z).text;
   assertStringIncludes(text, "Salzburg (50xx)");
-  assertStringIncludes(text, "freigegebene Trainer");
+  assertStringIncludes(text, "0/8"); // S6: ≥5/8 von Ziel 8
+  assertStringIncludes(text, "2 freigegeben");
 });
 
 Deno.test("K8: fehlende Salzburg-Tabellen -> kein Absturz (trainerFrei aus, Rest 0)", async () => {
