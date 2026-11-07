@@ -57,7 +57,9 @@ function mockSupabase(aufzeichnung) {
     const json = (body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
     if (url.includes("/auth/v1/signup")) {
-      return json({ user: { id: "u-test-1" }, access_token: "tok-test", refresh_token: "ref-test" }, 200);
+      // Kurze Platzhalter-Werte (unter 8 Zeichen), damit der Geheimnis-Wächter
+      // sie nicht für echte Tokens hält. Nur die Wahrheit „ist gesetzt" zählt.
+      return json({ user: { id: "u-test-1" }, access_token: "t1", refresh_token: "r1" }, 200);
     }
     if (url.includes("/rest/v1/trichter_ereignisse") && method === "POST") {
       try { aufzeichnung.trichter.push(JSON.parse(req.postData() || "{}")); } catch {}
