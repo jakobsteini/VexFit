@@ -15,10 +15,10 @@ const lies = (p: string) => Deno.readTextFile(new URL(p, import.meta.url));
 Deno.test("K4: Umkreissuche zeigt die nächsten statt Sackgasse", async () => {
   const s = await lies("./suche.html");
   assertStringIncludes(s, "const mitEntfernung = [];");
-  assertStringIncludes(s, "const imUmkreis = mitEntfernung.filter(t => t._online || t._distance <= radius);");
-  assertStringIncludes(s, "Die nächsten (ab ${km} km)");
-  // Leerzustand nur noch im echten Null-Fall.
-  assertStringIncludes(s, "naeheHinweisAus();\n  showEmpty();");
+  assertStringIncludes(s, "const imUmkreis = mitEntfernung.filter(t => t._distance <= radius);");
+  assertStringIncludes(s, "Die nächsten (ab ${vorOrt[0]._distance} km)");
+  // Leerzustand nur noch im echten Null-Fall: kein Trainer vor Ort UND online.
+  assertStringIncludes(s, "if(!vorOrt.length && !online.length)");
 });
 
 Deno.test("K4: Nähe-Hinweisband mit Vormerkung vorhanden", async () => {

@@ -121,3 +121,40 @@ Tests: `d1_kein_nachname_test.ts` (4 neu). Suite **744 grün**, `deno check` gr�
 `deno lint` **30** (Baseline, keine neuen).
 
 D1: **erledigt** – Commit folgt.
+
+## D2 + D3 – Standortfilter pro Land (zwei Abschnitte) + Trainerfoto zentriert
+
+D2 und D3 teilen eine Karten-Umstellung (gemeinsamer Commit).
+
+**D2 – zwei Abschnitte:**
+- Neues reines Modul `vexfit-abschnitte.js` (`einteilen`, `istOnline`,
+  `nurOnline`, `ausLand`, `LANDNAME`) – ohne DOM/Netz prüfbar.
+  Regeln: Vor-Ort = nur gewähltes Land und nicht reiner Online; Online =
+  alle mit Online-Angebot, aber „beides" aus dem gewählten Land steht nur vor Ort
+  (kein Doppeleintrag); Online: gewähltes Land zuerst, andere Länder mit
+  „Online · aus Deutschland/Schweiz/Österreich".
+- `suche.html`: `umkreisSuche` trennt über `vexAbschnitte.einteilen`, berechnet
+  Entfernungen nur für die Vor-Ort-Kandidaten, rendert über `renderErgebnis` zwei
+  `<section>`-Abschnitte. 0 Vor-Ort-Treffer → ehrlicher Hinweis + nächste im
+  selben Land (bis 6) bzw. leerer Vor-Ort-Abschnitt + Vormerkband; Online-Abschnitt
+  und Anfrage bleiben möglich. **URL-Zustand**: `urlStand()` schreibt plz/land/radius
+  per `history.replaceState`; beim Laden werden plz, land **und radius** aus der
+  Adresse übernommen (Teilen/Neuladen/Zurück).
+- Live im eingebauten Browser bestätigt: DE-Online-Trainer erscheint bei
+  AT-Suche nur im Online-Abschnitt mit „aus Deutschland", nicht vor Ort.
+
+**D3 – Foto zentriert:**
+- Kartenfoto jetzt echtes `<img class="cimg">` statt Hintergrundbild:
+  `object-fit:cover; object-position:center top` (Gesicht nicht abgeschnitten),
+  feste `.ci`-Höhe 160 px (alle Karten gleich), `loading="lazy"`, feste
+  `width/height`, `alt` = „Vorname N.". Ohne Foto zentrierter Initialen-Platzhalter
+  (`.cav`) in gleicher Größe. In den VORHER-Bildern war die Bildmitte (Rumpf) zu
+  sehen; jetzt der Kopf.
+- `personal-trainer-salzburg.html` nutzt KEINE eigenen Karten (verlinkt nur die
+  Suche) → nichts anzupassen.
+
+Drei bestehende Tests an die neue (gleichwertige) Umsetzung angepasst
+(admin_test, k4_naehe_test, nachtlauf_phase2_kunde_test). Neu: `d2_abschnitte_test.ts`
+(5), `d3_foto_test.ts` (3). Suite **752 grün**, check+lint grün (30 Baseline).
+
+D2: **erledigt.** D3: **erledigt.**

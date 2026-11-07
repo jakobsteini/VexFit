@@ -84,7 +84,9 @@ Deno.test("Suche zeigt Trainer ohne Foto mit Initialen (kein Fehler, kein undefi
   const suche = await lies("./suche.html");
   assertStringIncludes(suche, "avatarAdresse(t.avatar_url)");
   assertStringIncludes(suche, "(t.vorname||'?')[0]");
-  assertStringIncludes(suche, "bild ? '' :");
-  assertStringIncludes(suche, "(t.spezialisierungen||[])");
+  // D3: Foto -> echtes <img>, ohne Foto zentrierter Initialen-Platzhalter.
+  assertStringIncludes(suche, "const bildHtml = bild");
+  assertStringIncludes(suche, '<div class="cav">${initials || \'?\'}</div>');
+  assertStringIncludes(suche, "(t.spezialisierungen || [])");
   assertStringIncludes(suche, "t.preis_stunde ?");
 });

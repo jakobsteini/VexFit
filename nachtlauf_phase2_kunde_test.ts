@@ -39,7 +39,11 @@ Deno.test("suche.html: Enter startet die Suche, Warteliste sendet die PLZ", asyn
 
 Deno.test("suche.html: Umkreissuche erkennt Online-Trainer am trainingsort", async () => {
   const s = await lies("./suche.html");
-  assertStringIncludes(s, "ort === 'online' || ort === 'beides'");
+  // Die Online-Erkennung liegt jetzt in der geprüften Einteilung (D2);
+  // suche.html nutzt sie fuer die zwei Abschnitte.
+  assertStringIncludes(s, "vexAbschnitte.einteilen(allTrainers, sel)");
+  const ab = await lies("./vexfit-abschnitte.js");
+  assertStringIncludes(ab, "ort === 'online' || ort === 'beides'");
 });
 
 Deno.test("keine Preise in falscher Reihenfolge (auch dynamisch) auf oeffentlichen Seiten", async () => {

@@ -79,8 +79,17 @@ nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content
 .tc:hover{background:var(--mid)}
 .tc::before{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform 0.35s}
 .tc:hover::before{transform:scaleX(1)}
-.ci{height:160px;display:flex;align-items:center;justify-content:center;position:relative}
+.ci{height:160px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:var(--mid)}
+/* D3: Kartenfoto – gleiche Groesse, horizontal mittig, Gesicht nicht abschneiden. */
+.cimg{width:100%;height:100%;object-fit:cover;object-position:center top;display:block}
 .cav{font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:2px;color:rgba(232,255,0,0.3)}
+/* D2: Abschnitte Vor-Ort / Online. */
+.sektion{margin-bottom:30px}
+.sektion-titel{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;margin:0 0 14px;color:var(--white);display:flex;align-items:center;gap:12px}
+.sektion-titel::after{content:'';flex:1;height:1px;background:var(--border)}
+.sektion-leer{font-size:14px;color:var(--text-muted);line-height:1.6;max-width:460px;margin:0}
+.cf-km,.cf-online{font-size:11px;color:var(--text-muted)}
+.cf-online{color:var(--accent)}
 .cbadge{position:absolute;top:12px;left:12px;background:var(--accent);color:var(--black);padding:3px 8px;border-radius:2px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
 .cbadge.online{background:rgba(232,255,0,0.15);color:var(--accent);border:1px solid rgba(232,255,0,0.3)}
 .cb{padding:18px}
@@ -293,6 +302,7 @@ try {
 <script src="vexfit-matching.js"></script>
 <script src="vexfit-trichter.js"></script>
 <script src="vexfit-vorschau.js"></script>
+<script src="vexfit-abschnitte.js"></script>
 <script>
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -401,16 +411,6 @@ function avatarAdresse(u) {
   return (typeof u === 'string' && u.indexOf(AVATAR_PREFIX) === 0) ? u : null;
 }
 
-// BG colors for avatars
-const bgColors = [
-  'linear-gradient(135deg,#1a1a1a,#2a2a2a)',
-  'linear-gradient(135deg,#1e1a0a,#2a2800)',
-  'linear-gradient(135deg,#0a1a1a,#002a2a)',
-  'linear-gradient(135deg,#1a0a1a,#2a002a)',
-  'linear-gradient(135deg,#0a0a1a,#00002a)',
-  'linear-gradient(135deg,#1a1500,#2a2200)',
-];
-
 // Ein gemeinsamer Zwischenspeicher fuer alle PLZ-Abfragen dieses Seitenaufrufs,
 // damit dieselbe PLZ nur einmal beim Standortdienst nachgefragt wird. Wird an
 // vexPlz.aufloesen als {cache} uebergeben; die landbegrenzten Trainer-Abfragen
@@ -487,6 +487,18 @@ function oeffneProfil(id) {
   window.location = 'profil.html?id=' + id;
 }
 
+// D2: Land, PLZ und Umkreis in der Adresse halten, damit Neuladen, Zurück-Knopf
+// und Teilen denselben Stand zeigen. Nur ersetzen (kein neuer History-Eintrag).
+function urlStand(plz, land, radius) {
+  try {
+    const u = new URL(location.href);
+    if(plz) u.searchParams.set('plz', plz); else u.searchParams.delete('plz');
+    if(land) u.searchParams.set('land', land); else u.searchParams.delete('land');
+    if(radius != null && !Number.isNaN(radius)) u.searchParams.set('radius', String(radius)); else u.searchParams.delete('radius');
+    history.replaceState(null, '', u.pathname + u.search);
+  } catch(e) {}
+}
+
 async function searchByPLZ() {
   const plz = document.getElementById('plzInput').value.trim();
   const radius = parseInt(document.getElementById('radiusInput').value);
@@ -494,6 +506,7 @@ async function searchByPLZ() {
 
   if(radius === 0) {
     try { vexfitTrichter('suche', { rolle: 'kunde', einmal: false }); } catch(e) {}
+    urlStand(plz, gewaehltesLand(), 0);
     renderTrainers(allTrainers);
     if(allTrainers.length) { try { vexfitTrichter('treffer', { rolle: 'kunde', einmal: false }); } catch(e) {} }
     status.textContent = `Alle ${allTrainers.length} Trainer werden angezeigt`;
@@ -519,6 +532,7 @@ async function searchByPLZ() {
   // K1: Suche ausgeführt (mit grobem PLZ-Bereich). PLZ für die weiteren Stufen merken.
   letztePlz = plz;
   letztesLand = land || '';
+  urlStand(plz, land, radius);
   try { vexfitTrichter('suche', { rolle: 'kunde', plz: plz, land: land, einmal: false }); } catch(e) {}
 
   status.textContent = '📍 Standort wird ermittelt...';
@@ -539,52 +553,46 @@ async function searchByPLZ() {
 }
 
 async function umkreisSuche(coords, radius, status) {
+  const sel = gewaehltesLand(); // 'AT'|'DE'|'CH'|null
   status.textContent = `📍 ${coords.stadt} · Suche in ${radius} km Umkreis...`;
 
-  // K4: ALLE Trainer mit Entfernung berechnen (nicht nur im Radius), damit wir
-  // bei 0 Treffern im Umkreis die NÄCHSTEN zeigen können statt einer Sackgasse.
+  // D2: Erst in Vor-Ort (nur gewaehltes Land) und Online (laenderuebergreifend)
+  // trennen – die Einteilung ist eine reine, geprüfte Funktion.
+  const { vorOrt: vorOrtKand, online } = vexAbschnitte.einteilen(allTrainers, sel);
+
+  // K4: Fuer alle Vor-Ort-Kandidaten die Entfernung berechnen (nicht nur im
+  // Radius), damit bei 0 Treffern im Umkreis die NÄCHSTEN im selben Land gezeigt
+  // werden statt einer Sackgasse.
   const mitEntfernung = [];
-  for(const t of allTrainers) {
-    // Online-Trainer: trainingsort ('online'/'beides') hat Vorrang, sonst der
-    // Freitext trainingsart. So fallen reine Online-Trainer ohne PLZ nicht aus
-    // der Umkreissuche (gleiche Regel wie vexEinstieg.istOnline).
-    const ort = String(t.trainingsort||'').toLowerCase();
-    if(ort === 'online' || ort === 'beides' || (t.trainingsart||'').toLowerCase().includes('online')) {
-      mitEntfernung.push({...t, _distance: 0, _online: true});
-      continue;
-    }
+  for(const t of vorOrtKand) {
     if(!t.plz) continue;
     const tc = await trainerCoords(t);
     if(!tc) continue;
     const dist = calcDistance(coords.lat, coords.lng, tc.lat, tc.lng);
     mitEntfernung.push({...t, _distance: Math.round(dist)});
   }
-  // Erst nach Entfernung (Online-Trainer hinten, da ortsunabhängig).
-  mitEntfernung.sort((a,b) => (a._online?1:0) - (b._online?1:0) || a._distance - b._distance);
-  const imUmkreis = mitEntfernung.filter(t => t._online || t._distance <= radius);
+  mitEntfernung.sort((a,b) => a._distance - b._distance);
+  const imUmkreis = mitEntfernung.filter(t => t._distance <= radius);
 
+  let vorOrt, nurNaechste = false;
   if(imUmkreis.length) {
-    status.textContent = `📍 ${coords.stadt} · ${imUmkreis.length} Trainer in ${radius} km gefunden`;
+    vorOrt = imUmkreis;
+    status.textContent = `📍 ${coords.stadt} · ${imUmkreis.length} vor Ort in ${radius} km`;
     naeheHinweisAus();
-    renderTrainersWithDistance(imUmkreis);
     try { vexfitTrichter('treffer', { rolle: 'kunde', plz: letztePlz, land: letztesLand, einmal: false }); } catch(e) {}
-    return;
-  }
-
-  // K4: Keiner im gewählten Umkreis → die nächsten (bis 6) zeigen, mit klarer
-  // Entfernung, statt einer Sackgasse. Dazu der Hinweis + Vormerk-Knopf.
-  const naechste = mitEntfernung.filter(t => !t._online).slice(0, 6);
-  if(naechste.length) {
-    const km = naechste[0]._distance;
-    status.textContent = `📍 Kein Trainer in ${radius} km um ${coords.stadt}. Die nächsten (ab ${km} km):`;
-    renderTrainersWithDistance(naechste);
+  } else if(mitEntfernung.length) {
+    vorOrt = mitEntfernung.slice(0, 6);
+    nurNaechste = true;
+    status.textContent = `📍 Kein Trainer in ${radius} km um ${coords.stadt}. Die nächsten (ab ${vorOrt[0]._distance} km):`;
     naeheHinweisAn(coords, radius);
-    return;
+  } else {
+    // Niemand vor Ort im gewählten Land. Ehrlicher Hinweis + Vormerkung; der
+    // Online-Abschnitt und die Anfrage bleiben trotzdem möglich.
+    vorOrt = [];
+    status.textContent = `📍 Noch kein Trainer vor Ort um ${coords.stadt}.`;
+    naeheHinweisAn(coords, radius);
   }
-
-  // Wirklich niemand (keine PLZ hinterlegt / keine Online-Trainer) → Vormerkung.
-  naeheHinweisAus();
-  showEmpty();
+  renderErgebnis(vorOrt, online, sel, nurNaechste);
 }
 
 // K4: Hinweisband unter der Trefferliste, wenn nur die „nächsten" (außerhalb des
@@ -604,42 +612,81 @@ function naeheHinweisAus() {
   if(el) el.style.display = 'none';
 }
 
-function renderTrainersWithDistance(trainers) {
-  trainers = vorschauFilter(trainers);
+// D3/D5: Eine einheitliche Karte für alle Ansichten (Vor-Ort, Online, Standard).
+// meta = { online?:bool, ausLand?:'AT'|'DE'|'CH'|null, distanz?:number|null }.
+// Foto als echtes <img> (object-fit cover, object-position center top, lazy,
+// alt „Vorname N."); leere Felder werden sauber ausgeblendet.
+function trainerKarteHtml(t, i, meta) {
+  meta = meta || {};
+  const online = !!meta.online;
+  const bild = avatarAdresse(t.avatar_url);
+  const initialQuelle = (t.nachname || t.nachname_initial || '');
+  const initials = vexEsc(((t.vorname||'?')[0] + (initialQuelle[0] || '')).toUpperCase());
+  const name = kartenName(t); // bereits escaped; anon -> „Vorname N."
+  const bildHtml = bild
+    ? `<img class="cimg" src="${vexEsc(bild)}" alt="${name || 'Trainer'}" loading="lazy" width="400" height="160">`
+    : `<div class="cav">${initials || '?'}</div>`;
+  let ortZeile;
+  if(online) {
+    const al = meta.ausLand;
+    ortZeile = '🌐 Online' + (al ? ' · aus ' + vexEsc(vexAbschnitte.LANDNAME[al] || al) : '');
+  } else {
+    const teile = [t.stadt, t.trainingsart].filter(x => x && String(x).trim()).map(vexEsc);
+    ortZeile = '📍 ' + teile.join(' · ');
+  }
+  const preis = t.preis_stunde ? `${vexEsc(t.preis_stunde)} €<span>/Std</span>` : '<span>Auf Anfrage</span>';
+  const tags = (t.spezialisierungen || []).filter(Boolean).slice(0,3).map(s => `<span class="ctag">${vexEsc(s)}</span>`).join('');
+  const marker = online
+    ? '<span class="cf-online">🌐 Online</span>'
+    : (meta.distanz != null ? `<span class="cf-km">📍 ${vexEsc(meta.distanz)} km</span>` : '');
+  return `<div class="tc" onclick="oeffneProfil('${t.id}')">
+      <div class="ci">${bildHtml}${kartenAbzeichen(t, online)}</div>
+      <div class="cb">
+        <div class="cn">${name}</div>
+        <div class="cl">${ortZeile}</div>
+        ${tags ? `<div class="ctags">${tags}</div>` : ''}
+        <div class="cf"><div class="cp">${preis}</div>${marker}</div>
+      </div>
+      ${kontaktKnopf(angemeldet)}
+    </div>`;
+}
+
+// D2: Ergebnis in zwei Abschnitten rendern. #trainerGrid wird zum Container
+// (ohne eigene Grid-Klasse); je Abschnitt eine eigene .grid.
+function renderErgebnis(vorOrt, online, sel, nurNaechste) {
+  vorOrt = vorschauFilter(vorOrt) || [];
+  online = vorschauFilter(online) || [];
   const grid = document.getElementById('trainerGrid');
   const empty = document.getElementById('emptyState');
   const count = document.getElementById('trainerCount');
 
-  if(!trainers.length) {
+  if(!vorOrt.length && !online.length) {
+    grid.className = '';
     grid.innerHTML = '';
     empty.classList.add('show');
     count.textContent = '0 Trainer';
     return;
   }
   empty.classList.remove('show');
-  count.textContent = trainers.length + ' Trainer';
-  const bgColors = ['linear-gradient(135deg,#1a1a1a,#2a2a2a)','linear-gradient(135deg,#1e1a0a,#2a2800)','linear-gradient(135deg,#0a1a1a,#002a2a)'];
-  grid.innerHTML = trainers.map((t,i) => {
-    const initials = vexEsc(((t.vorname||'?')[0]+((t.nachname||t.nachname_initial||'?')[0])).toUpperCase());
-    const tags = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="ctag">${vexEsc(s)}</span>`).join('');
-    const preis = t.preis_stunde ? `${t.preis_stunde} €<span>/Std</span>` : '<span>Auf Anfrage</span>';
-    const distLabel = t._online ? '<span style="color:#e8ff00;font-size:11px">🌐 Online</span>' : t._distance !== undefined ? `<span style="color:#888;font-size:11px">📍 ${t._distance} km</span>` : '';
-    const bild = avatarAdresse(t.avatar_url);
-    const ciStyle = bild ? `background-image:url('${vexEsc(bild)}');background-size:cover;background-position:center` : `background:${bgColors[i%bgColors.length]}`;
-    return `<div class="tc" onclick="oeffneProfil('${t.id}')">
-      <div class="ci" style="${ciStyle}">
-        ${bild ? '' : `<div class="cav">${initials}</div>`}
-        ${kartenAbzeichen(t, t._online)}
-      </div>
-      <div class="cb">
-        <div class="cn">${kartenName(t)}</div>
-        <div class="cl">${vexEsc(t.trainingsart)} · ${vexEsc(t.stadt)}</div>
-        <div class="ctags">${tags}</div>
-        <div class="cf"><div class="cp">${preis}</div>${distLabel}</div>
-      </div>
-      ${kontaktKnopf(angemeldet)}
-    </div>`;
-  }).join('');
+  count.textContent = (vorOrt.length + online.length) + ' Trainer';
+  grid.className = ''; // Container statt eigenem Grid
+
+  let html = '';
+  const vorTitel = nurNaechste ? 'Am nächsten · vor Ort' : 'Personal Training vor Ort';
+  if(vorOrt.length) {
+    html += `<section class="sektion"><h2 class="sektion-titel">${vorTitel}</h2><div class="grid">`
+      + vorOrt.map((t,i) => trainerKarteHtml(t, i, { distanz: (t._distance != null ? t._distance : null) })).join('')
+      + '</div></section>';
+  } else {
+    html += '<section class="sektion"><h2 class="sektion-titel">Personal Training vor Ort</h2>'
+      + '<p class="sektion-leer">Noch kein Trainer vor Ort im gewählten Land. Trag dich unten ein – oder frag einen Online-Trainer an.</p></section>';
+  }
+  if(online.length) {
+    html += '<section class="sektion"><h2 class="sektion-titel">Online-Training</h2><div class="grid">'
+      + online.map((t,i) => trainerKarteHtml(t, i, { online: true, ausLand: vexAbschnitte.ausLand(t, sel) })).join('')
+      + '</div></section>';
+  }
+  grid.innerHTML = html;
 }
 
 async function loadTrainers() {
@@ -704,6 +751,7 @@ function renderTrainers(trainers) {
   const count = document.getElementById('trainerCount');
 
   if(!trainers || trainers.length === 0) {
+    grid.className = 'grid';
     grid.innerHTML = '';
     empty.classList.add('show');
     count.textContent = '0 Trainer';
@@ -713,32 +761,11 @@ function renderTrainers(trainers) {
   empty.classList.remove('show');
   count.textContent = trainers.length + ' Trainer';
 
-  grid.innerHTML = trainers.map((t, i) => {
-    const initials = vexEsc(((t.vorname||'?')[0] + ((t.nachname||t.nachname_initial||'?')[0])).toUpperCase());
-    const bg = bgColors[i % bgColors.length];
-    const isOnline = t.trainingsart === 'Online';
-    const tags = (t.spezialisierungen || []).slice(0, 3);
-    const preis = t.preis_stunde ? `${t.preis_stunde} €<span>/Std</span>` : '<span>Auf Anfrage</span>';
-    const bild = avatarAdresse(t.avatar_url);
-    const ciStyle = bild ? `background-image:url('${vexEsc(bild)}');background-size:cover;background-position:center` : `background:${bg}`;
-
-    return `
-      <div class="tc" onclick="oeffneProfil('${t.id}')">
-        <div class="ci" style="${ciStyle}">
-          ${bild ? '' : `<div class="cav">${initials}</div>`}
-          ${kartenAbzeichen(t, isOnline)}
-        </div>
-        <div class="cb">
-          <div class="cn">${kartenName(t)}</div>
-          <div class="cl">${isOnline ? '🌐 Online · DACH-weit' : '📍 ' + vexEsc(t.stadt) + ' · ' + vexEsc(t.trainingsart)}</div>
-          <div class="ctags">${tags.map(tag => `<span class="ctag">${vexEsc(tag)}</span>`).join('')}</div>
-          <div class="cf">
-            <div class="cp">${preis}</div>
-          </div>
-        </div>
-        ${kontaktKnopf(angemeldet)}
-      </div>`;
-  }).join('');
+  // Standard-/Filter-/Matching-Ansicht: ein Raster, einheitliche Karten.
+  grid.className = 'grid';
+  grid.innerHTML = trainers.map((t, i) =>
+    trainerKarteHtml(t, i, { online: vexAbschnitte.istOnline(t) })
+  ).join('');
 }
 
 function filterTrainers() {
@@ -941,6 +968,10 @@ loadTrainers().then(function() {
     var vorgabe = q.get('plz');
     var landVorgabe = vexPlz.landNormal(q.get('land'));
     if (landVorgabe && landFeld()) landFeld().value = landVorgabe;
+    // D2: Umkreis aus der Adresse uebernehmen (Teilen/Neuladen/Zurueck).
+    var rad = q.get('radius');
+    var radEl = document.getElementById('radiusInput');
+    if (rad && radEl && [].some.call(radEl.options, function(o){ return o.value === rad; })) radEl.value = rad;
     if (vorgabe && /^\d{4,5}$/.test(vorgabe.trim())) {
       var feld = document.getElementById('plzInput');
       if (feld) { feld.value = vorgabe.trim(); plzLandAbgleich(); searchByPLZ(); }
