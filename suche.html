@@ -875,7 +875,16 @@ async function submitNotify() {
   document.getElementById('notifySuccess').style.display = 'block';
 }
 
-loadTrainers();
+// K5: Stadtseite kann die Suche vorausfüllen (?plz=5020) und direkt starten.
+loadTrainers().then(function() {
+  try {
+    var vorgabe = new URLSearchParams(location.search).get('plz');
+    if (vorgabe && /^\d{4,5}$/.test(vorgabe.trim())) {
+      var feld = document.getElementById('plzInput');
+      if (feld) { feld.value = vorgabe.trim(); searchByPLZ(); }
+    }
+  } catch (e) {}
+});
 </script>
 <!-- WhatsApp Button -->
 <style>

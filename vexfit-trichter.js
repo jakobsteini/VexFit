@@ -19,13 +19,27 @@
     if (ua.indexOf("fban") >= 0 || ua.indexOf("fbav") >= 0 || ua.indexOf("fb_iab") >= 0) return "facebook";
     return "sonst";
   }
+  // K5: UTM „laufen durch" über die ganze Kundenstrecke (Stadtseite → Suche →
+  // Profil → Anfrage). Beim ersten Aufruf mit UTM werden sie best effort in
+  // sessionStorage gespiegelt; auf Folgeseiten ohne Query kommen sie von dort.
+  var SCHLUESSEL = "vexfit_werbung";
   function werbung() {
     var p = new URLSearchParams(global.location ? global.location.search : "");
-    return {
+    var w = {
       quelle: (p.get("utm_source") || "").trim() || null,
       kampagne: (p.get("utm_campaign") || "").trim() || null,
       inhalt: (p.get("utm_content") || "").trim() || null,
     };
+    try {
+      var alt = JSON.parse(global.sessionStorage.getItem(SCHLUESSEL) || "null");
+      if (alt && typeof alt === "object") {
+        if (!w.quelle && alt.quelle) w.quelle = alt.quelle;
+        if (!w.kampagne && alt.kampagne) w.kampagne = alt.kampagne;
+        if (!w.inhalt && alt.inhalt) w.inhalt = alt.inhalt;
+      }
+      if (w.quelle || w.kampagne || w.inhalt) global.sessionStorage.setItem(SCHLUESSEL, JSON.stringify(w));
+    } catch (e) { /* best effort */ }
+    return w;
   }
   // Grober PLZ-Bereich: die ersten zwei Ziffern. "5020" -> "50". Reicht, um zu
   // sehen, wo Nachfrage ist, ohne jemanden zu verorten.

@@ -37,6 +37,12 @@ const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASIS = 'https://vexfit.app';
 const SCHWELLE = 3;
 
+// K5 (07.11.2026): handgemachte Kunden-Stadtseiten, die dieses Werkzeug NICHT
+// erzeugen, überschreiben oder löschen darf. personal-trainer-salzburg.html ist
+// eine reine Kunden-Landingseite (Nutzen/Ablauf, KEINE Trainerliste) und gehört
+// nicht dem Generator.
+const HANDGEMACHT = new Set(['personal-trainer-salzburg.html']);
+
 // ████ ABSCHALTUNG ████ Trainer sind nur nach Anmeldung sichtbar; oeffentliche
 // Stadtseiten wuerden Suchmaschinen etwas zeigen, was Besucher nicht sehen
 // duerfen. Solange das gilt, bleibt dieser Schalter auf true.
@@ -452,7 +458,7 @@ async function main() {
     console.log('sitemap.xml wird ohne Trainerprofile neu geschrieben.');
     const geloescht = [];
     for (const f of readdirSync(REPO)) {
-      if (/^personal-trainer-.+\.html$/.test(f)) { unlinkSync(join(REPO, f)); geloescht.push(f); }
+      if (/^personal-trainer-.+\.html$/.test(f) && !HANDGEMACHT.has(f)) { unlinkSync(join(REPO, f)); geloescht.push(f); }
     }
     writeFileSync(join(REPO, 'sitemap.xml'), sitemapXml([], repoSeiten()));
     console.log(`Geloescht (${geloescht.length}): ${geloescht.join(', ') || 'keine'}`);
@@ -492,9 +498,10 @@ async function main() {
 
   // Seiten schreiben.
   const angelegt = [], aktualisiert = [], unveraendert = [];
-  const sollDateien = new Set();
+  const sollDateien = new Set(HANDGEMACHT); // handgemachte Seiten nie löschen
   for (const { stadt, datei, trainer: ts } of geplant) {
     sollDateien.add(datei);
+    if (HANDGEMACHT.has(datei)) { continue; } // handgemachte Seite nicht überschreiben
     const inhalt = stadtseiteHtml(stadt, ts);
     const pfad = join(REPO, datei);
     if (!existsSync(pfad)) { writeFileSync(pfad, inhalt); angelegt.push(`${datei} (${ts.length} Trainer)`); }
@@ -505,7 +512,7 @@ async function main() {
   // Verwaiste Stadtseiten loeschen (Stadt unter der Schwelle oder weg).
   const geloescht = [];
   for (const f of readdirSync(REPO)) {
-    if (/^personal-trainer-.+\.html$/.test(f) && !sollDateien.has(f)) {
+    if (/^personal-trainer-.+\.html$/.test(f) && !sollDateien.has(f) && !HANDGEMACHT.has(f)) {
       unlinkSync(join(REPO, f));
       geloescht.push(f);
     }
