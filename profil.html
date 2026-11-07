@@ -355,7 +355,9 @@ function seoNichtGefunden(){ metaName('robots','noindex'); }
 // Setzt Titel, Beschreibung, canonical, og und JSON-LD (Person) aus den
 // geladenen oeffentlichen Trainerdaten. Keine erfundenen Angaben.
 function setzeProfilSeo(t, id){
-  const name = (t.vorname + ' ' + t.nachname).trim();
+  // D1: fuer Nichtangemeldete/Suchmaschinen nur „Vorname N." – kein voller
+  // Nachname in Titel, Beschreibung, og-Tags oder JSON-LD.
+  const name = profilAnzeigeName(t);
   const stadt = (t.stadt || '').trim();
   const online = t.trainingsart === 'Online';
   const ortText = online ? 'Online' : (stadt || 'der Nähe');
@@ -401,6 +403,33 @@ function zaehleProfilaufruf(id) {
   } catch(e) {}
 }
 
+// D1 (08.11.2026): Anzeigename. Angemeldet -> voller, formatierter Name wie
+// bisher. Nicht angemeldet -> nur „Vorname N." (Initiale aus nachname_initial;
+// der volle Nachname wird fuer Nichtangemeldete nie geladen).
+function profilAnzeigeName(t) {
+  if (angemeldet) return vexName(((t.vorname || '') + ' ' + (t.nachname || '')).trim());
+  const init = (t.nachname_initial || '').trim();
+  return ((t.vorname || '') + ' ' + init).trim();
+}
+
+// D1 (08.11.2026): Profil-Ladeweg fuer NICHT Angemeldete. Genau eine Quelle:
+// die strenge Sicht trainers_vorschau (ohne vollen Nachnamen, ohne
+// Kontaktdaten, ohne Monatspreis). Fehlt sie (Migration 2026-11-08-01 noch
+// nicht eingespielt), Rueckfall auf trainers_oeffentlich OHNE Nachnamen –
+// so bricht die Seite zwischen Push und Migration nicht und liefert trotzdem
+// kein PII. Video/Galerie/Monatspreis/Probetraining gehoeren bewusst NICHT zur
+// Vorschau; sie bleiben der Anmeldung vorbehalten.
+async function ladeProfilVorschau(id) {
+  const kopf = authKopf();
+  const VS = 'id,created_at,vorname,nachname_initial,stadt,plz,land,trainingsart,trainingsort,spezialisierungen,sprachen,bio,preis_stunde,avatar_url,trainingsorte,verifiziert,verfuegbarkeit';
+  let res = await fetch(`${SUPABASE_URL}/rest/v1/trainers_vorschau?id=eq.${id}&select=${VS}`, { headers: kopf });
+  if(!res.ok && (res.status === 404 || res.status === 400)) {
+    const FB = 'id,created_at,vorname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,avatar_url,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis,verfuegbarkeit';
+    res = await fetch(`${SUPABASE_URL}/rest/v1/trainers_oeffentlich?id=eq.${id}&select=${FB}`, { headers: kopf });
+  }
+  return res;
+}
+
 async function loadProfile() {
   const urlParams = new URLSearchParams(window.location.search);
   const id = urlParams.get('id');
@@ -408,12 +437,15 @@ async function loadProfile() {
 
   try {
     // Angemeldete lesen die Trainertabelle mit ihrem Token (wie bisher, inkl.
-    // Calendly). Nicht Angemeldete UND Suchmaschinen lesen NUR die oeffentliche
-    // Sicht trainers_oeffentlich - dort gibt es keine Kontaktdaten (weder
-    // E-Mail noch Telefon noch Calendly), damit nichts davon im HTML/JSON landet.
+    // Calendly). Nicht Angemeldete UND Suchmaschinen lesen NUR die strenge
+    // Vorschau-Sicht trainers_vorschau - sie liefert KEINEN vollen Nachnamen
+    // (nur die Initiale als nachname_initial), keine Kontaktdaten, keinen
+    // Monatspreis. So steht kein voller Nachname im HTML, in den Meta-Tags oder
+    // im JSON-LD. Fehlt die Sicht, faellt ladeProfilVorschau auf
+    // trainers_oeffentlich OHNE Nachnamen zurueck (nur Vorname, kein PII).
     const res = angemeldet
       ? await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&gesperrt=is.false&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis,verfuegbarkeit`, { headers: authKopf() })
-      : await fetch(`${SUPABASE_URL}/rest/v1/trainers_oeffentlich?id=eq.${id}&select=id,created_at,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis,verfuegbarkeit`, { headers: authKopf() });
+      : await ladeProfilVorschau(id);
     if(istAbgemeldet(res)) return;
     if(!res.ok) throw new Error('Profil laden fehlgeschlagen: ' + res.status);
     const data = await res.json();
@@ -438,9 +470,10 @@ async function loadProfile() {
 
 function renderProfile(t) {
   // Teil 3: Name nur für die Anzeige schön formatieren (gespeicherte Daten bleiben).
-  const anzeigeName = vexName(((t.vorname || '') + ' ' + (t.nachname || '')).trim());
+  const anzeigeName = profilAnzeigeName(t);
   document.title = `Vexfit – ${anzeigeName}`;
-  const initials = ((t.vorname||'?')[0] + (t.nachname||'?')[0]).toUpperCase();
+  const nachInit = (t.nachname || t.nachname_initial || '?');
+  const initials = ((t.vorname||'?')[0] + (nachInit[0] || '?')).toUpperCase();
   const avatarEl = document.getElementById('pAvatar');
   const bild = avatarAdresse(t.avatar_url);
   if(bild) {

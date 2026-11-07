@@ -335,9 +335,11 @@ function istAbgemeldet(r) {
 
 // ==KERN-ANFANG== (DOM-freie, reine Hilfen; werden von suche_test.ts ausgewertet)
 // Die Spalten der oeffentlichen Sicht trainers_oeffentlich. Bewusst OHNE
-// email, telefon, user_id, created_at. Eine Spalte "preis" gibt es nicht; die
-// realen, bereits oeffentlichen Preisspalten sind preis_stunde und preis_monat.
-const OEFFENTLICHE_SPALTEN = 'id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,sprachen,trainingsorte,verifiziert,created_at,verfuegbarkeit';
+// email, telefon, user_id – UND seit D1 (08.11.2026) auch OHNE nachname: nicht
+// angemeldete Besucher bekommen nie den vollen Nachnamen. Dieser Pfad greift nur
+// bei ausgeschalteter Vorschau; ohne nachname bleibt er aber PII-sicher und
+// vertraegt sich mit der Spalten-Sperre fuer anon (Migration 2026-11-08-03).
+const OEFFENTLICHE_SPALTEN = 'id,vorname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,sprachen,trainingsorte,verifiziert,created_at,verfuegbarkeit';
 
 // S1 (07./08.11.2026): Bei EINGESCHALTETER öffentlicher Vorschau laden nicht
 // angemeldete Besucher aus der strengen Sicht trainers_vorschau. Sie liefert
@@ -374,7 +376,7 @@ function kontaktKnopf(istAngemeldet) {
 // Laedt die Profile ohne Sitzung aus der oeffentlichen Sicht. Reine Funktion
 // (fetch kommt von aussen), damit sie ohne DOM geprueft werden kann.
 async function ladeOeffentlich(fetchImpl, basisUrl, apikey) {
-  const res = await fetchImpl(basisUrl + '/rest/v1/trainers_oeffentlich?select=' + OEFFENTLICHE_SPALTEN + '&order=nachname.asc', {
+  const res = await fetchImpl(basisUrl + '/rest/v1/trainers_oeffentlich?select=' + OEFFENTLICHE_SPALTEN + '&order=vorname.asc', {
     headers: { apikey: apikey, Authorization: 'Bearer ' + apikey }
   });
   if(!res.ok) throw new Error('Trainer laden fehlgeschlagen: ' + res.status);
@@ -750,7 +752,7 @@ function filterTrainers() {
     if(stadtMatch.length > 0) {
       const rest = filtered.filter(t => !(t.stadt||'').toLowerCase().includes(q) && (
         (t.vorname||'').toLowerCase().includes(q) ||
-        (t.nachname||'').toLowerCase().includes(q) ||
+        (angemeldet && (t.nachname||'').toLowerCase().includes(q)) ||
         (t.spezialisierungen || []).some(s => s.toLowerCase().includes(q)) ||
         (t.bio || '').toLowerCase().includes(q)
       ));
@@ -758,7 +760,7 @@ function filterTrainers() {
     } else {
       filtered = filtered.filter(t =>
         (t.vorname||'').toLowerCase().includes(q) ||
-        (t.nachname||'').toLowerCase().includes(q) ||
+        (angemeldet && (t.nachname||'').toLowerCase().includes(q)) ||
         (t.spezialisierungen || []).some(s => s.toLowerCase().includes(q)) ||
         (t.bio || '').toLowerCase().includes(q)
       );
