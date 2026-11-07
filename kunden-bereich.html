@@ -321,6 +321,7 @@ try {
 <script src="vexfit-plz.js"></script>
 <script src="vexfit-ziele.js"></script>
 <script src="vexfit-einstieg.js"></script>
+<script src="vexfit-trichter.js"></script>
 <script>
 const SB = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -767,6 +768,8 @@ async function benachrichtigungStatusPruefen() {
 
 function openModal(t) {
   selT = t;
+  // K1: Anfrage begonnen (anonym, grober PLZ-Bereich des Kunden).
+  try { vexfitTrichter('anfrage_start', { rolle: 'kunde', plz: (K && K.plz) || '', einmal: false }); } catch(e) {}
   document.getElementById('modalInfo').textContent = `${t.vorname} ${t.nachname} · ${t.trainingsart||''} · ${t.stadt||''}`;
   document.getElementById('modalMsg').value = '';
   document.getElementById('overlay').classList.add('open');
@@ -810,6 +813,8 @@ async function sendAnfrage() {
     let anfrageId = '';
     try { const neu = await r.json(); if(Array.isArray(neu) && neu[0] && neu[0].id) anfrageId = neu[0].id; } catch(e) {}
     fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neue-anfrage',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(sess&&sess.access_token||'')},body:JSON.stringify({...body, anfrage_id: anfrageId})}).catch(()=>{});
+    // K1: Anfrage abgeschickt (anonym).
+    try { vexfitTrichter('anfrage', { rolle: 'kunde', plz: (K && K.plz) || '', einmal: false }); } catch(e) {}
     document.getElementById('overlay').classList.remove('open');
     selT = null;
     document.getElementById('welcomePage').classList.remove('hidden');

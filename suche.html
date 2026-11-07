@@ -273,6 +273,7 @@ try {
 <script src="vexfit-plz.js"></script>
 <script src="vexfit-ziele.js"></script>
 <script src="vexfit-matching.js"></script>
+<script src="vexfit-trichter.js"></script>
 <script>
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -341,6 +342,10 @@ async function ladeOeffentlich(fetchImpl, basisUrl, apikey) {
 // ==KERN-ENDE==
 
 let allTrainers = [];
+// K1: Kunden-Trichter. Letzte gesuchte PLZ merken (für die Stufen suche/treffer/
+// profil), und „Seite geöffnet" einmal melden. Anonym, best effort.
+let letztePlz = '';
+try { if (typeof vexfitTrichter === 'function') vexfitTrichter('seite', { rolle: 'kunde' }); } catch (e) {}
 let activeFilter = 'alle';
 
 // Als Profilbild gilt nur eine Adresse aus dem eigenen Bilder-Behaelter;
@@ -404,13 +409,22 @@ function calcDistance(lat1, lng1, lat2, lng2) {
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
+// K1: Profil-Öffnen zählen (anonym), dann zur Profilseite. keepalive im Beacon
+// sorgt dafür, dass die Meldung die Navigation überlebt.
+function oeffneProfil(id) {
+  try { vexfitTrichter('profil', { rolle: 'kunde', plz: letztePlz, einmal: false }); } catch(e) {}
+  window.location = 'profil.html?id=' + id;
+}
+
 async function searchByPLZ() {
   const plz = document.getElementById('plzInput').value.trim();
   const radius = parseInt(document.getElementById('radiusInput').value);
   const status = document.getElementById('plzStatus');
 
   if(radius === 0) {
+    try { vexfitTrichter('suche', { rolle: 'kunde', einmal: false }); } catch(e) {}
     renderTrainers(allTrainers);
+    if(allTrainers.length) { try { vexfitTrichter('treffer', { rolle: 'kunde', einmal: false }); } catch(e) {} }
     status.textContent = `Alle ${allTrainers.length} Trainer werden angezeigt`;
     return;
   }
@@ -419,6 +433,9 @@ async function searchByPLZ() {
     status.textContent = '⚠️ Bitte gültige PLZ eingeben';
     return;
   }
+  // K1: Suche ausgeführt (mit grobem PLZ-Bereich). PLZ für die weiteren Stufen merken.
+  letztePlz = plz;
+  try { vexfitTrichter('suche', { rolle: 'kunde', plz: plz, einmal: false }); } catch(e) {}
 
   status.textContent = '📍 Standort wird ermittelt...';
   const ergebnis = await vexPlz.aufloesen(plz, { cache: plzCache });
@@ -463,6 +480,8 @@ async function umkreisSuche(coords, radius, status) {
   filtered.sort((a,b) => (a._online?1:0) - (b._online?1:0) || a._distance - b._distance);
   status.textContent = `📍 ${coords.stadt} · ${filtered.length} Trainer in ${radius} km gefunden`;
   renderTrainersWithDistance(filtered);
+  // K1: Treffer > 0 melden (anonym, grober PLZ-Bereich aus der letzten Suche).
+  if(filtered.length) { try { vexfitTrichter('treffer', { rolle: 'kunde', plz: letztePlz, einmal: false }); } catch(e) {} }
 }
 
 function renderTrainersWithDistance(trainers) {
@@ -486,7 +505,7 @@ function renderTrainersWithDistance(trainers) {
     const distLabel = t._online ? '<span style="color:#e8ff00;font-size:11px">🌐 Online</span>' : t._distance !== undefined ? `<span style="color:#888;font-size:11px">📍 ${t._distance} km</span>` : '';
     const bild = avatarAdresse(t.avatar_url);
     const ciStyle = bild ? `background-image:url('${vexEsc(bild)}');background-size:cover;background-position:center` : `background:${bgColors[i%bgColors.length]}`;
-    return `<div class="tc" onclick="window.location='profil.html?id=${t.id}'">
+    return `<div class="tc" onclick="oeffneProfil('${t.id}')">
       <div class="ci" style="${ciStyle}">
         ${bild ? '' : `<div class="cav">${initials}</div>`}
         ${kartenAbzeichen(t, t._online)}
@@ -579,7 +598,7 @@ function renderTrainers(trainers) {
     const ciStyle = bild ? `background-image:url('${vexEsc(bild)}');background-size:cover;background-position:center` : `background:${bg}`;
 
     return `
-      <div class="tc" onclick="window.location='profil.html?id=${t.id}'">
+      <div class="tc" onclick="oeffneProfil('${t.id}')">
         <div class="ci" style="${ciStyle}">
           ${bild ? '' : `<div class="cav">${initials}</div>`}
           ${kartenAbzeichen(t, isOnline)}

@@ -2570,6 +2570,19 @@ export interface AbendberichtFehler {
   grund: string;
 }
 
+/** K1: Kunden-Trichter-Summen über 24 h (die sechs anonymen Kunden-Stufen). */
+export interface KundeTrichter24h {
+  seite: number;
+  suche: number;
+  treffer: number;
+  profil: number;
+  anfrage_start: number;
+  anfrage: number;
+}
+export function leererKundenTrichter(): KundeTrichter24h {
+  return { seite: 0, suche: 0, treffer: 0, profil: 0, anfrage_start: 0, anfrage: 0 };
+}
+
 /** B8: Trichter einer Herkunft über 24 h (die fünf anonymen Stufen). */
 export interface TrichterQuelle {
   quelle: string;
@@ -2590,6 +2603,8 @@ export interface AbendberichtZahlen {
   bezahlt: number;
   zahlungFehlgeschlagen: number;
   gekuendigt: number;
+  /** K1: Kunden-Trichter der letzten 24 h (anonym, Summen je Stufe). */
+  kundenTrichter24h: KundeTrichter24h;
   /** B8: Trichter der letzten 24 h nach Herkunft (anonym, aus trichter_ereignisse). */
   trichter24h: TrichterQuelle[];
   /** B8: freigegebene bzw. in Prüfung befindliche Trainer mit < 5/8 Angaben,
@@ -2631,7 +2646,7 @@ export function leereAbendberichtZahlen(): AbendberichtZahlen {
   return {
     neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
     anfragenOffen: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
-    trichter24h: [], profileUnter5: 0,
+    trichter24h: [], profileUnter5: 0, kundenTrichter24h: leererKundenTrichter(),
     fehler: [], cronHinweise: [],
   };
 }
@@ -2648,7 +2663,8 @@ export function abendberichtLeer(z: AbendberichtZahlen): boolean {
     z.neueTrainer === 0 && z.neueKunden === 0 && z.wartenNamen.length === 0 &&
     z.anfragenOffen === 0 && z.warteliste === 0 &&
     (z.bezahlt + z.zahlungFehlgeschlagen + z.gekuendigt) === 0 &&
-    trichterSumme(z.trichter24h) === 0 && z.profileUnter5 === 0;
+    trichterSumme(z.trichter24h) === 0 && z.profileUnter5 === 0 &&
+    kundenTrichterSumme(z.kundenTrichter24h) === 0;
 }
 
 function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert: string }[] {
@@ -2677,12 +2693,24 @@ function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert
   if (trichterFehler) {
     basis.push({ beschriftung: "Trichter (24 h)", wert: `nicht verfügbar (Fehler: ${trichterFehler.grund})` });
   } else if (z.trichter24h.length) {
-    basis.push({ beschriftung: "— Trichter (24 h) nach Herkunft —", wert: "Seite → Formular → Abgeschickt → Bestätigt → Profil≥5" });
+    basis.push({ beschriftung: "— Trainer-Trichter (24 h) nach Herkunft —", wert: "Seite → Formular → Abgeschickt → Bestätigt → Profil≥5" });
     for (const q of z.trichter24h) {
       basis.push({ beschriftung: q.quelle, wert: `${q.seite} · ${q.formular} · ${q.abgesendet} · ${q.bestaetigt} · ${q.profil5}` });
     }
   }
+  // K1: Kunden-Trichter der letzten 24 h (Summen je Stufe). Nur wenn es dort
+  // überhaupt Ereignisse gab – sonst spart es eine Null-Zeile.
+  const k = z.kundenTrichter24h;
+  if (!trichterFehler && kundenTrichterSumme(k) > 0) {
+    basis.push({ beschriftung: "— Kunden-Trichter (24 h) —", wert: "Seite → Suche → Treffer → Profil → Anfrage begonnen → abgeschickt" });
+    basis.push({ beschriftung: "Kunden", wert: `${k.seite} · ${k.suche} · ${k.treffer} · ${k.profil} · ${k.anfrage_start} · ${k.anfrage}` });
+  }
   return basis;
+}
+
+/** K1: Summe aller Kunden-Trichter-Ereignisse (24 h). */
+export function kundenTrichterSumme(k: KundeTrichter24h): number {
+  return k.seite + k.suche + k.treffer + k.profil + k.anfrage_start + k.anfrage;
 }
 
 /** B7: Abschnitt „Technische Hinweise" – nur wenn Zählwerte fehlten ODER ein
@@ -2817,11 +2845,22 @@ export async function abendberichtZahlenHolen(
   // Fehlt die Tabelle (Migration 2026-11-06-01 nicht eingespielt), wird es als
   // „nicht verfügbar" vermerkt – der Bericht geht trotzdem raus.
   try {
-    const ev = await lesenFn<{ stufe: string; quelle?: string | null }>(
-      `trichter_ereignisse?erstellt_am=gt.${encodeURIComponent(seit)}&select=stufe,quelle&limit=5000`,
+    const ev = await lesenFn<{ stufe: string; quelle?: string | null; rolle?: string | null }>(
+      `trichter_ereignisse?erstellt_am=gt.${encodeURIComponent(seit)}&select=stufe,quelle,rolle&limit=5000`,
     );
     const map: Record<string, TrichterQuelle> = {};
+    const k = leererKundenTrichter();
     for (const e of ev) {
+      if (e.rolle === "kunde") {
+        // K1: Kunden-Trichter (Summen je Stufe).
+        if (e.stufe === "seite") k.seite++;
+        else if (e.stufe === "suche") k.suche++;
+        else if (e.stufe === "treffer") k.treffer++;
+        else if (e.stufe === "profil") k.profil++;
+        else if (e.stufe === "anfrage_start") k.anfrage_start++;
+        else if (e.stufe === "anfrage") k.anfrage++;
+        continue;
+      }
       const q = (e.quelle != null && String(e.quelle).trim()) ? String(e.quelle).trim() : "direkt/unbekannt";
       const o = map[q] || (map[q] = { quelle: q, seite: 0, formular: 0, abgesendet: 0, bestaetigt: 0, profil5: 0 });
       if (e.stufe === "seite") o.seite++;
@@ -2831,6 +2870,7 @@ export async function abendberichtZahlenHolen(
       else if (e.stufe === "profil5") o.profil5++;
     }
     z.trichter24h = Object.keys(map).sort().map((q) => map[q]);
+    z.kundenTrichter24h = k;
   } catch (e) { merkeFehler("Trichter (24 h)", e); }
 
   // B8: Trainerprofile mit < 5/8 Angaben, ohne als Test/Spam markierte Konten.

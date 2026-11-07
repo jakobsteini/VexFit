@@ -358,6 +358,7 @@ export function trichterNachQuelle(ereignisse, jetzt = Date.now(), tage = 7) {
   const quellen = {};
   for (const e of ereignisse || []) {
     if (!e || !TRICHTER_STUFEN.includes(e.stufe)) continue;
+    if (e.rolle === "kunde") continue; // K1: Kunden-Ereignisse gehören zum Kunden-Trichter
     const t = e.erstellt_am ? new Date(e.erstellt_am).getTime() : NaN;
     if (isNaN(t) || t < grenze) continue;
     const q = (e.quelle != null && String(e.quelle).trim()) || "direkt/unbekannt";
@@ -366,6 +367,42 @@ export function trichterNachQuelle(ereignisse, jetzt = Date.now(), tage = 7) {
     gesamt[e.stufe]++;
   }
   return { gesamt, quellen };
+}
+
+// ── K1 (07.11.): Kunden-Trichter (eigene Stufen) ──
+export const KUNDE_TRICHTER_STUFEN = ["seite", "suche", "treffer", "profil", "anfrage_start", "anfrage"];
+export const KUNDE_TRICHTER_LABEL = {
+  seite: "Seite geöffnet",
+  suche: "Suche ausgeführt",
+  treffer: "Treffer > 0",
+  profil: "Profil angesehen",
+  anfrage_start: "Anfrage begonnen",
+  anfrage: "Anfrage abgeschickt",
+};
+
+/** Zählt die KUNDEN-Trichter-Ereignisse (rolle='kunde') der letzten `tage` Tage,
+ *  aufgeschlüsselt nach Herkunft UND grobem PLZ-Bereich. Reine Funktion. */
+export function trichterKundeNachQuelle(ereignisse, jetzt = Date.now(), tage = 7) {
+  const grenze = jetzt - tage * 86400000;
+  const leer = () => { const o = {}; for (const s of KUNDE_TRICHTER_STUFEN) o[s] = 0; return o; };
+  const gesamt = leer();
+  const quellen = {};
+  const plzBereiche = {};
+  for (const e of ereignisse || []) {
+    if (!e || e.rolle !== "kunde" || !KUNDE_TRICHTER_STUFEN.includes(e.stufe)) continue;
+    const t = e.erstellt_am ? new Date(e.erstellt_am).getTime() : NaN;
+    if (isNaN(t) || t < grenze) continue;
+    const q = (e.quelle != null && String(e.quelle).trim()) || "direkt/unbekannt";
+    quellen[q] = quellen[q] || leer();
+    quellen[q][e.stufe]++;
+    gesamt[e.stufe]++;
+    if (e.plz_bereich != null && String(e.plz_bereich).trim()) {
+      const pb = String(e.plz_bereich).trim();
+      plzBereiche[pb] = plzBereiche[pb] || leer();
+      plzBereiche[pb][e.stufe]++;
+    }
+  }
+  return { gesamt, quellen, plzBereiche };
 }
 
 /** B5.3: Anzeigetext für den Abo-Status eines Trainers. */
@@ -752,13 +789,18 @@ function starteVerwaltung() {
       if (!kuRes.ok) throw new Error("Kunden laden: HTTP " + kuRes.status);
       daten.trainers = await trRes.json();
       daten.kunden = await kuRes.json();
-      // B3: anonyme Trichter-Ereignisse (nur Admin liest sie). Best effort:
-      // fehlt die Tabelle (Migration 2026-11-06-01 noch nicht eingespielt),
-      // bleibt der Trichter leer und das Dashboard läuft normal weiter.
-      try {
-        const trichRes = await hole("trichter_ereignisse?select=stufe,quelle,kampagne,inhalt,browsertyp,rolle,erstellt_am&order=erstellt_am.desc&limit=5000");
-        daten.trichter = trichRes.ok ? await trichRes.json() : [];
-      } catch { daten.trichter = []; }
+      // B3/K1: anonyme Trichter-Ereignisse (nur Admin liest sie). Best effort:
+      // zuerst MIT plz_bereich (K1); fehlt die Spalte (Migration 2026-11-07-01
+      // noch nicht eingespielt → HTTP 400), ohne plz_bereich erneut; fehlt die
+      // ganze Tabelle, bleibt der Trichter leer. Das Dashboard läuft immer weiter.
+      daten.trichter = [];
+      for (const spalten of ["stufe,quelle,kampagne,inhalt,browsertyp,rolle,plz_bereich,erstellt_am", "stufe,quelle,kampagne,inhalt,browsertyp,rolle,erstellt_am"]) {
+        try {
+          const trichRes = await hole(`trichter_ereignisse?select=${spalten}&order=erstellt_am.desc&limit=5000`);
+          if (trichRes.ok) { daten.trichter = await trichRes.json(); break; }
+          if (trichRes.status !== 400) break; // kein Spaltenproblem → nicht weiter versuchen
+        } catch { break; }
+      }
       // Teil 1a: bekannte IDs und Signaturen setzen (beim ersten Laden ohne
       // Hervorhebung), Zeitstempel merken.
       for (const p of daten.trainers) if (p.id != null) bekannt.trainer.add(String(p.id));
@@ -1172,13 +1214,41 @@ function starteVerwaltung() {
       ? quellNamen.map((q) => trichterZeile(q, trichter.quellen[q])).join("") + trichterZeile("Gesamt", trichter.gesamt)
       : `<tr><td colspan="${TRICHTER_STUFEN.length + 1}" class="leer-text">Noch keine Trichter-Daten (oder Tabelle noch nicht eingespielt).</td></tr>`;
 
+    // K1 (07.11.): Kunden-Trichter – eigene Stufen, nach Herkunft UND grobem
+    // PLZ-Bereich (zeigt, wo gesucht und wo angefragt wird).
+    const kunde = trichterKundeNachQuelle(daten.trichter || [], Date.now(), 7);
+    const kStufenKopf = KUNDE_TRICHTER_STUFEN.map((s) => `<th>${escapeHtml(KUNDE_TRICHTER_LABEL[s])}</th>`).join("");
+    const kZeile = (name, z) =>
+      `<tr><td data-label="Herkunft"><strong>${escapeHtml(name)}</strong></td>` +
+      KUNDE_TRICHTER_STUFEN.map((s) => `<td data-label="${escapeHtml(KUNDE_TRICHTER_LABEL[s])}">${z[s]}</td>`).join("") + `</tr>`;
+    const kQuellen = Object.keys(kunde.quellen).sort();
+    const kPlz = Object.keys(kunde.plzBereiche).sort();
+    const kGesamtSumme = KUNDE_TRICHTER_STUFEN.reduce((n, s) => n + kunde.gesamt[s], 0);
+    const kKoerper = kQuellen.length
+      ? kQuellen.map((q) => kZeile(q, kunde.quellen[q])).join("") + kZeile("Gesamt", kunde.gesamt)
+      : `<tr><td colspan="${KUNDE_TRICHTER_STUFEN.length + 1}" class="leer-text">Noch keine Kunden-Ereignisse (oder Migration 2026-11-07-01 nicht eingespielt).</td></tr>`;
+    const kPlzKoerper = kPlz.length
+      ? kPlz.map((pb) => kZeile(pb + "xxx", kunde.plzBereiche[pb])).join("")
+      : `<tr><td colspan="${KUNDE_TRICHTER_STUFEN.length + 1}" class="leer-text">Noch keine PLZ-Bereiche.</td></tr>`;
+
     box.innerHTML =
-      `<h3 style="font-size:14px;margin:4px 0 10px">Trichter · letzte 7 Tage · nach Herkunft</h3>
+      `<h3 style="font-size:14px;margin:4px 0 10px">Trainer-Trichter · letzte 7 Tage · nach Herkunft</h3>
        <div class="table-wrap"><table>
          <thead><tr><th>Herkunft</th>${stufenKopf}</tr></thead>
          <tbody>${trichterKoerper}</tbody>
        </table></div>
        <div class="herkunft-hinweis">Anonyme Zählung ohne Personendaten. „Bestätigt" = Konto mit sofortiger Sitzung; „Profil ≥5/8" zählt erst, sobald der Trainer-Bereich die Stufe meldet.${gesamtSumme ? "" : " Noch keine Ereignisse."}</div>
+       <h3 style="font-size:14px;margin:22px 0 10px">Kunden-Trichter · letzte 7 Tage · nach Herkunft</h3>
+       <div class="table-wrap"><table>
+         <thead><tr><th>Herkunft</th>${kStufenKopf}</tr></thead>
+         <tbody>${kKoerper}</tbody>
+       </table></div>
+       <h3 style="font-size:14px;margin:16px 0 10px">Kunden-Trichter · nach PLZ-Bereich</h3>
+       <div class="table-wrap"><table>
+         <thead><tr><th>PLZ-Bereich</th>${kStufenKopf}</tr></thead>
+         <tbody>${kPlzKoerper}</tbody>
+       </table></div>
+       <div class="herkunft-hinweis">Anonyme Zählung: Seite → Suche → Treffer → Profil → Anfrage begonnen → abgeschickt. PLZ-Bereich = erste zwei Ziffern (z. B. 50 = Salzburg).${kGesamtSumme ? "" : " Noch keine Kunden-Ereignisse."}</div>
        <h3 style="font-size:14px;margin:22px 0 10px">Registrierungen je Tag · letzte 14 Tage</h3>
        <div class="table-wrap"><table>
          <thead><tr><th>Tag</th><th>Neue Trainer</th><th>Neue Kunden</th><th>nach Herkunft (T=Trainer, K=Kunden)</th></tr></thead>
