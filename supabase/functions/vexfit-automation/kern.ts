@@ -85,6 +85,61 @@ export const SPAM_PRO_EMAIL_24H = 1;
 /** Fix 7b: hoechstens 20 anonyme Eintraege je IP-Adresse in 1 h. */
 export const SPAM_PRO_IP_1H = 20;
 
+// ============================================================================
+// S3 (07./08.11.2026): Missbrauchsverdacht einer Anfrage (reine Logik).
+// Verdaechtige Anfragen werden MARKIERT (zur Pruefung), NICHT hart geblockt:
+// sie gehen nicht an den Trainer, sondern in die Admin-Liste „Zur Pruefung".
+// ============================================================================
+
+/** Domain einer E-Mail (Kleinbuchstaben), oder "" wenn keine gueltige. */
+export function emailDomain(email: unknown): string {
+  const s = String(email ?? "").toLowerCase().trim();
+  const i = s.lastIndexOf("@");
+  return i > 0 && i < s.length - 1 ? s.slice(i + 1) : "";
+}
+
+/** Gehoert die E-Mail zu einer Wegwerf-/Einmal-Mail-Domain? */
+export function istWegwerfDomain(email: unknown, domains: Set<string>): boolean {
+  const d = emailDomain(email);
+  return !!d && domains.has(d);
+}
+
+/** Offensichtlich unsinniger Name (markieren, nicht blockieren). */
+export function nameUnsinnig(name: unknown): boolean {
+  const s = String(name ?? "").trim();
+  if (s.length < 2) return true;
+  if ((s.match(/\p{L}/gu) || []).length === 0) return true; // keine Buchstaben
+  if (/(.)\1{4,}/u.test(s)) return true; // 5x dasselbe Zeichen am Stueck
+  if (/https?:\/\/|www\.|\.(com|net|ru|xyz|top|info)\b/i.test(s)) return true; // URL im Namen
+  return false;
+}
+
+/** Offensichtlich unsinnige Nachricht. Leer ist erlaubt (Nachricht optional). */
+export function nachrichtUnsinnig(text: unknown): boolean {
+  const s = String(text ?? "").trim();
+  if (!s) return false;
+  if ((s.match(/\p{L}/gu) || []).length === 0) return true; // keine Buchstaben
+  if (/(.)\1{7,}/u.test(s)) return true; // 8x dasselbe Zeichen am Stueck
+  return false;
+}
+
+/**
+ * Gesamturteil zu einer Anfrage. Rueckgabe { verdaechtig, grund }.
+ * grund ist eine kurze, nicht personenbezogene Kennung fuer die Admin-Liste.
+ */
+export function anfrageVerdacht(opts: {
+  email?: unknown;
+  name?: unknown;
+  nachricht?: unknown;
+  domains?: Set<string>;
+}): { verdaechtig: boolean; grund: string } {
+  const domains = opts.domains ?? new Set<string>();
+  if (istWegwerfDomain(opts.email, domains)) return { verdaechtig: true, grund: "wegwerf-mail" };
+  if (nameUnsinnig(opts.name)) return { verdaechtig: true, grund: "name-unsinnig" };
+  if (nachrichtUnsinnig(opts.nachricht)) return { verdaechtig: true, grund: "nachricht-unsinnig" };
+  return { verdaechtig: false, grund: "" };
+}
+
 /**
  * Laengengrenzen je Feld. Der Workflow hatte keine — n8n nahm alles an.
  * Bewusst weit: sie halten Unsinn heraus, ohne eine echte Eingabe zu kuerzen.
@@ -121,6 +176,8 @@ export interface Trainer {
 export interface Anfrage {
   /** Pflicht: seit E2 wird genau DIESE Zeile als weitergeleitet markiert. */
   id: string;
+  trainer_id?: string | null;
+  trainer_name?: string | null;
   kunden_name?: string | null;
   kunden_email?: string | null;
   ziel?: string | null;
@@ -135,9 +192,11 @@ export interface Anfrage {
 export interface AnfrageVoll {
   id: string;
   trainer_id?: string | null;
+  trainer_name?: string | null;
   kunden_email?: string | null;
   kunden_name?: string | null;
   ziel?: string | null;
+  nachricht?: string | null;
   alternativen_gesendet?: boolean | null;
 }
 
@@ -289,6 +348,15 @@ export interface Anschluesse {
   benutzerAusToken(token: string): Promise<{ id: string; email: string; aal?: string | null } | null>;
   /** Teil 8: Anzahl Anfragen dieses Kunden seit einem Zeitpunkt (Ratenbremse). */
   anfragenAnzahlSeit(kundenEmail: string, seitISO: string): Promise<number>;
+  /** S3: Liste der Wegwerf-Mail-Domains (aus wegwerf-domains.ts). Default leer. */
+  wegwerfDomains?(): Set<string>;
+  /** S3: markiert die NEUESTE Anfrage eines Kunden an einen Trainer als
+   *  „zur Pruefung" (pruef_status) mit Grund. Gibt true zurueck, wenn eine Zeile
+   *  gesetzt wurde. Fehlt die Spalte (Migration 2026-11-08-02 nicht eingespielt),
+   *  wirft es nicht – dann false (die Anfrage wird dann wie bisher behandelt). */
+  anfrageZurPruefung?(trainerId: string, kundenEmail: string, grund: string): Promise<boolean>;
+  /** S3: setzt pruef_status einer Anfrage ('ok'|'zur_pruefung'|'verworfen'). */
+  anfragePruefSetzen?(id: string, status: string): Promise<number>;
   /** Fix 7b: Zahl anonymer Formular-Eintraege dieser E-Mail seit einem Zeitpunkt. */
   spamProEmailSeit(email: string, seitISO: string): Promise<number>;
   /** Fix 7b: Zahl anonymer Formular-Eintraege dieser IP-Adresse seit einem Zeitpunkt. */
@@ -1563,6 +1631,26 @@ async function neueAnfrage(
     return antwort(200, { ok: true, mails: 0 }, herkunft);
   }
 
+  // S3: Missbrauchsverdacht (Wegwerf-Mail, unsinniger Name/Nachricht). Verdaechtige
+  // Anfragen gehen NICHT an den Trainer, sondern in die Admin-Liste „Zur Pruefung".
+  // Best effort: fehlt die Spalte pruef_status, laeuft es wie bisher weiter.
+  const verdacht = anfrageVerdacht({
+    email: kundenEmail,
+    name: body.kunde_name ?? body.kunden_name,
+    nachricht: body.kunde_nachricht ?? body.nachricht,
+    domains: a.wegwerfDomains ? a.wegwerfDomains() : new Set<string>(),
+  });
+  if (verdacht.verdaechtig && a.anfrageZurPruefung) {
+    let gesetzt = false;
+    try { gesetzt = await a.anfrageZurPruefung(String(body.trainer_id), kundenEmail, verdacht.grund); }
+    catch (fehler) { a.melden?.("anfrageZurPruefung fehlgeschlagen", String(fehler)); }
+    if (gesetzt) {
+      a.melden?.("Anfrage zur Pruefung (kein Trainer-Versand)", { grund: verdacht.grund });
+      return antwort(200, { ok: true, mails: 0, zur_pruefung: true, grund: verdacht.grund }, herkunft);
+    }
+    // Konnte nicht markiert werden (Spalte fehlt) -> wie bisher ausliefern.
+  }
+
   // Baustein 1: Studio-Trainer (angestellt) zahlen nichts. Erkennung allein an
   // trainers.studio_standort_id. Dann KEIN Zahlungslink: Kontaktdaten direkt in
   // die Mail, und die aelteste offene Anfrage wird freigeschaltet, damit sie
@@ -1976,6 +2064,49 @@ async function adminAktion(
         if (istMigrationFehlt(fehler)) return antwort(400, { fehler: MIGRATION_HINWEIS }, herkunft);
         throw fehler;
       }
+    }
+
+    // ── S3: verdaechtige Anfrage aus „Zur Pruefung" FREIGEBEN: pruef_status auf
+    // 'ok' setzen und den Trainer jetzt doch benachrichtigen. ──
+    case "anfrage_freigeben": {
+      if (!a.anfrageNachId || !a.anfragePruefSetzen) {
+        return antwort(501, { fehler: "Anfrage-Pruefung in dieser Fassung nicht verfuegbar" }, herkunft);
+      }
+      const anfrage = await a.anfrageNachId(zielId);
+      if (!anfrage) return antwort(404, { fehler: "Anfrage nicht gefunden" }, herkunft);
+      const n = await a.anfragePruefSetzen(zielId, "ok");
+      let mails = 0;
+      const trainer = anfrage.trainer_id ? await a.trainerNachId(String(anfrage.trainer_id)) : null;
+      if (trainer) {
+        const mailBody = {
+          trainer_id: anfrage.trainer_id,
+          trainer_name: anfrage.trainer_name,
+          kunde_name: anfrage.kunden_name,
+          kunden_name: anfrage.kunden_name,
+          kunde_email: anfrage.kunden_email,
+          kunden_email: anfrage.kunden_email,
+          kunde_ziel: anfrage.ziel,
+          ziel: anfrage.ziel,
+          kunde_nachricht: anfrage.nachricht,
+          nachricht: anfrage.nachricht,
+        };
+        const mail = trainer.studio_standort_id
+          ? mailStudioAnfrage(trainer, mailBody)
+          : (trainer.stripe_bezahlt === true ? mailWeitereAnfrage(trainer, mailBody) : mailErsteAnfrage(trainer, mailBody));
+        if (await sendeWennAdresseTaugt(a, mail)) mails++;
+      }
+      await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: "anfragen", ziel_id: zielId, ergebnis: `freigegeben geaendert=${n} mail=${mails}` });
+      return antwort(200, { ok: true, geaendert: n, mails }, herkunft);
+    }
+
+    // ── S3: verdaechtige Anfrage VERWERFEN: pruef_status auf 'verworfen'. ──
+    case "anfrage_verwerfen": {
+      if (!a.anfragePruefSetzen) {
+        return antwort(501, { fehler: "Anfrage-Pruefung in dieser Fassung nicht verfuegbar" }, herkunft);
+      }
+      const n = await a.anfragePruefSetzen(zielId, "verworfen");
+      await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: "anfragen", ziel_id: zielId, ergebnis: `verworfen geaendert=${n}` });
+      return antwort(200, { ok: true, geaendert: n }, herkunft);
     }
 
     // ── Land eindeutig (07.11.2026): fehlendes Land einer Person von Hand

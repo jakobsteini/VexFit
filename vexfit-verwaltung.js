@@ -1181,6 +1181,44 @@ function starteVerwaltung() {
         </tr>`;
       }).join("");
     } catch { tb.innerHTML = '<tr><td colspan="6" class="leer-text">Anfragen konnten nicht geladen werden.</td></tr>'; }
+    // S3: Liste „Zur Pruefung" mitladen (best effort, eigener try).
+    try { await ladeAnfragenPruefung(); } catch { /* still */ }
+  }
+
+  // S3: verdaechtige Anfragen (pruef_status='zur_pruefung') mit Freigeben/Verwerfen.
+  async function ladeAnfragenPruefung() {
+    const tb = $("pruef-tbody");
+    if (!tb) return;
+    try {
+      const r = await hole("anfragen?pruef_status=eq.zur_pruefung&select=id,created_at,trainer_name,kunden_name,pruef_grund&order=created_at.desc&limit=100");
+      if (!r.ok) {
+        // Fehlt die Spalte (Migration 2026-11-08-02 nicht eingespielt), ruhig bleiben.
+        tb.innerHTML = '<tr><td colspan="5" class="leer-text">Prüf-Liste nicht verfügbar (Migration 2026-11-08-02 einspielen).</td></tr>';
+        return;
+      }
+      const rows = await r.json();
+      if (!rows.length) { tb.innerHTML = '<tr><td colspan="5" class="leer-text">Nichts zur Prüfung. 👍</td></tr>'; return; }
+      tb.innerHTML = rows.map((a) => `<tr>
+        <td data-label="Datum">${a.created_at ? new Date(a.created_at).toLocaleDateString("de-AT") : "–"}</td>
+        <td data-label="Trainer">${escapeHtml(nameFormatieren(a.trainer_name)) || "–"}</td>
+        <td data-label="Kunde">${escapeHtml(nameFormatieren(a.kunden_name)) || "–"}</td>
+        <td data-label="Grund">${escapeHtml(a.pruef_grund || "–")}</td>
+        <td data-label="Aktion"><button class="btn-klein" data-aktion="anfrage-freigeben" data-id="${escapeHtml(a.id)}">Freigeben</button> <button class="btn-klein" data-aktion="anfrage-verwerfen" data-id="${escapeHtml(a.id)}">Verwerfen</button></td>
+      </tr>`).join("");
+    } catch { tb.innerHTML = '<tr><td colspan="5" class="leer-text">Prüf-Liste konnte nicht geladen werden.</td></tr>'; }
+  }
+
+  async function anfrageFreigeben(id) {
+    const d = await adminEdge({ aktion: "anfrage_freigeben", ziel_id: id });
+    if (!d) return;
+    erfolg(d.mails > 0 ? "Freigegeben und an den Trainer geschickt." : "Freigegeben (keine Trainer-Mail möglich).");
+    ladeAnfragenPruefung();
+  }
+  async function anfrageVerwerfen(id) {
+    const d = await adminEdge({ aktion: "anfrage_verwerfen", ziel_id: id });
+    if (!d) return;
+    erfolg("Anfrage verworfen.");
+    ladeAnfragenPruefung();
   }
 
   // ══════════ B3.1: Heute zu tun (Übersicht, nur lesend) ══════════
@@ -2292,6 +2330,8 @@ function starteVerwaltung() {
       if (akt === "standort-anlegen") { standortAnlegen(id); return; }
       if (akt === "standort-bearbeiten") { standortBearbeiten(id); return; }
       if (akt === "land-setzen") { landSetzen(art, id, a.dataset.land); return; }
+      if (akt === "anfrage-freigeben") { anfrageFreigeben(id); return; }
+      if (akt === "anfrage-verwerfen") { anfrageVerwerfen(id); return; }
     });
     // Checkbox der Studio-Freigabe (change statt click)
     document.addEventListener("change", (e) => {

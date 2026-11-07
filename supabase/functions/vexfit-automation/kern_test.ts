@@ -550,6 +550,68 @@ Deno.test("/neue-anfrage: schon bezahlt → WEITERE Anfrage mit 9,99-Link", asyn
   assert(!m.text.includes(LINK_ERSTE), "falscher Zahlungslink in der Mail");
 });
 
+// S3 (07./08.11.2026): verdaechtige Anfragen gehen NICHT an den Trainer.
+Deno.test("/neue-anfrage S3: unsinniger Name -> Zur Pruefung, keine Trainer-Mail", async () => {
+  const { anschluesse, auf } = bau({ trainer: { ...T_STANDARD, stripe_bezahlt: false } });
+  const geprueft: { ruf: number; grund: string } = { ruf: 0, grund: "" };
+  anschluesse.wegwerfDomains = () => new Set(["mailinator.com"]);
+  anschluesse.anfrageZurPruefung = (_trainer, _email, grund) => { geprueft.ruf++; geprueft.grund = grund; return Promise.resolve(true); };
+  const a = await bearbeiten(
+    anfrage("neue-anfrage", {
+      trainer_id: "t-1",
+      kunden_name: "))))",
+      kunden_email: "kundin@beispiel.at",
+      ziel: "Abnehmen",
+      nachricht: "Hallo!",
+    }, MIT_TOKEN),
+    anschluesse,
+  );
+  assertEquals(a.status, 200);
+  const d = await a.json();
+  assertEquals(d.zur_pruefung, true);
+  assertEquals(d.mails, 0);
+  assertEquals(auf.mails.length, 0, "verdaechtige Anfrage darf keine Mail ausloesen");
+  assertEquals(geprueft.ruf, 1, "anfrageZurPruefung muss aufgerufen werden");
+  assertEquals(geprueft.grund, "name-unsinnig");
+});
+
+Deno.test("/neue-anfrage S3: Wegwerf-Mail -> Zur Pruefung, keine Trainer-Mail", async () => {
+  const { anschluesse, auf } = bau({
+    trainer: { ...T_STANDARD, stripe_bezahlt: false },
+    nutzer: { id: "u-bot", email: "bot@mailinator.com" },
+  });
+  anschluesse.wegwerfDomains = () => new Set(["mailinator.com"]);
+  anschluesse.anfrageZurPruefung = () => Promise.resolve(true);
+  const a = await bearbeiten(
+    anfrage("neue-anfrage", {
+      trainer_id: "t-1", kunden_name: "Anna", kunden_email: "bot@mailinator.com",
+      ziel: "Abnehmen", nachricht: "Hallo, ich moechte starten.",
+    }, MIT_TOKEN),
+    anschluesse,
+  );
+  const d = await a.json();
+  assertEquals(d.zur_pruefung, true);
+  assertEquals(auf.mails.length, 0);
+});
+
+Deno.test("/neue-anfrage S3: saubere Anfrage wird NICHT zur Pruefung geschickt", async () => {
+  const { anschluesse, auf } = bau({ trainer: { ...T_STANDARD, stripe_bezahlt: false } });
+  let geprueft = false;
+  anschluesse.wegwerfDomains = () => new Set(["mailinator.com"]);
+  anschluesse.anfrageZurPruefung = () => { geprueft = true; return Promise.resolve(true); };
+  const a = await bearbeiten(
+    anfrage("neue-anfrage", {
+      trainer_id: "t-1", kunden_name: "Anna", kunden_email: "kundin@beispiel.at",
+      ziel: "Abnehmen", nachricht: "Hallo, ich moechte abnehmen.",
+    }, MIT_TOKEN),
+    anschluesse,
+  );
+  const d = await a.json();
+  assertEquals(d.zur_pruefung, undefined, "saubere Anfrage nicht zur Pruefung");
+  assertEquals(geprueft, false);
+  assert(auf.mails.length >= 1, "saubere Anfrage wird ausgeliefert");
+});
+
 // Baustein 1: Studio-Trainer (angestellt) zahlen nichts.
 Deno.test("/neue-anfrage: Studio-Trainer → Kontaktdaten direkt, KEIN Zahlungslink, Anfrage freigeschaltet", async () => {
   const { anschluesse, auf } = bau({

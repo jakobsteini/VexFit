@@ -453,6 +453,14 @@ tr:last-child td{border-bottom:none}
 
     <!-- Anfragen -->
     <div class="tab-content" id="tab-anfragen">
+      <!-- S3: Verdaechtige Anfragen „Zur Pruefung" (gehen NICHT an den Trainer). -->
+      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Zur Prüfung · verdächtige Anfragen</h3>
+      <div class="section-hinweis">Diese Anfragen wurden automatisch als verdächtig markiert (Wegwerf-Mail, unsinniger Name/Nachricht) und NICHT an den Trainer geschickt. Freigeben schickt sie an den Trainer, Verwerfen lehnt sie ab (protokolliert).</div>
+      <div class="table-wrap" style="margin-bottom:22px"><table>
+        <thead><tr><th>Datum</th><th>Trainer</th><th>Kunde</th><th>Grund</th><th>Aktion</th></tr></thead>
+        <tbody id="pruef-tbody"><tr><td colspan="5" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
+      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Alle Anfragen</h3>
       <div class="table-wrap"><table>
         <thead><tr><th>Datum</th><th>Trainer</th><th>Kunde</th><th>Status</th><th>Unbeantwortet seit</th><th>Weitergeleitet</th></tr></thead>
         <tbody id="anfragen-tbody"><tr><td colspan="6" class="leer-text">Lade …</td></tr></tbody>

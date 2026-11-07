@@ -171,6 +171,8 @@ try {
     </div>
     <div class="pw-meter" id="t-pw-meter" style="display:none"><div class="pw-bar"><span></span><span></span><span></span></div><div class="pw-word"></div></div>
     <div class="error-banner" id="t-pw-error"></div>
+    <!-- Honigtopf gegen Spam-Bots: bleibt bei Menschen leer. -->
+    <input type="text" id="t-webseite" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0" aria-hidden="true">
     <label class="checkbox-field"><input type="checkbox" id="t-agb"><div class="custom-cb"></div><span class="cb-label">Ich akzeptiere die <a href="rechtliches.html#agb" target="_blank">AGB</a> und <a href="rechtliches.html#datenschutz" target="_blank">Datenschutzbestimmungen</a></span></label>
     <div class="form-actions"><button class="btn-next" id="t-submit-btn" onclick="submitTrainer()">Profil gratis erstellen 🚀</button></div>
     <p style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:10px">Kostenlos, bis du die erste Kundenanfrage über Vexfit annimmst. Danach 49,99 €/Monat, monatlich kündbar. Jeder weitere Kunde über Vexfit einmalig 9,99 €.</p>
@@ -199,6 +201,8 @@ try {
     </div>
     <div class="pw-meter" id="c-pw-meter" style="display:none"><div class="pw-bar"><span></span><span></span><span></span></div><div class="pw-word"></div></div>
     <div class="error-banner" id="c-pw-error"></div>
+    <!-- Honigtopf gegen Spam-Bots: bleibt bei Menschen leer. -->
+    <input type="text" id="c-webseite" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0" aria-hidden="true">
     <label class="checkbox-field"><input type="checkbox" id="c-agb"><div class="custom-cb"></div><span class="cb-label">Ich akzeptiere die <a href="rechtliches.html#agb" target="_blank">AGB & Datenschutz</a></span></label>
     <div class="form-actions"><button class="btn-next" id="c-submit-btn" onclick="submitClient()">Trainer finden →</button></div>
     <p style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:10px">PLZ und dein Ziel gibst du gleich bei der Trainersuche ein.</p>
@@ -594,6 +598,8 @@ async function herkunftNachtragen(tabelle, email, herkunft, token){
 
 async function submitTrainer(){
   hideError('t-error');
+  // S3: Honigtopf. Ein Bot füllt das versteckte Feld – dann still abbrechen.
+  if(((document.getElementById('t-webseite')||{}).value||'')) return;
   // Teil R: kurzes Erstformular – nur Vorname, Nachname, E-Mail, Passwort, AGB.
   // PLZ/Trainingsort/Profil kommen danach im Trainer-Bereich (geführter Ablauf).
   const fn=document.getElementById('t-fn').value.trim(),ln=document.getElementById('t-ln').value.trim(),email=document.getElementById('t-email').value.trim().toLowerCase();
@@ -669,6 +675,8 @@ async function submitTrainer(){
 
 async function submitClient(){
   hideError('c-error');
+  // S3: Honigtopf. Ein Bot füllt das versteckte Feld – dann still abbrechen.
+  if(((document.getElementById('c-webseite')||{}).value||'')) return;
   // Teil R: kurzes Erstformular – nur Vorname, Nachname, E-Mail, Passwort, AGB.
   // PLZ und Ziel gibt der Kunde direkt bei der Trainersuche (suche.html) ein.
   const fn=document.getElementById('c-fn').value.trim(),ln=document.getElementById('c-ln').value.trim(),email=document.getElementById('c-email').value.trim().toLowerCase();

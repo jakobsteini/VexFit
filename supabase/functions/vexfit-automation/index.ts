@@ -57,6 +57,9 @@ import {
 // Teil A: Web-Push-Krypto (VAPID + aes128gcm) – nur hier, damit kern.ts
 // netz-/bibliotheksfrei bleibt.
 import { pushEinzelSenden as webPushEinzelSenden, vapidKonfig } from "../_shared/webpush.ts";
+// S3: Wegwerf-Mail-Domains (erweiterbare Liste als Datei im Repo).
+import { WEGWERF_DOMAINS } from "./wegwerf-domains.ts";
+const WEGWERF_SET = new Set(WEGWERF_DOMAINS.map((d) => d.toLowerCase().trim()).filter(Boolean));
 
 // Teil 7: Meta-Pixel-ID (dieselbe wie im Browser) und Merker, damit der Hinweis
 // bei fehlendem Secret nur einmal pro Instanz im Log steht.
@@ -259,6 +262,42 @@ const anschluesse: Anschluesse = {
         `&order=created_at.asc&limit=1`,
     );
     return zeilen[0] ?? null;
+  },
+
+  // ── S3: Missbrauchs-Pruefung ──
+  wegwerfDomains(): Set<string> {
+    return WEGWERF_SET;
+  },
+  // Markiert die NEUESTE (noch ok/offene) Anfrage dieses Kunden an diesen Trainer
+  // als „zur Pruefung". Zwei Schritte, weil PostgREST-PATCH kein order/limit kann:
+  // erst die neueste Kennung holen, dann genau diese Zeile setzen.
+  async anfrageZurPruefung(trainerId: string, kundenEmail: string, grund: string): Promise<boolean> {
+    const liste = await lesen<{ id: string }>(
+      `anfragen?trainer_id=eq.${encodeURIComponent(trainerId)}` +
+        `&kunden_email=eq.${encodeURIComponent(kundenEmail)}` +
+        `&or=(pruef_status.is.null,pruef_status.eq.ok)` +
+        `&select=id&order=created_at.desc&limit=1`,
+    );
+    const id = liste[0]?.id;
+    if (!id) return false;
+    const r = await fetch(restAdresse(`anfragen?id=eq.${encodeURIComponent(id)}`), {
+      method: "PATCH",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify({ pruef_status: "zur_pruefung", pruef_grund: grund }),
+    });
+    if (!r.ok) { const t = await r.text().catch(() => ""); throw new Error(`anfrageZurPruefung fehlgeschlagen: HTTP ${r.status} ${t}`); }
+    const zeilen = await r.json().catch(() => []);
+    return Array.isArray(zeilen) && zeilen.length >= 1;
+  },
+  async anfragePruefSetzen(id: string, status: string): Promise<number> {
+    const r = await fetch(restAdresse(`anfragen?id=eq.${encodeURIComponent(id)}`), {
+      method: "PATCH",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify({ pruef_status: status }),
+    });
+    if (!r.ok) { const t = await r.text().catch(() => ""); throw new Error(`anfragePruefSetzen fehlgeschlagen: HTTP ${r.status} ${t}`); }
+    const zeilen = await r.json().catch(() => []);
+    return Array.isArray(zeilen) ? zeilen.length : 0;
   },
 
   // Node "Trainer als bezahlt markieren"
@@ -740,18 +779,21 @@ const anschluesse: Anschluesse = {
 
   // B4e: eine Anfrage mit Kundendaten (service_role).
   async anfrageNachId(id: string) {
+    // trainer_name und nachricht zusaetzlich fuer die S3-Admin-Freigabe.
     const zeilen = await lesen<Record<string, unknown>>(
       `anfragen?id=eq.${encodeURIComponent(id)}` +
-        `&select=id,trainer_id,kunden_email,kunden_name,ziel,alternativen_gesendet`,
+        `&select=id,trainer_id,trainer_name,kunden_email,kunden_name,ziel,nachricht,alternativen_gesendet`,
     );
     const z = zeilen[0];
     return z
       ? {
         id: String(z.id),
         trainer_id: z.trainer_id as string | null,
+        trainer_name: z.trainer_name as string | null,
         kunden_email: z.kunden_email as string | null,
         kunden_name: z.kunden_name as string | null,
         ziel: z.ziel as string | null,
+        nachricht: z.nachricht as string | null,
         alternativen_gesendet: z.alternativen_gesendet as boolean | null,
       }
       : null;
