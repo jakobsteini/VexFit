@@ -53,4 +53,10 @@ Deno.test("S1: suche.html lädt nicht angemeldet aus trainers_vorschau, ohne Nac
   for (const verboten of ["email", "telefon", "user_id", "preis_monat"]) {
     assert(!felder.includes(verboten), `VORSCHAU_SPALTEN darf ${verboten} nicht anfordern`);
   }
+  // Rückfall (Sicht noch nicht eingespielt) lädt trainers_oeffentlich OHNE Nachnamen.
+  assertStringIncludes(s, "VORSCHAU_FALLBACK_SPALTEN");
+  const fb = s.match(/const VORSCHAU_FALLBACK_SPALTEN = '([^']+)'/);
+  assert(fb, "VORSCHAU_FALLBACK_SPALTEN nicht gefunden");
+  assert(!fb![1].split(",").includes("nachname"), "Rückfall darf keinen Nachnamen anfordern");
+  assertStringIncludes(s, "res.status === 404 || res.status === 400");
 });

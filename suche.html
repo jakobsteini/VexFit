@@ -344,11 +344,19 @@ const OEFFENTLICHE_SPALTEN = 'id,vorname,nachname,stadt,plz,trainingsart,trainin
 // KEINEN vollen Nachnamen (nur die Initiale als nachname_initial) und keinen
 // Monatspreis – so steht kein Nachname und kein Kontaktfeld in der Netz-Antwort.
 const VORSCHAU_SPALTEN = 'id,vorname,nachname_initial,stadt,plz,land,trainingsart,trainingsort,trainingsorte,spezialisierungen,sprachen,bio,preis_stunde,avatar_url,verifiziert,verfuegbarkeit,created_at';
+// Rückfall-Spalten, falls die strenge Sicht trainers_vorschau noch nicht
+// eingespielt ist (Migration 2026-11-08-01): die bestehende Sicht
+// trainers_oeffentlich OHNE Nachnamen laden (kein PII), nur der Vorname wird
+// angezeigt. So bricht die Seite zwischen Push und Migration nicht.
+const VORSCHAU_FALLBACK_SPALTEN = 'id,vorname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,avatar_url,verifiziert,created_at';
 
 async function ladeVorschau(fetchImpl, basisUrl, apikey) {
-  const res = await fetchImpl(basisUrl + '/rest/v1/trainers_vorschau?select=' + VORSCHAU_SPALTEN + '&order=vorname.asc', {
-    headers: { apikey: apikey, Authorization: 'Bearer ' + apikey }
-  });
+  const kopf = { apikey: apikey, Authorization: 'Bearer ' + apikey };
+  let res = await fetchImpl(basisUrl + '/rest/v1/trainers_vorschau?select=' + VORSCHAU_SPALTEN + '&order=vorname.asc', { headers: kopf });
+  if(!res.ok && (res.status === 404 || res.status === 400)) {
+    // Sicht fehlt noch -> Rückfall ohne Nachnamen (kein PII), nur Vorname.
+    res = await fetchImpl(basisUrl + '/rest/v1/trainers_oeffentlich?select=' + VORSCHAU_FALLBACK_SPALTEN + '&order=vorname.asc', { headers: kopf });
+  }
   if(!res.ok) throw new Error('Trainer laden fehlgeschlagen: ' + res.status);
   const daten = await res.json();
   if(!Array.isArray(daten)) throw new Error('Unerwartete Antwort beim Trainer laden');
