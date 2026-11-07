@@ -28,10 +28,13 @@ Deno.test("Fix 5: profil.html fuellt Name (nur Anzeige) und Ziel fuer Kunden vor
   );
 });
 
-Deno.test("Fix 5: nicht Angemeldete sehen weiter den Anmelde-Hinweis", async () => {
+Deno.test("Fix 5: nicht Angemeldete sehen den Anfrage-Block (K3: Ein-Schritt-Anfrage statt Anmelde-Wand)", async () => {
   const s = await lies("./profil.html");
-  assertStringIncludes(s, "Anmelden, um anzufragen");
-  // Angemeldet-Zweig blendet den Hinweis aus, Else-Zweig blendet ihn ein (unveraendert).
+  // K3 (07.11.): statt „Anmelden, um anzufragen" jetzt die Ein-Schritt-Anfrage
+  // mit Kontoanlage direkt im anonHinweis-Block.
+  assert(!s.includes("Anmelden, um anzufragen"), "alte Anmelde-Wand noch da");
+  assertStringIncludes(s, "function sendAnfrageMitKonto(");
+  // Angemeldet-Zweig blendet den Block aus, Else-Zweig blendet ihn ein (unveraendert).
   assertStringIncludes(s, "if(anonHinweis) anonHinweis.style.display = 'none';");
   assertStringIncludes(s, "if(anonHinweis) anonHinweis.style.display = 'block';");
 });

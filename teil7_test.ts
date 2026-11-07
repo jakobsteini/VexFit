@@ -103,10 +103,13 @@ Deno.test("7.4/7.5 profil.html: oeffentlich + Anmelde-Knopf + Speichern vor Mail
     !html.includes("location.replace('registrieren.html?typ=kunde')"),
     "alte Zwangs-Umleitung ist noch da",
   );
-  // Anmelde-Knopf statt Formular fuer anon, mit Ruecksprung-Ziel.
-  assertStringIncludes(html, "Anmelden, um anzufragen");
+  // K3 (07.11.): für anon jetzt die Ein-Schritt-Anfrage mit Kontoanlage statt
+  // reiner Anmelde-Wand; der „Schon ein Konto? Anmelden"-Link merkt sich das Ziel.
+  assert(!html.includes("Anmelden, um anzufragen"), "alte Anmelde-Wand noch da");
+  assertStringIncludes(html, "function sendAnfrageMitKonto(");
   assertStringIncludes(html, "vexfit_ziel");
-  // Doppelklick-Schutz und Konto-E-Mail (kein freies Feld).
+  // Doppelklick-Schutz (angemeldeter Pfad) und Konto-E-Mail des angemeldeten
+  // Formulars bleibt ohne freies c-email-Feld.
   assertStringIncludes(html, "anfrageLaeuft");
-  assert(!html.includes('id="c-email"'), "freies E-Mail-Feld sollte entfernt sein");
+  assert(!html.includes('id="c-email"'), "freies E-Mail-Feld im angemeldeten Formular sollte entfernt sein");
 });

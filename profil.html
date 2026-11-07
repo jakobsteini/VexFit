@@ -257,8 +257,19 @@ try {
         </div>
         <div id="anonHinweis" style="display:none">
           <div class="contact-title">TRAINER ANFRAGEN</div>
-          <p class="contact-sub">Melde dich an, um diesem Trainer eine unverbindliche Anfrage zu senden.</p>
-          <button class="btn-send" id="loginAnfrageBtn" onclick="zurAnmeldung()">Anmelden, um anzufragen →</button>
+          <p class="contact-sub">Unverbindlich und kostenlos. Dein Konto wird dabei direkt angelegt.</p>
+          <div class="alert-error" id="anonError"></div>
+          <div class="field"><label>Dein Ziel</label><input type="text" placeholder="z.B. Abnehmen, Muskelaufbau..." id="a-goal"></div>
+          <div class="field"><label>Gewünschter Zeitraum</label><input type="text" placeholder="z.B. ab nächster Woche, Dienstag abends..." id="a-zeitraum"></div>
+          <div class="field"><label>Nachricht <span style="color:var(--text-muted,#888);font-weight:400">(optional)</span></label><textarea placeholder="Erzähl dem Trainer kurz was du suchst..." id="a-message"></textarea></div>
+          <div class="field"><label>Dein Vorname</label><input type="text" placeholder="Anna" id="a-vorname" autocomplete="given-name"></div>
+          <div class="field"><label>Deine E-Mail</label><input type="email" placeholder="anna@beispiel.at" id="a-email" autocomplete="email" inputmode="email"></div>
+          <div class="field"><label>Passwort wählen</label><input type="password" placeholder="mindestens 8 Zeichen" id="a-pw" autocomplete="new-password"></div>
+          <!-- Honigtopf gegen Spam: bleibt bei Menschen leer. -->
+          <input type="text" id="a-webseite" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0" aria-hidden="true">
+          <label style="display:flex;align-items:flex-start;gap:9px;margin:6px 0 12px;font-size:12.5px;color:var(--text-muted,#999);cursor:pointer"><input type="checkbox" id="a-agb" style="margin-top:2px"><span>Ich akzeptiere die <a href="rechtliches.html#agb" target="_blank" style="color:var(--accent)">AGB</a> & <a href="rechtliches.html#datenschutz" target="_blank" style="color:var(--accent)">Datenschutz</a>. Für Kunden ist Vexfit kostenlos.</span></label>
+          <button class="btn-send" id="anonSendBtn" onclick="sendAnfrageMitKonto()">Anfrage senden →</button>
+          <p style="font-size:11.5px;color:var(--text-muted,#888);margin-top:8px;text-align:center">Schon ein Konto? <a href="#" onclick="zurAnmeldung();return false" style="color:var(--accent)">Anmelden</a></p>
         </div>
         <div class="contact-success" id="contactSuccess">
           <div class="contact-success-icon">🎉</div>
@@ -284,6 +295,7 @@ try {
 <script src="vexfit-escape.js"></script>
 <script src="vexfit-namen.js"></script>
 <script src="vexfit-video.js"></script>
+<script src="vexfit-trichter.js"></script>
 <script>
 // ──── ZUGANG ────
 // Trainerprofile sind OHNE Anmeldung sichtbar (Geschaeftsmodell): das Profil
@@ -567,6 +579,103 @@ function renderProfile(t) {
 function zurAnmeldung() {
   try { sessionStorage.setItem('vexfit_ziel', location.pathname.split('/').pop() + location.search); } catch(e) {}
   location.href = 'login.html';
+}
+
+// K3 (07.11.): Anfrage DIREKT vom Profil – Konto wird im selben Schritt angelegt.
+// Nur nötige Felder (Ziel, Zeitraum, Nachricht optional) + Vorname/E-Mail/Passwort.
+// Zeitraum und Nachricht wandern gemeinsam in das Feld nachricht (keine neue
+// Spalte). Auto-Bestätigung: Konto bekommt sofort eine Sitzung -> Anfrage wird
+// angelegt und dem Trainer zugestellt. Verlangt Supabase eine E-Mail-Bestätigung
+// (keine sofortige Sitzung), wird die Anfrage NICHT anonym zugestellt (Missbrauch:
+// unbestätigte Mail könnte Trainer mit Scheinanfragen überhäufen, die bei Annahme
+// Kosten auslösen) -> stattdessen als Entwurf gemerkt und nach der Bestätigung im
+// Kundenbereich abgeschickt. BLOCK ist in docs/konzept-2026-11-07.md begründet.
+let anonAnfrageLaeuft = false;
+function anonNachricht(zeitraum, message) {
+  const z = (zeitraum || '').trim();
+  const m = (message || '').trim();
+  const teile = [];
+  if (z) teile.push('Gewünschter Zeitraum: ' + z);
+  if (m) teile.push(m);
+  return teile.join('\n\n') || '–';
+}
+async function sendAnfrageMitKonto() {
+  if (anonAnfrageLaeuft) return;
+  const err = document.getElementById('anonError');
+  err.classList.remove('show');
+  const goal = document.getElementById('a-goal').value.trim();
+  const zeitraum = document.getElementById('a-zeitraum').value.trim();
+  const message = document.getElementById('a-message').value.trim();
+  const vorname = document.getElementById('a-vorname').value.trim();
+  const email = document.getElementById('a-email').value.trim().toLowerCase();
+  const pw = document.getElementById('a-pw').value;
+  const koeder = (document.getElementById('a-webseite') || {}).value || '';
+  const zeigeFehler = (t) => { err.textContent = '⚠️ ' + t; err.classList.add('show'); };
+  if (koeder) return; // Honigtopf: still abbrechen, kein Hinweis.
+  if (!goal) return zeigeFehler('Bitte dein Ziel angeben.');
+  if (!vorname) return zeigeFehler('Bitte deinen Vornamen angeben.');
+  if (!email || email.indexOf('@') < 1) return zeigeFehler('Bitte eine gültige E-Mail angeben.');
+  if (!pw || pw.length < 8) return zeigeFehler('Bitte ein Passwort mit mindestens 8 Zeichen wählen.');
+  if (!document.getElementById('a-agb').checked) return zeigeFehler('Bitte AGB & Datenschutz akzeptieren.');
+
+  anonAnfrageLaeuft = true;
+  const btn = document.getElementById('anonSendBtn');
+  btn.disabled = true; btn.textContent = 'Wird gesendet...';
+  const nachricht = anonNachricht(zeitraum, message);
+  const tName = trainerData ? (trainerData.vorname + ' ' + (trainerData.nachname || '')).trim() : '–';
+  const tId = trainerData ? trainerData.id : null;
+  const zuruecksetzen = () => { anonAnfrageLaeuft = false; btn.disabled = false; btn.textContent = 'Anfrage senden →'; };
+
+  try { if (typeof vexfitTrichter === 'function') vexfitTrichter('anfrage_start', { rolle: 'kunde', plz: (trainerData && trainerData.plz) || '', einmal: false }); } catch(e) {}
+
+  try {
+    const ar = await fetch(SUPABASE_URL + '/auth/v1/signup', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY }, body: JSON.stringify({ email, password: pw }) });
+    const ad = await ar.json();
+    if (!ar.ok) {
+      const msg = (ad && (ad.msg || ad.error_description || ad.message)) || '';
+      if (/registered|exists|already/i.test(String(msg))) { zeigeFehler('Für diese E-Mail gibt es schon ein Konto. Bitte melde dich an.'); }
+      else { zeigeFehler('Konto konnte nicht angelegt werden. Bitte später erneut versuchen.'); }
+      zuruecksetzen(); return;
+    }
+    const userId = ad.user?.id || ad.id || null;
+    const token = ad.access_token || null;
+
+    // Entwurf für den Fall "E-Mail-Bestätigung nötig" (keine sofortige Sitzung).
+    const entwurf = { trainer_id: tId, trainer_name: tName, kunden_name: vorname, ziel: goal, nachricht: nachricht };
+
+    if (!token || !userId) {
+      // E-Mail-Bestätigung aktiv: NICHT anonym zustellen. Entwurf merken.
+      try { localStorage.setItem('vexfit_anfrage_entwurf', JSON.stringify(entwurf)); } catch(e) {}
+      document.getElementById('anfrageForm') && (document.getElementById('anfrageForm').style.display = 'none');
+      document.getElementById('anonHinweis').style.display = 'none';
+      const s = document.getElementById('contactSuccess');
+      s.querySelector('p').textContent = 'Fast geschafft! Bitte bestätige deine E-Mail – danach schicken wir deine Anfrage an ' + tName + ' ab (einmal anmelden genügt).';
+      s.classList.add('show');
+      return;
+    }
+
+    // Auto-Bestätigung: Konto hat eine Sitzung. Kunde-Zeile + Anfrage anlegen.
+    try { localStorage.setItem('vexfit_session', JSON.stringify({ access_token: token, refresh_token: ad.refresh_token || null, user_id: userId, email, role: 'kunde' })); } catch(e) {}
+    const authK = (extra) => { const k = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token }; if (extra) for (const n in extra) k[n] = extra[n]; return k; };
+    // Kunde-Zeile (best effort; blockiert die Anfrage nicht).
+    try {
+      await fetch(SUPABASE_URL + '/rest/v1/kunden', { method: 'POST', headers: authK({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify({ vorname, nachname: '', email, stadt: '', plz: '', ziel: goal, erwartungen: '', user_id: userId }) });
+    } catch(e) {}
+    // Anfrage anlegen.
+    const anfrageRes = await fetch(SUPABASE_URL + '/rest/v1/anfragen', { method: 'POST', headers: authK({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }), body: JSON.stringify({ trainer_id: tId, trainer_name: tName, kunden_name: vorname, kunden_email: email, ziel: goal, nachricht: nachricht, weitergeleitet: false }) });
+    if (!anfrageRes.ok) { console.error('Anfrage speichern:', anfrageRes.status); zeigeFehler('Anfrage konnte nicht gespeichert werden. Bitte erneut versuchen.'); zuruecksetzen(); return; }
+    // Trainer benachrichtigen (best effort).
+    try {
+      fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neue-anfrage', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ trainer_id: tId, trainer_name: tName, kunde_name: vorname, kunde_email: email, kunde_ziel: goal, kunde_nachricht: nachricht }) }).catch(()=>{});
+    } catch(e) {}
+    try { if (typeof vexfitTrichter === 'function') vexfitTrichter('anfrage', { rolle: 'kunde', plz: (trainerData && trainerData.plz) || '', einmal: false }); } catch(e) {}
+    document.getElementById('anonHinweis').style.display = 'none';
+    document.getElementById('contactSuccess').classList.add('show');
+  } catch (e) {
+    console.error('sendAnfrageMitKonto:', e);
+    zeigeFehler('Verbindungsfehler. Bitte prüfe deine Internetverbindung.');
+    zuruecksetzen();
+  }
 }
 
 // Fuer angemeldete Kunden Name und Ziel aus der eigenen kunden-Zeile vorausfuellen.

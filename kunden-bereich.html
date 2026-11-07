@@ -1221,8 +1221,35 @@ function einstiegRouten() {
 }
 // Erst die eigene kunden-Zeile laden (Ziel/PLZ), DANN den Einstieg routen -
 // sonst fragt der Einstieg Ziel/PLZ erneut, obwohl beides gespeichert ist (Befund B).
+// K3 (07.11.): Hat der Kunde vom Profil aus eine Anfrage gestellt, aber die
+// E-Mail erst später bestätigt, liegt ein Entwurf in localStorage. Jetzt – mit
+// gültiger Sitzung – wird die Anfrage an den Trainer abgeschickt (keine anonyme
+// Zustellung, daher kein Missbrauchsweg). Genau einmal, dann Entwurf löschen.
+async function entwurfAbschicken() {
+  let e = null;
+  try { e = JSON.parse(localStorage.getItem('vexfit_anfrage_entwurf') || 'null'); } catch(_) {}
+  if(!e || !e.trainer_id) return;
+  try { localStorage.removeItem('vexfit_anfrage_entwurf'); } catch(_) {}
+  try {
+    const body = {
+      trainer_id: e.trainer_id, trainer_name: e.trainer_name || '–',
+      kunden_email: sess.email, kunden_name: e.kunden_name || (K ? (K.vorname||'') : '') || sess.email,
+      ziel: e.ziel || '–', nachricht: e.nachricht || '–', status: 'ausstehend', weitergeleitet: false
+    };
+    const r = await fetch(`${SB}/rest/v1/anfragen`, { method:'POST', headers: authKopf({'Content-Type':'application/json', Prefer:'return=representation'}), body: JSON.stringify(body) });
+    if(istAbgemeldet(r) || !r.ok) return;
+    let anfrageId = '';
+    try { const neu = await r.json(); if(Array.isArray(neu) && neu[0] && neu[0].id) anfrageId = neu[0].id; } catch(_) {}
+    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neue-anfrage',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(sess&&sess.access_token||'')},body:JSON.stringify({...body, anfrage_id: anfrageId})}).catch(()=>{});
+    try { if(typeof vexfitTrichter === 'function') vexfitTrichter('anfrage', { rolle: 'kunde', plz: (K && K.plz) || '', einmal: false }); } catch(_) {}
+    try { alert('Deine Anfrage an ' + (e.trainer_name || 'den Trainer') + ' ist unterwegs!'); } catch(_) {}
+  } catch(_) {}
+}
+// Erst die eigene kunden-Zeile laden (Ziel/PLZ), DANN den Einstieg routen -
+// sonst fragt der Einstieg Ziel/PLZ erneut, obwohl beides gespeichert ist (Befund B).
 (async function start() {
   await loadKunde();
+  await entwurfAbschicken();
   einstiegRouten();
 })();
 </script>
