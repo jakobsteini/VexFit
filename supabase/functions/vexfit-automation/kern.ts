@@ -2825,6 +2825,16 @@ export interface AbendberichtZahlen {
   neueKunden: number;
   wartenNamen: string[];
   anfragenOffen: number;
+  /** S8: neue Anfragen der letzten 24 h. */
+  anfragenNeu24h: number;
+  /** S8/S3: offene Anfragen „zur Prüfung" (verdächtig, nicht an den Trainer). */
+  anfragenZurPruefung: number;
+  /** S8: in den letzten 24 h angenommene bzw. abgelehnte Anfragen. */
+  anfragenAngenommen24h: number;
+  anfragenAbgelehnt24h: number;
+  /** S8/S4: Anfragen, zu denen Ersatzvorschläge verschickt wurden (gesamt –
+   *  die Spalte alternativen_gesendet trägt keinen Zeitstempel). */
+  ersatzVersendet: number;
   warteliste: number;
   bezahlt: number;
   zahlungFehlgeschlagen: number;
@@ -2882,7 +2892,9 @@ export function istFehlerErgebnis(ergebnis: string | null | undefined): boolean 
 export function leereAbendberichtZahlen(): AbendberichtZahlen {
   return {
     neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
-    anfragenOffen: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
+    anfragenOffen: 0, anfragenNeu24h: 0, anfragenZurPruefung: 0,
+    anfragenAngenommen24h: 0, anfragenAbgelehnt24h: 0, ersatzVersendet: 0,
+    warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
     trichter24h: [], profileUnter5: 0, kundenTrichter24h: leererKundenTrichter(),
     salzburg: null,
     fehler: [], cronHinweise: [],
@@ -2899,7 +2911,9 @@ export function trichterSumme(t: TrichterQuelle[]): number {
 export function abendberichtLeer(z: AbendberichtZahlen): boolean {
   return z.fehler.length === 0 && z.cronHinweise.length === 0 &&
     z.neueTrainer === 0 && z.neueKunden === 0 && z.wartenNamen.length === 0 &&
-    z.anfragenOffen === 0 && z.warteliste === 0 &&
+    z.anfragenOffen === 0 && z.anfragenNeu24h === 0 && z.anfragenZurPruefung === 0 &&
+    z.anfragenAngenommen24h === 0 && z.anfragenAbgelehnt24h === 0 &&
+    z.warteliste === 0 &&
     (z.bezahlt + z.zahlungFehlgeschlagen + z.gekuendigt) === 0 &&
     trichterSumme(z.trichter24h) === 0 && z.profileUnter5 === 0 &&
     kundenTrichterSumme(z.kundenTrichter24h) === 0;
@@ -2919,6 +2933,10 @@ function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert
     zeile("Neue Trainer (24 h)", `${z.neueTrainer}${z.neueTrainer ? ` (${herk})` : ""}`),
     zeile("Neue Kunden (24 h)", String(z.neueKunden)),
     zeile("Warten auf Freigabe", z.wartenNamen.length ? `${z.wartenNamen.length} (${z.wartenNamen.join(", ")})` : "0"),
+    // S8: Anfragen-Fluss (24 h) inkl. „zur Prüfung" (S3) und Ersatzvorschläge (S4).
+    zeile("Neue Anfragen (24 h)", `${z.anfragenNeu24h} (angenommen ${z.anfragenAngenommen24h}, abgelehnt ${z.anfragenAbgelehnt24h})`),
+    zeile("Anfragen zur Prüfung (offen)", String(z.anfragenZurPruefung)),
+    zeile("Ersatzvorschläge versendet (gesamt)", String(z.ersatzVersendet)),
     zeile("Anfragen ohne Antwort > 24 h", String(z.anfragenOffen)),
     zeile("Wartelisten-Einträge ohne Trainer", String(z.warteliste)),
     zeile("Zahlungen (24 h)", `bezahlt ${z.bezahlt}, fehlgeschlagen ${z.zahlungFehlgeschlagen}, gekündigt ${z.gekuendigt}`),
@@ -3063,6 +3081,24 @@ export async function abendberichtZahlenHolen(
   try {
     z.anfragenOffen = await zaehlenFn(`anfragen?beantwortet_am=is.null&created_at=lt.${encodeURIComponent(seit)}&or=(status.is.null,status.not.in.(angenommen,abgelehnt))&select=id`);
   } catch (e) { merkeFehler("Anfragen ohne Antwort > 24 h", e); }
+
+  // S8: neue Anfragen (24 h) + angenommen/abgelehnt (per beantwortet_am).
+  try {
+    z.anfragenNeu24h = await zaehlenFn(`anfragen?created_at=gt.${encodeURIComponent(seit)}&select=id`);
+  } catch (e) { merkeFehler("Neue Anfragen (24 h)", e); }
+  try {
+    z.anfragenAngenommen24h = await zaehlenFn(`anfragen?status=eq.angenommen&beantwortet_am=gt.${encodeURIComponent(seit)}&select=id`);
+    z.anfragenAbgelehnt24h = await zaehlenFn(`anfragen?status=eq.abgelehnt&beantwortet_am=gt.${encodeURIComponent(seit)}&select=id`);
+  } catch (e) { merkeFehler("Neue Anfragen (24 h)", e); }
+  // S8/S3: offene Anfragen „zur Prüfung" (verdächtig). Fehlt die Spalte
+  // pruef_status (Migration 2026-11-08-02 nicht eingespielt), bleibt es 0.
+  try {
+    z.anfragenZurPruefung = await zaehlenFn(`anfragen?pruef_status=eq.zur_pruefung&select=id`);
+  } catch { /* Spalte fehlt – kein Fehler, 0 */ }
+  // S8/S4: Anfragen mit verschickten Ersatzvorschlägen (gesamt).
+  try {
+    z.ersatzVersendet = await zaehlenFn(`anfragen?alternativen_gesendet=eq.true&select=id`);
+  } catch { /* Spalte fehlt – kein Fehler, 0 */ }
 
   // Wartelisten-Einträge ohne Trainer (offene „Benachrichtige mich").
   try {
