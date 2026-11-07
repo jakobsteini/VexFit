@@ -158,3 +158,20 @@ Drei bestehende Tests an die neue (gleichwertige) Umsetzung angepasst
 (5), `d3_foto_test.ts` (3). Suite **752 grün**, check+lint grün (30 Baseline).
 
 D2: **erledigt.** D3: **erledigt.**
+
+## D4 – Kontrast und Kopfzeile
+
+- Knopf „✨ Passenden Trainer in 4 Fragen finden": von dünnem Umriss (Akzent auf
+  Akzent) auf gefüllte Fläche `.match-cta` = **Schwarz #0A0A0A auf #E8FF00**
+  (Kontrast ≈ 15:1, ≥ 4,5:1), mit sichtbarem Fokusring.
+- Kopfzeile: `html{scroll-padding-top:76px}` – Anker-Sprünge (und Laden mit #hash)
+  landen nicht mehr unter der festen Kopfzeile. Die Hauptüberschrift stand schon
+  frei (siehe D0), bleibt es bei 375 und 1440 px.
+- Gesamtkontrast: `--text-muted` von `#666` auf **`#8a8a8a`** angehoben (wie
+  personal-trainer-salzburg.html). Kleiner Text (Kartenort, Entfernung, Zähler,
+  Footer) erreicht so auf Schwarz/Karten ≥ 4,5:1. axe-core ist nicht im Projekt;
+  der Knopf-Kontrast wird in `d4_kontrast_test.ts` echt nachgerechnet, die
+  Live-Werte prüft D7 über die berechneten Stile.
+
+Test `d4_kontrast_test.ts` (3, inkl. WCAG-Rechner). Suite grün, lint 30 Baseline.
+D4: **erledigt.**
