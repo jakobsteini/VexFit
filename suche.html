@@ -339,6 +339,22 @@ function istAbgemeldet(r) {
 // realen, bereits oeffentlichen Preisspalten sind preis_stunde und preis_monat.
 const OEFFENTLICHE_SPALTEN = 'id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url,sprachen,trainingsorte,verifiziert,created_at,verfuegbarkeit';
 
+// S1 (07./08.11.2026): Bei EINGESCHALTETER öffentlicher Vorschau laden nicht
+// angemeldete Besucher aus der strengen Sicht trainers_vorschau. Sie liefert
+// KEINEN vollen Nachnamen (nur die Initiale als nachname_initial) und keinen
+// Monatspreis – so steht kein Nachname und kein Kontaktfeld in der Netz-Antwort.
+const VORSCHAU_SPALTEN = 'id,vorname,nachname_initial,stadt,plz,land,trainingsart,trainingsort,trainingsorte,spezialisierungen,sprachen,bio,preis_stunde,avatar_url,verifiziert,verfuegbarkeit,created_at';
+
+async function ladeVorschau(fetchImpl, basisUrl, apikey) {
+  const res = await fetchImpl(basisUrl + '/rest/v1/trainers_vorschau?select=' + VORSCHAU_SPALTEN + '&order=vorname.asc', {
+    headers: { apikey: apikey, Authorization: 'Bearer ' + apikey }
+  });
+  if(!res.ok) throw new Error('Trainer laden fehlgeschlagen: ' + res.status);
+  const daten = await res.json();
+  if(!Array.isArray(daten)) throw new Error('Unerwartete Antwort beim Trainer laden');
+  return daten;
+}
+
 // Knopf fuer die Kontaktaufnahme in einer Trainerkarte.
 // Nicht angemeldet: fuehrt zur Kundenregistrierung ("Anmelden und anfragen").
 // Angemeldet: leer - fuer Angemeldete bleibt die Karte unveraendert.
@@ -438,7 +454,10 @@ function calcDistance(lat1, lng1, lat2, lng2) {
 // angemeldet) nur „Vorname N."; sonst wie bisher der volle, formatierte Name.
 function kartenName(t) {
   if (typeof vexVorschau !== 'undefined' && vexVorschau.vorschauAktiv(angemeldet)) {
-    return vexEsc(vexVorschau.vorschauName(t.vorname, t.nachname));
+    // Vorschau: nur Vorname + Initiale. Die strenge Sicht liefert die Initiale
+    // fertig (nachname_initial); ohne sie bleibt nur der Vorname.
+    const init = (t.nachname_initial || '').trim();
+    return vexEsc(((t.vorname || '') + ' ' + init).trim());
   }
   return vexEsc(vexName((t.vorname || "") + " " + (t.nachname || "")));
 }
@@ -591,7 +610,7 @@ function renderTrainersWithDistance(trainers) {
   count.textContent = trainers.length + ' Trainer';
   const bgColors = ['linear-gradient(135deg,#1a1a1a,#2a2a2a)','linear-gradient(135deg,#1e1a0a,#2a2800)','linear-gradient(135deg,#0a1a1a,#002a2a)'];
   grid.innerHTML = trainers.map((t,i) => {
-    const initials = vexEsc(((t.vorname||'?')[0]+(t.nachname||'?')[0]).toUpperCase());
+    const initials = vexEsc(((t.vorname||'?')[0]+((t.nachname||t.nachname_initial||'?')[0])).toUpperCase());
     const tags = (t.spezialisierungen||[]).slice(0,3).map(s=>`<span class="ctag">${vexEsc(s)}</span>`).join('');
     const preis = t.preis_stunde ? `${t.preis_stunde} €<span>/Std</span>` : '<span>Auf Anfrage</span>';
     const distLabel = t._online ? '<span style="color:#e8ff00;font-size:11px">🌐 Online</span>' : t._distance !== undefined ? `<span style="color:#888;font-size:11px">📍 ${t._distance} km</span>` : '';
@@ -630,8 +649,11 @@ async function loadTrainers() {
       if(!res.ok) throw new Error('Trainer laden fehlgeschlagen: ' + res.status);
       daten = await res.json();
       if(!Array.isArray(daten)) throw new Error('Unerwartete Antwort beim Trainer laden');
+    } else if(typeof vexVorschau !== 'undefined' && vexVorschau.vorschauAktiv(angemeldet)) {
+      // Öffentliche Vorschau AN: strenge Sicht ohne Nachnamen/Kontaktdaten.
+      daten = await ladeVorschau(fetch, SUPABASE_URL, SUPABASE_KEY);
     } else {
-      // Ohne Sitzung: oeffentliche Sicht, nur freigeschaltete Trainer, keine Kontaktdaten.
+      // Ohne Sitzung (Vorschau aus): oeffentliche Sicht wie bisher.
       daten = await ladeOeffentlich(fetch, SUPABASE_URL, SUPABASE_KEY);
     }
     // "Admin entscheidet allein" (Migration 2026-10-31-10): sichtbar ist, wer
@@ -682,7 +704,7 @@ function renderTrainers(trainers) {
   count.textContent = trainers.length + ' Trainer';
 
   grid.innerHTML = trainers.map((t, i) => {
-    const initials = vexEsc(((t.vorname||'?')[0] + (t.nachname||'?')[0]).toUpperCase());
+    const initials = vexEsc(((t.vorname||'?')[0] + ((t.nachname||t.nachname_initial||'?')[0])).toUpperCase());
     const bg = bgColors[i % bgColors.length];
     const isOnline = t.trainingsart === 'Online';
     const tags = (t.spezialisierungen || []).slice(0, 3);
@@ -716,20 +738,20 @@ function filterTrainers() {
 
   // 1. Stadt zuerst filtern (höchste Priorität)
   if(q) {
-    const stadtMatch = filtered.filter(t => t.stadt.toLowerCase().includes(q));
+    const stadtMatch = filtered.filter(t => (t.stadt||'').toLowerCase().includes(q));
     // Wenn Stadt-Treffer → diese zuerst, Rest danach
     if(stadtMatch.length > 0) {
-      const rest = filtered.filter(t => !t.stadt.toLowerCase().includes(q) && (
-        t.vorname.toLowerCase().includes(q) ||
-        t.nachname.toLowerCase().includes(q) ||
+      const rest = filtered.filter(t => !(t.stadt||'').toLowerCase().includes(q) && (
+        (t.vorname||'').toLowerCase().includes(q) ||
+        (t.nachname||'').toLowerCase().includes(q) ||
         (t.spezialisierungen || []).some(s => s.toLowerCase().includes(q)) ||
         (t.bio || '').toLowerCase().includes(q)
       ));
       filtered = [...stadtMatch, ...rest];
     } else {
       filtered = filtered.filter(t =>
-        t.vorname.toLowerCase().includes(q) ||
-        t.nachname.toLowerCase().includes(q) ||
+        (t.vorname||'').toLowerCase().includes(q) ||
+        (t.nachname||'').toLowerCase().includes(q) ||
         (t.spezialisierungen || []).some(s => s.toLowerCase().includes(q)) ||
         (t.bio || '').toLowerCase().includes(q)
       );
@@ -740,7 +762,7 @@ function filterTrainers() {
   if(activeFilter !== 'alle') {
     filtered = filtered.filter(t =>
       (t.spezialisierungen || []).some(s => s.toLowerCase().includes(activeFilter.toLowerCase())) ||
-      t.trainingsart.toLowerCase().includes(activeFilter.toLowerCase())
+      (t.trainingsart||'').toLowerCase().includes(activeFilter.toLowerCase())
     );
   }
 

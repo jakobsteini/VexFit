@@ -16,8 +16,9 @@
     //           (Nachname abgekürzt), Schwerpunkte, Ort (keine Adresse), Preis
     //           pro Stunde, Foto. Kontaktdaten/Nachname/Anfrage bleiben hinter
     //           der Kurz-Anmeldung.
-    // NICHT eigenmächtig einschalten – Entscheidung liegt bei Jakob.
-    OEFFENTLICHE_VORSCHAU: false,
+    // Jakob hat am 07.11.2026 das Einschalten entschieden (ersetzt den Grundsatz
+    // vom 12.10.2026 „Suche/Profile nur hinter Anmeldung").
+    OEFFENTLICHE_VORSCHAU: true,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = global.VEXFIT_CONFIG;
 })(typeof window !== "undefined" ? window : globalThis);
