@@ -36,13 +36,14 @@ const VOLL: AbendberichtZahlen = {
   trichter24h: [],
   profileUnter5: 0,
   kundenTrichter24h: { seite: 0, suche: 0, treffer: 0, profil: 0, anfrage_start: 0, anfrage: 0 },
+  salzburg: null,
   fehler: [],
   cronHinweise: [],
 };
 const LEER: AbendberichtZahlen = {
   neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
   anfragenOffen: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
-  trichter24h: [], profileUnter5: 0, kundenTrichter24h: { seite: 0, suche: 0, treffer: 0, profil: 0, anfrage_start: 0, anfrage: 0 }, fehler: [], cronHinweise: [],
+  trichter24h: [], profileUnter5: 0, kundenTrichter24h: { seite: 0, suche: 0, treffer: 0, profil: 0, anfrage_start: 0, anfrage: 0 }, salzburg: null, fehler: [], cronHinweise: [],
 };
 // Wie VOLL, aber trainer_alerts lieferte 404 (Wartelisten-Zahl fehlt).
 const TEILWEISE: AbendberichtZahlen = {

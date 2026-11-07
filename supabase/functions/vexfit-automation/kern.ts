@@ -2605,6 +2605,8 @@ export interface AbendberichtZahlen {
   gekuendigt: number;
   /** K1: Kunden-Trichter der letzten 24 h (anonym, Summen je Stufe). */
   kundenTrichter24h: KundeTrichter24h;
+  /** K8: kurze Stadt-Übersicht Salzburg (PLZ 50xx). null = nicht geladen. */
+  salzburg: { trainerFrei: number; suchen7: number; vorm: number } | null;
   /** B8: Trichter der letzten 24 h nach Herkunft (anonym, aus trichter_ereignisse). */
   trichter24h: TrichterQuelle[];
   /** B8: freigegebene bzw. in Prüfung befindliche Trainer mit < 5/8 Angaben,
@@ -2647,6 +2649,7 @@ export function leereAbendberichtZahlen(): AbendberichtZahlen {
     neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
     anfragenOffen: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
     trichter24h: [], profileUnter5: 0, kundenTrichter24h: leererKundenTrichter(),
+    salzburg: null,
     fehler: [], cronHinweise: [],
   };
 }
@@ -2704,6 +2707,10 @@ function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert
   if (!trichterFehler && kundenTrichterSumme(k) > 0) {
     basis.push({ beschriftung: "— Kunden-Trichter (24 h) —", wert: "Seite → Suche → Treffer → Profil → Anfrage begonnen → abgeschickt" });
     basis.push({ beschriftung: "Kunden", wert: `${k.seite} · ${k.suche} · ${k.treffer} · ${k.profil} · ${k.anfrage_start} · ${k.anfrage}` });
+  }
+  // K8: kurze Stadt-Übersicht Salzburg.
+  if (z.salzburg) {
+    basis.push({ beschriftung: "Salzburg (50xx)", wert: `${z.salzburg.trainerFrei} freigegebene Trainer · ${z.salzburg.suchen7} Suchen (7 T) · ${z.salzburg.vorm} Vormerkungen` });
   }
   return basis;
 }
@@ -2885,6 +2892,21 @@ export async function abendberichtZahlenHolen(
     }
     z.profileUnter5 = zeilen.filter((t) => t.ist_test !== true && (8 - freischaltFehlendeFelder(t).length) < 5).length;
   } catch (e) { merkeFehler("Trainerprofile < 5/8 Angaben", e); }
+
+  // K8: kurze Stadt-Übersicht Salzburg (PLZ 50xx): freigegebene Trainer (ohne
+  // Test), Kundensuchen der letzten 7 Tage, Vormerkungen. Best effort – fehlt
+  // eine Tabelle/Spalte, bleibt salzburg einfach null (keine Zeile, kein Fehler).
+  try {
+    const seit7 = new Date(jetztMs - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const trainer = await lesenFn<{ ist_test?: boolean | null }>(
+      `trainers?plz=like.50*&aktiv=eq.true&gesperrt=not.is.true&select=id,ist_test`,
+    ).catch(() => lesenFn<{ ist_test?: boolean | null }>(`trainers?plz=like.50*&aktiv=eq.true&select=id`));
+    const trainerFrei = trainer.filter((t) => t.ist_test !== true).length;
+    let suchen7 = 0, vorm = 0;
+    try { suchen7 = (await lesenFn<unknown>(`such_eingaben?plz=like.50*&erstellt_am=gte.${seit7}&select=plz`)).length; } catch { /* Tabelle fehlt */ }
+    try { vorm = (await lesenFn<unknown>(`warteliste?plz=like.50*&select=plz`)).length; } catch { /* Tabelle fehlt */ }
+    z.salzburg = { trainerFrei, suchen7, vorm };
+  } catch (e) { merkeFehler("Stadt-Übersicht Salzburg", e); }
 
   return z;
 }
