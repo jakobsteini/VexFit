@@ -251,6 +251,17 @@ try {
     </div>
   </div>
 
+  <!-- K4: Hinweis + Vormerkung, wenn nur die nächsten (außerhalb des Umkreises) gezeigt werden -->
+  <div id="naeheHinweis" style="display:none;max-width:460px;margin:0 auto 20px;background:var(--card,#161616);border:1px solid var(--border-input,rgba(255,255,255,0.12));border-radius:6px;padding:16px 18px">
+    <div id="naeheHinweisText" style="font-size:13px;color:var(--text-muted,#999);line-height:1.6;margin-bottom:10px"></div>
+    <div id="naeheVormerkForm" style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="email" id="naehe-email" placeholder="deine@email.com" autocomplete="email" inputmode="email" style="flex:1;min-width:180px;background:var(--gray,#111);border:1px solid var(--border-input,rgba(255,255,255,0.12));color:var(--white,#f5f5f0);padding:11px 13px;border-radius:3px;font-size:14px;outline:none">
+      <input type="text" id="naehe-webseite" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+      <button class="s-btn" style="width:auto;padding:11px 18px" onclick="naeheVormerken()">🔔 Benachrichtige mich</button>
+    </div>
+    <div id="naeheVormerkOk" style="display:none;font-size:13px;color:var(--accent,#e8ff00);margin-top:4px">✅ Eingetragen – wir melden uns, sobald ein Trainer in deiner Nähe verfügbar ist.</div>
+  </div>
+
   <!-- TRAINER GRID -->
   <div class="grid" id="trainerGrid"></div>
 </div>
@@ -475,32 +486,67 @@ async function searchByPLZ() {
 async function umkreisSuche(coords, radius, status) {
   status.textContent = `📍 ${coords.stadt} · Suche in ${radius} km Umkreis...`;
 
-  // Filter trainers with known PLZ by distance, also include online trainers
-  const filtered = [];
+  // K4: ALLE Trainer mit Entfernung berechnen (nicht nur im Radius), damit wir
+  // bei 0 Treffern im Umkreis die NÄCHSTEN zeigen können statt einer Sackgasse.
+  const mitEntfernung = [];
   for(const t of allTrainers) {
     // Online-Trainer: trainingsort ('online'/'beides') hat Vorrang, sonst der
     // Freitext trainingsart. So fallen reine Online-Trainer ohne PLZ nicht aus
     // der Umkreissuche (gleiche Regel wie vexEinstieg.istOnline).
     const ort = String(t.trainingsort||'').toLowerCase();
     if(ort === 'online' || ort === 'beides' || (t.trainingsart||'').toLowerCase().includes('online')) {
-      filtered.push({...t, _distance: 0, _online: true});
+      mitEntfernung.push({...t, _distance: 0, _online: true});
       continue;
     }
     if(!t.plz) continue;
     const tc = await trainerCoords(t);
     if(!tc) continue;
     const dist = calcDistance(coords.lat, coords.lng, tc.lat, tc.lng);
-    if(dist <= radius) filtered.push({...t, _distance: Math.round(dist)});
+    mitEntfernung.push({...t, _distance: Math.round(dist)});
+  }
+  // Erst nach Entfernung (Online-Trainer hinten, da ortsunabhängig).
+  mitEntfernung.sort((a,b) => (a._online?1:0) - (b._online?1:0) || a._distance - b._distance);
+  const imUmkreis = mitEntfernung.filter(t => t._online || t._distance <= radius);
+
+  if(imUmkreis.length) {
+    status.textContent = `📍 ${coords.stadt} · ${imUmkreis.length} Trainer in ${radius} km gefunden`;
+    naeheHinweisAus();
+    renderTrainersWithDistance(imUmkreis);
+    try { vexfitTrichter('treffer', { rolle: 'kunde', plz: letztePlz, einmal: false }); } catch(e) {}
+    return;
   }
 
-  // Erst die Trainer im Umkreis (nach Entfernung), danach die Online-Trainer.
-  // Online-Trainer sind vom Umkreisfilter ausgenommen und standen durch
-  // _distance:0 frueher ganz oben; jetzt stehen sie hinter den Treffern im Umkreis.
-  filtered.sort((a,b) => (a._online?1:0) - (b._online?1:0) || a._distance - b._distance);
-  status.textContent = `📍 ${coords.stadt} · ${filtered.length} Trainer in ${radius} km gefunden`;
-  renderTrainersWithDistance(filtered);
-  // K1: Treffer > 0 melden (anonym, grober PLZ-Bereich aus der letzten Suche).
-  if(filtered.length) { try { vexfitTrichter('treffer', { rolle: 'kunde', plz: letztePlz, einmal: false }); } catch(e) {} }
+  // K4: Keiner im gewählten Umkreis → die nächsten (bis 6) zeigen, mit klarer
+  // Entfernung, statt einer Sackgasse. Dazu der Hinweis + Vormerk-Knopf.
+  const naechste = mitEntfernung.filter(t => !t._online).slice(0, 6);
+  if(naechste.length) {
+    const km = naechste[0]._distance;
+    status.textContent = `📍 Kein Trainer in ${radius} km um ${coords.stadt}. Die nächsten (ab ${km} km):`;
+    renderTrainersWithDistance(naechste);
+    naeheHinweisAn(coords, radius);
+    return;
+  }
+
+  // Wirklich niemand (keine PLZ hinterlegt / keine Online-Trainer) → Vormerkung.
+  naeheHinweisAus();
+  showEmpty();
+}
+
+// K4: Hinweisband unter der Trefferliste, wenn nur die „nächsten" (außerhalb des
+// Umkreises) gezeigt werden. Bietet die Vormerkung an, ohne die Seite auf
+// „leer" zu stellen.
+function naeheHinweisAn(coords, radius) {
+  const el = document.getElementById('naeheHinweis');
+  if(!el) return;
+  const t = document.getElementById('naeheHinweisText');
+  if(t) t.textContent = `Noch kein Trainer in ${radius} km um ${coords && coords.stadt ? coords.stadt : 'dich'}. Lass dich benachrichtigen, sobald sich einer in deiner Region anmeldet.`;
+  // E-Mail-Feld der Vormerkung mit der PLZ als Kontext; Ort merken.
+  el.dataset.stadt = (coords && coords.stadt) || '';
+  el.style.display = 'block';
+}
+function naeheHinweisAus() {
+  const el = document.getElementById('naeheHinweis');
+  if(el) el.style.display = 'none';
 }
 
 function renderTrainersWithDistance(trainers) {
@@ -765,6 +811,34 @@ function spracheOptionenAufbauen() {
 function showEmpty() {
   document.getElementById('emptyState').classList.add('show');
   document.getElementById('trainerCount').textContent = '0 Trainer';
+}
+
+// K4: Vormerkung aus dem Nähe-Hinweis (0 Treffer im Umkreis). Nutzt den
+// bestehenden, Spam-geschützten Weg /neuer-kunde (anonym) – der Eintrag landet
+// als Interessent bei Jakob (Nachfrage-Übersicht). Die AUTOMATISCHE „genau eine
+// Mail, sobald ein Trainer frei ist" läuft über die Warteliste und steht
+// angemeldeten Kunden im Kundenbereich offen (bestehender Mechanismus). Hinweis
+// dazu in docs/konzept-2026-11-07.md.
+async function naeheVormerken() {
+  const band = document.getElementById('naeheHinweis');
+  const email = (document.getElementById('naehe-email').value || '').trim();
+  const koeder = (document.getElementById('naehe-webseite') || {}).value || '';
+  if(koeder) return;
+  if(!email || email.indexOf('@') < 1) { alert('Bitte eine gültige E-Mail eingeben.'); return; }
+  const stadt = (band && band.dataset.stadt) || (document.getElementById('plzInput')?.value.trim() || '');
+  try {
+    const r = await fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-kunde', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ vorname: 'Interessent', nachname: '', email: email, stadt: stadt, ziel: 'Vormerkung – Trainer in der Nähe gesucht', budget: '', webseite: koeder })
+    });
+    if(r.status === 429) { alert('Wir haben deine Anmeldung schon. Danke!'); return; }
+    if(!r.ok) throw new Error('Status ' + r.status);
+    document.getElementById('naeheVormerkForm').style.display = 'none';
+    document.getElementById('naeheVormerkOk').style.display = 'block';
+  } catch(e) {
+    console.error('naeheVormerken:', e && e.name);
+    alert('Konnte nicht gespeichert werden. Bitte später erneut versuchen.');
+  }
 }
 
 async function submitNotify() {
