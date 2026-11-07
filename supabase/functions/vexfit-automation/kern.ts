@@ -928,16 +928,16 @@ export function mailErsteAnfrage(
     ueberschrift: "Deine erste Kundenanfrage",
     absatz:
       `Hallo ${nameFormatieren(w(trainer.vorname))}, über Vexfit hat dich jemand angefragt. ` +
-      "Um Name und E-Mail-Adresse zu sehen, aktiviere dein Abo.",
+      "Nimm die Anfrage an, um Name und E-Mail zu sehen und loszulegen – oder lehne sie kostenlos ab.",
     datenZeilen: [
       { beschriftung: "Ziel", wert: w(kunde.ziel) },
       { beschriftung: "Nachricht", wert: w(kunde.nachricht) },
     ],
-    knopfText: "Abo aktivieren",
+    knopfText: "Anfrage annehmen (Abo aktivieren)",
     knopfLink: zahlungslink(LINK_ERSTE, trainer),
     hinweis:
-      "49,99 € pro Monat, monatlich kündbar. Die Kontaktdaten erhältst du " +
-      "unmittelbar nach der Zahlung.",
+      "Erst mit dem Annehmen beginnt dein Abo: 49,99 € pro Monat, monatlich kündbar (AGB §3). " +
+      "Ablehnen kostet nichts. Die Kontaktdaten erhältst du unmittelbar nach der Zahlung.",
     grundZeile:
       "Du erhältst diese E-Mail, weil du ein Trainerprofil auf Vexfit angelegt hast.",
   });

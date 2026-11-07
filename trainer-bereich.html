@@ -1726,7 +1726,13 @@ function renderAnfragen(data) {
       } else if(z === 'abgelehnt') {
         statusHTML = '<div class="anf-status abgelehnt">Abgelehnt</div>';
       } else {
+        // S5: klar machen, was Annehmen/Ablehnen bedeutet. Studio-Trainer zahlen
+        // nie – fuer sie kein Abo-Hinweis.
+        const annahmeHinweis = istStudio
+          ? '<div class="anf-hinweis" style="font-size:11px;color:var(--muted);margin:6px 0">Als Studio-Trainer kostenlos. Annehmen oder ablehnen – beides ohne Gebühr.</div>'
+          : '<div class="anf-hinweis" style="font-size:11px;color:var(--muted);margin:6px 0">Annehmen startet dein Abo (49,99 €/Monat, monatlich kündbar, AGB §3). Ablehnen ist kostenlos.</div>';
         statusHTML = `<div class="anf-status offen">Neu</div>
+        ${annahmeHinweis}
         <div class="anf-actions">
           <button class="btn-annehmen" onclick="beantworteAnfrage('${a.id}','angenommen',this)">Annehmen</button>
           <button class="btn-ablehnen" onclick="beantworteAnfrage('${a.id}','abgelehnt',this)">Ablehnen</button>

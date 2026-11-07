@@ -523,8 +523,13 @@ Deno.test("/neue-anfrage: noch nicht bezahlt → ERSTE Anfrage mit 49,99-Link an
   );
   assertStringIncludes(m.text, "Ziel: Abnehmen");
   assertStringIncludes(m.text, "Nachricht: Hallo!");
-  assertStringIncludes(m.text, "Abo aktivieren: " + LINK_ERSTE);
+  assertStringIncludes(m.text, LINK_ERSTE);
+  assertStringIncludes(m.text, "Anfrage annehmen");
   assertStringIncludes(m.text, "49,99 € pro Monat, monatlich kündbar");
+  // S5: Annehmen startet das Abo (AGB §3), Ablehnen ist kostenlos.
+  assertStringIncludes(m.text, "AGB §3");
+  assertStringIncludes(m.text, "kostenlos ab");
+  assertStringIncludes(m.text, "Ablehnen kostet nichts");
   // Der Kundenname wird vor der Zahlung NICHT gezeigt.
   assert(
     !m.text.includes("Testkundin"),
@@ -677,7 +682,7 @@ Deno.test("/neue-anfrage: normaler Trainer unveraendert, auch wenn Studio-Feld l
   );
   const m = auf.mails[0];
   assertEquals(m.betreff, "Deine erste Kundenanfrage auf Vexfit");
-  assertStringIncludes(m.text, "Abo aktivieren: " + LINK_ERSTE);
+  assertStringIncludes(m.text, LINK_ERSTE);
   assertEquals(auf.weitergeleitetMarkiert, []);
 });
 
