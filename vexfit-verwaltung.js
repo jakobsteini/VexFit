@@ -405,6 +405,60 @@ export function trichterKundeNachQuelle(ereignisse, jetzt = Date.now(), tage = 7
   return { gesamt, quellen, plzBereiche };
 }
 
+// ── K6 (07.11.): Stadt-/PLZ-Übersicht – wo ist Nachfrage, wo fehlen Trainer ──
+/** Aggregiert je PLZ (mit Stadt-Label): freigegebene Trainer, davon Profil ≥5/8,
+ *  Kundensuchen der letzten 7/30 Tage, Vormerkungen und Anfragen. Test-/Spam-
+ *  Trainer (ist_test) werden ausgenommen. Reine Funktion. */
+export function stadtUebersicht(daten, jetzt = Date.now()) {
+  const { trainers, suchen, warteliste, anfragen } = daten || {};
+  const g7 = jetzt - 7 * 86400000, g30 = jetzt - 30 * 86400000;
+  const orte = {};
+  const slot = (plz) => (orte[plz] = orte[plz] || { plz, stadt: "", trainerFrei: 0, trainerReif: 0, suchen7: 0, suchen30: 0, vorm: 0, anfragen: 0 });
+  const plzVonTrainer = {};
+  for (const t of trainers || []) {
+    if (t.ist_test === true) continue;
+    if (t.id != null && t.plz) plzVonTrainer[String(t.id)] = t.plz;
+    if (!t.plz) continue;
+    const o = slot(t.plz);
+    if (t.stadt && !o.stadt) o.stadt = t.stadt;
+    if (t.aktiv === true && t.gesperrt !== true) {
+      o.trainerFrei++;
+      if ((8 - fehlendeProfilfelder(t).length) >= 5) o.trainerReif++;
+    }
+  }
+  for (const s of suchen || []) {
+    if (!s.plz) continue;
+    const t = s.erstellt_am ? new Date(s.erstellt_am).getTime() : NaN;
+    if (isNaN(t)) continue;
+    const o = slot(s.plz);
+    if (t >= g30) o.suchen30++;
+    if (t >= g7) o.suchen7++;
+  }
+  for (const v of warteliste || []) {
+    if (!v.plz) continue;
+    const o = slot(v.plz);
+    o.vorm++;
+    if (v.stadt && !o.stadt) o.stadt = v.stadt;
+  }
+  for (const a of anfragen || []) {
+    const plz = a.trainer_id != null ? plzVonTrainer[String(a.trainer_id)] : null;
+    if (plz) slot(plz).anfragen++;
+  }
+  return Object.values(orte);
+}
+
+/** K6: Standardsortierung – größter Handlungsbedarf zuerst: Orte mit Nachfrage
+ *  (Suchen/Vormerkungen), aber ohne freigegebene Trainer. Reine Funktion. */
+export function stadtUebersichtSortiert(liste, feld) {
+  const arr = Array.isArray(liste) ? liste.slice() : [];
+  if (feld && feld !== "bedarf") {
+    return arr.sort((a, b) => (b[feld] || 0) - (a[feld] || 0) || (b.suchen30 - a.suchen30));
+  }
+  // Bedarf = Nachfrage ohne (genug) Trainer zuerst.
+  const bedarf = (o) => (o.suchen30 + o.vorm) * (o.trainerFrei === 0 ? 10 : 1);
+  return arr.sort((a, b) => bedarf(b) - bedarf(a) || (b.suchen30 + b.vorm) - (a.suchen30 + a.vorm));
+}
+
 /** B5.3: Anzeigetext für den Abo-Status eines Trainers. */
 export function aboStatusLabel(status) {
   switch (status) {
@@ -1431,10 +1485,37 @@ function starteVerwaltung() {
     ).join("");
   }
 
+  // K6: Zustand der Stadt-Übersicht (geladene Daten + aktuelle Sortierung).
+  const stadtZustand = { suchen: [], warteliste: [], anfragen: [], feld: "bedarf" };
+  function renderStadtUebersicht() {
+    const tb = $("stadt-uebersicht-tbody");
+    if (!tb) return;
+    const liste = stadtUebersicht({
+      trainers: sichtbar(daten.trainers, zustand.testsAusTrainer),
+      suchen: stadtZustand.suchen, warteliste: stadtZustand.warteliste, anfragen: stadtZustand.anfragen,
+    }, Date.now());
+    const sortiert = stadtUebersichtSortiert(liste, stadtZustand.feld);
+    tb.innerHTML = sortiert.length ? sortiert.map((o) => {
+      const ort = o.stadt ? `${escapeHtml(o.stadt)} (${escapeHtml(o.plz)})` : escapeHtml(o.plz);
+      const kennung = (o.trainerFrei === 0 && (o.suchen30 + o.vorm) > 0) ? ' <span class="badge badge-unpaid">Nachfrage ohne Trainer</span>' : "";
+      return `<tr><td data-label="Ort"><strong>${ort}</strong>${kennung}</td><td data-label="Trainer frei">${o.trainerFrei}</td><td data-label="≥5/8">${o.trainerReif}</td><td data-label="Suchen 7d">${o.suchen7}</td><td data-label="Suchen 30d">${o.suchen30}</td><td data-label="Vormerk.">${o.vorm}</td><td data-label="Anfragen">${o.anfragen}</td></tr>`;
+    }).join("") : '<tr><td colspan="7" class="leer-text">Noch keine Orte mit Daten.</td></tr>';
+  }
   async function ladeNachfrage() {
     const tb = $("nachfrage-tbody"), zb = $("ziele-tbody");
     const hinweis = "Die Nachfrage-Übersicht braucht die Tabellen such_eingaben und warteliste.";
     const zeige = (t) => { tb.innerHTML = `<tr><td colspan="4" class="leer-text">${escapeHtml(t)}</td></tr>`; zb.innerHTML = `<tr><td colspan="2" class="leer-text">${escapeHtml(t)}</td></tr>`; };
+    // K6: zusätzliche Datenquellen für die Stadt-Übersicht (erstellt_am für 7/30
+    // Tage, Anfragen je Trainer). Best effort: fehlt eine, bleibt die Übersicht
+    // trotzdem bestmöglich befüllt.
+    try {
+      const [se30R, anfR] = await Promise.all([
+        hole("such_eingaben?select=plz,erstellt_am&limit=5000"),
+        hole("anfragen?select=trainer_id&limit=5000"),
+      ]);
+      stadtZustand.suchen = se30R.ok ? await se30R.json() : [];
+      stadtZustand.anfragen = anfR.ok ? await anfR.json() : [];
+    } catch { stadtZustand.suchen = []; stadtZustand.anfragen = []; }
     try {
       const [seR, wlR] = await Promise.all([
         hole("such_eingaben?select=plz,spezialisierungen&limit=5000"),
@@ -1442,6 +1523,8 @@ function starteVerwaltung() {
       ]);
       if (!seR.ok || !wlR.ok) { zeige(hinweis); return; }
       const suchen = await seR.json(), vorm = await wlR.json();
+      stadtZustand.warteliste = vorm;
+      renderStadtUebersicht();
       const orte = {};
       const slot = (p) => (orte[p] = orte[p] || { plz: p, stadt: "", suchen: 0, vorm: 0, trainer: 0 });
       for (const s of suchen) if (s.plz) slot(s.plz).suchen++;
@@ -2145,6 +2228,9 @@ function starteVerwaltung() {
       }
       const sort = e.target.closest("th[data-sort]");
       if (sort) { aufSortieren(sort.dataset.liste, sort.dataset.sort); return; }
+      // K6: Stadt-Übersicht nach einer Spalte sortieren.
+      const stadtSort = e.target.closest("th.stadt-sort");
+      if (stadtSort) { stadtZustand.feld = stadtSort.dataset.feld || "bedarf"; renderStadtUebersicht(); return; }
       const schliessen = e.target.closest("[data-schliessen]");
       if (schliessen) { const was = schliessen.dataset.schliessen; if (was === "detail") detailSchliessen(); else if (was === "dialog") dialogZu(false); else if (was === "form") formZu(null); else if (was === "mehr") mehrSchliessen(); return; }
       const a = e.target.closest("[data-aktion]");

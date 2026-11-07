@@ -494,6 +494,21 @@ tr:last-child td{border-bottom:none}
 
     <!-- Nachfrage -->
     <div class="tab-content" id="tab-nachfrage">
+      <!-- K6: Stadt-/PLZ-Übersicht. Spalten klickbar zum Sortieren. -->
+      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Stadt-Übersicht · wo ist Nachfrage, wo fehlen Trainer</h3>
+      <div class="section-hinweis">Freigegebene Trainer (ohne Test/Spam), davon Profil ≥5/8, Kundensuchen 7/30 Tage, Vormerkungen, Anfragen. Spaltenüberschrift antippen zum Sortieren.</div>
+      <div class="table-wrap" style="margin-bottom:22px"><table>
+        <thead><tr>
+          <th>Ort</th>
+          <th class="stadt-sort" data-feld="trainerFrei" style="cursor:pointer">Trainer frei</th>
+          <th class="stadt-sort" data-feld="trainerReif" style="cursor:pointer">≥5/8</th>
+          <th class="stadt-sort" data-feld="suchen7" style="cursor:pointer">Suchen 7d</th>
+          <th class="stadt-sort" data-feld="suchen30" style="cursor:pointer">Suchen 30d</th>
+          <th class="stadt-sort" data-feld="vorm" style="cursor:pointer">Vormerk.</th>
+          <th class="stadt-sort" data-feld="anfragen" style="cursor:pointer">Anfragen</th>
+        </tr></thead>
+        <tbody id="stadt-uebersicht-tbody"><tr><td colspan="7" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
       <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Nachfrage je Ort</h3>
       <div class="table-wrap" style="margin-bottom:22px"><table>
         <thead><tr><th>Ort</th><th>Suchen</th><th>Vormerkungen</th><th>Trainer</th></tr></thead>
