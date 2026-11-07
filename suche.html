@@ -272,8 +272,10 @@ try {
 <script src="vexfit-namen.js"></script>
 <script src="vexfit-plz.js"></script>
 <script src="vexfit-ziele.js"></script>
+<script src="vexfit-config.js"></script>
 <script src="vexfit-matching.js"></script>
 <script src="vexfit-trichter.js"></script>
+<script src="vexfit-vorschau.js"></script>
 <script>
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -409,6 +411,23 @@ function calcDistance(lat1, lng1, lat2, lng2) {
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
+// K2: Name in der Karte. In der öffentlichen Vorschau (Schalter an, nicht
+// angemeldet) nur „Vorname N."; sonst wie bisher der volle, formatierte Name.
+function kartenName(t) {
+  if (typeof vexVorschau !== 'undefined' && vexVorschau.vorschauAktiv(angemeldet)) {
+    return vexEsc(vexVorschau.vorschauName(t.vorname, t.nachname));
+  }
+  return vexEsc(vexName((t.vorname || "") + " " + (t.nachname || "")));
+}
+// K2: In der öffentlichen Vorschau nur Profile >= 5/8 (Näherung) zeigen; sonst
+// die Liste unverändert lassen.
+function vorschauFilter(liste) {
+  if (typeof vexVorschau !== 'undefined' && vexVorschau.vorschauAktiv(angemeldet)) {
+    return (liste || []).filter(vexVorschau.vorschauReif);
+  }
+  return liste;
+}
+
 // K1: Profil-Öffnen zählen (anonym), dann zur Profilseite. keepalive im Beacon
 // sorgt dafür, dass die Meldung die Navigation überlebt.
 function oeffneProfil(id) {
@@ -485,6 +504,7 @@ async function umkreisSuche(coords, radius, status) {
 }
 
 function renderTrainersWithDistance(trainers) {
+  trainers = vorschauFilter(trainers);
   const grid = document.getElementById('trainerGrid');
   const empty = document.getElementById('emptyState');
   const count = document.getElementById('trainerCount');
@@ -511,7 +531,7 @@ function renderTrainersWithDistance(trainers) {
         ${kartenAbzeichen(t, t._online)}
       </div>
       <div class="cb">
-        <div class="cn">${vexEsc(vexName((t.vorname||"") + " " + (t.nachname||"")))}</div>
+        <div class="cn">${kartenName(t)}</div>
         <div class="cl">${vexEsc(t.trainingsart)} · ${vexEsc(t.stadt)}</div>
         <div class="ctags">${tags}</div>
         <div class="cf"><div class="cp">${preis}</div>${distLabel}</div>
@@ -574,6 +594,7 @@ function kartenAbzeichen(t, isOnline) {
 }
 
 function renderTrainers(trainers) {
+  trainers = vorschauFilter(trainers);
   const grid = document.getElementById('trainerGrid');
   const empty = document.getElementById('emptyState');
   const count = document.getElementById('trainerCount');
@@ -604,7 +625,7 @@ function renderTrainers(trainers) {
           ${kartenAbzeichen(t, isOnline)}
         </div>
         <div class="cb">
-          <div class="cn">${vexEsc(vexName((t.vorname||"") + " " + (t.nachname||"")))}</div>
+          <div class="cn">${kartenName(t)}</div>
           <div class="cl">${isOnline ? '🌐 Online · DACH-weit' : '📍 ' + vexEsc(t.stadt) + ' · ' + vexEsc(t.trainingsart)}</div>
           <div class="ctags">${tags.map(tag => `<span class="ctag">${vexEsc(tag)}</span>`).join('')}</div>
           <div class="cf">
