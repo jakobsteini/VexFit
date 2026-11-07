@@ -254,3 +254,47 @@ D7: **erledigt.**
 
 Invariante abgesichert durch `d8_cache_test.ts` (2). Suite **763 grün**.
 D8: **erledigt** (kein Versionssprung – bewusst).
+
+## D9 – Wochenplan KW 46
+
+`docs/wochenplan-2026-11-09.md` (Mo 09.11.–So 15.11.2026). Nur aus Repo-Inhalten
+(Konzept, Protokolle, Werkzeuge); alles Nicht-Repo als **[BLOCK]** markiert.
+Ziel: Salzburg, erste echte Kundenanfrage. Werktags „nach 16 Uhr" (Zivildienst),
+Kanäle: Briefe per Post (`werkzeuge/brief-generator.mjs`), persönliche Besuche,
+Anzeige „VF Trainer AT 4" → `trainer.html`, Presse. Rechtsrahmen AT (keine
+Kaltanrufe/Werbe-Mails). Tägliche Kennzahlen aus der Admin-Stadt-Übersicht.
+
+D9: **erledigt.**
+
+---
+
+## Abschluss – Übersicht D0–D9
+
+| Baustein | Status | Commit |
+|---|---|---|
+| D0 Bestandsaufnahme + VORHER-Screenshots | erledigt | 211ff5e |
+| D1 Kein voller Nachname öffentlich | erledigt | d876365 |
+| D2 Standortfilter pro Land (zwei Abschnitte) | erledigt | 495e56b |
+| D3 Trainerfoto zentriert | erledigt | 495e56b (mit D2) |
+| D4 Kontrast und Kopfzeile | erledigt | 343ee73 |
+| D5 Karten und Seite aufräumen | erledigt | de0980c |
+| D6 SEO und Teilen | erledigt | 0c6adf2 |
+| D7 Gesamttest + NACHHER-Screenshots | erledigt | ce16f41 |
+| D8 Service-Worker und Cache (kein Bump, begründet) | erledigt | cac6264 |
+| D9 Wochenplan KW 46 | erledigt | (dieser Commit) |
+
+### Ladewege Trainerdaten: vorher → nachher
+- **suche.html** nicht angemeldet: vorher `trainers_vorschau` (ohne Nachname) mit
+  Rückfall `trainers_oeffentlich` ohne Nachname **plus** totem Pfad
+  `ladeOeffentlich` **mit** `nachname` → nachher: toter Pfad ebenfalls **ohne**
+  `nachname` (`OEFFENTLICHE_SPALTEN`), Freitextsuche trifft Nachnamen nur angemeldet.
+- **profil.html** nicht angemeldet: vorher `trainers_oeffentlich` **mit** `nachname`
+  (DOM + Meta + JSON-LD) → nachher `trainers_vorschau` (nur `nachname_initial`),
+  Rückfall `trainers_oeffentlich` **ohne** `nachname`; Anzeige „Vorname N.".
+- **suche.html** angemeldet / **profil.html** angemeldet: unverändert (Tabelle
+  `trainers` mit Token, voller Name erlaubt).
+
+### Neue Migrationsdateien (nur Datei, nicht eingespielt)
+- `migrations/2026-11-08-03-anon-kein-nachname.sql` (+ Rücknahme): entzieht `anon`
+  den Spalten-Lesezugriff auf `nachname` in `trainers_oeffentlich`. Einspielen
+  **nach** `2026-11-08-01-trainers-vorschau.sql`.
