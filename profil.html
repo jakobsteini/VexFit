@@ -273,8 +273,9 @@ try {
         </div>
         <div class="contact-success" id="contactSuccess">
           <div class="contact-success-icon">🎉</div>
-          <h3>NACHRICHT<br><span>GESENDET!</span></h3>
-          <p>Wir haben deine Anfrage erhalten und melden uns so schnell wie möglich bei dir!</p>
+          <h3>ANFRAGE<br><span>GESENDET!</span></h3>
+          <p id="contactSuccessText">Deine Anfrage ist raus. Der Trainer entscheidet selbst, ob und wie er sich bei dir meldet. Den Status deiner Anfrage siehst du jederzeit in deinem Kundenbereich.</p>
+          <a href="kunden-bereich.html" class="btn-send" style="display:inline-block;margin-top:14px;text-decoration:none">Zu meinen Anfragen →</a>
         </div>
       </div>
     </div>
@@ -670,6 +671,8 @@ async function sendAnfrageMitKonto() {
     } catch(e) {}
     try { if (typeof vexfitTrichter === 'function') vexfitTrichter('anfrage', { rolle: 'kunde', plz: (trainerData && trainerData.plz) || '', einmal: false }); } catch(e) {}
     document.getElementById('anonHinweis').style.display = 'none';
+    const erfolgText = document.getElementById('contactSuccessText');
+    if (erfolgText) erfolgText.textContent = 'Deine Anfrage ist bei ' + tName + ' eingegangen. ' + tName + ' entscheidet selbst, ob und wie er sich bei dir meldet – es gibt keine feste Antwortzeit. Den Status siehst du jederzeit in deinem Kundenbereich.';
     document.getElementById('contactSuccess').classList.add('show');
   } catch (e) {
     console.error('sendAnfrageMitKonto:', e);
