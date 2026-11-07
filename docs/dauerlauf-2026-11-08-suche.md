@@ -193,3 +193,24 @@ D5-Punkte erfüllt:
 
 Test `d5_karten_test.ts` (4). Suite **759 grün**, check+lint grün (30 Baseline).
 D5: **erledigt.**
+
+## D6 – SEO und Teilen (ohne Datenbankänderung)
+
+- `suche.html`: **canonical** auf `https://vexfit.app/suche.html` (ohne Parameter);
+  Seite bleibt **noindex**. Neuer `setzeSucheSeo(stadt, land)` setzt nach einer
+  Suche Titel/Beschreibung/og/twitter passend zu **Ort und Land** – z. B.
+  „Personal Trainer in Salzburg finden | Vexfit". **Keine personenbezogenen
+  Daten** in Meta-Tags (nur Ort/Land; der Test schließt nachname/email/telefon aus).
+- **Sitemap/robots – Entscheidung:** Die Suche wird NICHT schädlich indexiert.
+  `robots.txt` enthält `Disallow: /suche.html`, die Seite ist `noindex`, und
+  `sitemap.xml` listet **keine** `suche.html`- oder PLZ-Varianten. Damit entstehen
+  keine tausenden PLZ-Seiten im Index. Die `sitemap.xml` wird von
+  `werkzeuge/stadtseiten.mjs` erzeugt (Einschluss je Datei) und daher **nicht von
+  Hand** geändert.
+- Hinweis (kein BLOCK, Folgeaufgabe): `personal-trainer-salzburg.html` ist
+  indexierbar, steht aber noch nicht in der `sitemap.xml`. Beim nächsten Lauf des
+  Generators (`werkzeuge/stadtseiten.mjs`) wird sie aufgenommen; bewusst nicht von
+  Hand ergänzt, um Konflikte mit dem Generator zu vermeiden.
+
+Test `d6_seo_test.ts` (2). Suite **761 grün**, check+lint grün.
+D6: **erledigt.**

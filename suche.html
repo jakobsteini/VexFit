@@ -7,6 +7,10 @@
 <link rel="manifest" href="manifest.json">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex">
+<!-- D6: Kanonische Adresse ist die Suche OHNE Parameter – so bündeln sich geteilte
+     PLZ-Varianten. Die Seite bleibt noindex; Suchmaschinen indexieren keine
+     PLZ-Varianten (siehe auch robots.txt Disallow: /suche.html). -->
+<link rel="canonical" href="https://vexfit.app/suche.html">
 <title>Vexfit – Trainer finden</title>
 <meta name="description" content="Durchsuche Personal Trainer in deiner Nähe – nach Stadt und Ziel. Für Kunden kostenlos.">
 <meta property="og:type" content="website">
@@ -495,6 +499,26 @@ function oeffneProfil(id) {
   window.location = 'profil.html?id=' + id;
 }
 
+// D6: Titel/Beschreibung/og passend zu Ort/Land setzen (nur Ort + Land, KEINE
+// personenbezogenen Daten). Die Seite bleibt noindex; das hilft Tab/Teilen.
+function setzeSucheSeo(stadt, land) {
+  try {
+    const ort = (stadt || '').trim();
+    const ln = land ? (vexAbschnitte.LANDNAME[land] || land) : '';
+    const titel = ort ? `Personal Trainer in ${ort} finden | Vexfit` : 'Vexfit – Trainer finden';
+    const besch = ort
+      ? `Finde Personal Trainer in ${ort}${ln ? ' (' + ln + ')' : ''} – vor Ort und online. Für Kunden kostenlos.`
+      : 'Durchsuche Personal Trainer in deiner Nähe – nach Stadt und Ziel. Für Kunden kostenlos.';
+    document.title = titel;
+    const setM = (sel, val) => { const el = document.head.querySelector(sel); if (el) el.setAttribute('content', val); };
+    setM('meta[name="description"]', besch);
+    setM('meta[property="og:title"]', titel);
+    setM('meta[property="og:description"]', besch);
+    setM('meta[name="twitter:title"]', titel);
+    setM('meta[name="twitter:description"]', besch);
+  } catch (e) {}
+}
+
 // D2: Land, PLZ und Umkreis in der Adresse halten, damit Neuladen, Zurück-Knopf
 // und Teilen denselben Stand zeigen. Nur ersetzen (kein neuer History-Eintrag).
 function urlStand(plz, land, radius) {
@@ -562,6 +586,7 @@ async function searchByPLZ() {
 
 async function umkreisSuche(coords, radius, status) {
   const sel = gewaehltesLand(); // 'AT'|'DE'|'CH'|null
+  setzeSucheSeo(coords.stadt, sel); // D6: Titel/Beschreibung passend zu Ort/Land
   status.textContent = `📍 ${coords.stadt} · Suche in ${radius} km Umkreis...`;
 
   // D2: Erst in Vor-Ort (nur gewaehltes Land) und Online (laenderuebergreifend)
