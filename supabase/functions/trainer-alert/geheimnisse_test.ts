@@ -46,6 +46,11 @@ const HARMLOS: { datei: string; hash: string; grund: string }[] = [
     hash: "52986df1c94522cb3b1b76511878ff54809516a43704a0375c8f5f47ac7eb345",
     grund: "Vexfit-Geschaeftsnummer (oeffentlich) in der Signatur der Freischalt-Mail (mailFreischaltung)",
   },
+  {
+    datei: "supabase/functions/vexfit-automation/profil_erinnerung_test.ts",
+    hash: "9d5473adfc3ff1af8b566073e082e6390b14b82b1e63c4e44feedb241b7e338a",
+    grund: "Platzhalter-Testnummer (alle Nullen) in der Fixture, keine echte Nummer",
+  },
 ];
 
 /** SHA-256 in Hex — damit die Ausnahmen oben ohne den Klartext auskommen. */

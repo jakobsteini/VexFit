@@ -29,8 +29,9 @@ Hallo Max, danke, dass du bei Vexfit dabei bist! Dein Profil ist zu 6 von 8
 fertig. Es fehlen noch: Foto, Preis pro Stunde. In der Suche sehen Kundinnen und
 Kunden zuerst Foto, Ort und Preis – vollständig ausgefüllte Profile werden eher
 angeklickt. Das Ergänzen dauert nur wenige Minuten. Vexfit ist für dich
-kostenlos, bis du die erste Kundenanfrage über Vexfit annimmst. Wenn du Fragen
-hast, antworte einfach auf diese Mail – sie erreicht Jakob direkt.
+kostenlos, bis du die erste Kundenanfrage über Vexfit annimmst. Danach 49,99
+€/Monat, monatlich kündbar. Jeder weitere Kunde über Vexfit einmalig 9,99 €.
+Wenn du Fragen hast, antworte einfach auf diese Mail – sie erreicht Jakob direkt.
 
 Es fehlt noch: Foto, Preis pro Stunde
 

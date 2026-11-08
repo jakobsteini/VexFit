@@ -2630,8 +2630,9 @@ export function mailProfilErinnerung(t: TrainerProfil): Mail {
     ` In der Suche sehen Kundinnen und Kunden zuerst Foto, Ort und Preis – ` +
     `vollständig ausgefüllte Profile werden eher angeklickt. Das Ergänzen dauert ` +
     `nur wenige Minuten. Vexfit ist für dich kostenlos, bis du die erste ` +
-    `Kundenanfrage über Vexfit annimmst. Wenn du Fragen hast, antworte einfach ` +
-    `auf diese Mail – sie erreicht Jakob direkt.`;
+    `Kundenanfrage über Vexfit annimmst. Danach 49,99 €/Monat, monatlich ` +
+    `kündbar. Jeder weitere Kunde über Vexfit einmalig 9,99 €. Wenn du Fragen ` +
+    `hast, antworte einfach auf diese Mail – sie erreicht Jakob direkt.`;
   return baueMail(w(t.email), `Dein Vexfit-Profil ist zu ${erfuellt} von 8 fertig`, {
     ueberschrift: "Mach dein Profil komplett",
     absatz,

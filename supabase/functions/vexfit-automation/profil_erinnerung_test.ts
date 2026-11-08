@@ -65,6 +65,11 @@ Deno.test("mailProfilErinnerung: fehlende Angaben, Link, kein Nachname, keine Ad
   assertStringIncludes(m.html, erinnerungZiel("Foto"));
   // AGB-konforme Preis-Formulierung, keine verbotene Variante.
   assertStringIncludes(m.text, "kostenlos, bis du die erste Kundenanfrage über Vexfit annimmst");
+  // Nach der Gratisphase wird der Preis genannt (kein Überraschungseffekt):
+  // Monatspreis UND „monatlich kündbar" UND der Preis je weiterem Kunden.
+  assertStringIncludes(m.text, "49,99 €/Monat");
+  assertStringIncludes(m.text, "monatlich kündbar");
+  assertStringIncludes(m.text, "9,99 €");
   assert(!/bis zum ersten kunden|ersten kunden gewonnen/i.test(m.text));
   // Kein voller Nachname (auch nicht in HTML), nur „Max".
   assert(!m.text.includes("Mustermann"), "voller Nachname im Text");
