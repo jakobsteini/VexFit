@@ -2093,6 +2093,72 @@ function starteVerwaltung() {
     if (name === "karte") kartenInit();
     else if (name === "herkunft") renderHerkunft();
     else if (name === "zahlungen") renderAboStatus();
+    else if (name === "erinnerung") ladeProfilErinnerung();
+  }
+
+  // ── Profil-Erinnerung (Service-Mail an registrierte Trainer, Versand per Klick) ──
+  let _erinnerungId = null;
+  function erinnerungDatum(iso) {
+    if (!iso) return "–";
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? "–" : d.toLocaleDateString("de-AT", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  }
+  async function ladeProfilErinnerung() {
+    const tb = $("erinnerung-tbody");
+    if (!tb) return;
+    tb.innerHTML = '<tr><td colspan="8" class="leer-text">Lade …</td></tr>';
+    const d = await adminEdge({ aktion: "profil_erinnerung_liste" });
+    if (!d) { tb.innerHTML = '<tr><td colspan="8" class="leer-text">Konnte nicht geladen werden.</td></tr>'; return; }
+    renderProfilErinnerung(Array.isArray(d.eintraege) ? d.eintraege : []);
+  }
+  function renderProfilErinnerung(eintraege) {
+    const tb = $("erinnerung-tbody");
+    if (!tb) return;
+    if (!eintraege.length) { tb.innerHTML = '<tr><td colspan="8" class="leer-text">Keine Trainer.</td></tr>'; return; }
+    tb.innerHTML = eintraege.map((e) => {
+      const unbestaetigt = e.email_bestaetigt === false
+        ? ' <span class="badge" style="background:rgba(251,146,60,0.18);color:var(--orange,#fb923c);padding:1px 6px;border-radius:100px;font-size:10px">E-Mail unbestätigt</span>' : "";
+      const salz = e.salzburg ? ' <span class="badge" style="background:rgba(232,255,0,0.14);color:var(--accent,#e8ff00);padding:1px 6px;border-radius:100px;font-size:10px">Salzburg</span>' : "";
+      const fehlt = (e.fehlend && e.fehlend.length) ? escapeHtml(e.fehlend.join(", ")) : "–";
+      const knopf = e.darf
+        ? `<button class="btn-klein" data-aktion="profil-erinnerung" data-id="${escapeHtml(e.id)}">Erinnerung</button>`
+        : `<span class="leer-text" title="${escapeHtml(e.grund || "")}">${escapeHtml(e.grund || "nicht möglich")}</span>`;
+      return `<tr>
+        <td data-label="Trainer">${escapeHtml(e.name)}${salz}${unbestaetigt}</td>
+        <td data-label="Ort / PLZ">${escapeHtml([e.ort, e.plz].filter(Boolean).join(" · ")) || "–"}</td>
+        <td data-label="Land">${escapeHtml(e.land || "–")}</td>
+        <td data-label="x/8">${e.erfuellt}/8</td>
+        <td data-label="Fehlt">${fehlt}</td>
+        <td data-label="Registriert">${erinnerungDatum(e.registriert_am)}</td>
+        <td data-label="Letzte Erinnerung">${erinnerungDatum(e.letzte_erinnerung_am)}</td>
+        <td data-label="Aktion">${knopf}</td>
+      </tr>`;
+    }).join("");
+  }
+  async function profilErinnerungVorschau(id) {
+    const d = await adminEdge({ aktion: "profil_erinnerung_vorschau", ziel_id: id });
+    if (!d) return;
+    if (!d.darf) { fehler(d.grund || "Erinnerung derzeit nicht möglich."); return; }
+    _erinnerungId = id;
+    $("erinnerung-empf").textContent = "An: " + (d.empfaenger || "–");
+    $("erinnerung-betreff").textContent = "Betreff: " + (d.betreff || "");
+    $("erinnerung-text").textContent = d.text || "";
+    $("erinnerung-overlay").classList.remove("verborgen");
+    $("erinnerung-box").classList.remove("verborgen");
+  }
+  function erinnerungVorschauZu() {
+    $("erinnerung-overlay").classList.add("verborgen");
+    $("erinnerung-box").classList.add("verborgen");
+    _erinnerungId = null;
+  }
+  async function profilErinnerungSenden() {
+    const id = _erinnerungId;
+    if (!id) return;
+    const d = await adminEdge({ aktion: "profil_erinnerung_senden", ziel_id: id });
+    erinnerungVorschauZu();
+    if (!d) return; // Fehler schon gemeldet
+    if (d.gesendet) { erfolg("Erinnerung gesendet."); ladeProfilErinnerung(); }
+    else fehler("Erinnerung wurde nicht gesendet.");
   }
 
   // Teil M: Deep-Link aus der Mail anspringen. #trainer-<id> / #kunde-<id>
@@ -2341,7 +2407,7 @@ function starteVerwaltung() {
       const stadtSort = e.target.closest("th.stadt-sort");
       if (stadtSort) { stadtZustand.feld = stadtSort.dataset.feld || "bedarf"; renderStadtUebersicht(); return; }
       const schliessen = e.target.closest("[data-schliessen]");
-      if (schliessen) { const was = schliessen.dataset.schliessen; if (was === "detail") detailSchliessen(); else if (was === "dialog") dialogZu(false); else if (was === "form") formZu(null); else if (was === "mehr") mehrSchliessen(); return; }
+      if (schliessen) { const was = schliessen.dataset.schliessen; if (was === "detail") detailSchliessen(); else if (was === "dialog") dialogZu(false); else if (was === "form") formZu(null); else if (was === "mehr") mehrSchliessen(); else if (was === "erinnerung") erinnerungVorschauZu(); return; }
       const a = e.target.closest("[data-aktion]");
       if (!a) return;
       const akt = a.dataset.aktion, id = a.dataset.id, art = a.dataset.art;
@@ -2367,6 +2433,8 @@ function starteVerwaltung() {
       if (akt === "land-setzen") { landSetzen(art, id, a.dataset.land); return; }
       if (akt === "anfrage-freigeben") { anfrageFreigeben(id); return; }
       if (akt === "anfrage-verwerfen") { anfrageVerwerfen(id); return; }
+      if (akt === "profil-erinnerung") { profilErinnerungVorschau(id); return; }
+      if (akt === "erinnerung-senden") { profilErinnerungSenden(); return; }
     });
     // Checkbox der Studio-Freigabe (change statt click)
     document.addEventListener("change", (e) => {

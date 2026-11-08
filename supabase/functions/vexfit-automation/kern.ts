@@ -411,6 +411,17 @@ export interface Anschluesse {
   /** Teil 4: Abmeldung per Token (ohne Login). Setzt erinnerungen_aus=true und
    *  meldet, ob ein Token passte. */
   erinnerungAbmelden?(token: string): Promise<boolean>;
+  /** Manuelle Profil-Erinnerung (Verwaltung): alle Trainer mit Profilfeldern
+   *  (service_role). Der Kern blendet Test/Spam aus und sortiert. */
+  profilErinnerungKandidaten?(): Promise<TrainerProfil[]>;
+  /** Trainer-ID → letzte manuelle Profil-Erinnerung (ISO) über alle Trainer. */
+  profilErinnerungLetzteMap?(): Promise<Record<string, string>>;
+  /** Letzte manuelle Profil-Erinnerung EINES Trainers (ISO) oder null. */
+  profilErinnerungLetzte?(trainerId: string): Promise<string | null>;
+  /** Protokolliert eine verschickte manuelle Profil-Erinnerung (service_role). */
+  profilErinnerungProtokollieren?(trainerId: string, fehlende: string[]): Promise<void>;
+  /** Best effort: Auth-user_id → E-Mail bestätigt? Fehlt der Zugriff, leere Map. */
+  emailBestaetigtMap?(): Promise<Record<string, boolean>>;
   /** Teil M: Kundenzeile per E-Mail (service_role) für Deep-Link #kunde-<id> und
    *  die Inhalte der Betreiber-Mail. Fehlt sie, wird ohne Deep-Link gebaut. */
   kundeProfilNachEmail?(email: string): Promise<Record<string, unknown> | null>;
@@ -1937,6 +1948,26 @@ async function adminAktion(
       }, herkunft);
     }
   }
+  // Profil-Erinnerung: Liste aller Trainer (ohne Test/Spam), Salzburg zuerst.
+  // Kein ziel_id – vor der ziel_id-Pflicht. Nur lesend (service_role).
+  if (aktion === "profil_erinnerung_liste") {
+    if (!a.profilErinnerungKandidaten) {
+      return antwort(200, { ok: true, eintraege: [], uebersprungen: "nicht verdrahtet" }, herkunft);
+    }
+    try {
+      const kand = await a.profilErinnerungKandidaten();
+      const letzteMap = a.profilErinnerungLetzteMap ? await a.profilErinnerungLetzteMap() : {};
+      const emailMap = a.emailBestaetigtMap ? await a.emailBestaetigtMap() : {};
+      const eintraege = profilErinnerungListe(kand, letzteMap, emailMap);
+      return antwort(200, { ok: true, eintraege }, herkunft);
+    } catch (fehler) {
+      if (istMigrationFehlt(fehler)) {
+        return antwort(200, { ok: true, eintraege: [], uebersprungen: "migration fehlt" }, herkunft);
+      }
+      throw fehler;
+    }
+  }
+
   const zielId = String(body.ziel_id ?? "");
   if (!zielId) return antwort(400, { fehler: "ziel_id fehlt" }, herkunft);
   // Eingaben begrenzen (Typ/Laenge): Kennungen sind UUIDs/kurze Strings.
@@ -1988,6 +2019,42 @@ async function adminAktion(
         ergebnis: `mail=${mail.gesendet}${mail.grund ? " (" + mail.grund + ")" : ""}`,
       });
       return antwort(200, { ok: true, mail }, herkunft);
+    }
+    // Profil-Erinnerung: Vorschau (baut die Mail, sendet NICHT).
+    case "profil_erinnerung_vorschau": {
+      const erg = await profilErinnerungVorbereiten(a, zielId);
+      if ("fehler" in erg) return antwort(400, { fehler: erg.fehler }, herkunft);
+      return antwort(200, {
+        ok: true,
+        empfaenger: erg.empfaenger,
+        betreff: erg.betreff,
+        text: erg.text,
+        erfuellt: erg.erfuellt,
+        fehlend: erg.fehlend,
+        darf: erg.darf,
+        grund: erg.grund,
+      }, herkunft);
+    }
+    // Profil-Erinnerung: senden (NUR auf Klick). Serverseitig geprüft: 8/8,
+    // Test/Spam und 14-Tage-Sperre werden abgelehnt; dann Versand + Protokoll.
+    case "profil_erinnerung_senden": {
+      const erg = await profilErinnerungVorbereiten(a, zielId);
+      if ("fehler" in erg) return antwort(400, { fehler: erg.fehler }, herkunft);
+      if (!erg.darf) return antwort(400, { fehler: erg.grund }, herkunft);
+      await a.mailSenden(erg.mail);
+      try {
+        await a.profilErinnerungProtokollieren?.(zielId, erg.fehlend);
+      } catch (fehler) {
+        a.melden?.("profil-erinnerung: Protokoll fehlgeschlagen", String(fehler));
+      }
+      await a.protokoll?.({
+        admin_id: nutzer.id,
+        aktion,
+        ziel_tabelle: "trainers",
+        ziel_id: zielId,
+        ergebnis: `gesendet fehlend=${erg.fehlend.length}`,
+      });
+      return antwort(200, { ok: true, gesendet: true, empfaenger: erg.empfaenger }, herkunft);
     }
     case "trainer_sperren":
       geaendert = await a.adminTrainerSetzen(zielId, { aktiv: false });
@@ -2492,6 +2559,184 @@ export function mailErinnerung(
   });
 }
 
+// ============================================================================
+// Manuelle Profil-Erinnerung (Verwaltung, von Jakob PER KLICK ausgelöst)
+// ----------------------------------------------------------------------------
+// Anders als die automatischen Stufen-Mails (erinnerung_stufe): Jakob wählt in
+// der Verwaltung einen Trainer, sieht die fertige Mail als Vorschau und
+// verschickt sie erst mit „Jetzt senden". Höchstens eine je Trainer in 14
+// Tagen (serverseitig aus profil_erinnerungen gelesen). Kein Sammelversand.
+// ============================================================================
+
+/** Raum Salzburg: AT-PLZ beginnt mit 50 oder 51. Als Konstante (im Abschluss
+ *  genannt), damit Liste und Sortierung dieselbe Regel verwenden. */
+export const SALZBURG_PLZ_PRAEFIXE = ["50", "51"] as const;
+export function istSalzburgPlz(plz: unknown): boolean {
+  const p = String(plz ?? "").trim();
+  return SALZBURG_PLZ_PRAEFIXE.some((pre) => p.startsWith(pre));
+}
+
+/** Höchstens eine manuelle Erinnerung je Trainer in so vielen Tagen. */
+export const PROFIL_ERINNERUNG_SPERRE_TAGE = 14;
+
+/** „Vorname N." – nie der volle Nachname (auch nicht der eines anderen Trainers). */
+export function trainerKurzname(vorname: unknown, nachname: unknown): string {
+  const vn = nameFormatieren(w(vorname));
+  const nn = w(nachname).trim();
+  const init = nn ? nn[0].toUpperCase() + "." : "";
+  return (vn + " " + init).trim();
+}
+
+/** Darf dieser Trainer gerade eine manuelle Profil-Erinnerung bekommen?
+ *  Abgelehnt: Test/Spam-Konto, vollständiges Profil (8/8), oder innerhalb der
+ *  14-Tage-Sperre. Nicht bestätigte E-Mail ist KEIN Ablehnungsgrund. Rein. */
+export function profilErinnerungDarf(
+  t: TrainerProfil,
+  letzteISO: string | null | undefined,
+  jetzt: number = Date.now(),
+): { erlaubt: boolean; grund: string } {
+  if (t.ist_test === true) return { erlaubt: false, grund: "Test/Spam-Konto" };
+  if (freischaltFehlendeFelder(t).length === 0) {
+    return { erlaubt: false, grund: "Profil ist vollständig (8/8)" };
+  }
+  if (letzteISO) {
+    const ms = Date.parse(String(letzteISO));
+    if (!Number.isNaN(ms)) {
+      const tage = (jetzt - ms) / 86_400_000;
+      if (tage < PROFIL_ERINNERUNG_SPERRE_TAGE) {
+        const rest = Math.max(1, Math.ceil(PROFIL_ERINNERUNG_SPERRE_TAGE - tage));
+        return { erlaubt: false, grund: `Erst in ${rest} Tag(en) wieder (14-Tage-Sperre)` };
+      }
+    }
+  }
+  return { erlaubt: true, grund: "" };
+}
+
+/**
+ * Die manuelle Profil-Erinnerung an den Trainer. Du-Form, kurz, österreichisches
+ * Deutsch. Inhalt: Danke; „x von 8 fertig"; fehlende Angaben in Klartext; Hinweis
+ * Foto/Ort/Preis; Knopf zur ersten fehlenden Angabe; kostenlos bis zur ersten
+ * ANGENOMMENEN Kundenanfrage (AGB-konform, preis_formulierung_test bleibt grün);
+ * Antwort erreicht Jakob. Keine erfundenen Zahlen, keine Adresse. Rein.
+ */
+export function mailProfilErinnerung(t: TrainerProfil): Mail {
+  const fehlt = freischaltFehlendeFelder(t);
+  const erfuellt = 8 - fehlt.length;
+  const vorname = nameFormatieren(w(t.vorname)) || "du";
+  const absatz =
+    `Hallo ${vorname}, danke, dass du bei Vexfit dabei bist! Dein Profil ist zu ` +
+    `${erfuellt} von 8 fertig.` +
+    (fehlt.length ? ` Es fehlen noch: ${fehlt.join(", ")}.` : "") +
+    ` In der Suche sehen Kundinnen und Kunden zuerst Foto, Ort und Preis – ` +
+    `vollständig ausgefüllte Profile werden eher angeklickt. Das Ergänzen dauert ` +
+    `nur wenige Minuten. Vexfit ist für dich kostenlos, bis du die erste ` +
+    `Kundenanfrage über Vexfit annimmst. Wenn du Fragen hast, antworte einfach ` +
+    `auf diese Mail – sie erreicht Jakob direkt.`;
+  return baueMail(w(t.email), `Dein Vexfit-Profil ist zu ${erfuellt} von 8 fertig`, {
+    ueberschrift: "Mach dein Profil komplett",
+    absatz,
+    datenZeilen: fehlt.length ? [{ beschriftung: "Es fehlt noch", wert: fehlt.join(", ") }] : [],
+    knopfText: "Profil jetzt vervollständigen",
+    knopfLink: erinnerungZiel(fehlt[0]),
+    fusszeile: "Vexfit · Salzburg, Österreich",
+    impressumLink: `${VEXFIT_BASIS}/rechtliches.html`,
+    impressumText: "Impressum",
+    grundZeile: "Du erhältst diese E-Mail, weil dein Trainerprofil auf Vexfit noch nicht vollständig ist.",
+  });
+}
+
+/** Eine Zeile der Admin-Liste „Profil-Erinnerung". */
+export interface ProfilErinnerungEintrag {
+  id: string;
+  name: string;
+  ort: string;
+  plz: string;
+  land: string;
+  erfuellt: number;
+  fehlend: string[];
+  registriert_am: string;
+  letzte_erinnerung_am: string | null;
+  /** true/false aus der Auth; null = unbekannt (Kennzeichen „unbestätigt" nur bei false). */
+  email_bestaetigt: boolean | null;
+  salzburg: boolean;
+  darf: boolean;
+  grund: string;
+}
+
+/**
+ * Baut die sortierte Liste für die Verwaltung: ohne Test/Spam-Konten; Raum
+ * Salzburg (PLZ 50/51) zuerst, dann nach Vollständigkeit aufsteigend, dann Name.
+ * letzteMap: Trainer-ID → letzte Erinnerung (ISO); emailMap: user_id → bestätigt.
+ * Rein (ohne Netz prüfbar).
+ */
+export function profilErinnerungListe(
+  trainers: TrainerProfil[],
+  letzteMap: Record<string, string>,
+  emailMap: Record<string, boolean>,
+  jetzt: number = Date.now(),
+): ProfilErinnerungEintrag[] {
+  const eintraege = (trainers || [])
+    .filter((t) => t.ist_test !== true)
+    .map((t): ProfilErinnerungEintrag => {
+      const id = w(t.id);
+      const letzte = letzteMap[id] ?? null;
+      const fehlend = freischaltFehlendeFelder(t);
+      const darf = profilErinnerungDarf(t, letzte, jetzt);
+      const roh = t as unknown as Record<string, unknown>;
+      const userId = w(roh.user_id);
+      const best = (emailMap && userId in emailMap) ? emailMap[userId] : null;
+      return {
+        id,
+        name: trainerKurzname(t.vorname, t.nachname),
+        ort: w(t.stadt),
+        plz: w(t.plz),
+        land: w(roh.land),
+        erfuellt: 8 - fehlend.length,
+        fehlend,
+        registriert_am: w(t.created_at),
+        letzte_erinnerung_am: letzte,
+        email_bestaetigt: best,
+        salzburg: istSalzburgPlz(t.plz),
+        darf: darf.erlaubt,
+        grund: darf.grund,
+      };
+    });
+  eintraege.sort((a, b) => {
+    if (a.salzburg !== b.salzburg) return a.salzburg ? -1 : 1;
+    if (a.erfuellt !== b.erfuellt) return a.erfuellt - b.erfuellt;
+    return a.name.localeCompare(b.name, "de");
+  });
+  return eintraege;
+}
+
+/** Lädt den Trainer und baut Vorschau-Daten + fertige Mail (ohne zu senden).
+ *  Gibt { fehler } zurück, wenn der Trainer fehlt oder nichts verdrahtet ist. */
+async function profilErinnerungVorbereiten(
+  a: Anschluesse,
+  zielId: string,
+): Promise<
+  | { betreff: string; text: string; empfaenger: string; erfuellt: number; fehlend: string[]; darf: boolean; grund: string; mail: Mail }
+  | { fehler: string }
+> {
+  if (!a.trainerProfilNachId) return { fehler: "Nicht verdrahtet." };
+  const t = await a.trainerProfilNachId(zielId);
+  if (!t) return { fehler: "Trainer nicht gefunden." };
+  const letzte = a.profilErinnerungLetzte ? await a.profilErinnerungLetzte(zielId) : null;
+  const darf = profilErinnerungDarf(t, letzte);
+  const fehlend = freischaltFehlendeFelder(t);
+  const mail = mailProfilErinnerung(t);
+  return {
+    betreff: mail.betreff,
+    text: mail.text,
+    empfaenger: w(t.email),
+    erfuellt: 8 - fehlend.length,
+    fehlend,
+    darf: darf.erlaubt,
+    grund: darf.grund,
+    mail,
+  };
+}
+
 /**
  * Teil 4: vom Zeitplan (pg_cron, alle 15 min) gerufen. Prüft den eigenen
  * Schlüssel (x-vexfit-cron / VEXFIT_CRON_KEY, wie unbeantwortet-pruefen), lädt
@@ -2857,6 +3102,9 @@ export interface AbendberichtZahlen {
   /** B8: freigegebene bzw. in Prüfung befindliche Trainer mit < 5/8 Angaben,
    *  ohne als Test/Spam markierte Konten. */
   profileUnter5: number;
+  /** Manuelle Profil-Erinnerungen: letzte 24 h und gesamt. */
+  profilErinnerungen24h: number;
+  profilErinnerungenGesamt: number;
   /** Zählwerte, die nicht geladen werden konnten (leer = alles ok). */
   fehler: AbendberichtFehler[];
   /** Fehlgeschlagene/teilweise Cron-Läufe der letzten 24 h aus admin_protokoll
@@ -2896,6 +3144,7 @@ export function leereAbendberichtZahlen(): AbendberichtZahlen {
     anfragenAngenommen24h: 0, anfragenAbgelehnt24h: 0, ersatzVersendet: 0,
     warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
     trichter24h: [], profileUnter5: 0, kundenTrichter24h: leererKundenTrichter(),
+    profilErinnerungen24h: 0, profilErinnerungenGesamt: 0,
     salzburg: null,
     fehler: [], cronHinweise: [],
   };
@@ -2942,6 +3191,7 @@ function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert
     zeile("Zahlungen (24 h)", `bezahlt ${z.bezahlt}, fehlgeschlagen ${z.zahlungFehlgeschlagen}, gekündigt ${z.gekuendigt}`),
     // B8: Profile mit < 5/8 Angaben (ohne Test-/Spam-Konten).
     zeile("Trainerprofile < 5/8 Angaben", String(z.profileUnter5)),
+    zeile("Profil-Erinnerungen (24 h / gesamt)", `${z.profilErinnerungen24h} / ${z.profilErinnerungenGesamt}`),
   ];
   // B8: Trichter der letzten 24 h nach Herkunft (anonym). Eine Zeile je
   // Herkunft mit den fünf Stufen; fehlt die Tabelle, steht „nicht verfügbar".
@@ -3168,6 +3418,14 @@ export async function abendberichtZahlenHolen(
     }
     z.profileUnter5 = zeilen.filter((t) => t.ist_test !== true && (8 - freischaltFehlendeFelder(t).length) < 5).length;
   } catch (e) { merkeFehler("Trainerprofile < 5/8 Angaben", e); }
+
+  // Manuelle Profil-Erinnerungen: 24 h / gesamt. Best effort – fehlt die Tabelle
+  // (Migration 2026-11-08-04 nicht eingespielt), bleiben beide Werte 0.
+  try {
+    const seit24 = new Date(jetztMs - 24 * 60 * 60 * 1000).toISOString();
+    z.profilErinnerungenGesamt = (await lesenFn<unknown>("profil_erinnerungen?select=id&limit=100000")).length;
+    z.profilErinnerungen24h = (await lesenFn<unknown>(`profil_erinnerungen?gesendet_am=gte.${encodeURIComponent(seit24)}&select=id&limit=100000`)).length;
+  } catch (e) { merkeFehler("Profil-Erinnerungen (24 h / gesamt)", e); }
 
   // K8: kurze Stadt-Übersicht Salzburg (PLZ 50xx): freigegebene Trainer (ohne
   // Test), Kundensuchen der letzten 7 Tage, Vormerkungen. Best effort – fehlt

@@ -556,6 +556,62 @@ const anschluesse: Anschluesse = {
     return Array.isArray(zeilen) && zeilen.length >= 1;
   },
 
+  // ── Manuelle Profil-Erinnerung (Verwaltung) ──
+  // Alle Trainer mit vollem Datensatz (service_role). select=* ist robust gegen
+  // noch fehlende Spalten (land/ist_test/user_id). Der Kern blendet Test/Spam aus.
+  async profilErinnerungKandidaten(): Promise<TrainerProfil[]> {
+    return await lesen<TrainerProfil>("trainers?select=*&order=created_at.desc&limit=2000");
+  },
+  // Trainer-ID → letzte manuelle Erinnerung (ISO). gesendet_am absteigend; der
+  // erste Treffer je Trainer ist die jüngste. Fehlt die Tabelle (Migration nicht
+  // eingespielt), wirft lesen – der Kern fängt das als "migration fehlt" ab.
+  async profilErinnerungLetzteMap(): Promise<Record<string, string>> {
+    const zeilen = await lesen<{ trainer_id: string; gesendet_am: string }>(
+      "profil_erinnerungen?select=trainer_id,gesendet_am&order=gesendet_am.desc&limit=100000",
+    );
+    const map: Record<string, string> = {};
+    for (const z of zeilen) {
+      if (z.trainer_id && !(z.trainer_id in map)) map[z.trainer_id] = z.gesendet_am;
+    }
+    return map;
+  },
+  // Letzte Erinnerung EINES Trainers (für die 14-Tage-Sperre beim Senden).
+  async profilErinnerungLetzte(trainerId: string): Promise<string | null> {
+    const zeilen = await lesen<{ gesendet_am: string }>(
+      `profil_erinnerungen?trainer_id=eq.${encodeURIComponent(trainerId)}&select=gesendet_am&order=gesendet_am.desc&limit=1`,
+    );
+    return zeilen[0]?.gesendet_am ?? null;
+  },
+  // Protokolliert eine verschickte Erinnerung (service_role). gesendet_am wird
+  // von der DB gesetzt (default now()).
+  async profilErinnerungProtokollieren(trainerId: string, fehlende: string[]): Promise<void> {
+    const a = await fetch(restAdresse("profil_erinnerungen"), {
+      method: "POST",
+      headers: { ...restKopf(), Prefer: "return=minimal" },
+      body: JSON.stringify({ trainer_id: trainerId, fehlende_angaben: fehlende }),
+    });
+    if (!a.ok) throw new Error(`profil_erinnerungen schreiben fehlgeschlagen: HTTP ${a.status}`);
+  },
+  // Best effort: Auth-user_id → E-Mail bestätigt (email_confirmed_at gesetzt).
+  // Scheitert der Zugriff, leere Map → der Kern markiert "unbekannt" statt falsch.
+  async emailBestaetigtMap(): Promise<Record<string, boolean>> {
+    try {
+      const basis = pflicht("SUPABASE_URL").replace(/\/+$/, "");
+      const map: Record<string, boolean> = {};
+      for (let seite = 1; seite <= 20; seite++) {
+        const r = await fetch(`${basis}/auth/v1/admin/users?per_page=200&page=${seite}`, { headers: restKopf() });
+        if (!r.ok) break;
+        const d = await r.json().catch(() => null) as { users?: { id: string; email_confirmed_at?: string | null }[] } | null;
+        const users = d?.users ?? [];
+        for (const u of users) if (u && u.id) map[u.id] = !!u.email_confirmed_at;
+        if (users.length < 200) break;
+      }
+      return map;
+    } catch {
+      return {};
+    }
+  },
+
   // ── B4: Warteliste ("Benachrichtige mich" = trainer_alerts) ──
   // B4.1: ein noch aktiver Eintrag einer E-Mail (optional auf eine PLZ begrenzt),
   // inkl. Abmelde-Token – für die Bestätigungsmail. Fehlerkörper weitergeben,

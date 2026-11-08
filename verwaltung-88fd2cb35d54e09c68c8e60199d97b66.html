@@ -362,6 +362,7 @@ tr:last-child td{border-bottom:none}
         <button class="tab" data-tab="studios">Studios</button>
         <button class="tab" data-tab="zertifikate">Zertifikate</button>
         <button class="tab" data-tab="nachfrage">Nachfrage</button>
+        <button class="tab" data-tab="erinnerung">Profil-Erinnerung</button>
         <button class="tab" data-tab="protokoll">Protokoll</button>
         <!-- Teil 1d/1f: Geräte-Mitteilungen + Abmelden nur im Mehr-Blatt (Handy) -->
         <div class="mehr-nur-handy mehr-aktionen">
@@ -584,6 +585,39 @@ tr:last-child td{border-bottom:none}
     <div class="panel-kopf"><div class="panel-titel" id="detail-titel"></div><button class="panel-zu" data-schliessen="detail">✕</button></div>
     <div class="panel-body" id="detail-body"></div>
     <div class="panel-foot" id="detail-foot"></div>
+  </div>
+
+    <!-- Profil-Erinnerung: Trainer mit unvollständigem Profil, Versand nur per Klick -->
+    <div class="tab-content" id="tab-erinnerung">
+      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Profil-Erinnerung · Service-Mail an registrierte Trainer</h3>
+      <div class="section-hinweis">
+        Alle Trainer ohne Test/Spam-Markierung, Raum Salzburg (PLZ 50/51) zuerst,
+        dann nach Vollständigkeit aufsteigend. Der Knopf „Erinnerung" zeigt zuerst
+        die fertige Mail als Vorschau – verschickt wird erst mit „Jetzt senden".
+        Höchstens eine Erinnerung je Trainer in 14 Tagen; vollständige Profile
+        (8/8) und Test/Spam werden abgelehnt. Nicht bestätigte E-Mail ist erlaubt,
+        wird aber gekennzeichnet.
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr>
+          <th>Trainer</th><th>Ort / PLZ</th><th>Land</th><th>x/8</th>
+          <th>Fehlt</th><th>Registriert</th><th>Letzte Erinnerung</th><th>Aktion</th>
+        </tr></thead>
+        <tbody id="erinnerung-tbody"><tr><td colspan="8" class="leer-text">Lade …</td></tr></tbody>
+      </table></div>
+    </div>
+
+  <!-- Vorschau der Profil-Erinnerung (Versand erst auf „Jetzt senden") -->
+  <div id="erinnerung-overlay" class="overlay verborgen" data-schliessen="erinnerung"></div>
+  <div id="erinnerung-box" class="dialog-box verborgen" style="max-width:640px">
+    <div class="dialog-titel">Vorschau · Profil-Erinnerung</div>
+    <div class="feld-label" id="erinnerung-empf" style="margin-bottom:4px"></div>
+    <div class="feld-label" id="erinnerung-betreff" style="margin-bottom:8px"></div>
+    <pre id="erinnerung-text" style="white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:13px;line-height:1.6;background:rgba(255,255,255,0.04);border:1px solid var(--bi,rgba(255,255,255,0.12));border-radius:8px;padding:12px;max-height:48vh;overflow:auto;margin:0 0 12px"></pre>
+    <div class="dialog-aktionen">
+      <button class="btn-gross btn-neutral" id="erinnerung-abbrechen" data-schliessen="erinnerung">Abbrechen</button>
+      <button class="btn-gross btn-ja" id="erinnerung-senden" data-aktion="erinnerung-senden">Jetzt senden</button>
+    </div>
   </div>
 
   <!-- Bestätigungsdialog -->
