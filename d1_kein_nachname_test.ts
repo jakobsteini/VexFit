@@ -58,9 +58,13 @@ Deno.test("D1: suche.html – oeffentlicher Pfad ohne Nachnamen, Freitextsuche n
   assertStringIncludes(s, "(angemeldet && (t.nachname||'').toLowerCase().includes(q))");
 });
 
-Deno.test("D1: Migration 2026-11-08-03 entzieht anon den Nachnamen (mit Ruecknahme)", async () => {
+Deno.test("D1: Migration 2026-11-08-03 entzieht anon den Nachnamen wirksam (mit Ruecknahme)", async () => {
   const mig = await lies("./migrations/2026-11-08-03-anon-kein-nachname.sql");
-  assertStringIncludes(mig, "REVOKE SELECT (nachname) ON public.trainers_oeffentlich FROM anon");
+  // Wirksam nur mit SICHTWEITEM Entzug (ein Spalten-REVOKE allein wirkt nicht,
+  // solange das sichtweite GRANT besteht).
+  assertStringIncludes(mig, "REVOKE SELECT ON public.trainers_oeffentlich FROM anon");
+  // Danach wieder ein Spalten-GRANT an anon (nur unbedenkliche Spalten).
+  assertStringIncludes(mig, "GRANT SELECT (%s) ON public.trainers_oeffentlich TO anon");
   const r = await lies("./migrations/ruecknahmen/2026-11-08-03-anon-kein-nachname-ruecknahme.sql");
-  assertStringIncludes(r, "GRANT SELECT (nachname) ON public.trainers_oeffentlich TO anon");
+  assertStringIncludes(r, "GRANT SELECT ON public.trainers_oeffentlich TO anon");
 });

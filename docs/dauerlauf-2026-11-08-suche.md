@@ -298,3 +298,37 @@ D9: **erledigt.**
 - `migrations/2026-11-08-03-anon-kein-nachname.sql` (+ Rücknahme): entzieht `anon`
   den Spalten-Lesezugriff auf `nachname` in `trainers_oeffentlich`. Einspielen
   **nach** `2026-11-08-01-trainers-vorschau.sql`.
+
+---
+
+## Nachtrag 08.11.2026 – Nachname-Sperre auf DB-Ebene wirksam gemacht (Korrektur Migration 03)
+
+**Befund:** Die erste Fassung von `2026-11-08-03` tat nur
+`REVOKE SELECT (nachname) ON public.trainers_oeffentlich FROM anon`. In PostgreSQL
+hebt ein **Spalten**-REVOKE ein bestehendes **sichtweites** `GRANT SELECT` nicht
+auf. `trainers_oeffentlich` hat für `anon` genau so ein sichtweites GRANT (angelegt
+2026-10-26, zuletzt erneuert in `2026-10-31-10`). Der Spalten-REVOKE lief also ins
+Leere – live liefert `trainers_oeffentlich?select=nachname` für `anon` weiterhin
+**HTTP 200 mit vollem Nachnamen** (mit `werkzeuge/pruef-anon-rest.mjs` gemessen).
+
+**Korrektur (wirksam):**
+1. `REVOKE SELECT ON public.trainers_oeffentlich FROM anon` (sichtweit).
+2. `GRANT SELECT (<unbedenkliche Spalten>) ON public.trainers_oeffentlich TO anon`
+   – Fail-Closed-Allowlist **ohne** `nachname` (und ohne jede Kontakt-/Adressspalte),
+   mit den real vorhandenen Spalten geschnitten, idempotent.
+
+**Basistabelle `trainers` bewusst NICHT angefasst:** `anon` hat dort seit
+`2026-10-12` gar kein SELECT; die Sichten laufen `security_invoker = false`
+(Eigentümerrechte), ein Eingriff an der Basistabelle würde die Vorschau weder
+schützen noch brechen. `trainers_vorschau` bleibt für `anon` voll lesbar (nur
+`nachname_initial`). `authenticated` unverändert.
+
+**Rücknahme** stellt das sichtweite GRANT wieder her. **Prüfung:**
+`docs/pruefung/2026-11-08-03-pruefung.sql` (SQL, nur lesend) und
+`werkzeuge/pruef-anon-rest.mjs` (REST + Playwright, nur lesend, Exit 1 bei
+Durchfallen). **Service-Worker:** keine Änderung – dieser Baustein ändert keine
+ausgelieferte Seite/JS, und keine öffentliche Seite hat einen SW (Cache-Bump
+weder nötig noch wirksam). **Tests:** 767 grün, `deno check` grün, `deno lint` 30
+(alle vorbestehend). **Live-Messung vor Einspielen:** a) DURCHGEFALLEN (Leck
+besteht), b) BESTANDEN, c) BESTANDEN, d) BESTANDEN (Seiten nutzen bereits
+`trainers_vorschau`). Nach Einspielen von 03 muss a) BESTANDEN sein.
