@@ -12,9 +12,14 @@
 // ============================================================================
 // Vexfit - Stadtseiten erzeugen (SEO)
 //
-// Liest alle freigeschalteten Trainer (aktiv=true) mit dem oeffentlichen
-// Schluessel - derselbe Zugriff, den suche.html im Browser macht, mit
-// denselben oeffentlich sichtbaren Spalten. Gruppiert nach Stadt und erzeugt
+// Liest die freigeschalteten Trainer mit dem oeffentlichen (anon) Schluessel
+// ueber die STRENGE Vorschau-Sicht trainers_vorschau - derselbe PII-sichere
+// Weg, den suche.html fuer nicht angemeldete Besucher nimmt. Diese Sicht
+// liefert NUR die Initiale des Nachnamens (nachname_initial), nie den vollen
+// Nachnamen, keine E-Mail/Telefon. Frueher las das Werkzeug trainers_oeffentlich
+// mit der Spalte nachname; seit anon dort kein Leserecht mehr hat (Migration
+// 2026-11-08-03), lieferte das HTTP 401 und der SEO-Lauf schlug fehl.
+// Gruppiert nach Stadt und erzeugt
 // fuer jede Stadt mit mindestens SCHWELLE Trainern eine fertige HTML-Datei
 // personal-trainer-<stadt>.html im Hauptverzeichnis. Seiten von Staedten,
 // die unter die Schwelle gefallen oder verschwunden sind, werden geloescht.
@@ -52,8 +57,10 @@ const STILLGELEGT = false;
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
 
-// Genau die Spalten, die suche.html oeffentlich anzeigt - nichts darueber hinaus.
-const SPALTEN = 'id,vorname,nachname,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,preis_monat,avatar_url';
+// Genau die Spalten der Vorschau-Sicht, die wir fuer die Stadtseiten brauchen -
+// NUR nachname_initial, nie der volle Nachname, keine Kontaktdaten. preis_monat
+// gibt es in der Vorschau bewusst nicht (nur preis_stunde).
+export const SPALTEN = 'id,vorname,nachname_initial,stadt,plz,trainingsart,trainingsort,spezialisierungen,bio,preis_stunde,avatar_url';
 
 // Wie in suche.html: als Profilbild gilt nur eine Adresse aus dem eigenen Behaelter.
 const AVATAR_PREFIX = SUPABASE_URL + '/storage/v1/object/public/avatars/';
@@ -105,8 +112,13 @@ const BG_FARBEN = [
   'linear-gradient(135deg,#1a1500,#2a2200)',
 ];
 
+// Anzeigename ohne vollen Nachnamen: „Vorname N." aus nachname_initial.
+export function anzeigeName(t) {
+  return `${t.vorname || ''} ${t.nachname_initial || ''}`.trim();
+}
+
 export function trainerKarte(t, i) {
-  const initialen = escapeHtml(((t.vorname || '?')[0] + (t.nachname || '?')[0]).toUpperCase());
+  const initialen = escapeHtml(((t.vorname || '?')[0] + (t.nachname_initial || '?')[0]).toUpperCase());
   const istOnline = t.trainingsart === 'Online';
   const tags = (t.spezialisierungen || []).slice(0, 3);
   const preis = t.preis_stunde ? `€${escapeHtml(t.preis_stunde)}<span>/Std</span>`
@@ -122,7 +134,7 @@ export function trainerKarte(t, i) {
           </div>
         </div>
         <div class="cb">
-          <div class="cn">${escapeHtml(t.vorname)} ${escapeHtml(t.nachname)}</div>
+          <div class="cn">${escapeHtml(anzeigeName(t))}</div>
           <div class="cl">${istOnline ? '🌐 Online · DACH-weit' : '📍 ' + escapeHtml(t.stadt) + ' · ' + escapeHtml(t.trainingsart)}</div>
           <div class="ctags">${tags.map(tag => `<span class="ctag">${escapeHtml(tag)}</span>`).join('')}</div>
           <div class="cf">
@@ -156,7 +168,7 @@ export function jsonLd(stadt, trainer) {
     itemListElement: trainer.map((t, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      name: `${t.vorname} ${t.nachname}`,
+      name: anzeigeName(t),
       url: `${BASIS}/profil.html?id=${t.id}`,
     })),
   }, null, 1);
@@ -450,6 +462,24 @@ export function stadtDateien(trainer) {
     .map(([stadt, ts]) => ({ stadt, datei: `personal-trainer-${slug(stadt)}.html`, trainer: ts }));
 }
 
+// Laedt die Trainer aus der Vorschau-Sicht (anon). Herausgeloest und mit
+// injizierbarem fetch, damit ein Test ihn gegen eine Attrappe laufen lassen
+// kann. Wirft bei HTTP-Fehler oder unerwarteter Antwort (main faengt das ab).
+export async function ladeVorschauTrainer(fetchImpl = fetch) {
+  const antwort = await fetchImpl(
+    `${SUPABASE_URL}/rest/v1/trainers_vorschau?select=${SPALTEN}&order=vorname.asc`,
+    { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } },
+  );
+  if (!antwort.ok) {
+    throw new Error(`Trainer konnten nicht geladen werden (HTTP ${antwort.status}).`);
+  }
+  const trainer = await antwort.json();
+  if (!Array.isArray(trainer)) {
+    throw new Error('Unerwartete Antwort der Datenbank.');
+  }
+  return trainer;
+}
+
 // ──── Hauptlauf ────
 async function main() {
   if (STILLGELEGT) {
@@ -465,16 +495,11 @@ async function main() {
     console.log('sitemap.xml neu geschrieben.');
     return;
   }
-  const antwort = await fetch(`${SUPABASE_URL}/rest/v1/trainers_oeffentlich?select=${SPALTEN}&order=nachname.asc`, {
-    headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` },
-  });
-  if (!antwort.ok) {
-    console.error(`FEHLER: Trainer konnten nicht geladen werden (HTTP ${antwort.status}). Es wurde nichts geaendert.`);
-    process.exit(1);
-  }
-  const trainer = await antwort.json();
-  if (!Array.isArray(trainer)) {
-    console.error('FEHLER: Unerwartete Antwort der Datenbank. Es wurde nichts geaendert.');
+  let trainer;
+  try {
+    trainer = await ladeVorschauTrainer(fetch);
+  } catch (e) {
+    console.error(`FEHLER: ${e.message} Es wurde nichts geaendert.`);
     process.exit(1);
   }
   console.log(`Freigeschaltete Trainer in der Datenbank: ${trainer.length}`);
