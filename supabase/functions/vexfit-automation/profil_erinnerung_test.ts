@@ -61,6 +61,13 @@ Deno.test("mailProfilErinnerung: fehlende Angaben, Link, kein Nachname, keine Ad
   assertStringIncludes(m.betreff, "zu 6 von 8");
   assertStringIncludes(m.text, "6 von 8");
   assertStringIncludes(m.text, "Foto, Preis pro Stunde");
+  // Die Liste der fehlenden Angaben steht genau EINMAL – im Fließtext –, nicht
+  // doppelt als eigene Zeile; die (falsch eingezahlte) Zeile „Es fehlt noch" ist weg.
+  const zaehle = (s: string, teil: string) => s.split(teil).length - 1;
+  assertEquals(zaehle(m.text, "Foto, Preis pro Stunde"), 1);
+  assertEquals(zaehle(m.html, "Foto, Preis pro Stunde"), 1);
+  assert(!m.text.includes("Es fehlt noch"), "Doppelzeile im Text vorhanden");
+  assert(!m.html.includes("Es fehlt noch"), "Doppelzeile im HTML vorhanden");
   // Link zur ersten fehlenden Angabe (Foto → Trainer-Bereich).
   assertStringIncludes(m.html, erinnerungZiel("Foto"));
   // AGB-konforme Preis-Formulierung, keine verbotene Variante.

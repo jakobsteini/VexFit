@@ -2636,7 +2636,9 @@ export function mailProfilErinnerung(t: TrainerProfil): Mail {
   return baueMail(w(t.email), `Dein Vexfit-Profil ist zu ${erfuellt} von 8 fertig`, {
     ueberschrift: "Mach dein Profil komplett",
     absatz,
-    datenZeilen: fehlt.length ? [{ beschriftung: "Es fehlt noch", wert: fehlt.join(", ") }] : [],
+    // Die fehlenden Angaben stehen bereits im Fließtext ("Es fehlen noch: …");
+    // keine zweite Zeile als datenZeile (sonst doppelt und in falscher Einzahl).
+    datenZeilen: [],
     knopfText: "Profil jetzt vervollständigen",
     knopfLink: erinnerungZiel(fehlt[0]),
     fusszeile: "Vexfit · Salzburg, Österreich",

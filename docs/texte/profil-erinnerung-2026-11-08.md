@@ -33,8 +33,6 @@ kostenlos, bis du die erste Kundenanfrage über Vexfit annimmst. Danach 49,99
 €/Monat, monatlich kündbar. Jeder weitere Kunde über Vexfit einmalig 9,99 €.
 Wenn du Fragen hast, antworte einfach auf diese Mail – sie erreicht Jakob direkt.
 
-Es fehlt noch: Foto, Preis pro Stunde
-
 [ Profil jetzt vervollständigen ]   → führt zur ersten fehlenden Angabe
 
 Vexfit · Salzburg, Österreich
