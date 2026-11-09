@@ -2103,6 +2103,13 @@ function starteVerwaltung() {
     const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? "–" : d.toLocaleDateString("de-AT", { day: "2-digit", month: "2-digit", year: "2-digit" });
   }
+  // „letzte Erinnerung" mit Art (automatisch/manuell).
+  function erinnerungLetzte(iso, art) {
+    const datum = erinnerungDatum(iso);
+    if (datum === "–" || !art) return datum;
+    const label = art === "automatisch" ? "automatisch" : "manuell";
+    return `${datum} (${label})`;
+  }
   async function ladeProfilErinnerung() {
     const tb = $("erinnerung-tbody");
     if (!tb) return;
@@ -2130,7 +2137,7 @@ function starteVerwaltung() {
         <td data-label="x/8">${e.erfuellt}/8</td>
         <td data-label="Fehlt">${fehlt}</td>
         <td data-label="Registriert">${erinnerungDatum(e.registriert_am)}</td>
-        <td data-label="Letzte Erinnerung">${erinnerungDatum(e.letzte_erinnerung_am)}</td>
+        <td data-label="Letzte Erinnerung">${erinnerungLetzte(e.letzte_erinnerung_am, e.letzte_erinnerung_art)}</td>
         <td data-label="Aktion">${knopf}</td>
       </tr>`;
     }).join("");

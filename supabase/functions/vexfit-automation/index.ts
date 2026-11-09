@@ -49,6 +49,8 @@ import {
   capiFreigeschaltet,
   type Mail,
   type MetaEreignis,
+  type ProfilErinnerungArt,
+  type ProfilErinnerungLetzte,
   type PushAbo,
   type StripeEreignis,
   type Trainer,
@@ -565,30 +567,44 @@ const anschluesse: Anschluesse = {
   // Trainer-ID → letzte manuelle Erinnerung (ISO). gesendet_am absteigend; der
   // erste Treffer je Trainer ist die jüngste. Fehlt die Tabelle (Migration nicht
   // eingespielt), wirft lesen – der Kern fängt das als "migration fehlt" ab.
-  async profilErinnerungLetzteMap(): Promise<Record<string, string>> {
-    const zeilen = await lesen<{ trainer_id: string; gesendet_am: string }>(
-      "profil_erinnerungen?select=trainer_id,gesendet_am&order=gesendet_am.desc&limit=100000",
-    );
-    const map: Record<string, string> = {};
+  async profilErinnerungLetzteMap(): Promise<Record<string, ProfilErinnerungLetzte>> {
+    // Mit Art (Spalte art aus Migration 2026-11-09-01). Fehlt sie noch (HTTP 400),
+    // ohne art erneut lesen und Art als "manuell" annehmen (Vorgabe der Spalte).
+    type Zeile = { trainer_id: string; gesendet_am: string; art?: string };
+    let zeilen: Zeile[];
+    try {
+      zeilen = await lesen<Zeile>(
+        "profil_erinnerungen?select=trainer_id,gesendet_am,art&order=gesendet_am.desc&limit=100000",
+      );
+    } catch (_f) {
+      zeilen = await lesen<Zeile>(
+        "profil_erinnerungen?select=trainer_id,gesendet_am&order=gesendet_am.desc&limit=100000",
+      );
+    }
+    const map: Record<string, ProfilErinnerungLetzte> = {};
     for (const z of zeilen) {
-      if (z.trainer_id && !(z.trainer_id in map)) map[z.trainer_id] = z.gesendet_am;
+      if (z.trainer_id && !(z.trainer_id in map)) {
+        const art: ProfilErinnerungArt = z.art === "automatisch" ? "automatisch" : "manuell";
+        map[z.trainer_id] = { am: z.gesendet_am, art };
+      }
     }
     return map;
   },
-  // Letzte Erinnerung EINES Trainers (für die 14-Tage-Sperre beim Senden).
+  // Letzter Versand EINES Trainers (ISO), egal welcher Art – für den gemeinsamen
+  // 3-Tage-Abstand beim manuellen Senden.
   async profilErinnerungLetzte(trainerId: string): Promise<string | null> {
     const zeilen = await lesen<{ gesendet_am: string }>(
       `profil_erinnerungen?trainer_id=eq.${encodeURIComponent(trainerId)}&select=gesendet_am&order=gesendet_am.desc&limit=1`,
     );
     return zeilen[0]?.gesendet_am ?? null;
   },
-  // Protokolliert eine verschickte Erinnerung (service_role). gesendet_am wird
-  // von der DB gesetzt (default now()).
-  async profilErinnerungProtokollieren(trainerId: string, fehlende: string[]): Promise<void> {
+  // Protokolliert eine verschickte Erinnerung (service_role) mit Art. gesendet_am
+  // wird von der DB gesetzt (default now()).
+  async profilErinnerungProtokollieren(trainerId: string, fehlende: string[], art: ProfilErinnerungArt): Promise<void> {
     const a = await fetch(restAdresse("profil_erinnerungen"), {
       method: "POST",
       headers: { ...restKopf(), Prefer: "return=minimal" },
-      body: JSON.stringify({ trainer_id: trainerId, fehlende_angaben: fehlende }),
+      body: JSON.stringify({ trainer_id: trainerId, fehlende_angaben: fehlende, art }),
     });
     if (!a.ok) throw new Error(`profil_erinnerungen schreiben fehlgeschlagen: HTTP ${a.status}`);
   },

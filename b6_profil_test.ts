@@ -50,7 +50,8 @@ Deno.test("B6: profil5-Trichter-Beacon ab 5/8, Rolle Trainer, einmalig", async (
 
 Deno.test("B6: Erinnerungs-Mails nennen x/8 und verlinken zur ersten fehlenden Angabe", async () => {
   const kern = await lies("./supabase/functions/vexfit-automation/kern.ts");
-  assertStringIncludes(kern, "von 8 Angaben");
+  // Betreff/Einstieg richten sich nach der Vollständigkeit: „x von 8 fertig".
+  assertStringIncludes(kern, "von 8 fertig");
   assertStringIncludes(kern, "function erinnerungZiel(");
   assertStringIncludes(kern, "profil-bearbeiten.html#");
 });

@@ -414,12 +414,15 @@ export interface Anschluesse {
   /** Manuelle Profil-Erinnerung (Verwaltung): alle Trainer mit Profilfeldern
    *  (service_role). Der Kern blendet Test/Spam aus und sortiert. */
   profilErinnerungKandidaten?(): Promise<TrainerProfil[]>;
-  /** Trainer-ID → letzte manuelle Profil-Erinnerung (ISO) über alle Trainer. */
-  profilErinnerungLetzteMap?(): Promise<Record<string, string>>;
-  /** Letzte manuelle Profil-Erinnerung EINES Trainers (ISO) oder null. */
+  /** Trainer-ID → letzte Profil-Erinnerung (ISO + Art automatisch/manuell) über
+   *  alle Trainer, egal welcher Art. Für die Verwaltungsliste. */
+  profilErinnerungLetzteMap?(): Promise<Record<string, ProfilErinnerungLetzte>>;
+  /** Letzter Profil-Erinnerungs-Versand EINES Trainers (ISO) oder null – egal ob
+   *  automatisch oder manuell. Für den gemeinsamen 3-Tage-Abstand. */
   profilErinnerungLetzte?(trainerId: string): Promise<string | null>;
-  /** Protokolliert eine verschickte manuelle Profil-Erinnerung (service_role). */
-  profilErinnerungProtokollieren?(trainerId: string, fehlende: string[]): Promise<void>;
+  /** Protokolliert eine verschickte Profil-Erinnerung (service_role). `art` ist
+   *  "manuell" (Verwaltung) oder "automatisch" (Stufen-Cron). */
+  profilErinnerungProtokollieren?(trainerId: string, fehlende: string[], art: ProfilErinnerungArt): Promise<void>;
   /** Best effort: Auth-user_id → E-Mail bestätigt? Fehlt der Zugriff, leere Map. */
   emailBestaetigtMap?(): Promise<Record<string, boolean>>;
   /** Teil M: Kundenzeile per E-Mail (service_role) für Deep-Link #kunde-<id> und
@@ -2043,7 +2046,7 @@ async function adminAktion(
       if (!erg.darf) return antwort(400, { fehler: erg.grund }, herkunft);
       await a.mailSenden(erg.mail);
       try {
-        await a.profilErinnerungProtokollieren?.(zielId, erg.fehlend);
+        await a.profilErinnerungProtokollieren?.(zielId, erg.fehlend, "manuell");
       } catch (fehler) {
         a.melden?.("profil-erinnerung: Protokoll fehlgeschlagen", String(fehler));
       }
@@ -2493,50 +2496,64 @@ export function erinnerungZiel(erstesFehlend?: string | null): string {
   return a ? `${VEXFIT_BASIS}/profil-bearbeiten.html#${a}` : `${VEXFIT_BASIS}/profil-bearbeiten.html`;
 }
 
-/** Die drei Erinnerungstexte (Du-Form, österreichisches Deutsch, keine
- *  erfundenen Zahlen). Wortgleich auch in docs/erinnerungs-mails.md. Die
- *  Sichtbarkeit hängt an der Freigabe durch Jakob – genau so steht es hier. */
-export const ERINNERUNG_TEXTE: Record<number, { betreff: string; absatz: (vorname: string, offen: number) => string }> = {
-  1: {
-    betreff: "Dein Vexfit.app-Profil ist fast fertig",
-    absatz: (vn, offen) =>
-      `Hallo ${vn}, schön, dass du bei Vexfit.app dabei bist! Dein Profil ist ` +
-      `noch nicht ganz fertig – es fehlen noch ${offen} von 8 Angaben. Mit einem ` +
-      `vollständigen Profil wirkst du auf Interessentinnen und Interessenten ` +
-      `gleich überzeugender. Das dauert nur ein paar Minuten.`,
-  },
-  2: {
-    betreff: "Noch ein paar Minuten bis zu deinem fertigen Profil",
-    absatz: (vn, offen) =>
-      `Hallo ${vn}, dein Profil auf Vexfit.app wartet noch auf dich: ${offen} von ` +
-      `8 Angaben fehlen. Je vollständiger dein Profil, desto eher entscheiden sich ` +
-      `Interessentinnen und Interessenten für dich. Ergänze die fehlenden Punkte ` +
-      `am besten gleich – es geht schnell.`,
-  },
-  3: {
-    betreff: "Letzte Erinnerung zu deinem Vexfit.app-Profil",
-    absatz: (vn, offen) =>
-      `Hallo ${vn}, das ist unsere letzte Erinnerung: In deinem Profil auf ` +
-      `Vexfit.app fehlen noch ${offen} von 8 Angaben. Sobald dein Profil ` +
-      `vollständig ist, prüfen wir es und schalten dich frei – dann bist du für ` +
-      `Kundinnen und Kunden in deiner Nähe sichtbar. Melde dich gern, wenn du ` +
-      `Fragen hast.`,
-  },
-};
+/** Preis-Hinweis, WORTGLEICH in manueller und automatischer Profil-Erinnerung.
+ *  AGB-konform (§3): kostenlos bis zur ersten ANGENOMMENEN Kundenanfrage. Die
+ *  Beträge sind dieselben wie in registrieren.html (preis_formulierung_test). */
+export const PREIS_HINWEIS_SATZ =
+  "Vexfit ist für dich kostenlos, bis du die erste Kundenanfrage über Vexfit " +
+  "annimmst. Danach 49,99 €/Monat, monatlich kündbar. Jeder weitere Kunde über " +
+  "Vexfit einmalig 9,99 €.";
 
 /**
- * Erinnerungs-Mail an den Trainer für eine Stufe (1–3). Anrede mit Vorname,
- * Stand „X von 8 fehlen" aus der bestehenden Logik, die fehlenden Angaben beim
- * Namen, EIN Knopf zur ersten fehlenden Angabe, Abmelde-Link mit Token. Fußzeile
- * ohne genaue Adresse. `abmeldeToken` kommt aus der Trainerzeile.
+ * Betreff nach VOLLSTÄNDIGKEIT (nicht nach Stufe). Kein „fast fertig" unter 4/8:
+ *   0–3/8 → „Dein Vexfit-Profil wartet auf dich"
+ *   4–6/8 → „Dein Vexfit-Profil ist zu x von 8 fertig"
+ *   7/8   → „Nur noch eine Angabe bis zu deinem fertigen Profil"
+ */
+export function erinnerungBetreff(erfuellt: number): string {
+  if (erfuellt >= 7) return "Nur noch eine Angabe bis zu deinem fertigen Profil";
+  if (erfuellt >= 4) return `Dein Vexfit-Profil ist zu ${erfuellt} von 8 fertig`;
+  return "Dein Vexfit-Profil wartet auf dich";
+}
+
+/**
+ * Einstieg (EIN Absatz) nach Vollständigkeit. Nennt „x von 8 fertig", die
+ * fehlenden Angaben GENAU EINMAL (Klartext aus freischaltFehlendeFelder, wie die
+ * manuelle Mail) und den gemeinsamen Preis-Hinweis. Rein.
+ */
+export function erinnerungEinstieg(vorname: string, erfuellt: number, fehlt: string[]): string {
+  const liste = fehlt.join(", ");
+  if (erfuellt >= 7) {
+    return `Hallo ${vorname}, dein Profil ist zu 7 von 8 fertig – es fehlt nur noch: ${liste}. ` +
+      `Sobald es vollständig ist, bist du in der Suche für Kundinnen und Kunden in deiner Nähe ` +
+      `sichtbar. Das dauert nur eine Minute. ${PREIS_HINWEIS_SATZ}`;
+  }
+  if (erfuellt >= 4) {
+    return `Hallo ${vorname}, dein Profil ist zu ${erfuellt} von 8 fertig – nur noch ein kleiner ` +
+      `Schritt. Es fehlen noch: ${liste}. Vollständig ausgefüllte Profile werden in der Suche ` +
+      `eher angeklickt. Das Ergänzen dauert nur wenige Minuten. ${PREIS_HINWEIS_SATZ}`;
+  }
+  return `Hallo ${vorname}, schön, dass du bei Vexfit dabei bist! Dein Profil ist zu ${erfuellt} ` +
+    `von 8 fertig. Es fehlen noch: ${liste}. In der Suche sehen Kundinnen und Kunden zuerst Foto, ` +
+    `Ort und Preis – mit einem vollständigen Profil wirst du eher gefunden. Das Ergänzen dauert ` +
+    `nur wenige Minuten. ${PREIS_HINWEIS_SATZ}`;
+}
+
+/**
+ * Automatische Erinnerungs-Mail an den Trainer. Betreff und Einstieg richten sich
+ * nach der VOLLSTÄNDIGKEIT (nicht nach der Stufe) – so steht nie „fast fertig" bei
+ * 0/8. Die fehlenden Angaben stehen genau einmal im Fließtext, der Preis-Hinweis
+ * ist derselbe wie in der manuellen Erinnerung. EIN Knopf zur ersten fehlenden
+ * Angabe, Abmelde-Link mit Token, Fußzeile ohne genaue Adresse. `stufe` steuert
+ * nur Häufigkeit/Anspruch, nicht den Text. `abmeldeToken` kommt aus der Trainerzeile.
  */
 export function mailErinnerung(
   t: TrainerProfil,
   stufe: number,
   abmeldeToken: string,
 ): Mail {
-  const text = ERINNERUNG_TEXTE[stufe] || ERINNERUNG_TEXTE[1];
   const fehlt = freischaltFehlendeFelder(t);
+  const erfuellt = 8 - fehlt.length;
   const vorname = nameFormatieren(w(t.vorname)) || "du";
   const abmeldeLink = w(abmeldeToken)
     ? `${FUNKTIONEN_BASIS}/functions/v1/vexfit-automation/erinnerung-abmelden?token=${encodeURIComponent(w(abmeldeToken))}`
@@ -2545,11 +2562,12 @@ export function mailErinnerung(
   //   1) Vexfit.app · Salzburg · Österreich
   //   2) Impressum-Link (dort steht die vollständige Anschrift, § 5 ECG)
   //   3) Abmelde-Link „Keine Erinnerungen mehr"
-  // Daher kein grundZeile-Satz mehr in den Erinnerungen.
-  return baueMail(w(t.email), text.betreff, {
-    ueberschrift: "Dein Profil ist fast fertig",
-    absatz: text.absatz(vorname, fehlt.length),
-    datenZeilen: fehlt.length ? [{ beschriftung: "Es fehlt noch", wert: fehlt.join(", ") }] : [],
+  // Die fehlenden Angaben stehen im Fließtext (genau einmal) – keine datenZeile.
+  void stufe;
+  return baueMail(w(t.email), erinnerungBetreff(erfuellt), {
+    ueberschrift: "Mach dein Profil komplett",
+    absatz: erinnerungEinstieg(vorname, erfuellt, fehlt),
+    datenZeilen: [],
     knopfText: "Profil jetzt vervollständigen",
     knopfLink: erinnerungZiel(fehlt[0]),
     fusszeile: "Vexfit.app · Salzburg · Österreich",
@@ -2576,8 +2594,25 @@ export function istSalzburgPlz(plz: unknown): boolean {
   return SALZBURG_PLZ_PRAEFIXE.some((pre) => p.startsWith(pre));
 }
 
-/** Höchstens eine manuelle Erinnerung je Trainer in so vielen Tagen. */
-export const PROFIL_ERINNERUNG_SPERRE_TAGE = 14;
+/**
+ * Mindestabstand zwischen ZWEI Profil-Erinnerungen an denselben Trainer – egal
+ * ob automatisch (Stufen-Cron) oder manuell (Verwaltung). Beide Pfade prüfen
+ * denselben letzten Versandzeitpunkt (aus profil_erinnerungen), damit ein Trainer
+ * nicht binnen Stunden zwei Erinnerungen bekommt (Fall Nirmal: 2 Mails in 22 h).
+ */
+export const PROFIL_ERINNERUNG_MINDESTABSTAND_TAGE = 3;
+
+/** Ist der Mindestabstand seit der letzten Erinnerung eingehalten? Ohne letzte
+ *  Erinnerung (null/ungültig) immer true. Rein, in beiden Pfaden genutzt. */
+export function erinnerungAbstandErfuellt(
+  letzteISO: string | null | undefined,
+  jetzt: number = Date.now(),
+): boolean {
+  if (!letzteISO) return true;
+  const ms = Date.parse(String(letzteISO));
+  if (Number.isNaN(ms)) return true;
+  return (jetzt - ms) / 86_400_000 >= PROFIL_ERINNERUNG_MINDESTABSTAND_TAGE;
+}
 
 /** „Vorname N." – nie der volle Nachname (auch nicht der eines anderen Trainers). */
 export function trainerKurzname(vorname: unknown, nachname: unknown): string {
@@ -2588,8 +2623,9 @@ export function trainerKurzname(vorname: unknown, nachname: unknown): string {
 }
 
 /** Darf dieser Trainer gerade eine manuelle Profil-Erinnerung bekommen?
- *  Abgelehnt: Test/Spam-Konto, vollständiges Profil (8/8), oder innerhalb der
- *  14-Tage-Sperre. Nicht bestätigte E-Mail ist KEIN Ablehnungsgrund. Rein. */
+ *  Abgelehnt: Test/Spam-Konto, vollständiges Profil (8/8), oder innerhalb des
+ *  gemeinsamen 3-Tage-Abstands (letzteISO ist der gemeinsame letzte Versand –
+ *  automatisch ODER manuell). Nicht bestätigte E-Mail ist KEIN Grund. Rein. */
 export function profilErinnerungDarf(
   t: TrainerProfil,
   letzteISO: string | null | undefined,
@@ -2599,15 +2635,11 @@ export function profilErinnerungDarf(
   if (freischaltFehlendeFelder(t).length === 0) {
     return { erlaubt: false, grund: "Profil ist vollständig (8/8)" };
   }
-  if (letzteISO) {
+  if (!erinnerungAbstandErfuellt(letzteISO, jetzt)) {
     const ms = Date.parse(String(letzteISO));
-    if (!Number.isNaN(ms)) {
-      const tage = (jetzt - ms) / 86_400_000;
-      if (tage < PROFIL_ERINNERUNG_SPERRE_TAGE) {
-        const rest = Math.max(1, Math.ceil(PROFIL_ERINNERUNG_SPERRE_TAGE - tage));
-        return { erlaubt: false, grund: `Erst in ${rest} Tag(en) wieder (14-Tage-Sperre)` };
-      }
-    }
+    const tage = (jetzt - ms) / 86_400_000;
+    const rest = Math.max(1, Math.ceil(PROFIL_ERINNERUNG_MINDESTABSTAND_TAGE - tage));
+    return { erlaubt: false, grund: `Erst in ${rest} Tag(en) wieder (3-Tage-Abstand)` };
   }
   return { erlaubt: true, grund: "" };
 }
@@ -2629,9 +2661,7 @@ export function mailProfilErinnerung(t: TrainerProfil): Mail {
     (fehlt.length ? ` Es fehlen noch: ${fehlt.join(", ")}.` : "") +
     ` In der Suche sehen Kundinnen und Kunden zuerst Foto, Ort und Preis – ` +
     `vollständig ausgefüllte Profile werden eher angeklickt. Das Ergänzen dauert ` +
-    `nur wenige Minuten. Vexfit ist für dich kostenlos, bis du die erste ` +
-    `Kundenanfrage über Vexfit annimmst. Danach 49,99 €/Monat, monatlich ` +
-    `kündbar. Jeder weitere Kunde über Vexfit einmalig 9,99 €. Wenn du Fragen ` +
+    `nur wenige Minuten. ${PREIS_HINWEIS_SATZ} Wenn du Fragen ` +
     `hast, antworte einfach auf diese Mail – sie erreicht Jakob direkt.`;
   return baueMail(w(t.email), `Dein Vexfit-Profil ist zu ${erfuellt} von 8 fertig`, {
     ueberschrift: "Mach dein Profil komplett",
@@ -2648,6 +2678,14 @@ export function mailProfilErinnerung(t: TrainerProfil): Mail {
   });
 }
 
+/** Art einer protokollierten Profil-Erinnerung. */
+export type ProfilErinnerungArt = "automatisch" | "manuell";
+/** Letzter Versand eines Trainers: Zeitpunkt (ISO) und Art. */
+export interface ProfilErinnerungLetzte {
+  am: string;
+  art: ProfilErinnerungArt;
+}
+
 /** Eine Zeile der Admin-Liste „Profil-Erinnerung". */
 export interface ProfilErinnerungEintrag {
   id: string;
@@ -2659,6 +2697,8 @@ export interface ProfilErinnerungEintrag {
   fehlend: string[];
   registriert_am: string;
   letzte_erinnerung_am: string | null;
+  /** Art der letzten Erinnerung ("automatisch"/"manuell") oder null, wenn keine. */
+  letzte_erinnerung_art: ProfilErinnerungArt | null;
   /** true/false aus der Auth; null = unbekannt (Kennzeichen „unbestätigt" nur bei false). */
   email_bestaetigt: boolean | null;
   salzburg: boolean;
@@ -2669,12 +2709,13 @@ export interface ProfilErinnerungEintrag {
 /**
  * Baut die sortierte Liste für die Verwaltung: ohne Test/Spam-Konten; Raum
  * Salzburg (PLZ 50/51) zuerst, dann nach Vollständigkeit aufsteigend, dann Name.
- * letzteMap: Trainer-ID → letzte Erinnerung (ISO); emailMap: user_id → bestätigt.
+ * letzteMap: Trainer-ID → { am (ISO), art }; emailMap: user_id → bestätigt.
+ * Der 3-Tage-Abstand (darf) nutzt denselben letzten Versand – egal welcher Art.
  * Rein (ohne Netz prüfbar).
  */
 export function profilErinnerungListe(
   trainers: TrainerProfil[],
-  letzteMap: Record<string, string>,
+  letzteMap: Record<string, ProfilErinnerungLetzte>,
   emailMap: Record<string, boolean>,
   jetzt: number = Date.now(),
 ): ProfilErinnerungEintrag[] {
@@ -2684,7 +2725,7 @@ export function profilErinnerungListe(
       const id = w(t.id);
       const letzte = letzteMap[id] ?? null;
       const fehlend = freischaltFehlendeFelder(t);
-      const darf = profilErinnerungDarf(t, letzte, jetzt);
+      const darf = profilErinnerungDarf(t, letzte?.am ?? null, jetzt);
       const roh = t as unknown as Record<string, unknown>;
       const userId = w(roh.user_id);
       const best = (emailMap && userId in emailMap) ? emailMap[userId] : null;
@@ -2697,7 +2738,8 @@ export function profilErinnerungListe(
         erfuellt: 8 - fehlend.length,
         fehlend,
         registriert_am: w(t.created_at),
-        letzte_erinnerung_am: letzte,
+        letzte_erinnerung_am: letzte?.am ?? null,
+        letzte_erinnerung_art: letzte?.art ?? null,
         email_bestaetigt: best,
         salzburg: istSalzburgPlz(t.plz),
         darf: darf.erlaubt,
@@ -2775,13 +2817,25 @@ async function erinnerungenPruefen(
     await a.protokoll?.({ aktion: "erinnerungen", ergebnis: `fehlgeschlagen (${grund})` });
     return antwort(200, { ok: true, geprueft: 0, mails: 0, fehlgeschlagen: grund }, herkunft);
   }
+  // Gemeinsamer letzter Versand (automatisch ODER manuell) je Trainer – für den
+  // 3-Tage-Abstand. Best effort: fehlt die Tabelle (Migration nicht eingespielt),
+  // bleibt die Map leer und der Abstand blockiert nichts.
+  let letzteMap: Record<string, ProfilErinnerungLetzte> = {};
+  try {
+    letzteMap = a.profilErinnerungLetzteMap ? await a.profilErinnerungLetzteMap() : {};
+  } catch { letzteMap = {}; }
   const jetzt = Date.now();
   let mails = 0;
   let behandelt = 0;
+  let abstand = 0;
   const fehlerListe: string[] = [];
   for (const t of kandidaten) {
     const stufe = erinnerungStufeFaellig(t, jetzt);
     if (!stufe) continue;
+    // Gemeinsamer 3-Tage-Abstand: nicht senden, wenn die letzte Erinnerung (egal
+    // ob automatisch oder manuell) noch keine 3 Tage her ist. Vor dem Anspruch
+    // prüfen, damit keine Stufe „verbraucht" wird.
+    if (!erinnerungAbstandErfuellt(letzteMap[t.id]?.am, jetzt)) { abstand++; continue; }
     const vorher = Number(t.erinnerung_stufe) || 0;
     const kurz = String(t.id).slice(0, 8);
     // Atomar beanspruchen: nur wer die Stufe bekommt, sendet (ein Lauf = eine
@@ -2799,8 +2853,13 @@ async function erinnerungenPruefen(
     behandelt++;
     try {
       const gesendet = await sendeWennAdresseTaugt(a, mailErinnerung(t, stufe, w(t.erinnerung_token)));
-      if (gesendet) mails++;
-      else {
+      if (gesendet) {
+        mails++;
+        // Automatischen Versand im gemeinsamen Protokoll vermerken – so sieht die
+        // manuelle Erinnerung (und der nächste Cron-Lauf) den Abstand. Best effort.
+        try { await a.profilErinnerungProtokollieren?.(t.id, freischaltFehlendeFelder(t), "automatisch"); }
+        catch (fehler) { a.melden?.("erinnerungen: Protokoll fehlgeschlagen", String(fehler)); }
+      } else {
         // Ungültige Adresse: Stufe auf den Stand vor dem Anspruch zurück, damit
         // ein späterer Lauf es erneut versuchen darf (kein Doppelversand, da die
         // Stufe zurückgesetzt wird).
@@ -2821,7 +2880,7 @@ async function erinnerungenPruefen(
       ergebnis: cronLaufErgebnis(behandelt, fehlerListe, `${mails} Mail(s) verschickt`),
     });
   }
-  return antwort(200, { ok: true, geprueft: kandidaten.length, mails, fehler: fehlerListe.length }, herkunft);
+  return antwort(200, { ok: true, geprueft: kandidaten.length, mails, abstand_uebersprungen: abstand, fehler: fehlerListe.length }, herkunft);
 }
 
 /**

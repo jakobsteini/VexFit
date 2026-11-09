@@ -86,15 +86,16 @@ Deno.test("mailProfilErinnerung: fehlende Angaben, Link, kein Nachname, keine Ad
   assert(!/stra(ß|ss)e|\bweg\b|hausnummer/i.test(m.text), "Adresse im Text");
 });
 
-Deno.test("profilErinnerungDarf: 8/8, Test/Spam, 14-Tage-Sperre – unbestätigt egal", () => {
+Deno.test("profilErinnerungDarf: 8/8, Test/Spam, 3-Tage-Abstand – unbestätigt egal", () => {
   // vollständig → abgelehnt
   assertEquals(profilErinnerungDarf(vollstaendig(), null).erlaubt, false);
   // Test/Spam → abgelehnt
   assertEquals(profilErinnerungDarf(trainer({ ist_test: true }), null).erlaubt, false);
-  // innerhalb 14 Tagen → abgelehnt
-  assertEquals(profilErinnerungDarf(trainer(), vorTagen(3)).erlaubt, false);
-  // genau außerhalb (20 Tage) → erlaubt
-  assertEquals(profilErinnerungDarf(trainer(), vorTagen(20)).erlaubt, true);
+  // innerhalb 3 Tagen (letzte Erinnerung, egal welcher Art) → abgelehnt
+  assertEquals(profilErinnerungDarf(trainer(), vorTagen(1)).erlaubt, false);
+  assertStringIncludes(profilErinnerungDarf(trainer(), vorTagen(1)).grund, "3-Tage-Abstand");
+  // ab 3 Tagen → erlaubt
+  assertEquals(profilErinnerungDarf(trainer(), vorTagen(5)).erlaubt, true);
   // noch nie erinnert → erlaubt (E-Mail-Bestätigung ist kein Faktor)
   assertEquals(profilErinnerungDarf(trainer(), null).erlaubt, true);
 });
@@ -123,7 +124,7 @@ Deno.test("profilErinnerungListe: ohne Test/Spam, Salzburg zuerst, x/8 aufsteige
 
 // ── Edge-Aktionen über bearbeiten() ──
 
-interface Spur { mails: Mail[]; protokolliert: { trainerId: string; fehlende: string[] }[] }
+interface Spur { mails: Mail[]; protokolliert: { trainerId: string; fehlende: string[]; art: string }[] }
 function baue(opt: {
   aal?: string;
   profil?: TrainerProfil | null;
@@ -138,7 +139,7 @@ function baue(opt: {
     profilErinnerungKandidaten: () => Promise.resolve(opt.kandidaten ?? []),
     profilErinnerungLetzteMap: () => Promise.resolve({}),
     emailBestaetigtMap: () => Promise.resolve({}),
-    profilErinnerungProtokollieren: (trainerId: string, fehlende: string[]) => { spur.protokolliert.push({ trainerId, fehlende }); return Promise.resolve(); },
+    profilErinnerungProtokollieren: (trainerId: string, fehlende: string[], art: string) => { spur.protokolliert.push({ trainerId, fehlende, art }); return Promise.resolve(); },
     mailSenden: (m: Mail) => { spur.mails.push(m); return Promise.resolve(); },
     protokoll: () => Promise.resolve(),
     melden: () => {},
@@ -177,7 +178,7 @@ Deno.test("Edge: senden schickt Mail + protokolliert fehlende Angaben", async ()
   assertEquals(res.status, 200);
   assertEquals(d.gesendet, true);
   assertEquals(spur.mails.length, 1);
-  assertEquals(spur.protokolliert, [{ trainerId: "t6", fehlende: ["Foto", "Preis pro Stunde"] }]);
+  assertEquals(spur.protokolliert, [{ trainerId: "t6", fehlende: ["Foto", "Preis pro Stunde"], art: "manuell" }]);
 });
 
 Deno.test("Edge: 8/8 abgelehnt, nichts gesendet", async () => {
@@ -187,13 +188,24 @@ Deno.test("Edge: 8/8 abgelehnt, nichts gesendet", async () => {
   assertEquals(spur.mails.length, 0);
 });
 
-Deno.test("Edge: innerhalb 14 Tagen abgelehnt (14-Tage-Sperre)", async () => {
-  const { anschluesse, spur } = baue({ letzte: vorTagen(5) });
+Deno.test("Edge: 3-Tage-Abstand – letzte Erinnerung < 3 Tage (auch automatisch) → manuell abgelehnt", async () => {
+  // „manuell nach Automatik": letzte ist eine automatische Erinnerung von vor 1 Tag.
+  const { anschluesse, spur } = baue({ letzte: vorTagen(1) });
   const res = await bearbeiten(req({ aktion: "profil_erinnerung_senden", ziel_id: "t6" }), anschluesse);
   const d = await res.json();
   assertEquals(res.status, 400);
-  assertStringIncludes(String(d.fehler), "14-Tage-Sperre");
+  assertStringIncludes(String(d.fehler), "3-Tage-Abstand");
   assertEquals(spur.mails.length, 0);
+});
+
+Deno.test("Edge: 3-Tage-Abstand – letzte Erinnerung ≥ 3 Tage → manuell erlaubt + protokolliert als manuell", async () => {
+  const { anschluesse, spur } = baue({ letzte: vorTagen(5) });
+  const res = await bearbeiten(req({ aktion: "profil_erinnerung_senden", ziel_id: "t6" }), anschluesse);
+  const d = await res.json();
+  assertEquals(res.status, 200);
+  assertEquals(d.gesendet, true);
+  assertEquals(spur.mails.length, 1);
+  assertEquals(spur.protokolliert, [{ trainerId: "t6", fehlende: ["Foto", "Preis pro Stunde"], art: "manuell" }]);
 });
 
 Deno.test("Edge: Test/Spam abgelehnt", async () => {

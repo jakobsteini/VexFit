@@ -13,11 +13,13 @@ import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
   type Anschluesse,
   bearbeiten,
+  erinnerungBetreff,
   erinnerungStufeFaellig,
   erinnerungZiel,
   ERLAUBTE_HERKUNFT,
   type Mail,
   mailErinnerung,
+  type ProfilErinnerungArt,
   type TrainerProfil,
 } from "./kern.ts";
 
@@ -75,12 +77,11 @@ Deno.test("Teil 4: Knopf-Ziel je erster fehlender Angabe", () => {
 });
 
 // ── Pure: Mailinhalt ────────────────────────────────────────────────────────
-Deno.test("Teil 4: mailErinnerung – Anrede, X von 8, fehlende Angaben, Knopf, Abmelde-Link, Fußzeile", () => {
+Deno.test("Teil 4: mailErinnerung – Anrede, x von 8 fertig, fehlende Angaben, Knopf, Abmelde-Link, Fußzeile", () => {
   const m = mailErinnerung(trainer(), 1, "tok-1");
   assertEquals(m.an, "lukas@example.com");
-  assertStringIncludes(m.betreff, "Vexfit.app");
   assertStringIncludes(m.text, "Hallo Lukas,");          // Vorname formatiert
-  assertStringIncludes(m.text, "1 von 8");               // nur Telefon fehlt
+  assertStringIncludes(m.text, "7 von 8 fertig");        // nur Telefon fehlt → 7/8
   assertStringIncludes(m.text, "Telefon");               // fehlende Angabe benannt
   assertStringIncludes(m.text, "Profil jetzt vervollständigen");
   assertStringIncludes(m.text, "profil-bearbeiten.html#fTelefon");
@@ -93,8 +94,49 @@ Deno.test("Teil 4: mailErinnerung – Anrede, X von 8, fehlende Angaben, Knopf, 
   assertStringIncludes(m.text, "Salzburg · Österreich");
   assert(!m.text.includes("Fuschl am See"), "genaue Adresse in der Erinnerung");
   assert(!m.html.includes("Fuschl am See"), "genaue Adresse im HTML");
-  // Drei verschiedene Betreffzeilen.
-  assert(mailErinnerung(trainer(), 1, "t").betreff !== mailErinnerung(trainer(), 3, "t").betreff);
+});
+
+// Betreff/Einstieg richten sich nach der Vollständigkeit (nicht nach der Stufe).
+Deno.test("Teil 4: Betreff je Vollständigkeitsstufe; kein fast-fertig unter 4/8", () => {
+  // 0/8: nichts gesetzt außer Pflichtfeldern leer → „wartet auf dich".
+  const leer = trainer({
+    avatar_url: "", trainingsart: "", trainingsort: "", preis_stunde: 0,
+    bio: "", erfahrung: "", spezialisierungen: [], telefon: "",
+  });
+  const m0 = mailErinnerung(leer, 1, "t");
+  assertEquals(m0.betreff, "Dein Vexfit-Profil wartet auf dich");
+  assert(!/fast fertig/i.test(m0.text + m0.html), "fast-fertig bei 0/8");
+  assert(!/fast fertig/i.test(m0.betreff), "fast-fertig im Betreff bei 0/8");
+  assertStringIncludes(m0.text, "0 von 8 fertig");
+
+  // 5/8: drei fehlen (Foto, Preis, Telefon) → „zu 5 von 8 fertig".
+  const m5 = mailErinnerung(trainer({ avatar_url: "", preis_stunde: 0, telefon: "" }), 1, "t");
+  assertEquals(m5.betreff, "Dein Vexfit-Profil ist zu 5 von 8 fertig");
+
+  // 7/8: nur Telefon fehlt → „Nur noch eine Angabe …".
+  const m7 = mailErinnerung(trainer(), 1, "t");
+  assertEquals(m7.betreff, "Nur noch eine Angabe bis zu deinem fertigen Profil");
+
+  // Reine Betreff-Funktion deckt die drei Bänder ab.
+  assertEquals(erinnerungBetreff(0), "Dein Vexfit-Profil wartet auf dich");
+  assertEquals(erinnerungBetreff(3), "Dein Vexfit-Profil wartet auf dich");
+  assertEquals(erinnerungBetreff(4), "Dein Vexfit-Profil ist zu 4 von 8 fertig");
+  assertEquals(erinnerungBetreff(6), "Dein Vexfit-Profil ist zu 6 von 8 fertig");
+  assertEquals(erinnerungBetreff(7), "Nur noch eine Angabe bis zu deinem fertigen Profil");
+});
+
+// Fehlende Angaben genau einmal; Preis-Hinweis wie in der manuellen Mail.
+Deno.test("Teil 4: fehlende Angaben genau einmal + Preiszeile (kostenlos/49,99/monatlich kündbar)", () => {
+  const m = mailErinnerung(trainer({ avatar_url: "", preis_stunde: 0, telefon: "" }), 1, "t");
+  const zaehle = (s: string, teil: string) => s.split(teil).length - 1;
+  assertEquals(zaehle(m.text, "Foto, Preis pro Stunde, Telefon"), 1);
+  assertEquals(zaehle(m.html, "Foto, Preis pro Stunde, Telefon"), 1);
+  assert(!m.text.includes("Es fehlt noch:"), "eigene Es-fehlt-noch-Zeile doppelt");
+  // Preis-Hinweis wortgleich zur manuellen Erinnerung.
+  assertStringIncludes(m.text, "kostenlos, bis du die erste Kundenanfrage über Vexfit annimmst");
+  assertStringIncludes(m.text, "49,99 €/Monat");
+  assertStringIncludes(m.text, "monatlich kündbar");
+  assertStringIncludes(m.text, "9,99 €");
 });
 
 Deno.test("Fußzeile: alle drei Stufen – Salzburg · Österreich, Impressum-Link, Abmelde-Link; keine Adresse/Telefon", () => {
@@ -125,9 +167,16 @@ Deno.test("Fußzeile: Reihenfolge Adresse → Impressum → Abmelde", () => {
 });
 
 // ── Endpunkt: Cron-Schlüssel + Versand ──────────────────────────────────────
-interface Spur { mails: Mail[]; stufen: { id: string; stufe: number }[]; }
-function baue(opt: { kandidaten?: TrainerProfil[]; mailWirft?: boolean; ohneVerdrahtung?: boolean } = {}): { a: Anschluesse; spur: Spur } {
-  const spur: Spur = { mails: [], stufen: [] };
+interface Spur { mails: Mail[]; stufen: { id: string; stufe: number }[]; protokoll: { id: string; art: ProfilErinnerungArt }[]; }
+function baue(
+  opt: {
+    kandidaten?: TrainerProfil[];
+    mailWirft?: boolean;
+    ohneVerdrahtung?: boolean;
+    letzteMap?: Record<string, { am: string; art: ProfilErinnerungArt }>;
+  } = {},
+): { a: Anschluesse; spur: Spur } {
+  const spur: Spur = { mails: [], stufen: [], protokoll: [] };
   // Simuliert den atomaren Anspruch je Trainer (bereits verschickte Stufe).
   const stand = new Map<string, number>();
   const fehlt = (n: string) => () => { throw new Error(`${n} nicht erwartet`); };
@@ -148,6 +197,12 @@ function baue(opt: { kandidaten?: TrainerProfil[]; mailWirft?: boolean; ohneVerd
       return Promise.resolve(false);
     };
     base.erinnerungAbmelden = (_token: string) => Promise.resolve(true);
+    // Gemeinsamer letzter Versand (für den 3-Tage-Abstand) und Protokoll.
+    base.profilErinnerungLetzteMap = () => Promise.resolve(opt.letzteMap ?? {});
+    base.profilErinnerungProtokollieren = (id: string, _fehlende: string[], art: ProfilErinnerungArt) => {
+      spur.protokoll.push({ id, art });
+      return Promise.resolve();
+    };
   }
   for (const n of ["trainerNachId","trainerNachEmail","aeltesteOffeneAnfrage","trainerBezahltMarkieren","anfrageWeitergeleitetMarkieren","stripeEreignis","ereignisSchonVerarbeitet","ereignisVermerken","anfragenAnzahlSeit","spamProEmailSeit","spamProIpSeit","spamEintragVormerken","adminZeileLoeschen"]) {
     if (!(n in base)) base[n] = fehlt(n);
@@ -195,12 +250,45 @@ Deno.test("Teil 4: ohne Verdrahtung/Migration bleibt der Pfad still (kein Abstur
   assertEquals((await res.json()).uebersprungen, "nicht verdrahtet");
 });
 
-Deno.test("Teil 4: docs/erinnerungs-mails.md enthält die drei Texte", async () => {
+Deno.test("Teil 4: automatischer Versand wird mit Art automatisch protokolliert", async () => {
+  const { a, spur } = baue({ kandidaten: [trainer({ id: "auto", created_at: vorStundenNun(3) })] });
+  const d = await (await bearbeiten(cronReq(), a)).json();
+  assertEquals(d.mails, 1);
+  assertEquals(spur.protokoll.length, 1);
+  assertEquals(spur.protokoll[0], { id: "auto", art: "automatisch" });
+});
+
+Deno.test("Teil 4: 3-Tage-Abstand – letzte (manuelle) Erinnerung < 3 Tage → Automatik sendet nicht", async () => {
+  const vor1Tag = new Date(Date.now() - 1 * 86_400_000).toISOString();
+  const { a, spur } = baue({
+    kandidaten: [trainer({ id: "x", created_at: vorStundenNun(30) })], // Stufe 2 wäre fällig
+    letzteMap: { x: { am: vor1Tag, art: "manuell" } }, // aber vor 1 Tag schon manuell erinnert
+  });
+  const d = await (await bearbeiten(cronReq(), a)).json();
+  assertEquals(d.mails, 0);
+  assertEquals(d.abstand_uebersprungen, 1);
+  assertEquals(spur.mails.length, 0);
+  assertEquals(spur.stufen.length, 0); // keine Stufe verbraucht
+});
+
+Deno.test("Teil 4: 3-Tage-Abstand – letzte Erinnerung ≥ 3 Tage → Automatik sendet wieder", async () => {
+  const vor5Tagen = new Date(Date.now() - 5 * 86_400_000).toISOString();
+  const { a, spur } = baue({
+    kandidaten: [trainer({ id: "y", created_at: vorStundenNun(30) })],
+    letzteMap: { y: { am: vor5Tagen, art: "automatisch" } },
+  });
+  const d = await (await bearbeiten(cronReq(), a)).json();
+  assertEquals(d.mails, 1);
+  assertEquals(spur.mails.length, 1);
+});
+
+Deno.test("Teil 4: docs/erinnerungs-mails.md enthält die drei Betreffe (nach Vollständigkeit)", async () => {
   const doc = await Deno.readTextFile(new URL("../../../docs/erinnerungs-mails.md", import.meta.url));
-  for (const stufe of [1, 2, 3]) {
-    assertStringIncludes(doc, mailErinnerung(trainer(), stufe, "t").betreff);
+  for (const erfuellt of [0, 5, 7]) {
+    assertStringIncludes(doc, erinnerungBetreff(erfuellt));
   }
   assertStringIncludes(doc, "Salzburg · Österreich");
+  assertStringIncludes(doc, "monatlich kündbar"); // Preis-Hinweis dokumentiert
   assert(!doc.includes("Fuschl am See"), "genaue Adresse im Doku-Text");
 });
 

@@ -35,7 +35,7 @@ const SESSION = JSON.stringify({ access_token: TOKEN, refresh_token: "r", user_i
 const LISTE = [
   { id: "a", name: "Anna B.", ort: "Salzburg", plz: "5020", land: "AT", erfuellt: 3, fehlend: ["Foto", "Preis pro Stunde", "Telefon", "Über mich", "Erfahrung"], registriert_am: "2026-11-07T10:00:00Z", letzte_erinnerung_am: null, email_bestaetigt: false, salzburg: true, darf: true, grund: "" },
   { id: "b", name: "Ben K.", ort: "Hallein", plz: "5400", land: "AT", erfuellt: 6, fehlend: ["Foto", "Preis pro Stunde"], registriert_am: "2026-11-06T10:00:00Z", letzte_erinnerung_am: null, email_bestaetigt: true, salzburg: true, darf: true, grund: "" },
-  { id: "c", name: "Cara M.", ort: "Wien", plz: "1010", land: "AT", erfuellt: 8, fehlend: [], registriert_am: "2026-11-05T10:00:00Z", letzte_erinnerung_am: "2026-11-08T08:00:00Z", email_bestaetigt: true, salzburg: false, darf: false, grund: "Profil ist vollständig (8/8)" },
+  { id: "c", name: "Cara M.", ort: "Wien", plz: "1010", land: "AT", erfuellt: 8, fehlend: [], registriert_am: "2026-11-05T10:00:00Z", letzte_erinnerung_am: "2026-11-08T08:00:00Z", letzte_erinnerung_art: "automatisch", email_bestaetigt: true, salzburg: false, darf: false, grund: "Profil ist vollständig (8/8)" },
 ];
 const VORSCHAU = {
   ok: true, darf: true, empfaenger: "anna@example.com",
