@@ -2442,20 +2442,21 @@ const VEXFIT_BASIS = "https://vexfit.app";
 // der Migration. Der Abmelde-Link MUSS hierher zeigen, sonst läuft er ins Leere.
 const FUNKTIONEN_BASIS = "https://hbapzwxdehfgnputrfjf.supabase.co";
 
-/** Feste Zeitfenster nach der Registrierung (in Stunden). Damit Altkonten nicht
- *  auf einmal mehrere Mails bekommen: jede Stufe gilt nur in IHREM Fenster. */
-export const ERINNERUNG_FENSTER = [
-  { stufe: 1, abStunden: 2, bisStunden: 24 },
-  { stufe: 2, abStunden: 24, bisStunden: 72 },
-  { stufe: 3, abStunden: 72, bisStunden: 96 },
-] as const;
+/** Zeitpunkte der drei Stufen in Stunden NACH der Registrierung: 2 Stunden,
+ *  3 Tage, 7 Tage. KEINE obere Grenze je Stufe – eine Stufe bleibt fällig, bis
+ *  sie tatsächlich gesendet ist (so wird eine wegen des 3-Tage-Abstands
+ *  blockierte Stufe VERSCHOBEN, nicht übersprungen). Höchstens drei Stufen. */
+export const ERINNERUNG_STUFEN_STUNDEN = [2, 72, 168] as const;
 
 /**
- * Welche Erinnerungsstufe ist für diesen Trainer JETZT fällig – oder null?
- * Rein (ohne Netz prüfbar). Keine Erinnerung, wenn das Profil vollständig,
- * freigeschaltet (aktiv), gesperrt oder abgemeldet ist; außerhalb von 2–96 h
- * nach der Registrierung; oder wenn die Stufe des aktuellen Fensters schon
- * verschickt wurde. Höchstens eine Stufe je Aufruf.
+ * Welche Erinnerungsstufe ist für diesen Trainer nach der Zeit fällig – oder
+ * null? Es wird IMMER die nächste noch nicht gesendete Stufe (erinnerung_stufe +
+ * 1) betrachtet, und zwar sobald ihr Zeitpunkt erreicht ist; höhere Stufen
+ * werden nie übersprungen und nie zwei auf einmal. Keine Erinnerung, wenn das
+ * Profil vollständig (8/8), freigeschaltet (aktiv), gesperrt oder abgemeldet ist
+ * oder bereits alle drei Stufen verschickt sind. Der gemeinsame 3-Tage-Abstand
+ * wird NICHT hier geprüft (dafür fehlt der letzte Versandzeitpunkt), sondern im
+ * Cron-Lauf – eine dort blockierte Stufe bleibt hier weiter fällig. Rein.
  */
 export function erinnerungStufeFaellig(
   t: TrainerProfil,
@@ -2470,12 +2471,9 @@ export function erinnerungStufeFaellig(
   if (Number.isNaN(ms)) return null;
   const stunden = (jetzt - ms) / 3_600_000;
   const bereits = Number(t.erinnerung_stufe) || 0;
-  for (const f of ERINNERUNG_FENSTER) {
-    if (stunden >= f.abStunden && stunden < f.bisStunden) {
-      return bereits < f.stufe ? f.stufe : null;
-    }
-  }
-  return null; // vor dem ersten Fenster, in keiner Lücke oder ab 96 h
+  if (bereits >= ERINNERUNG_STUFEN_STUNDEN.length) return null; // alle drei verschickt
+  const naechste = bereits + 1;
+  return stunden >= ERINNERUNG_STUFEN_STUNDEN[naechste - 1] ? naechste : null;
 }
 
 /** Ziel-Adresse „zur ersten fehlenden Angabe". Das Profilfoto wird im

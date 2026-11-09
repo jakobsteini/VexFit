@@ -2,16 +2,22 @@
 
 Automatische Erinnerung in **Stufen**, je genau einmal, nur solange das Profil
 unvollständig und der Trainer noch nicht freigeschaltet, gesperrt, gelöscht oder
-abgemeldet ist. Feste Zeitfenster nach der Registrierung: Stufe 1 zwischen 2 und
-24 Stunden, Stufe 2 zwischen 24 und 72 Stunden, Stufe 3 zwischen 72 und 96
-Stunden. Älter als 96 Stunden → keine Erinnerung. **Höchstens drei automatische
-Erinnerungen** je Trainer (eine je Stufe), pro Lauf höchstens eine Mail.
+abgemeldet ist. Zeitpunkte nach der Registrierung: **Stufe 1 ab 2 Stunden, Stufe
+2 ab 3 Tagen, Stufe 3 ab 7 Tagen.** **Höchstens drei automatische Erinnerungen**
+je Trainer (eine je Stufe), pro Lauf höchstens eine Mail, immer in dieser
+Reihenfolge.
 
 **Gemeinsamer Mindestabstand: 3 Tage.** Zwischen zwei Profil-Erinnerungen an
 denselben Trainer liegen mindestens 3 Tage – egal ob automatisch (Stufen-Cron)
 oder manuell (Verwaltung, per Klick). Beide Pfade prüfen denselben letzten
-Versandzeitpunkt (Tabelle `profil_erinnerungen`, Spalte `art`). Vollständige
-Profile (8/8) und Test-/Spam-Konten bekommen nie eine Erinnerung.
+Versandzeitpunkt (Tabelle `profil_erinnerungen`, Spalte `art`). Ist eine Stufe
+nach der Zeit fällig, aber der 3-Tage-Abstand (z. B. wegen einer manuellen Mail)
+noch nicht erfüllt, wird die Stufe **verschoben, nicht übersprungen**: der
+nächste Cron-Lauf nach Ablauf der 3 Tage sendet sie nach. Weil Stufe 1 erst 2
+Stunden nach der Registrierung geht, landet Stufe 2 dadurch rund 2 Stunden nach
+dem 3-Tage-Punkt. Vollständige Profile (8/8) und Test-/Spam-Konten bekommen nie
+eine Erinnerung – wird das Profil während der Wartezeit vollständig oder das
+Konto als Test/Spam markiert, stoppt die Folge.
 
 Absender: office@vexfit.app · gleiches Mailgerüst wie die übrigen Vexfit-Mails.
 

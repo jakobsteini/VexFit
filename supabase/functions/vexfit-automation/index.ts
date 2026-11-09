@@ -504,11 +504,14 @@ const anschluesse: Anschluesse = {
   },
 
   // Teil 4: Kandidaten für Erinnerungs-Mails – noch nicht freigegeben, nicht
-  // gesperrt, nicht abgemeldet, in den letzten 96 h registriert. Vollständigkeit
-  // und Zeitfenster entscheidet der Kern. Fehlen die Spalten (Migration
-  // 2026-11-02 nicht eingespielt), antwortet PostgREST mit Fehler → "migration fehlt".
+  // gesperrt, nicht abgemeldet, in den letzten 14 Tagen registriert. Die Stufen
+  // liegen bei 2 h / 3 Tagen / 7 Tagen; eine wegen des 3-Tage-Abstands
+  // verschobene Stufe kann noch einige Tage später fällig werden – deshalb 14
+  // Tage (statt der früheren 96 h) als Fenster. Vollständigkeit, Zeitpunkt und
+  // Abstand entscheidet der Kern. Fehlen die Spalten (Migration 2026-11-02 nicht
+  // eingespielt), antwortet PostgREST mit Fehler → "migration fehlt".
   async trainerFuerErinnerung(): Promise<TrainerProfil[]> {
-    const seit = new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString();
+    const seit = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
     const basis = "id,vorname,email,created_at,avatar_url,trainingsart,trainingsort,preis_stunde,bio,erfahrung,spezialisierungen,telefon,aktiv,gesperrt,erinnerung_stufe,erinnerungen_aus,erinnerung_token";
     // B7: Test-/Spam-Konten (ist_test) ausschließen. Zuerst MIT Spalte/Filter;
     // schlägt das fehl, weil die Migration 2026-11-06-02 noch nicht eingespielt

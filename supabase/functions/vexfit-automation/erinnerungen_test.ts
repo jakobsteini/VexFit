@@ -41,23 +41,29 @@ function trainer(ueber: Partial<TrainerProfil> = {}): TrainerProfil {
   };
 }
 
-// ── Pure: Zeitfenster/Stufen ────────────────────────────────────────────────
-Deno.test("Teil 4: Stufen nach 2/24/72 h, nichts vor 2 h und ab 96 h", () => {
-  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(1) }), JETZT), null); // zu früh
-  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(3) }), JETZT), 1);
-  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(30) }), JETZT), 2);
-  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(80) }), JETZT), 3);
-  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(100) }), JETZT), null); // > 96 h
-  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(240) }), JETZT), null); // 10 Tage
+// ── Pure: Zeitpunkte/Stufen (Schwellen 2 h / 3 Tage / 7 Tage) ────────────────
+const H_TAG = 24;
+Deno.test("Teil 4: Stufen-Schwellen 2 h / 3 Tage / 7 Tage, nichts vor 2 h", () => {
+  // bereits = 0 → immer die NÄCHSTE offene Stufe ist 1, sobald 2 h erreicht sind.
+  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(1) }), JETZT), null); // < 2 h
+  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(3) }), JETZT), 1); // ≥ 2 h
+  // Auch viel später bleibt die nächste offene Stufe 1 (keine zwei auf einmal,
+  // kein Überspringen): ein spät entdecktes Konto bekommt zuerst Stufe 1.
+  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(3 * H_TAG) }), JETZT), 1);
+  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(10 * H_TAG) }), JETZT), 1);
 });
 
-Deno.test("Teil 4: jede Stufe nur einmal (erinnerung_stufe)", () => {
-  // In Fenster 1, aber Stufe 1 schon verschickt → nichts.
-  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(3), erinnerung_stufe: 1 }), JETZT), null);
-  // In Fenster 2, Stufe 1 verschickt → Stufe 2 fällig.
-  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(30), erinnerung_stufe: 1 }), JETZT), 2);
-  // In Fenster 2, Stufe 2 schon verschickt → nichts.
-  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(30), erinnerung_stufe: 2 }), JETZT), null);
+Deno.test("Teil 4: nächste Stufe erst ab ihrer Schwelle; nie zwei auf einmal; max 3", () => {
+  // Stufe 1 verschickt, aber 3 Tage noch nicht erreicht → nichts (verschoben).
+  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(2 * H_TAG), erinnerung_stufe: 1 }), JETZT), null);
+  // Stufe 1 verschickt, ≥ 3 Tage → Stufe 2 fällig.
+  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(3 * H_TAG + 3), erinnerung_stufe: 1 }), JETZT), 2);
+  // Stufe 2 verschickt, aber 7 Tage noch nicht erreicht → nichts.
+  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(5 * H_TAG), erinnerung_stufe: 2 }), JETZT), null);
+  // Stufe 2 verschickt, ≥ 7 Tage → Stufe 3 fällig.
+  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(7 * H_TAG + 3), erinnerung_stufe: 2 }), JETZT), 3);
+  // Alle drei verschickt → nie mehr etwas.
+  assertEquals(erinnerungStufeFaellig(trainer({ created_at: vorStunden(30 * H_TAG), erinnerung_stufe: 3 }), JETZT), null);
 });
 
 Deno.test("Teil 4: keine Erinnerung bei vollständig/aktiv/gesperrt/abgemeldet", () => {
@@ -220,13 +226,13 @@ Deno.test("Teil 4: ohne Cron-Schlüssel → 401", async () => {
   assertEquals((await bearbeiten(cronReq("erinnerungen", false), a)).status, 401);
 });
 
-Deno.test("Teil 4: ein fälliger Trainer → genau 1 Mail; zweiter Lauf im selben Fenster → keine", async () => {
+Deno.test("Teil 4: ein fälliger Trainer → genau 1 Mail (Stufe 1); zweiter Lauf ohne neue Schwelle → keine", async () => {
   const { a, spur } = baue({ kandidaten: [trainer({ created_at: vorStundenNun(3) })] });
   const d1 = await (await bearbeiten(cronReq(), a)).json();
   assertEquals(d1.mails, 1);
   assertEquals(spur.mails.length, 1);
   assertEquals(spur.mails[0].betreff, mailErinnerung(trainer(), 1, "t").betreff);
-  // Zweiter Lauf: Stufe 1 schon beansprucht → keine weitere Mail.
+  // Zweiter Lauf: Stufe 1 schon beansprucht, Stufe 2 (3 Tage) noch nicht fällig → keine Mail.
   const d2 = await (await bearbeiten(cronReq(), a)).json();
   assertEquals(d2.mails, 0);
   assertEquals(spur.mails.length, 1);
@@ -235,8 +241,8 @@ Deno.test("Teil 4: ein fälliger Trainer → genau 1 Mail; zweiter Lauf im selbe
 Deno.test("Teil 4: nicht fällige Kandidaten bekommen nichts", async () => {
   const { a, spur } = baue({ kandidaten: [
     trainer({ id: "voll", telefon: "+43 1" }),       // vollständig
-    trainer({ id: "alt", created_at: vorStundenNun(200) }), // zu alt
-    trainer({ id: "frisch", created_at: vorStundenNun(0.5) }), // zu früh
+    trainer({ id: "fertig", created_at: vorStundenNun(240), erinnerung_stufe: 3 }), // alle drei Stufen verschickt
+    trainer({ id: "frisch", created_at: vorStundenNun(0.5) }), // zu früh (< 2 h)
   ] });
   const d = await (await bearbeiten(cronReq(), a)).json();
   assertEquals(d.mails, 0);
@@ -261,7 +267,7 @@ Deno.test("Teil 4: automatischer Versand wird mit Art automatisch protokolliert"
 Deno.test("Teil 4: 3-Tage-Abstand – letzte (manuelle) Erinnerung < 3 Tage → Automatik sendet nicht", async () => {
   const vor1Tag = new Date(Date.now() - 1 * 86_400_000).toISOString();
   const { a, spur } = baue({
-    kandidaten: [trainer({ id: "x", created_at: vorStundenNun(30) })], // Stufe 2 wäre fällig
+    kandidaten: [trainer({ id: "x", created_at: vorStundenNun(30) })], // Stufe 1 wäre nach Zeit fällig
     letzteMap: { x: { am: vor1Tag, art: "manuell" } }, // aber vor 1 Tag schon manuell erinnert
   });
   const d = await (await bearbeiten(cronReq(), a)).json();
@@ -280,6 +286,73 @@ Deno.test("Teil 4: 3-Tage-Abstand – letzte Erinnerung ≥ 3 Tage → Automatik
   const d = await (await bearbeiten(cronReq(), a)).json();
   assertEquals(d.mails, 1);
   assertEquals(spur.mails.length, 1);
+});
+
+// Simulierte Uhr: ein Cron-Lauf zum Zeitpunkt „elapsedH Stunden nach
+// Registrierung", mit bereits verschickter Stufe und – wenn gesetzt – einem
+// letzten Versand vor sinceLastH Stunden (egal welcher Art).
+async function lauf(opt: { elapsedH: number; bereits: number; sinceLastH?: number; extra?: Partial<TrainerProfil> }) {
+  const kand = trainer({ id: "sim", created_at: vorStundenNun(opt.elapsedH), erinnerung_stufe: opt.bereits, ...opt.extra });
+  const letzteMap = opt.sinceLastH != null
+    ? { sim: { am: new Date(Date.now() - opt.sinceLastH * 3_600_000).toISOString(), art: "automatisch" as const } }
+    : undefined;
+  const { a, spur } = baue({ kandidaten: [kand], letzteMap });
+  const d = await (await bearbeiten(cronReq(), a)).json();
+  return { d, spur };
+}
+const TAG = 24;
+
+Deno.test("Teil 4: Zeitstrahl ohne manuelle Mail – 2 h, 3 Tage (+2 h), 7 Tage, danach nichts", async () => {
+  // 2 h nach Registrierung, noch nichts verschickt → Stufe 1.
+  let r = await lauf({ elapsedH: 2, bereits: 0 });
+  assertEquals(r.d.mails, 1);
+  assertEquals(r.spur.stufen[0].stufe, 1);
+
+  // Genau 3 Tage: Stufe 1 ging vor 70 h (bei 2 h) → 3-Tage-Abstand noch nicht
+  // erfüllt → verschoben, keine Mail.
+  r = await lauf({ elapsedH: 3 * TAG, bereits: 1, sinceLastH: 3 * TAG - 2 });
+  assertEquals(r.d.mails, 0);
+  assertEquals(r.d.abstand_uebersprungen, 1);
+
+  // 3 Tage + 2 h: Abstand zur 2-h-Mail jetzt 72 h → Stufe 2 geht raus.
+  r = await lauf({ elapsedH: 3 * TAG + 2, bereits: 1, sinceLastH: 3 * TAG });
+  assertEquals(r.d.mails, 1);
+  assertEquals(r.spur.stufen[0].stufe, 2);
+
+  // 7 Tage: Stufe 2 ging vor ~94 h → Abstand erfüllt, Schwelle 7 Tage erreicht → Stufe 3.
+  r = await lauf({ elapsedH: 7 * TAG, bereits: 2, sinceLastH: 7 * TAG - (3 * TAG + 2) });
+  assertEquals(r.d.mails, 1);
+  assertEquals(r.spur.stufen[0].stufe, 3);
+
+  // Danach: alle drei verschickt → nie mehr etwas.
+  r = await lauf({ elapsedH: 30 * TAG, bereits: 3, sinceLastH: 20 * TAG });
+  assertEquals(r.d.mails, 0);
+});
+
+Deno.test("Teil 4: manuelle Mail an Tag 2 verschiebt Stufe 2 auf Tag 5 (nie zwei Mails in 3 Tagen)", async () => {
+  // Tag 3: Stufe 2 wäre nach Zeit fällig, aber die manuelle Mail an Tag 2 ist
+  // erst 1 Tag her → verschoben.
+  let r = await lauf({ elapsedH: 3 * TAG, bereits: 1, sinceLastH: 1 * TAG });
+  assertEquals(r.d.mails, 0);
+  assertEquals(r.d.abstand_uebersprungen, 1);
+
+  // Tag 4: manuelle Mail 2 Tage her → noch gesperrt.
+  r = await lauf({ elapsedH: 4 * TAG, bereits: 1, sinceLastH: 2 * TAG });
+  assertEquals(r.d.mails, 0);
+
+  // Tag 5: manuelle Mail 3 Tage her → Stufe 2 wird nachgeholt.
+  r = await lauf({ elapsedH: 5 * TAG, bereits: 1, sinceLastH: 3 * TAG });
+  assertEquals(r.d.mails, 1);
+  assertEquals(r.spur.stufen[0].stufe, 2);
+});
+
+Deno.test("Teil 4: 8/8 oder Test/Spam während der Wartezeit stoppt die Folge", async () => {
+  // Profil inzwischen vollständig (Telefon ergänzt) → keine weitere Stufe.
+  let r = await lauf({ elapsedH: 7 * TAG, bereits: 1, extra: { telefon: "+43 660 2" } });
+  assertEquals(r.d.mails, 0);
+  // Konto als Test/Spam markiert → keine weitere Stufe.
+  r = await lauf({ elapsedH: 7 * TAG, bereits: 1, extra: { ist_test: true } });
+  assertEquals(r.d.mails, 0);
 });
 
 Deno.test("Teil 4: docs/erinnerungs-mails.md enthält die drei Betreffe (nach Vollständigkeit)", async () => {
