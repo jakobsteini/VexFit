@@ -302,3 +302,36 @@ lint 30.
 **Commit E6:** docs/links-2026-11-10.md, e2e/salzburg-kundenweg.spec.ts,
 e2e/registrierung-kurz.spec.ts, e6-Test, Protokoll. Keine Codeänderung an den
 Seiten nötig (Weg war bereits korrekt). Keine Migration.
+
+---
+
+## E7 – Gesamttest (keine Migration)
+
+- **Deno-Suite:** **811 grün**, `deno check` grün, `deno lint` **30** (Baseline,
+  keine neuen).
+- **Browser-Rundgang** (Playwright/Chromium, lokaler Server :8799):
+  - `pruef-suche.mjs`: **ALLES GRÜN** (375/1440).
+  - `pruef-profil-erinnerung.mjs`: **ALLES GRÜN**.
+  - `vor-ads-rundgang.mjs`: grün.
+  - **`klick-rundgang-b9.mjs`: E7 hat einen echten E2-Regress gefunden und
+    behoben** – der Trainer-Registrierungs-Rundgang füllte die **neue
+    Pflicht-PLZ** nicht, dadurch blockte `submitTrainer` und `/neuer-trainer`
+    feuerte nicht mehr. Fix: Zippopotam gestubbt (5020→Salzburg), Land+PLZ im
+    Rundgang gefüllt. Danach **75 ok, 0 Fehlschläge**.
+  - `klick-rundgang-k9.mjs`: 2 Fehlschläge zur öffentlichen Namens-Vorschau
+    („voller Name sichtbar"/„Vorname N."). **Vorbestehend** – reproduziert mit
+    der unveränderten vexfit-trichter.js von vor dem Lauf; **nicht** durch E1–E6
+    verursacht (betrifft `suche.html`/`OEFFENTLICHE_VORSCHAU`, die der Lauf nicht
+    anfasst). Als offener Punkt in `offen-2026-11-10.md` notiert.
+- **Screenshots:** `docs/screenshots/2026-11-10/` – Trainer-Registrierung
+  **vorher/nachher** (390 px): nachher zeigt Land + Postleitzahl (E2). Nur
+  `registrieren.html` wurde an einer öffentlichen Seite inhaltlich geändert.
+- **Service-Worker:** **kein Versionssprung.** Begründung: Der einzige SW
+  (`sw-verwaltung.js`) ist nur für die **Admin-Hülle** und precacht ausschließlich
+  `verwaltung-…​.html` (unverändert); alles andere (inkl. `vexfit-verwaltung.js`)
+  läuft **network-first** – Admins bekommen die neue JS beim nächsten Laden. Die
+  geänderten **öffentlichen** Dateien (`registrieren.html`, `vexfit-trichter.js`)
+  werden von **keinem** Service-Worker gecacht (es gibt keinen öffentlichen SW).
+
+**Commit E7:** klick-rundgang-b9.mjs (Regress-Fix), Screenshots + README,
+Protokoll.

@@ -56,6 +56,12 @@ function mockSupabase(aufzeichnung) {
     const method = req.method();
     const json = (body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 
+    // E2 (10.11.): Trainer-Registrierung ermittelt den Ort aus der PLZ
+    // (vexfit-plz.js → api.zippopotam.us). Gestubbt: 5020 → Salzburg.
+    if (url.includes("zippopotam.us")) {
+      return json({ places: [{ "place name": "Salzburg", latitude: "47.80", longitude: "13.04" }] });
+    }
+
     if (url.includes("/auth/v1/signup")) {
       // Kurze Platzhalter-Werte (unter 8 Zeichen), damit der Geheimnis-Wächter
       // sie nicht für echte Tokens hält. Nur die Wahrheit „ist gesetzt" zählt.
@@ -140,7 +146,11 @@ async function trainerWeg(browser, kontext) {
   await page.fill("#t-ln", "Trainer");
   await page.fill("#t-email", `b9+${kontext.erwarterTyp}@beispiel.test`);
   await page.fill("#t-pw", "Sehr-Gut-2026!");
-  await page.waitForTimeout(150);
+  // E2: Land + PLZ sind jetzt Pflicht; der Ort wird aus der PLZ ermittelt
+  // (Zippopotam gestubbt). Nach dem Tippen kurz auf die Auflösung warten.
+  await page.selectOption("#t-land", "AT");
+  await page.fill("#t-plz", "5020");
+  await page.waitForTimeout(900);
   const formularBeacon = aufz.trichter.find((e) => e.stufe === "formular");
   merk(!!formularBeacon, `[${kontext.name}] Tippen feuert Trichter 'formular'`);
   // Die AGB-Checkbox ist (wie im echten Design) visuell versteckt; der
