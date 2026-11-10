@@ -207,3 +207,19 @@ Deno.test("Migration ergaenzt land in den vier Tabellen, ohne zu befuellen", asy
     assertStringIncludes(r, `public.${tab} DROP COLUMN IF EXISTS land`);
   }
 });
+
+// ── E2 (10.11.): Standort-Pflicht bei der Trainer-Registrierung ──
+Deno.test("E2: unbekannte PLZ im gewählten Land wird abgelehnt (null)", async () => {
+  const vexPlz = await ladeVexPlz();
+  const { fetch } = macheFetch({ "at/5020": { stadt: "Salzburg", lat: "47.80", lng: "13.04" } });
+  const erg = await vexPlz.aufloesen("9999", { fetch, land: "AT" });
+  assertEquals(erg, null, "eine im Land unbekannte PLZ liefert keinen Ort");
+});
+
+Deno.test("E2: registrieren.html – Trainer-Formular mit Land+PLZ, land-bewusste Auflösung", async () => {
+  const html = await lies("./registrieren.html");
+  assertStringIncludes(html, 'id="t-land"');
+  assertStringIncludes(html, 'id="t-plz"');
+  assertStringIncludes(html, "{cache:plzCache,land:landSel}");
+  assertStringIncludes(html, "stadt:plzStand.t.stadt,plz:plzWert,land:ortLand");
+});

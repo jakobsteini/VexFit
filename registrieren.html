@@ -171,12 +171,28 @@ try {
     </div>
     <div class="pw-meter" id="t-pw-meter" style="display:none"><div class="pw-bar"><span></span><span></span><span></span></div><div class="pw-word"></div></div>
     <div class="error-banner" id="t-pw-error"></div>
+    <!-- E2 (10.11.2026): Standort ist für die Salzburg-Strategie entscheidend –
+         Land + PLZ sind bei der Trainer-Registrierung Pflicht, der Ort wird aus
+         der PLZ ermittelt (vexfit-plz.js). -->
+    <div class="field-row">
+      <div class="field"><label>Land</label>
+        <select id="t-land" onchange="plzGeaendert('t')">
+          <option value="AT">Österreich</option>
+          <option value="DE">Deutschland</option>
+          <option value="CH">Schweiz</option>
+        </select>
+      </div>
+      <div class="field"><label>Postleitzahl</label>
+        <input type="text" inputmode="numeric" placeholder="5020" id="t-plz" autocomplete="postal-code" oninput="plzGeaendert('t')">
+      </div>
+    </div>
+    <div id="t-plz-status" style="font-size:13px;color:var(--text-muted);min-height:18px;margin:-4px 0 8px"></div>
     <!-- Honigtopf gegen Spam-Bots: bleibt bei Menschen leer. -->
     <input type="text" id="t-webseite" autocomplete="off" tabindex="-1" style="position:absolute;left:-9999px;opacity:0;height:0" aria-hidden="true">
     <label class="checkbox-field"><input type="checkbox" id="t-agb"><div class="custom-cb"></div><span class="cb-label">Ich akzeptiere die <a href="rechtliches.html#agb" target="_blank">AGB</a> und <a href="rechtliches.html#datenschutz" target="_blank">Datenschutzbestimmungen</a></span></label>
     <div class="form-actions"><button class="btn-next" id="t-submit-btn" onclick="submitTrainer()">Profil gratis erstellen 🚀</button></div>
     <p style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:10px">Kostenlos, bis du die erste Kundenanfrage über Vexfit annimmst. Danach 49,99 €/Monat, monatlich kündbar. Jeder weitere Kunde über Vexfit einmalig 9,99 €.</p>
-    <p style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:6px">PLZ, Trainingsort und dein Profil machst du gleich danach im Trainer-Bereich fertig.</p>
+    <p style="font-size:12px;color:var(--text-muted);text-align:center;margin-top:6px">Trainingsort, Foto und dein restliches Profil machst du gleich danach im Trainer-Bereich fertig.</p>
     <div class="trust-row"><div class="trust-item"><span>✓</span> Gratis bis zur 1. angenommenen Anfrage</div><div class="trust-item"><span>✓</span> Danach monatlich kündbar</div><div class="trust-item"><span>✓</span> DACH-Region</div></div>
     <div class="already-account" style="margin-top:18px">Schon ein Konto? <a href="login.html?typ=trainer">Jetzt anmelden →</a></div>
     <div style="text-align:center;margin-top:16px"><button class="btn-back-s" onclick="backToSelector()">← Zurück</button></div>
@@ -487,11 +503,14 @@ async function plzPruefen(kuerzel){
   const wert=document.getElementById(kuerzel+'-plz').value.trim();
   if(!/^\d{4,5}$/.test(wert)){plzStatusZeigen(kuerzel,'Bitte gib eine gültige Postleitzahl ein (4 oder 5 Ziffern).',true);return null}
   if(plzStand[kuerzel].plz===wert&&plzStand[kuerzel].stadt)return plzStand[kuerzel].stadt;
+  // E2: Trainer wählt sein Land explizit – damit ist eine 4-stellige PLZ
+  // eindeutig (5020 AT vs. 5020 CH), keine Rückfrage nötig.
+  const landSel=((document.getElementById(kuerzel+'-land')||{}).value||'').trim()||null;
   const lauf=++plzLauf[kuerzel];
   const btn=document.getElementById(kuerzel+'-submit-btn');
   btn.disabled=true;
   plzStatusZeigen(kuerzel,'Postleitzahl wird geprüft...');
-  const erg=await vexPlz.aufloesen(wert,{cache:plzCache});
+  const erg=await vexPlz.aufloesen(wert,{cache:plzCache,land:landSel});
   if(lauf!==plzLauf[kuerzel])return null; // inzwischen wurde weiter getippt
   // Eindeutiger Treffer: Stadt + Land uebernehmen.
   if(erg&&erg.stadt&&!erg.mehrdeutig){
@@ -607,11 +626,20 @@ async function submitTrainer(){
   const pw=pruefePasswort('t');
   if(pw===null)return;
   if(!document.getElementById('t-agb').checked){showError('t-error','Bitte AGB akzeptieren!');return}
+  // E2: Land + PLZ sind Pflicht; der Ort wird aus der PLZ ermittelt (über das
+  // gewählte Land eindeutig). Ohne gültigen Ort keine Registrierung.
+  const land=((document.getElementById('t-land')||{}).value||'').trim();
+  if(!land){showError('t-error','Bitte wähle dein Land.');return}
+  const plzWert=((document.getElementById('t-plz')||{}).value||'').trim();
+  if(!/^\d{4,5}$/.test(plzWert)){showError('t-error','Bitte gib deine Postleitzahl ein (4 oder 5 Ziffern).');return}
+  const ortName=(plzStand.t.plz===plzWert&&plzStand.t.stadt)?plzStand.t.stadt:await plzPruefen('t');
+  if(!ortName||!plzStand.t.stadt||plzStand.t.plz!==plzWert){showError('t-error','Zu dieser Postleitzahl und diesem Land wurde kein Ort gefunden. Bitte prüfe PLZ und Land.');return}
+  const ortLand=plzStand.t.land||land;
   const btn=document.getElementById('t-submit-btn');imVersand.t=true;btn.disabled=true;btn.textContent='Wird gespeichert...';
   // Neutrale Startwerte: PLZ/Stadt/Trainingsart bleiben leer und werden später
   // im Trainer-Bereich ergänzt. Leere Strings sind für NOT-NULL-Spalten gültig;
   // falls die DB sie trotzdem ablehnt, siehe migrations/2026-11-01-03-registrierung-kurz.sql.
-  const td={vorname:fn,nachname:ln,email,telefon:'',stadt:'',plz:'',trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
+  const td={vorname:fn,nachname:ln,email,telefon:'',stadt:plzStand.t.stadt,plz:plzWert,land:ortLand,trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
   // Herkunft der Anzeige (für die sofortige Meldung an office@vexfit.app).
   // Robuste Erfassung aus VEXFIT_WERBUNG (überlebt In-App-Browser-Neuladen).
   const utm=VEXFIT_WERBUNG.utm_campaign||'';

@@ -9,16 +9,31 @@ import { assert, assertStringIncludes } from "jsr:@std/assert@1";
 
 const lies = (p: string) => Deno.readTextFile(new URL(p, import.meta.url));
 
-Deno.test("Trainer-Erstformular: genau Vorname, Nachname, E-Mail, Passwort (ein Feld), AGB", async () => {
+Deno.test("Trainer-Erstformular: Vorname, Nachname, E-Mail, Passwort, AGB – plus E2: Land + PLZ (Pflicht)", async () => {
   const html = await lies("./registrieren.html");
   for (const id of ['id="t-fn"', 'id="t-ln"', 'id="t-email"', 'id="t-pw"', 'id="t-agb"']) assertStringIncludes(html, id);
-  // Weg: Passwort wiederholen, PLZ, "Wo trainierst du?".
+  // E2 (10.11.): Standort ist Pflicht – Land-Auswahl und PLZ gehören jetzt ins
+  // Trainer-Erstformular (Ort wird automatisch ermittelt, kein manuelles Ort-Feld).
+  assertStringIncludes(html, 'id="t-land"');
+  assertStringIncludes(html, 'id="t-plz"');
+  assert(!html.includes('id="t-ort"'), '"Wo trainierst du?" (manuelles Ort-Feld) soll es nicht geben');
   assert(!html.includes('id="t-pw2"'), "Passwort-wiederholen noch vorhanden");
-  assert(!html.includes('id="t-plz"'), "PLZ noch im Erstformular");
-  assert(!html.includes('id="t-ort"'), '"Wo trainierst du?" noch im Erstformular');
   // "Passwort zeigen"-Umschalter.
   assertStringIncludes(html, "pwZeigen('t')");
   assertStringIncludes(html, "function pwZeigen(");
+});
+
+Deno.test("E2: submitTrainer macht Land + PLZ zur Pflicht und speichert Ort/PLZ/Land", async () => {
+  const html = await lies("./registrieren.html");
+  // Pflicht-Prüfungen vorhanden.
+  assertStringIncludes(html, "Bitte wähle dein Land.");
+  assertStringIncludes(html, "Bitte gib deine Postleitzahl ein");
+  // Ort wird über vexfit-plz.js (land-bewusst) ermittelt, ohne Treffer kein Konto.
+  assertStringIncludes(html, "Zu dieser Postleitzahl und diesem Land wurde kein Ort gefunden");
+  // Gespeichert werden Stadt (automatisch), PLZ und Land.
+  assertStringIncludes(html, "stadt:plzStand.t.stadt,plz:plzWert,land:ortLand");
+  // land-bewusste Auflösung an vexPlz.aufloesen.
+  assertStringIncludes(html, "{cache:plzCache,land:landSel}");
 });
 
 Deno.test("Kunden-Erstformular: nur die nötigsten Felder (kein PLZ/Ziel)", async () => {

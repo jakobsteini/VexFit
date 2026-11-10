@@ -223,6 +223,18 @@ export function fehlendeProfilfelder(t) {
   return fehlt;
 }
 
+/** E2 (10.11.): Trainer OHNE Standort (keine PLZ), ohne Test-/Spam-Konten. Für
+ *  die Verwaltungsliste „Standort fehlt" – Altbestand, der sich vor der
+ *  PLZ-Pflicht registriert hat. Reine Funktion. */
+export function trainerOhneStandort(trainers, testListe = []) {
+  const arr = Array.isArray(trainers) ? trainers : [];
+  return arr.filter((t) =>
+    t.ist_test !== true &&
+    !istTestkonto(t.email, testListe) &&
+    !(t.plz && String(t.plz).trim())
+  );
+}
+
 /** B2: die drei Pflichtangaben VOR der Freigabe – Foto, PLZ, Preis pro Stunde.
  *  Entscheidung Jakob. Dieselbe Regel wie vexfit-pflicht.js (vexPflicht) im
  *  Trainer-Bereich; die Übereinstimmung sichert verwaltung_logik_test.ts ab.
@@ -1226,6 +1238,14 @@ function starteVerwaltung() {
     const box = $("heute-zu-tun");
     if (!box) return;
     const warten = wartenAufFreigabe(sichtbar(daten.trainers, zustand.testsAusTrainer));
+    // E2: Trainer ohne Standort (Altbestand ohne PLZ) – Jakob kann die PLZ nachtragen.
+    const ohneStandort = trainerOhneStandort(daten.trainers);
+    const standortHtml = ohneStandort.length
+      ? ohneStandort.slice(0, 50).map((t) => {
+          const name = nameFormatieren(`${t.vorname || ""} ${t.nachname || ""}`.trim()) || "Trainer";
+          return `<div class="heute-zeile"><span class="heute-link" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">${escapeHtml(name)}</span><span class="heute-fehlt">keine PLZ</span></div>`;
+        }).join("")
+      : '<div class="heute-leer">Alle haben einen Standort</div>';
     const freigabeHtml = warten.length
       ? warten.slice(0, 50).map((t) => {
           const name = nameFormatieren(`${t.vorname || ""} ${t.nachname || ""}`.trim()) || "Trainer";
@@ -1240,6 +1260,10 @@ function starteVerwaltung() {
       `<div class="heute-karte">
          <div class="heute-kopf">🟡 Trainer warten auf Freigabe <span class="heute-zahl${warten.length ? "" : " null"}">${warten.length}</span></div>
          <div class="heute-liste">${freigabeHtml}</div>
+       </div>
+       <div class="heute-karte">
+         <div class="heute-kopf">📍 Standort fehlt (keine PLZ) <span class="heute-zahl${ohneStandort.length ? "" : " null"}">${ohneStandort.length}</span></div>
+         <div class="heute-liste">${standortHtml}</div>
        </div>
        <div class="heute-karte">
          <div class="heute-kopf">⏰ Anfragen ohne Antwort seit über 24 h <span class="heute-zahl null" id="heute-anfragen-zahl">…</span></div>

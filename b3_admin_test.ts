@@ -12,6 +12,7 @@ import {
   anfragenOhneAntwort,
   herkunftVon,
   herkunftZusammenfassung,
+  trainerOhneStandort,
   wartenAufFreigabe,
 } from "./vexfit-verwaltung.js";
 
@@ -127,4 +128,16 @@ Deno.test("B3: registrieren.html trägt die Herkunft best-effort nach (bricht Re
   assertStringIncludes(reg, "herkunftNachtragen('trainers'");
   assertStringIncludes(reg, "herkunftNachtragen('kunden'");
   assertStringIncludes(reg, "if(!herkunft || !token) return;");
+});
+
+// E2 (10.11.): Liste „Standort fehlt" – Trainer ohne PLZ, ohne Test-/Spam-Konten.
+Deno.test("E2: trainerOhneStandort listet nur Trainer ohne PLZ, keine Test-Konten", () => {
+  const liste = trainerOhneStandort([
+    { id: "1", vorname: "A", email: "a@b.at", plz: "5020" },        // hat PLZ
+    { id: "2", vorname: "B", email: "b@b.at", plz: "" },            // keine PLZ
+    { id: "3", vorname: "C", email: "c@b.at", plz: null },          // keine PLZ
+    { id: "4", vorname: "D", email: "d+test@b.at", plz: "" },       // Test (Alias)
+    { id: "5", vorname: "E", email: "e@b.at", plz: "", ist_test: true }, // Test (markiert)
+  ]);
+  assertEquals(liste.map((t) => t.id), ["2", "3"]);
 });

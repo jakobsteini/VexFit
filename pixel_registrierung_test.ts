@@ -44,7 +44,8 @@ Deno.test("Teil 1: Pixel feuert NUR im Erfolgszweig (nach dem Insert-Guard), nic
     ["async function submitTrainer(", "rest/v1/trainers", "pixelRegistrierungFertig('trainer'"],
     ["async function submitClient(", "rest/v1/kunden", "pixelRegistrierungFertig('kunde', capiEventId)"],
   ] as const) {
-    const b = s.slice(s.indexOf(start), s.indexOf(start) + 5000);
+    // Fenster großzügig (E2 fügte die Standort-Pflichtprüfung vor dem Insert ein).
+    const b = s.slice(s.indexOf(start), s.indexOf(start) + 6500);
     const guard = b.indexOf("if(!ir.ok)");
     const fire = b.indexOf(aufruf);
     assert(guard !== -1 && fire !== -1, `${start}: Guard oder Aufruf fehlt`);

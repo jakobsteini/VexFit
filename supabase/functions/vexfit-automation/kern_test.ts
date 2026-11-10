@@ -314,6 +314,21 @@ Deno.test("/neuer-trainer: gueltige Eingabe → genau eine Mail an Jakob, Wortla
   assertEquals(auf.weitergeleitetMarkiert, []);
 });
 
+// E2 (10.11.): die „Neuer Trainer"-Mail zeigt Ort/PLZ UND Land.
+Deno.test("E2 /neuer-trainer: Mail zeigt Ort, PLZ und Land", async () => {
+  const { anschluesse, auf } = bau();
+  await bearbeiten(
+    anfrage("neuer-trainer", {
+      vorname: "Nina", nachname: "Berger", email: "nina@beispiel.at",
+      stadt: "Salzburg", plz: "5020", land: "AT",
+    }, MIT_TOKEN),
+    anschluesse,
+  );
+  const m = auf.mails[0];
+  assertStringIncludes(m.text, "Ort / PLZ: Salzburg · 5020");
+  assertStringIncludes(m.text, "Land: AT");
+});
+
 Deno.test("/neuer-trainer: keine Passwortzeile mehr (neuer Wortlaut)", async () => {
   // Der neue, exakt vorgegebene Wortlaut hat keine Passwortzeile; ein gesetztes
   // Secret aendert daran nichts mehr.

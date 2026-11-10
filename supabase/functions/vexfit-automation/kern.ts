@@ -744,6 +744,8 @@ export function mailNeuerTrainer(
       datenZeilen: [
         { beschriftung: "Name", wert: name },
         { beschriftung: "Ort / PLZ", wert: ortPlz },
+        // E2: Land mit ausweisen – für die Salzburg-Strategie entscheidend.
+        { beschriftung: "Land", wert: w(p.land) || w(body.land) },
         { beschriftung: "E-Mail", wert: w(body.email) || w(p.email) },
         { beschriftung: "Telefon", wert: w(p.telefon) || w(body.telefon) },
         { beschriftung: "Registriert", wert: w(body.zeitpunkt) },

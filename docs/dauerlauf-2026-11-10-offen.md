@@ -103,3 +103,53 @@ bestätigt – Grundsatz: so wenig DB-Änderung wie möglich, nur als Datei.)
 
 **Commit E1:** kern.ts (interne zur-Prüfung-Mail + Push), kern_test.ts (Tests),
 Protokoll + Anleitung. Keine Migration.
+
+---
+
+## E2 – Trainer-Standort bei der Registrierung (keine Migration)
+
+**Befund:** Neue Trainer (Nirmal, Jaqueline, Rayene) hatten 0/8 und **keinen
+Standort** – für die Salzburg-Strategie entscheidend. Bisher verschob das „kurze
+Erstformular" (Teil R) die PLZ bewusst in den Trainer-Bereich.
+
+**Entscheidung (Jakob, in der Aufgabe):** Standort wird Pflicht bei der
+Trainer-Registrierung. Das kehrt Teil R für den Trainer um (der Kunde bleibt
+kurz).
+
+**Umsetzung:**
+- `registrieren.html`, Trainer-Formular: neue Felder **Land (AT/DE/CH, Vorgabe
+  AT)** + **PLZ**. Der Ort wird über `vexfit-plz.js` ermittelt – land-bewusst,
+  daher ist eine 4-stellige PLZ eindeutig (5020 AT ≠ 5020 CH), keine Rückfrage.
+  `plzPruefen` gibt das gewählte Land an `vexPlz.aufloesen` weiter.
+- `submitTrainer`: Land + PLZ **Pflicht**; ohne auflösbaren Ort **keine**
+  Registrierung. Gespeichert werden `stadt` (automatisch), `plz`, `land`.
+- `kern.ts` `mailNeuerTrainer`: zeigt jetzt **Ort/PLZ UND Land**.
+- `vexfit-verwaltung.js`: neue reine Funktion `trainerOhneStandort` +
+  Karte **„📍 Standort fehlt (keine PLZ)"** in „Heute zu tun" (Altbestand ohne
+  PLZ, ohne Test-/Spam-Konten, klickbar zum Trainer).
+- **Keine Migration:** `trainers` hat `plz`/`stadt`/`land` bereits (land seit
+  07.11.).
+
+**Tests:**
+- `registrierung_kurz_test.ts`: Trainer-Formular hat jetzt `t-land`+`t-plz`
+  (Pflicht), speichert `stadt/plz/land`, kein manuelles Ort-Feld; Kunde bleibt kurz.
+- `land_eindeutig_test.ts`: unbekannte PLZ im Land → `null` (abgelehnt);
+  registrieren.html reicht Land land-bewusst durch.
+- `kern_test.ts`: „Neuer Trainer"-Mail zeigt Ort, PLZ und Land.
+- `b3_admin_test.ts`: `trainerOhneStandort` listet nur Trainer ohne PLZ, keine
+  Test-Konten.
+- `pixel_registrierung_test.ts`: Suchfenster für den Handler leicht geweitert
+  (die Standort-Pflichtprüfung sitzt vor dem Insert) – Prüfabsicht unverändert.
+- Suite **801 grün**, `deno check` grün, `deno lint` 30 (Baseline).
+
+**Abendbericht-Teil (Ort/PLZ/Land je Trainer):** Die interne **„Neuer
+Trainer"-Mail** liefert den Standort je Ereignis sofort. Die **Trainerliste im
+Abendbericht** („Vorname N., Ort, x/8, freigegeben ja/nein") baut **E4/E5**
+(Raum Salzburg 50/51), weil E4 genau diese Zeile ohnehin neu fasst – dort wird
+der Ort je Trainer ausgewiesen.
+
+**Hinweis (kein BLOCK):** Nicht previewbar ohne echtes Supabase-Signup +
+Zippopotam; abgesichert über die statischen/Logik-Tests.
+
+**Commit E2:** registrieren.html, kern.ts, vexfit-verwaltung.js + 5 Testdateien,
+Protokoll. Keine Migration.
