@@ -198,3 +198,45 @@ Protokoll. Keine Migration.
 
 **Commit E3:** vexfit-trichter.js, registrieren.html, kern.ts, Migration+Rücknahme,
 Datenschutz-Entwurf, e3/b1/b3-Tests, Protokoll.
+
+---
+
+## E4 – Salzburg einheitlich zählen (keine Migration)
+
+**Befund:** Drei Definitionen für „Raum Salzburg": `SALZBURG_PLZ_PRAEFIX="50"`
+(Abendbericht), `SALZBURG_PLZ_PRAEFIXE=["50","51"]` und `SALZBURG_PRAEFIX="50"`
+(vexfit-verwaltung.js). Der Abendbericht zählte nur 50xx.
+
+**⚠️ Widerspruch in der Aufgabe – transparent aufgelöst:** Die Aufgabe nennt das
+Label **„(50/51)"** UND verlangt den Test **„Seekirchen (5201) zählt zu
+Salzburg". 5201 beginnt aber mit „52"**, fällt also NICHT unter 50/51. Beides ist
+zusammen nicht erfüllbar. Ich habe zugunsten des **Akzeptanztests** entschieden:
+`SALZBURG_PLZ_PRAEFIXE = ["50","51","52"]` (Stadt + Umgebung + Flachgau inkl.
+Seekirchen). Das Label wird **aus der Konstante** gebaut, also „Raum Salzburg
+(50/51/52)" – nie wieder auseinanderlaufend. **Wenn der Flachgau (52xx) NICHT
+dazugehören soll:** in `kern.ts` `"52"` aus `SALZBURG_PLZ_PRAEFIXE` streichen
+(Label und Admin ziehen automatisch nach) – Entscheidung Jakob.
+
+**Umsetzung:**
+- `kern.ts`: `SALZBURG_PLZ_PRAEFIX` entfernt; **eine** Quelle
+  `SALZBURG_PLZ_PRAEFIXE` + `istSalzburgPlz` + neuer `salzburgPlzFilter()`
+  (`or=(plz.like.50*,plz.like.51*,plz.like.52*)`) + `kurzName` (Vorname N.).
+- Abendbericht: Zeile **„Raum Salzburg (50/51/52)"**; lädt jetzt ALLE
+  Salzburger Trainer (auch nicht freigegebene) und listet je Trainer
+  **„Vorname N., Ort, x/8, freigegeben ja/nein"** (reife/freie zuerst).
+  such_eingaben/warteliste zählen über denselben Filter (51/52 inklusive).
+- `vexfit-verwaltung.js`: Salzburg-Karte nutzt dieselben Präfixe.
+- **Profil-Erinnerung** nutzt `istSalzburgPlz` – bereits dieselbe Quelle.
+- **Keine Migration.**
+
+**Tests:**
+- `s6_salzburg_test.ts`: Konstante = ["50","51","52"], `salzburgPlzFilter`,
+  `istSalzburgPlz("5201")` true / `"1010"` false; Abendbericht-Zeile +
+  Trainerliste („Salzburg, 6/8, freigegeben ja" / „Seekirchen, 3/8, …nein").
+- `k8_abendbericht_texte_test.ts`: Mock-Leser auf `or=`-Filter umgestellt,
+  Seekirchen 5201 zählt mit, Trainerliste gefüllt.
+- `profil_erinnerung_test.ts` / `s8_abendbericht_test.ts`: Präfixe/Label/Fixture
+  (trainer:[]) angeglichen.
+- Suite **805 grün**, `deno check` grün, `deno lint` 30 (Baseline).
+
+**Commit E4:** kern.ts, vexfit-verwaltung.js, 4 Testdateien, Protokoll.

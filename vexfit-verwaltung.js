@@ -1612,12 +1612,14 @@ function starteVerwaltung() {
 
   // S6: Salzburg-Ziel (Region über PLZ-Präfix 50, keine Koordinaten in der DB).
   // Ziel 8 starke Trainer; dazu Suchen/Vormerkungen/Anfragen/Annahmen (7 Tage).
-  const SALZBURG_PRAEFIX = "50";
+  // E4 (10.11.): Raum Salzburg einheitlich über die PLZ-Präfixe 50/51 (eine
+  // Quelle, deckungsgleich mit kern.ts SALZBURG_PLZ_PRAEFIXE).
+  const SALZBURG_PLZ_PRAEFIXE = ["50", "51", "52"];
   const SALZBURG_ZIEL = 8;
   async function renderSalzburgKarte() {
     const el = $("salzburg-inhalt");
     if (!el) return;
-    const inRegion = (plz) => String(plz || "").startsWith(SALZBURG_PRAEFIX);
+    const inRegion = (plz) => SALZBURG_PLZ_PRAEFIXE.some((p) => String(plz || "").startsWith(p));
     const jetzt = Date.now(), seit7ms = jetzt - 7 * 86400000;
     const trainer50 = sichtbar(daten.trainers || [], zustand.testsAusTrainer)
       .filter((t) => inRegion(t.plz) && t.aktiv && !t.gesperrt);

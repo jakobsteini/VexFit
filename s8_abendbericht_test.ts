@@ -19,14 +19,14 @@ Deno.test("S8: Abendbericht zeigt Anfragen-Fluss, Prüfung und Ersatzvorschläge
     anfragenAbgelehnt24h: 1,
     anfragenZurPruefung: 3,
     ersatzVersendet: 4,
-    salzburg: { trainerFrei: 1, trainerReif: 1, suchen7: 0, vorm: 0, anfragen7: 2, annahmen7: 1 },
+    salzburg: { trainerFrei: 1, trainerReif: 1, suchen7: 0, vorm: 0, anfragen7: 2, annahmen7: 1, trainer: [] },
   };
   const txt = mailAbendbericht(z).text;
   assertStringIncludes(txt, "Neue Anfragen (24 h): 5");
   assertStringIncludes(txt, "angenommen 2, abgelehnt 1");
   assertStringIncludes(txt, "Anfragen zur Prüfung (offen): 3");
   assertStringIncludes(txt, "Ersatzvorschläge versendet (gesamt): 4");
-  assertStringIncludes(txt, "Salzburg (50xx)");
+  assertStringIncludes(txt, "Raum Salzburg (50/51/52)");
 });
 
 Deno.test("S8: ohne Aktivität bleibt der Bericht kurz (leer)", () => {

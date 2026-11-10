@@ -6,8 +6,10 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
   type AbendberichtZahlen,
+  istSalzburgPlz,
   mailAbendbericht,
-  SALZBURG_PLZ_PRAEFIX,
+  SALZBURG_PLZ_PRAEFIXE,
+  salzburgPlzFilter,
   SALZBURG_ZIEL,
 } from "./supabase/functions/vexfit-automation/kern.ts";
 
@@ -21,24 +23,41 @@ const BASIS: AbendberichtZahlen = {
   salzburg: null, fehler: [], cronHinweise: [],
 };
 
-Deno.test("S6: Konstanten (Region 50, Ziel 8)", () => {
-  assertEquals(SALZBURG_PLZ_PRAEFIX, "50");
+Deno.test("S6/E4: Region 50/51/52 (eine Konstante), Ziel 8", () => {
+  assertEquals([...SALZBURG_PLZ_PRAEFIXE], ["50", "51", "52"]);
   assertEquals(SALZBURG_ZIEL, 8);
+  // E4: Seekirchen (5201, Flachgau) zählt zu Salzburg, Wien (1010) nicht.
+  assert(istSalzburgPlz("5201"));
+  assert(istSalzburgPlz("5020"));
+  assert(istSalzburgPlz("5110"));
+  assert(!istSalzburgPlz("1010"));
+  // PostgREST-Filter deckt alle Präfixe ab.
+  assertEquals(salzburgPlzFilter(), "or=(plz.like.50*,plz.like.51*,plz.like.52*)");
 });
 
-Deno.test("S6: Abendbericht enthält die Salzburg-Zeile mit ≥5/8, Ziel, Anfragen, Annahmen", () => {
+Deno.test("S6/E4: Abendbericht – Zeile Raum Salzburg 50/51 plus Trainerliste", () => {
   const zahlen: AbendberichtZahlen = {
     ...BASIS,
     neueKunden: 1, // damit der Bericht nicht auf „nichts Neues" kürzt
-    salzburg: { trainerFrei: 5, trainerReif: 3, suchen7: 7, vorm: 2, anfragen7: 4, annahmen7: 1 },
+    salzburg: {
+      trainerFrei: 5, trainerReif: 3, suchen7: 7, vorm: 2, anfragen7: 4, annahmen7: 1,
+      trainer: [
+        { name: "Nina B.", ort: "Salzburg", erfuellt: 6, frei: true },
+        { name: "Tom K.", ort: "Seekirchen", erfuellt: 3, frei: false },
+      ],
+    },
   };
   const m = mailAbendbericht(zahlen);
   const txt = m.text + m.html;
-  assertStringIncludes(txt, "Salzburg (50xx)");
+  assertStringIncludes(txt, "Raum Salzburg (50/51/52)");
   assertStringIncludes(txt, "3/8");          // trainerReif / Ziel
   assertStringIncludes(txt, "5 freigegeben");
   assertStringIncludes(txt, "4 Anfragen");
   assertStringIncludes(txt, "1 Annahmen");
+  // E4: je Trainer „Vorname N., Ort, x/8, freigegeben ja/nein".
+  assertStringIncludes(txt, "Nina B.");
+  assertStringIncludes(txt, "Salzburg, 6/8, freigegeben ja");
+  assertStringIncludes(txt, "Seekirchen, 3/8, freigegeben nein");
 });
 
 Deno.test("S6: Admin-Nachfrage-Reiter hat die Salzburg-Karte", async () => {
@@ -47,5 +66,7 @@ Deno.test("S6: Admin-Nachfrage-Reiter hat die Salzburg-Karte", async () => {
   const js = await lies("./vexfit-verwaltung.js");
   assertStringIncludes(js, "function renderSalzburgKarte");
   assertStringIncludes(js, "SALZBURG_ZIEL = 8");
-  assert(js.includes('startsWith(SALZBURG_PRAEFIX)'));
+  // E4: Region über die Präfixe 50/51 (eine Quelle).
+  assertStringIncludes(js, 'SALZBURG_PLZ_PRAEFIXE = ["50", "51", "52"]');
+  assert(js.includes('SALZBURG_PLZ_PRAEFIXE.some((p) => String(plz || "").startsWith(p))'));
 });

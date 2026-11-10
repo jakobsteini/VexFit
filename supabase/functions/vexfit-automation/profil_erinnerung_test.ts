@@ -100,10 +100,11 @@ Deno.test("profilErinnerungDarf: 8/8, Test/Spam, 3-Tage-Abstand – unbestätigt
   assertEquals(profilErinnerungDarf(trainer(), null).erlaubt, true);
 });
 
-Deno.test("Salzburg-Präfixe 50/51", () => {
-  assertEquals([...SALZBURG_PLZ_PRAEFIXE], ["50", "51"]);
+Deno.test("Salzburg-Präfixe 50/51/52 (E4: inkl. Flachgau)", () => {
+  assertEquals([...SALZBURG_PLZ_PRAEFIXE], ["50", "51", "52"]);
   assert(istSalzburgPlz("5020"));
   assert(istSalzburgPlz("5110"));
+  assert(istSalzburgPlz("5201")); // Seekirchen (Flachgau)
   assert(!istSalzburgPlz("1010"));
   assert(!istSalzburgPlz(""));
 });
