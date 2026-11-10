@@ -269,3 +269,36 @@ vor Scheinprofilen). Falls gewünscht, später als eigener, abschaltbarer Schalt
 - Suite **807 grün**, `deno check` grün, `deno lint` 30 (Baseline).
 
 **Commit E5:** kern.ts, vexfit-verwaltung.js, b3/k8-Tests + Fixtures, Protokoll.
+
+---
+
+## E6 – Kunden-Weg Salzburg (keine Migration)
+
+**Befund:** Der Weg für 0/1/2 freigegebene Trainer ist im Code bereits sauber
+abgedeckt – E6 bestätigt ihn und ergänzt die teilbaren Links + die Prüfung.
+
+- `personal-trainer-salzburg.html`: ehrlich, **„Für Kunden kostenlos"**, vor Ort
+  **oder online**, CTA in die Suche (`?plz=5020&land=AT`), **UTM-Weitergabe** an
+  die Suche-Links (inkl. `utm_source=persoenlich`); keine erfundene Trainerzahl.
+  Steht bereits in `sitemap.xml` (E0-Nebenbefund war veraltet).
+- `suche.html`: **0 Treffer** → Leerzustand bzw. **Nähe-Hinweis mit Vormerkung**
+  (`naeheVormerken` → `/neuer-kunde` → interne Mail an office@, aus E1);
+  **Online-Trainer** als eigener Abschnitt (Alternative); 1/2 Treffer → Karten
+  werden gezeigt. Interne Mail bei Vormerkung UND bei echter Anfrage (E1).
+- **Teilbare Links + Beitragstext:** `docs/links-2026-11-10.md`
+  (`utm_source=persoenlich`, Instagram/WhatsApp, Du-Form, ehrlich, keine
+  erfundenen Zahlen/Versprechen) – zum Freigeben durch Jakob.
+- **Playwright:** `e2e/salzburg-kundenweg.spec.ts` deckt 0/1/2 Trainer bei
+  **375 px und 1440 px** ab (Supabase/Geo/Vormerkung gestubbt). **Playwright ist
+  hier nicht installiert → nicht ausgeführt**, als Spec hinterlegt.
+- Nebenbei: `e2e/registrierung-kurz.spec.ts` an E2 angeglichen (Land+PLZ jetzt
+  Pflicht, Geo gestubbt).
+
+**Tests (`e6_salzburg_kundenweg_test.ts`, hier ausführbar):** Salzburg-Seite
+(kostenlos/online/UTM), suche.html (Leerzustand/Vormerkung/Online), Link-Doku
+(persoenlich), Spec deckt 0/1/2 × 375/1440. Suite **811 grün**, check grün,
+lint 30.
+
+**Commit E6:** docs/links-2026-11-10.md, e2e/salzburg-kundenweg.spec.ts,
+e2e/registrierung-kurz.spec.ts, e6-Test, Protokoll. Keine Codeänderung an den
+Seiten nötig (Weg war bereits korrekt). Keine Migration.

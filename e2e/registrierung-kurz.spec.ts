@@ -22,6 +22,9 @@ async function fangeSupabaseAb(page: import("@playwright/test").Page, calls: str
   await page.route("**/rest/v1/kunden*", (r) => { calls.push("insert-kunde"); return r.fulfill({ status: 201, body: "" }); });
   await page.route("**/functions/v1/vexfit-automation/neuer-trainer", (r) => { calls.push("mail-trainer:" + r.request().postData()); return r.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' }); });
   await page.route("**/functions/v1/vexfit-automation/neuer-kunde", (r) => { calls.push("mail-kunde"); return r.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' }); });
+  // E2 (10.11.): Trainer-Registrierung ermittelt den Ort aus der PLZ (vexfit-plz.js).
+  await page.route("**/api.zippopotam.us/**", (r) =>
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ places: [{ "place name": "Salzburg", latitude: "47.80", longitude: "13.04" }] }) }));
 }
 
 test("Trainer-Erstformular: nur Pflichtfelder, Mail sofort mit utm_campaign, dann geführter Ablauf", async ({ page }) => {
@@ -32,7 +35,9 @@ test("Trainer-Erstformular: nur Pflichtfelder, Mail sofort mit utm_campaign, dan
   // Genau die kurzen Felder, kein gelber Balken.
   await expect(page.locator("#t-fn")).toBeVisible();
   await expect(page.locator("#t-pw2")).toHaveCount(0);
-  await expect(page.locator("#t-plz")).toHaveCount(0);
+  // E2: Land + PLZ sind jetzt Pflicht im Trainer-Erstformular.
+  await expect(page.locator("#t-land")).toHaveCount(1);
+  await expect(page.locator("#t-plz")).toHaveCount(1);
   await expect(page.locator("#iabBanner")).toHaveCount(0);
   await expect(page.locator(".wa-btn")).toHaveCount(0);
 
@@ -40,6 +45,10 @@ test("Trainer-Erstformular: nur Pflichtfelder, Mail sofort mit utm_campaign, dan
   await page.fill("#t-ln", "Muster");
   await page.fill("#t-email", "max+e2e@example.com");
   await page.fill("#t-pw", "geheim123");
+  // E2: Land (AT) + PLZ (5020) – der Ort wird aus der PLZ ermittelt (gestubbt).
+  await page.selectOption("#t-land", "AT");
+  await page.fill("#t-plz", "5020");
+  await expect(page.locator("#t-plz-status")).toContainText(/Salzburg/i);
   // Die echte Checkbox ist display:none (eigenes Kästchen); echte Nutzer tippen
   // auf das sichtbare Kästchen (.custom-cb). Genau das klicken wir hier.
   await page.locator(".checkbox-field", { has: page.locator("#t-agb") })
