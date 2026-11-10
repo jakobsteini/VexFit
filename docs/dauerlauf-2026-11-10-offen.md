@@ -240,3 +240,32 @@ dazugehören soll:** in `kern.ts` `"52"` aus `SALZBURG_PLZ_PRAEFIXE` streichen
 - Suite **805 grün**, `deno check` grün, `deno lint` 30 (Baseline).
 
 **Commit E4:** kern.ts, vexfit-verwaltung.js, 4 Testdateien, Protokoll.
+
+---
+
+## E5 – Freigabe nicht vergessen (keine Migration)
+
+**Umsetzung:**
+- `kern.ts` (Abendbericht): „Warten auf Freigabe" lädt jetzt die Profilfelder +
+  E-Mail und **schließt Test-/Spam-Konten aus** (`ist_test` ODER E-Mail-Alias
+  „+"). Neue Liste **„Bereit zur Freigabe (≥5/8)"** – echte, noch nicht
+  freigegebene Trainer mit ≥5/8, als eigene Zeile „Name x/8".
+- `vexfit-verwaltung.js`: reine Funktion `bereitZurFreigabe(trainers)` +
+  Karte **„✅ Bereit zur Freigabe (≥5/8)"** in „Heute zu tun" mit **direktem
+  „Freigeben"-Knopf** (data-aktion="freigeben").
+- **Keine automatische Freigabe** eingeführt (Entscheidung bleibt bei Jakob).
+- **Keine Migration.**
+
+**Vorschlag (für Jakob):** Eine automatische Freigabe ab z. B. 7/8 wäre denkbar,
+ist aber bewusst NICHT gebaut – Freigabe bleibt eine menschliche Prüfung (Schutz
+vor Scheinprofilen). Falls gewünscht, später als eigener, abschaltbarer Schalter.
+
+**Tests:**
+- `b3_admin_test.ts`: `bereitZurFreigabe` listet nur reife, nicht freigegebene,
+  echte Konten (8/8), ohne Test-Alias/ist_test/schon freigegeben.
+- `k8_abendbericht_texte_test.ts`: Abendbericht lässt Test-Konto aus „Warten"
+  weg und listet „Bereit zur Freigabe (≥5/8): 1 (Reif Eins 8/8)".
+- Fixtures (`b7`/`s6`) um `bereitFreigabe` ergänzt.
+- Suite **807 grün**, `deno check` grün, `deno lint` 30 (Baseline).
+
+**Commit E5:** kern.ts, vexfit-verwaltung.js, b3/k8-Tests + Fixtures, Protokoll.

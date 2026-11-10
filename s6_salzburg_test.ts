@@ -16,7 +16,7 @@ import {
 const lies = (p: string) => Deno.readTextFile(new URL(p, import.meta.url));
 
 const BASIS: AbendberichtZahlen = {
-  neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
+  neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [], bereitFreigabe: [],
   anfragenOffen: 0, anfragenNeu24h: 0, anfragenZurPruefung: 0, anfragenAngenommen24h: 0, anfragenAbgelehnt24h: 0, ersatzVersendet: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
   trichter24h: [], profileUnter5: 0, profilErinnerungen24h: 0, profilErinnerungenGesamt: 0,
   kundenTrichter24h: { seite: 0, suche: 0, treffer: 0, profil: 0, anfrage_start: 0, anfrage: 0 },

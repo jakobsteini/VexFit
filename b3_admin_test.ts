@@ -10,6 +10,7 @@
 import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
   anfragenOhneAntwort,
+  bereitZurFreigabe,
   herkunftVon,
   herkunftZusammenfassung,
   trainerOhneStandort,
@@ -140,4 +141,21 @@ Deno.test("E2: trainerOhneStandort listet nur Trainer ohne PLZ, keine Test-Konte
     { id: "5", vorname: "E", email: "e@b.at", plz: "", ist_test: true }, // Test (markiert)
   ]);
   assertEquals(liste.map((t) => t.id), ["2", "3"]);
+});
+
+// E5 (10.11.): „Bereit zur Freigabe" – ≥5/8, nicht freigegeben, kein Test/Spam.
+Deno.test("E5: bereitZurFreigabe listet nur reife, nicht freigegebene, echte Konten", () => {
+  const voll = { // 8/8
+    avatar_url: AVATAR, trainingsart: "EMS", trainingsort: "vor_ort", preis_stunde: 50,
+    bio: "ein ausreichend langer Text", erfahrung: "5 Jahre", spezialisierungen: ["Kraft"], telefon: "+43 1 2",
+  };
+  const liste = bereitZurFreigabe([
+    { id: "1", vorname: "Reif", email: "r@b.at", aktiv: false, gesperrt: false, ...voll }, // 8/8
+    { id: "2", vorname: "Schwach", email: "s@b.at", aktiv: false, gesperrt: false, trainingsart: "EMS" }, // <5
+    { id: "3", vorname: "Frei", email: "f@b.at", aktiv: true, gesperrt: false, ...voll }, // schon freigegeben
+    { id: "4", vorname: "Test", email: "t+x@b.at", aktiv: false, gesperrt: false, ...voll }, // Test-Alias
+    { id: "5", vorname: "Markiert", email: "m@b.at", aktiv: false, gesperrt: false, ist_test: true, ...voll },
+  ]);
+  assertEquals(liste.map((t: { id: string }) => t.id), ["1"]);
+  assertEquals(liste[0].erfuellt, 8);
 });

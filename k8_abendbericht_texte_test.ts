@@ -55,6 +55,34 @@ Deno.test("K8: fehlende Salzburg-Tabellen -> kein Absturz (trainerFrei aus, Rest
   assertEquals(z.salzburg.vorm, 0);
 });
 
+// E5 (10.11.): „Warten auf Freigabe" ohne Test/Spam; „Bereit zur Freigabe" (≥5/8).
+Deno.test("E5: Abendbericht – Warten ohne Test-Konten, Bereit-zur-Freigabe-Liste", async () => {
+  const voll = {
+    avatar_url: "https://x/storage/v1/object/public/avatars/u/a.jpg",
+    trainingsart: "EMS", trainingsort: "vor_ort", preis_stunde: 50,
+    bio: "ein ausreichend langer Text", erfahrung: "5 Jahre",
+    spezialisierungen: ["Kraft"], telefon: "+43 1 2",
+  };
+  const leser = function <T>(pfad: string): Promise<T[]> {
+    if (pfad.startsWith("trainers?aktiv=eq.false")) {
+      return Promise.resolve([
+        { vorname: "Reif", nachname: "Eins", email: "r@b.at", ...voll },      // 8/8, echt
+        { vorname: "Roh", nachname: "Zwei", email: "roh@b.at", trainingsart: "EMS" }, // <5
+        { vorname: "Test", nachname: "Drei", email: "t+x@b.at", ...voll },     // Test-Alias
+      ] as unknown as T[]);
+    }
+    return Promise.resolve([] as T[]);
+  };
+  const z = await abendberichtZahlenHolen(leser, () => Promise.resolve(0), JETZT);
+  // Test-Alias ausgeschlossen.
+  assertEquals(z.wartenNamen, ["Reif Eins", "Roh Zwei"]);
+  // Nur der reife (≥5/8) ist „bereit".
+  assertEquals(z.bereitFreigabe.map((t) => t.name), ["Reif Eins"]);
+  assertEquals(z.bereitFreigabe[0].erfuellt, 8);
+  const text = mailAbendbericht({ ...z, neueKunden: 1 }).text;
+  assertStringIncludes(text, "Bereit zur Freigabe (≥5/8): 1 (Reif Eins 8/8)");
+});
+
 Deno.test("K8: kein englisches Login mehr (Text-Angleich)", async () => {
   for (const f of ["index.html", "suche.html"]) {
     const s = await lies("./" + f);

@@ -3220,6 +3220,8 @@ export interface AbendberichtZahlen {
   neueTrainerHerkunft: { quelle: string; anzahl: number }[];
   neueKunden: number;
   wartenNamen: string[];
+  /** E5: bereit zur Freigabe (≥5/8, nicht freigegeben, kein Test/Spam). */
+  bereitFreigabe: { name: string; erfuellt: number }[];
   anfragenOffen: number;
   /** S8: neue Anfragen der letzten 24 h. */
   anfragenNeu24h: number;
@@ -3316,7 +3318,7 @@ export function istFehlerErgebnis(ergebnis: string | null | undefined): boolean 
 /** B7: leere Zahlen (Grundwert bzw. Rückfall, wenn nichts geladen werden kann). */
 export function leereAbendberichtZahlen(): AbendberichtZahlen {
   return {
-    neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [],
+    neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [], bereitFreigabe: [],
     anfragenOffen: 0, anfragenNeu24h: 0, anfragenZurPruefung: 0,
     anfragenAngenommen24h: 0, anfragenAbgelehnt24h: 0, ersatzVersendet: 0,
     warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
@@ -3359,6 +3361,8 @@ function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert
     zeile("Neue Trainer (24 h)", `${z.neueTrainer}${z.neueTrainer ? ` (${herk})` : ""}`),
     zeile("Neue Kunden (24 h)", String(z.neueKunden)),
     zeile("Warten auf Freigabe", z.wartenNamen.length ? `${z.wartenNamen.length} (${z.wartenNamen.join(", ")})` : "0"),
+    // E5: bereit zur Freigabe (≥5/8) – Freigabe in der Verwaltung (Reiter „Heute zu tun").
+    zeile("Bereit zur Freigabe (≥5/8)", z.bereitFreigabe.length ? `${z.bereitFreigabe.length} (${z.bereitFreigabe.map((t) => `${t.name} ${t.erfuellt}/8`).join(", ")})` : "0"),
     // S8: Anfragen-Fluss (24 h) inkl. „zur Prüfung" (S3) und Ersatzvorschläge (S4).
     zeile("Neue Anfragen (24 h)", `${z.anfragenNeu24h} (angenommen ${z.anfragenAngenommen24h}, abgelehnt ${z.anfragenAbgelehnt24h})`),
     zeile("Anfragen zur Prüfung (offen)", String(z.anfragenZurPruefung)),
@@ -3511,15 +3515,24 @@ export async function abendberichtZahlenHolen(
     z.neueKunden = await zaehlenFn(`kunden?created_at=gt.${encodeURIComponent(seit)}&select=id`);
   } catch (e) { merkeFehler("Neue Kunden (24 h)", e); }
 
-  // Warten auf Freigabe (mit Namen).
+  // Warten auf Freigabe (mit Namen) – E5: ohne Test-/Spam-Konten; zusätzlich die
+  // Liste „Bereit zur Freigabe" (≥5/8, noch nicht freigegeben).
   try {
-    let zeilen: { vorname?: string | null; nachname?: string | null }[];
+    type WZ = TrainerProfil & { vorname?: string | null; nachname?: string | null; email?: string | null };
+    const felder = "vorname,nachname,email,avatar_url,trainingsart,trainingsort,preis_stunde,bio,erfahrung,spezialisierungen,telefon";
+    let zeilen: WZ[];
     try {
-      zeilen = await lesenFn<{ vorname?: string | null; nachname?: string | null }>(`trainers?aktiv=eq.false&gesperrt=eq.false&select=vorname,nachname&order=created_at.desc&limit=100`);
+      zeilen = await lesenFn<WZ>(`trainers?aktiv=eq.false&gesperrt=eq.false&select=${felder}&order=created_at.desc&limit=100`);
     } catch {
-      zeilen = await lesenFn<{ vorname?: string | null; nachname?: string | null }>(`trainers?aktiv=eq.false&select=vorname,nachname&order=created_at.desc&limit=100`);
+      zeilen = await lesenFn<WZ>(`trainers?aktiv=eq.false&select=${felder}&order=created_at.desc&limit=100`);
     }
-    z.wartenNamen = zeilen.map((t) => `${t.vorname ?? ""} ${t.nachname ?? ""}`.trim()).filter(Boolean);
+    // E5: Test-/Spam-Konten ausnehmen (ist_test ODER E-Mail-Alias „+").
+    const echt = zeilen.filter((t) => t.ist_test !== true && !String(t.email ?? "").includes("+"));
+    z.wartenNamen = echt.map((t) => `${t.vorname ?? ""} ${t.nachname ?? ""}`.trim()).filter(Boolean);
+    z.bereitFreigabe = echt
+      .map((t) => ({ name: `${t.vorname ?? ""} ${t.nachname ?? ""}`.trim() || "Trainer", erfuellt: 8 - freischaltFehlendeFelder(t).length }))
+      .filter((t) => t.erfuellt >= 5)
+      .sort((a, b) => b.erfuellt - a.erfuellt);
   } catch (e) { merkeFehler("Warten auf Freigabe", e); }
 
   // Anfragen ohne Antwort > 24 h.

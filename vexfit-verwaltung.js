@@ -264,6 +264,25 @@ export function wartenAufFreigabe(trainers) {
     }));
 }
 
+/** E5 (10.11.): „Bereit zur Freigabe" – Trainer mit ≥ 5/8 Angaben, noch nicht
+ *  freigegeben, nicht gesperrt, keine Test-/Spam-Konten. Mit x/8 und fehlenden
+ *  Angaben, nach Vollständigkeit absteigend. Reine Funktion. */
+export function bereitZurFreigabe(trainers, testListe = []) {
+  return (trainers || [])
+    .filter((t) =>
+      !t.aktiv && !t.gesperrt &&
+      t.ist_test !== true && !istTestkonto(t.email, testListe) &&
+      (8 - fehlendeProfilfelder(t).length) >= 5
+    )
+    .map((t) => ({
+      id: t.id, vorname: t.vorname, nachname: t.nachname,
+      stadt: t.stadt, plz: t.plz,
+      erfuellt: 8 - fehlendeProfilfelder(t).length,
+      fehlt: fehlendeProfilfelder(t),
+    }))
+    .sort((a, b) => b.erfuellt - a.erfuellt);
+}
+
 // ── Login-Schleifen-Fix: HTTP-Status deuten, Bereiche voneinander isolieren ──
 // NUR 401 (abgelaufenes/ungültiges Token) beendet die Sitzung. 403 heißt
 // „kein Recht auf diesen Bereich" und darf NICHT abmelden – sonst wird aus
@@ -1238,6 +1257,16 @@ function starteVerwaltung() {
     const box = $("heute-zu-tun");
     if (!box) return;
     const warten = wartenAufFreigabe(sichtbar(daten.trainers, zustand.testsAusTrainer));
+    // E5: „Bereit zur Freigabe" – ≥5/8, nicht freigegeben, kein Test, mit
+    // direktem Freigeben-Knopf.
+    const bereit = bereitZurFreigabe(daten.trainers);
+    const bereitHtml = bereit.length
+      ? bereit.slice(0, 50).map((t) => {
+          const name = nameFormatieren(`${t.vorname || ""} ${t.nachname || ""}`.trim()) || "Trainer";
+          const ort = t.stadt ? escapeHtml(nameFormatieren(t.stadt)) : (t.plz ? escapeHtml(t.plz) : "");
+          return `<div class="heute-zeile"><span class="heute-link" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">${escapeHtml(name)}</span>${ort ? `<span>${ort}</span>` : ""}<span class="heute-fehlt">${t.erfuellt}/8</span><button class="btn-klein btn-ja" data-aktion="freigeben" data-id="${escapeHtml(t.id)}">Freigeben</button></div>`;
+        }).join("")
+      : '<div class="heute-leer">Niemand bereit</div>';
     // E2: Trainer ohne Standort (Altbestand ohne PLZ) – Jakob kann die PLZ nachtragen.
     const ohneStandort = trainerOhneStandort(daten.trainers);
     const standortHtml = ohneStandort.length
@@ -1260,6 +1289,10 @@ function starteVerwaltung() {
       `<div class="heute-karte">
          <div class="heute-kopf">🟡 Trainer warten auf Freigabe <span class="heute-zahl${warten.length ? "" : " null"}">${warten.length}</span></div>
          <div class="heute-liste">${freigabeHtml}</div>
+       </div>
+       <div class="heute-karte">
+         <div class="heute-kopf">✅ Bereit zur Freigabe (≥5/8) <span class="heute-zahl${bereit.length ? "" : " null"}">${bereit.length}</span></div>
+         <div class="heute-liste">${bereitHtml}</div>
        </div>
        <div class="heute-karte">
          <div class="heute-kopf">📍 Standort fehlt (keine PLZ) <span class="heute-zahl${ohneStandort.length ? "" : " null"}">${ohneStandort.length}</span></div>
