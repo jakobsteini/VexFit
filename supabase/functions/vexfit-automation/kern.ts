@@ -3247,6 +3247,30 @@ export interface AbendberichtZahlen {
 }
 
 /** B7: kurzer Grund aus einem Fehler (bevorzugt "HTTP <code>", sonst gekürzt). */
+/** E3 (10.11.): Herkunft in eine kurze Kategorie einordnen – Spiegel von
+ *  vexfit-trichter.js (vexHerkunft.herkunftEinordnen). utm_source gewinnt; sonst
+ *  die Referrer-Domain grob zugeordnet (google/instagram/meta/…); ohne beides
+ *  „direkt". Rein, ohne Netz. */
+export function herkunftEinordnen(opts: { quelle?: unknown; referrer?: unknown }): string {
+  const q = String(opts.quelle ?? "").trim().toLowerCase();
+  if (q) {
+    if (q === "ig") return "instagram";
+    if (q === "fb" || q === "facebook") return "meta";
+    return q;
+  }
+  const ref = String(opts.referrer ?? "").trim().toLowerCase().replace(/^www\./, "");
+  if (ref) {
+    if (ref.includes("google.")) return "google";
+    if (ref.includes("instagram.")) return "instagram";
+    if (ref.includes("facebook.") || ref === "fb.com") return "meta";
+    if (ref.includes("bing.")) return "bing";
+    if (ref.includes("duckduckgo.")) return "duckduckgo";
+    if (ref === "t.co" || ref.includes("twitter.") || ref === "x.com") return "x";
+    return ref;
+  }
+  return "direkt";
+}
+
 export function abendberichtGrund(e: unknown): string {
   const m = String((e as { message?: string })?.message ?? e);
   const t = m.match(/HTTP \d{3}/);
@@ -3429,17 +3453,28 @@ export async function abendberichtZahlenHolen(
   // Neue Trainer (24 h) + Herkunft (innerer Rückfall ohne herkunft-Spalte ist
   // kein Fehler; erst wenn auch das Zählen scheitert, wird es vermerkt).
   try {
-    let zeilen: { herkunft?: string | null }[];
+    // E3: nach strukturierter Herkunft einordnen (utm_source bzw. Referrer-Domain);
+    // fehlen die Spalten, Rückfall auf die Freitext-Spalte, zuletzt nur zählen.
+    type HerkZeile = { herkunft_quelle?: string | null; herkunft_referrer?: string | null; herkunft?: string | null };
+    let zeilen: HerkZeile[];
+    let strukturiert = true;
     try {
-      zeilen = await lesenFn<{ herkunft?: string | null }>(`trainers?created_at=gt.${encodeURIComponent(seit)}&select=herkunft`);
+      zeilen = await lesenFn<HerkZeile>(`trainers?created_at=gt.${encodeURIComponent(seit)}&select=herkunft_quelle,herkunft_referrer`);
     } catch {
-      zeilen = await lesenFn<{ herkunft?: string | null }>(`trainers?created_at=gt.${encodeURIComponent(seit)}&select=id`);
+      strukturiert = false;
+      try {
+        zeilen = await lesenFn<HerkZeile>(`trainers?created_at=gt.${encodeURIComponent(seit)}&select=herkunft`);
+      } catch {
+        zeilen = await lesenFn<HerkZeile>(`trainers?created_at=gt.${encodeURIComponent(seit)}&select=id`);
+      }
     }
     z.neueTrainer = zeilen.length;
     const proQuelle: Record<string, number> = {};
     for (const t of zeilen) {
-      const q = (t.herkunft != null && String(t.herkunft).trim()) ? String(t.herkunft).trim() : "direkt/unbekannt";
-      proQuelle[q] = (proQuelle[q] || 0) + 1;
+      const label = strukturiert
+        ? herkunftEinordnen({ quelle: t.herkunft_quelle, referrer: t.herkunft_referrer })
+        : ((t.herkunft != null && String(t.herkunft).trim()) ? String(t.herkunft).trim() : "direkt");
+      proQuelle[label] = (proQuelle[label] || 0) + 1;
     }
     z.neueTrainerHerkunft = Object.keys(proQuelle).sort().map((q) => ({ quelle: q, anzahl: proQuelle[q] }));
   } catch (e) { merkeFehler("Neue Trainer (24 h)", e); }

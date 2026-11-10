@@ -55,10 +55,15 @@ Deno.test("B3: registrieren.html feuert alle vier Browser-Stufen", async () => {
 Deno.test("B3: Beacon überträgt nur Kampagnen-Kennungen + Browsertyp, keine Personendaten", async () => {
   const s = await lies("./registrieren.html");
   const i = s.indexOf("function trichterBeacon(");
-  const f = s.slice(i, i + 700);
+  // Genau den Beacon-Körper betrachten (bis zur nächsten Funktion), nicht in
+  // herkunftStrukturNachtragen hineinlaufen (das hat einen Parameter „email").
+  const ende = s.indexOf("herkunftStrukturNachtragen", i);
+  const f = s.slice(i, ende > i ? ende : i + 700);
   assertStringIncludes(f, "trichter_ereignisse");
   assertStringIncludes(f, "quelle: VEXFIT_WERBUNG.utm_source");
   assertStringIncludes(f, "browsertyp: vexfitBrowserTyp()");
+  // E3: Referrer-DOMAIN ist erlaubt (keine Personendaten).
+  assertStringIncludes(f, "referrer: VEXFIT_WERBUNG.referrer");
   // Keine E-Mail/Name im Beacon-Körper.
   assert(!/email|vorname|nachname/.test(f), "Beacon enthält Personendaten");
 });

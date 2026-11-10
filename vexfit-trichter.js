@@ -30,14 +30,22 @@
       kampagne: (p.get("utm_campaign") || "").trim() || null,
       inhalt: (p.get("utm_content") || "").trim() || null,
     };
+    // E3: Referrer-Domain beim ERSTEN Aufruf merken (ohne Pfad/Parameter).
+    w.referrer = referrerDomain(
+      global.document && global.document.referrer,
+      global.location && global.location.hostname,
+    ) || null;
     try {
       var alt = JSON.parse(global.sessionStorage.getItem(SCHLUESSEL) || "null");
       if (alt && typeof alt === "object") {
         if (!w.quelle && alt.quelle) w.quelle = alt.quelle;
         if (!w.kampagne && alt.kampagne) w.kampagne = alt.kampagne;
         if (!w.inhalt && alt.inhalt) w.inhalt = alt.inhalt;
+        // Den zuerst gesehenen Referrer behalten (Folgeseiten haben als Referrer
+        // die eigene Domain → referrerDomain liefert dort "" und überschreibt nicht).
+        if (!w.referrer && alt.referrer) w.referrer = alt.referrer;
       }
-      if (w.quelle || w.kampagne || w.inhalt) global.sessionStorage.setItem(SCHLUESSEL, JSON.stringify(w));
+      if (w.quelle || w.kampagne || w.inhalt || w.referrer) global.sessionStorage.setItem(SCHLUESSEL, JSON.stringify(w));
     } catch (e) { /* best effort */ }
     return w;
   }
@@ -52,6 +60,45 @@
   function landNormal(x) {
     var s = String(x == null ? "" : x).trim().toUpperCase();
     return (s === "AT" || s === "DE" || s === "CH") ? s : null;
+  }
+
+  // E3 (10.11.2026): aus einem Referrer NUR die Domain gewinnen – ohne Pfad,
+  // ohne Query, ohne Parameter. Die eigene Domain gilt als „kein externer
+  // Verweis" (leerer String). Kein Personenbezug: nur der grobe Herkunftsort.
+  function referrerDomain(ref, eigenerHost) {
+    try {
+      const r = String(ref == null ? "" : ref).trim();
+      if (!r) return "";
+      const u = new URL(r);
+      const host = (u.hostname || "").toLowerCase().replace(/^www\./, "");
+      const eigen = String(eigenerHost == null ? "" : eigenerHost).toLowerCase().replace(/^www\./, "");
+      if (!host || host === eigen) return "";
+      return host;
+    } catch { return ""; }
+  }
+
+  // E3: eine Herkunft in eine kurze Kategorie einordnen. utm_source gewinnt;
+  // sonst die Referrer-Domain grob zugeordnet (google/instagram/meta/…); ohne
+  // beides „direkt". Rein, ohne Netz/DOM – gleich im Server (kern.ts) gespiegelt.
+  function herkunftEinordnen(opt) {
+    opt = opt || {};
+    const q = String(opt.quelle == null ? "" : opt.quelle).trim().toLowerCase();
+    if (q) {
+      if (q === "ig") return "instagram";
+      if (q === "fb" || q === "facebook") return "meta";
+      return q;
+    }
+    const ref = String(opt.referrer == null ? "" : opt.referrer).trim().toLowerCase().replace(/^www\./, "");
+    if (ref) {
+      if (ref.indexOf("google.") >= 0) return "google";
+      if (ref.indexOf("instagram.") >= 0) return "instagram";
+      if (ref.indexOf("facebook.") >= 0 || ref === "fb.com") return "meta";
+      if (ref.indexOf("bing.") >= 0) return "bing";
+      if (ref.indexOf("duckduckgo.") >= 0) return "duckduckgo";
+      if (ref === "t.co" || ref.indexOf("twitter.") >= 0 || ref === "x.com") return "x";
+      return ref;
+    }
+    return "direkt";
   }
 
   var gemeldet = {};
@@ -82,6 +129,8 @@
     // nicht eingespielt), schlägt der Beacon still fehl, wie bei plz_bereich.
     var land = landNormal(opt.land);
     if (land) koerper.land = land;
+    // E3: Referrer-Domain mitsenden, falls vorhanden (Spalte best effort).
+    if (w.referrer) koerper.referrer = w.referrer;
     try {
       global.fetch(SUPABASE_URL + "/rest/v1/trichter_ereignisse", {
         method: "POST",
@@ -93,8 +142,13 @@
   }
 
   global.vexfitTrichter = vexfitTrichter;
+  // E3: reine Herkunfts-Helfer auch im Browser bereitstellen (registrieren.html).
+  global.vexHerkunft = { referrerDomain: referrerDomain, herkunftEinordnen: herkunftEinordnen };
   // Für Tests ohne Browser.
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { plzBereich: plzBereich, browserTyp: browserTyp, landNormal: landNormal };
+    module.exports = {
+      plzBereich: plzBereich, browserTyp: browserTyp, landNormal: landNormal,
+      referrerDomain: referrerDomain, herkunftEinordnen: herkunftEinordnen,
+    };
   }
 })(typeof window !== "undefined" ? window : globalThis);

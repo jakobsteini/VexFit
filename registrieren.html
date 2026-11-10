@@ -252,6 +252,7 @@ try {
 <script src="vexfit-plz.js"></script>
 <script src="vexfit-ziele.js"></script>
 <script src="vexfit-passwort.js"></script>
+<script src="vexfit-trichter.js"></script>
 <script>
 const SUPABASE_URL='https://hbapzwxdehfgnputrfjf.supabase.co';
 const SUPABASE_KEY='sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
@@ -301,9 +302,14 @@ const VEXFIT_WERBUNG=(function(){
   const schluessel=['utm_source','utm_campaign','utm_content','utm_medium','utm_term'];
   const w={};
   for(const k of schluessel){ const v=(p.get(k)||'').trim(); if(v) w[k]=v; }
+  // E3 (10.11.): Referrer-DOMAIN (ohne Pfad/Parameter) beim ersten Aufruf merken.
+  try{ const rd=(window.vexHerkunft&&window.vexHerkunft.referrerDomain)?window.vexHerkunft.referrerDomain(document.referrer, location.hostname):''; if(rd) w.referrer=rd; }catch(e){}
   try{
     const alt=JSON.parse(sessionStorage.getItem('vexfit_werbung')||'null');
-    if(alt&&typeof alt==='object'){ for(const k of schluessel){ if(!w[k]&&alt[k]) w[k]=alt[k]; } }
+    if(alt&&typeof alt==='object'){
+      for(const k of schluessel){ if(!w[k]&&alt[k]) w[k]=alt[k]; }
+      if(!w.referrer&&alt.referrer) w.referrer=alt.referrer; // zuerst gesehenen behalten
+    }
   }catch(e){}
   try{ if(Object.keys(w).length) sessionStorage.setItem('vexfit_werbung', JSON.stringify(w)); }catch(e){}
   return w;
@@ -338,6 +344,7 @@ function trichterBeacon(stufe, rolle){
         quelle: VEXFIT_WERBUNG.utm_source||null,
         kampagne: VEXFIT_WERBUNG.utm_campaign||null,
         inhalt: VEXFIT_WERBUNG.utm_content||null,
+        referrer: VEXFIT_WERBUNG.referrer||null,
         browsertyp: vexfitBrowserTyp()
       })
     }).catch(()=>{});
@@ -354,6 +361,9 @@ async function herkunftStrukturNachtragen(tabelle, email, token){
   if(VEXFIT_WERBUNG.utm_source)  koerper.herkunft_quelle   = VEXFIT_WERBUNG.utm_source;
   if(VEXFIT_WERBUNG.utm_campaign)koerper.herkunft_kampagne = VEXFIT_WERBUNG.utm_campaign;
   if(VEXFIT_WERBUNG.utm_content) koerper.herkunft_inhalt   = VEXFIT_WERBUNG.utm_content;
+  // E3: utm_medium und Referrer-Domain mitspeichern (best effort, neue Spalten).
+  if(VEXFIT_WERBUNG.utm_medium)  koerper.herkunft_medium   = VEXFIT_WERBUNG.utm_medium;
+  if(VEXFIT_WERBUNG.referrer)    koerper.herkunft_referrer = VEXFIT_WERBUNG.referrer;
   try{
     await fetch(SUPABASE_URL+'/rest/v1/'+tabelle+'?email=ilike.'+encodeURIComponent(email),{
       method:'PATCH',
@@ -645,6 +655,8 @@ async function submitTrainer(){
   const utm=VEXFIT_WERBUNG.utm_campaign||'';
   const utmSrc=VEXFIT_WERBUNG.utm_source||'';
   const utmCont=VEXFIT_WERBUNG.utm_content||'';
+  const utmMed=VEXFIT_WERBUNG.utm_medium||'';
+  const ref=VEXFIT_WERBUNG.referrer||'';
   const browserTyp=vexfitBrowserTyp();
   try{
     const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
@@ -667,7 +679,7 @@ async function submitTrainer(){
     try { zugestimmt = localStorage.getItem('vexfit_consent') === 'zugestimmt'; } catch(e) {}
     // Fix 7b: angemeldeter Pfad - Zugangs-Token mitschicken (die Function verlangt
     // es fuer nicht-anonyme Aufrufe). Ohne Sitzung wird keine interne Mail ausgeloest.
-    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-trainer',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...td, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_source: utmSrc, utm_campaign: utm, utm_content: utmCont, browsertyp: browserTyp, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
+    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-trainer',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...td, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_source: utmSrc, utm_campaign: utm, utm_content: utmCont, utm_medium: utmMed, referrer: ref, browsertyp: browserTyp, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
     pixelRegistrierungFertig('trainer', capiEventId);
     herkunftNachtragen('trainers', email, herkunftText(VEXFIT_WERBUNG), ad.access_token);
     herkunftStrukturNachtragen('trainers', email, ad.access_token);
@@ -717,6 +729,8 @@ async function submitClient(){
   const utm=VEXFIT_WERBUNG.utm_campaign||'';
   const utmSrc=VEXFIT_WERBUNG.utm_source||'';
   const utmCont=VEXFIT_WERBUNG.utm_content||'';
+  const utmMed=VEXFIT_WERBUNG.utm_medium||'';
+  const ref=VEXFIT_WERBUNG.referrer||'';
   const browserTyp=vexfitBrowserTyp();
   try{
     const ar=await fetch(SUPABASE_URL+'/auth/v1/signup',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY},body:JSON.stringify({email,password:pw})});
@@ -738,7 +752,7 @@ async function submitClient(){
     try { zugestimmt = localStorage.getItem('vexfit_consent') === 'zugestimmt'; } catch(e) {}
     // Fix 7b: angemeldeter Pfad - Zugangs-Token mitschicken (die Function verlangt
     // es fuer nicht-anonyme Aufrufe). Ohne Sitzung wird keine interne Mail ausgeloest.
-    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-kunde',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...cd, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_source: utmSrc, utm_campaign: utm, utm_content: utmCont, browsertyp: browserTyp, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
+    fetch('https://hbapzwxdehfgnputrfjf.supabase.co/functions/v1/vexfit-automation/neuer-kunde',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json',...(ad.access_token?{'Authorization':'Bearer '+ad.access_token}:{})},body:JSON.stringify({...cd, event_id: capiEventId, zustimmung: zugestimmt, event_source_url: location.href, utm_source: utmSrc, utm_campaign: utm, utm_content: utmCont, utm_medium: utmMed, referrer: ref, browsertyp: browserTyp, zeitpunkt: new Date().toLocaleString('de-AT')})}).catch(()=>{});
     if(ad.access_token){try{localStorage.setItem('vexfit_session',JSON.stringify({access_token:ad.access_token,refresh_token:ad.refresh_token||null,user_id:userId,email,role:'kunde'}));}catch(e){console.warn('localStorage blockiert:',e);}}
     pixelRegistrierungFertig('kunde', capiEventId);
     herkunftNachtragen('kunden', email, herkunftText(VEXFIT_WERBUNG), ad.access_token);

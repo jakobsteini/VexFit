@@ -37,8 +37,12 @@ Deno.test("B1: Browsertyp-Erkennung für Facebook- und Instagram-In-App-Browser"
 
 Deno.test("B1: utm_content und browsertyp gehen für Trainer UND Kunde an die Function", async () => {
   const s = await lies("./registrieren.html");
-  assertEquals((s.match(/utm_content: utmCont, browsertyp: browserTyp/g) || []).length, 2,
-    "utm_content+browsertyp nicht in beiden Submit-Pfaden");
+  // E3 schob utm_medium + referrer zwischen utm_content und browsertyp; beide
+  // gehen weiterhin in beiden Pfaden an die Function.
+  assertEquals((s.match(/utm_content: utmCont,/g) || []).length, 2,
+    "utm_content nicht in beiden Submit-Pfaden");
+  assertEquals((s.match(/browsertyp: browserTyp/g) || []).length, 2,
+    "browsertyp nicht in beiden Submit-Pfaden");
   // Nicht mehr direkt aus location.search beim Abschicken, sondern aus dem
   // beim Laden gefüllten robusten Speicher.
   assert(!s.includes("new URLSearchParams(location.search).get('utm_campaign')"),

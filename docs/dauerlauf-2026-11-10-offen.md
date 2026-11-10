@@ -153,3 +153,48 @@ Zippopotam; abgesichert über die statischen/Logik-Tests.
 
 **Commit E2:** registrieren.html, kern.ts, vexfit-verwaltung.js + 5 Testdateien,
 Protokoll. Keine Migration.
+
+---
+
+## E3 – Herkunft messen (Migration NUR Datei)
+
+**Befund:** 3 neue Trainer in 24 h, alle „direkt/unbekannt". Es fehlte die
+**Referrer-Domain** und eine saubere Herkunfts-Einordnung.
+
+**Umsetzung (kein Personenbezug, keine Drittanbieter-Cookies):**
+- `vexfit-trichter.js`: zwei reine Helfer
+  - `referrerDomain(ref, eigenerHost)` – nur die **Domain** (ohne Pfad/Parameter),
+    eigene Domain = kein externer Verweis;
+  - `herkunftEinordnen({quelle, referrer})` – utm_source gewinnt (ig→instagram,
+    fb/facebook→meta), sonst Referrer-Domain grob (google/instagram/meta/bing/…),
+    ohne beides **„direkt"**.
+  Beim ersten Aufruf wird die Referrer-Domain in `sessionStorage` gemerkt und im
+  anonymen Trichter-Beacon mitgesendet. Als `window.vexHerkunft` bereitgestellt.
+- `registrieren.html`: lädt `vexfit-trichter.js`, erfasst die Referrer-Domain,
+  reicht **referrer + utm_medium** an die interne Meldung (Trainer+Kunde), den
+  strukturierten Nachtrag (`herkunft_referrer`, `herkunft_medium`) und den
+  Trichter-Beacon weiter.
+- `kern.ts`: Spiegel `herkunftEinordnen`; der **Abendbericht** gruppiert „Neue
+  Trainer (24 h)" jetzt über die strukturierte Herkunft (utm_source bzw.
+  Referrer-Domain) statt über den Freitext – tidy Labels, „direkt" statt
+  „direkt/unbekannt". Robuster Rückfall, falls die Spalten fehlen.
+- **Migration NUR Datei:** `migrations/2026-11-10-01-herkunft-referrer.sql`
+  (+ Rücknahme) – `trichter_ereignisse.referrer` (+Längen-CHECK) und
+  `herkunft_referrer`/`herkunft_medium` auf `trainers`+`kunden`. **Reihenfolge:
+  nach 2026-11-06-01-trichter.sql.**
+- **Datenschutz:** NICHT selbst geändert; Entwurf als BLOCK in
+  `docs/recht/entwurf-herkunft-2026-11-10.md` (Art. 6 Abs. 1 lit. f, Widerspruch
+  an office@).
+
+**Tests (`e3_herkunft_test.ts` + angepasste Fenster-Tests):**
+- `referrerDomain` liefert nur die Domain; eigene Domain → „";
+- `herkunftEinordnen` (Client + Server-Spiegel): Quelle gewinnt, sonst Referrer,
+  sonst „direkt";
+- registrieren.html erfasst/überträgt Referrer + utm_medium;
+- Migration + Rücknahme als Dateien.
+- `b1_inapp_test.ts` / `b3_trichter_test.ts`: Fenster präzisiert (neue Felder);
+  Beacon enthält weiterhin keine Personendaten (Referrer-Domain ist erlaubt).
+- Suite **805 grün**, `deno check` grün, `deno lint` 30 (Baseline).
+
+**Commit E3:** vexfit-trichter.js, registrieren.html, kern.ts, Migration+Rücknahme,
+Datenschutz-Entwurf, e3/b1/b3-Tests, Protokoll.
