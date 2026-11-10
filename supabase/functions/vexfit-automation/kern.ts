@@ -814,6 +814,49 @@ export function mailNeueAnfrageIntern(
   });
 }
 
+/** E1: Verdachts-Grund (S3) in Klartext für die interne Benachrichtigung. */
+export function pruefGrundText(grund: unknown): string {
+  switch (String(grund ?? "")) {
+    case "wegwerf-mail": return "Wegwerf-Mail-Adresse";
+    case "name-unsinnig": return "unsinniger Name";
+    case "nachricht-unsinnig": return "unsinnige Nachricht";
+    default: return "Verdacht";
+  }
+}
+
+/** Mail (intern an BETREIBER): eine Anfrage wurde als verdächtig erkannt (S3),
+ *  NICHT an den Trainer zugestellt, sondern in die Admin-Liste „Zur Prüfung"
+ *  gelegt. E1: Jakob wird trotzdem benachrichtigt, damit keine solche Anfrage
+ *  unbemerkt liegen bleibt. Geht ausschließlich an office@, nie an den Trainer. */
+export function mailAnfrageZurPruefungIntern(
+  body: Record<string, unknown>,
+  trainerName: unknown,
+  grund: unknown,
+): Mail {
+  const kunde = nameFormatieren(w(body.kunden_name) || w(body.kunde_name)) ||
+    w(body.kunden_email) || w(body.kunde_email) || "Kunde";
+  const tName = nameFormatieren(w(trainerName)) || "Trainer";
+  const k = kundenAngaben(body);
+  return baueMail(
+    BETREIBER,
+    `Anfrage zur Prüfung: ${kunde} → ${tName} (${pruefGrundText(grund)})`,
+    {
+      ueberschrift: "Anfrage zur Prüfung",
+      datenZeilen: [
+        { beschriftung: "Kunde", wert: kunde },
+        { beschriftung: "Trainer", wert: tName },
+        { beschriftung: "Grund", wert: pruefGrundText(grund) },
+        { beschriftung: "Ziel", wert: w(k.ziel) },
+        { beschriftung: "Nachricht", wert: w(k.nachricht) },
+      ],
+      knopfText: "Zur Prüfung öffnen",
+      knopfLink: verwaltungLink("anfragen"),
+      grundZeile:
+        "Interne Benachrichtigung. Diese Anfrage wurde NICHT an den Trainer zugestellt – bitte im Admin prüfen und freigeben oder verwerfen.",
+    },
+  );
+}
+
 // ── Teil A: Web-Push-Mitteilungen ──
 
 /** Push-Mitteilung „Neuer Trainer: <Name>, <Ort>" (ohne E-Mail/Telefon). */
@@ -861,6 +904,20 @@ export function pushNeueAnfrage(
     titel: "Neue Anfrage",
     text: `${kunde} → ${trainerName}`,
     url: verwaltungLink(w(anfrageId) ? `anfrage-${w(anfrageId)}` : "anfragen"),
+  };
+}
+
+/** Push-Mitteilung „Anfrage zur Prüfung: <Kunde> → <Trainer>" (E1/S3). */
+export function pushAnfrageZurPruefung(
+  body: Record<string, unknown>,
+  trainerName: unknown,
+): PushNachricht {
+  const kunde = nameFormatieren(w(body.kunden_name) || w(body.kunde_name)) || "Kunde";
+  const tName = nameFormatieren(w(trainerName)) || "Trainer";
+  return {
+    titel: "🔎 Anfrage zur Prüfung",
+    text: `${kunde} → ${tName}`,
+    url: verwaltungLink("anfragen"),
   };
 }
 
@@ -1704,7 +1761,21 @@ async function neueAnfrage(
     catch (fehler) { a.melden?.("anfrageZurPruefung fehlgeschlagen", String(fehler)); }
     if (gesetzt) {
       a.melden?.("Anfrage zur Pruefung (kein Trainer-Versand)", { grund: verdacht.grund });
-      return antwort(200, { ok: true, mails: 0, zur_pruefung: true, grund: verdacht.grund }, herkunft);
+      // E1: Jakob trotzdem intern benachrichtigen – nur an BETREIBER (office@),
+      // NICHT an den Trainer –, damit keine „zur Prüfung"-Anfrage unbemerkt
+      // liegen bleibt. Name aus der Trainerzeile (body.trainer_name als Rückfall).
+      const trainerName = w(body.trainer_name) ||
+        `${w(trainer.vorname)} ${w(trainer.nachname)}`.trim();
+      const anJakob = await sendeWennAdresseTaugt(
+        a,
+        mailAnfrageZurPruefungIntern(body, trainerName, verdacht.grund),
+      );
+      await pushBenachrichtigung(a, pushAnfrageZurPruefung(body, trainerName));
+      return antwort(
+        200,
+        { ok: true, mails: anJakob ? 1 : 0, zur_pruefung: true, grund: verdacht.grund },
+        herkunft,
+      );
     }
     // Konnte nicht markiert werden (Spalte fehlt) -> wie bisher ausliefern.
   }

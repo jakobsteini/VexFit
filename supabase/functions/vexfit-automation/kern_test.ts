@@ -583,8 +583,12 @@ Deno.test("/neue-anfrage S3: unsinniger Name -> Zur Pruefung, keine Trainer-Mail
   assertEquals(a.status, 200);
   const d = await a.json();
   assertEquals(d.zur_pruefung, true);
-  assertEquals(d.mails, 0);
-  assertEquals(auf.mails.length, 0, "verdaechtige Anfrage darf keine Mail ausloesen");
+  // E1: keine Trainer-Mail, aber EINE interne Benachrichtigung an office@.
+  assertEquals(d.mails, 1);
+  assertEquals(auf.mails.length, 1, "genau die interne Benachrichtigung");
+  assertEquals(auf.mails[0].an, "office@vexfit.app", "nur an den Betreiber, nie an den Trainer");
+  assertStringIncludes(auf.mails[0].betreff, "Anfrage zur Prüfung");
+  assertStringIncludes(auf.mails[0].betreff, "unsinniger Name");
   assertEquals(geprueft.ruf, 1, "anfrageZurPruefung muss aufgerufen werden");
   assertEquals(geprueft.grund, "name-unsinnig");
 });
@@ -605,7 +609,11 @@ Deno.test("/neue-anfrage S3: Wegwerf-Mail -> Zur Pruefung, keine Trainer-Mail", 
   );
   const d = await a.json();
   assertEquals(d.zur_pruefung, true);
-  assertEquals(auf.mails.length, 0);
+  // E1: keine Trainer-Mail, aber EINE interne Benachrichtigung an office@.
+  assertEquals(auf.mails.length, 1);
+  assertEquals(auf.mails[0].an, "office@vexfit.app");
+  assertStringIncludes(auf.mails[0].betreff, "Anfrage zur Prüfung");
+  assertStringIncludes(auf.mails[0].betreff, "Wegwerf-Mail");
 });
 
 Deno.test("/neue-anfrage S3: saubere Anfrage wird NICHT zur Pruefung geschickt", async () => {
@@ -624,6 +632,58 @@ Deno.test("/neue-anfrage S3: saubere Anfrage wird NICHT zur Pruefung geschickt",
   assertEquals(d.zur_pruefung, undefined, "saubere Anfrage nicht zur Pruefung");
   assertEquals(geprueft, false);
   assert(auf.mails.length >= 1, "saubere Anfrage wird ausgeliefert");
+});
+
+// E1 (10.11.2026): der Anfrageweg Ende zu Ende – Jakob (office@) wird bei JEDER
+// meldewürdigen Lage benachrichtigt (neue Anfrage, „zur Prüfung", Vormerkung),
+// die Trainer-Mail nur im Normalfall.
+Deno.test("E1: Normalfall – Trainer-Mail UND interne office@-Mail", async () => {
+  const { anschluesse, auf } = bau({ trainer: { ...T_STANDARD, stripe_bezahlt: false } });
+  await bearbeiten(
+    anfrage("neue-anfrage", {
+      trainer_id: "t-1", kunden_name: "Anna", kunden_email: "kundin@beispiel.at",
+      ziel: "Abnehmen", nachricht: "Ich moechte starten.",
+    }, MIT_TOKEN),
+    anschluesse,
+  );
+  assertEquals(auf.mails.length, 2);
+  assertEquals(auf.mails[0].an, "trainer@beispiel.at");
+  assertEquals(auf.mails[1].an, "office@vexfit.app");
+  assertStringIncludes(auf.mails[1].betreff, "Neue Anfrage:");
+});
+
+Deno.test("E1: zur Prüfung – KEINE Trainer-Mail, nur interne office@-Mail", async () => {
+  const { anschluesse, auf } = bau({ trainer: { ...T_STANDARD, stripe_bezahlt: false } });
+  anschluesse.wegwerfDomains = () => new Set(["mailinator.com"]);
+  anschluesse.anfrageZurPruefung = () => Promise.resolve(true);
+  await bearbeiten(
+    anfrage("neue-anfrage", {
+      trainer_id: "t-1", kunden_name: "))))", kunden_email: "kundin@beispiel.at",
+      trainer_name: "Testvorname Testnachname", ziel: "Abnehmen", nachricht: "Hallo!",
+    }, MIT_TOKEN),
+    anschluesse,
+  );
+  assertEquals(auf.mails.length, 1);
+  assertEquals(auf.mails[0].an, "office@vexfit.app");
+  assert(
+    !auf.mails.some((m) => m.an === "trainer@beispiel.at"),
+    "eine verdächtige Anfrage darf den Trainer NICHT erreichen",
+  );
+});
+
+Deno.test("E1: Vormerkung (/neuer-kunde) – interne office@-Mail", async () => {
+  const { anschluesse, auf } = bau();
+  await bearbeiten(
+    anfrage("neuer-kunde", {
+      // Anonymes suche.html-Formular: leeres Köderfeld „webseite" (Honeypot).
+      webseite: "", email: "interessent@beispiel.at", vorname: "Max", stadt: "Salzburg", ziel: "Abnehmen",
+    }, VOM_BROWSER),
+    anschluesse,
+  );
+  assert(
+    auf.mails.some((m) => m.an === "office@vexfit.app"),
+    "Vormerkung muss Jakob intern erreichen",
+  );
 });
 
 // Baustein 1: Studio-Trainer (angestellt) zahlen nichts.
