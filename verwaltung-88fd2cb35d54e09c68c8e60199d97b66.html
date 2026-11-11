@@ -1,651 +1,310 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- Admin-Dashboard neu (Teil 1): nicht indexieren, nicht verfolgen. Nirgends
-     verlinkt; der Pfad steht nicht in robots.txt (das wuerde ihn verraten). -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<!-- Content-Security-Policy (Teil 1): nur eigene Quelle + Supabase. Kein
-     fremder Code, keine Inline-Skripte, keine Inline-Event-Handler (die ganze
-     Logik liegt in vexfit-verwaltung.js, 'self'). Bilder nur von Supabase-
-     Storage und data: (MFA-QR-Code). Verbindungen nur zu Supabase. -->
-<!-- Teil A: manifest-src und worker-src ergänzt (PWA + Service Worker, beides 'self'). -->
-<!-- B3: Karte (Leaflet). Zusätzlich erlaubt, NUR für die Karten-Ansicht (lesend):
-     Leaflet von cdnjs (script/style), OpenStreetMap-Kacheln als Bilder und die
-     PLZ-Auflösung (api.zippopotam.us, via vexfit-plz.js). Schreibende
-     Admin-Aktionen laufen unverändert nur über die Edge-Function /admin-aktion. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co data: https://*.tile.openstreetmap.org; font-src 'self'; connect-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co https://api.zippopotam.us; manifest-src 'self'; worker-src 'self'">
-<title>Vexfit – Verwaltung</title>
-<link rel="icon" type="image/png" sizes="32x32" href="marke/favicon-32.png">
-<!-- Teil A: Homescreen-App nur für die Verwaltung. Manifest + Icons sind nur von
-     dieser Seite verlinkt (nie von öffentlichen Seiten), der geheime Pfad wird
-     so nicht verraten. -->
-<link rel="manifest" href="manifest-admin.webmanifest">
-<link rel="apple-touch-icon" href="marke/favicon-180.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="Vexfit Admin">
-<meta name="theme-color" content="#0a0a0a">
-<link rel="stylesheet" href="fonts/vexfit-fonts.css">
-<!-- B3: Leaflet (feste Version von cdnjs) für die Admin-Karte. -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb" crossorigin="anonymous" referrerpolicy="no-referrer">
-<style>
-:root{--black:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1e1e1e;--card:#161616;--text-muted:#777;--border:rgba(255,255,255,0.08)}
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
-.logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;color:var(--white);text-decoration:none}
-.logo span{color:var(--accent)}
-.verborgen{display:none !important}
-a{color:var(--accent)}
-
-/* ── ANMELDUNG / MFA ── */
-.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-.auth-box{background:var(--card);border:1px solid var(--border);padding:38px 30px;border-radius:5px;width:100%;max-width:400px;text-align:center}
-.auth-box .logo{display:block;margin-bottom:22px;font-size:30px}
-.auth-title{font-family:'Bebas Neue',sans-serif;font-size:34px;letter-spacing:2px;margin-bottom:6px}
-.auth-sub{font-size:13px;color:var(--text-muted);margin-bottom:24px;font-weight:300;line-height:1.5}
-.feld-ein{display:flex;flex-direction:column;gap:7px;margin-bottom:14px;text-align:left}
-.feld-ein label{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)}
-.feld-ein input{background:var(--gray);border:1px solid rgba(255,255,255,0.12);color:var(--white);padding:13px 16px;font-family:'DM Sans',sans-serif;font-size:15px;border-radius:4px;outline:none;transition:border-color .2s;width:100%}
-.feld-ein input:focus{border-color:rgba(232,255,0,0.45)}
-.btn-haupt{width:100%;background:var(--accent);color:var(--black);padding:14px;border:none;border-radius:4px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:13px;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;margin-top:8px}
-.btn-haupt:disabled{opacity:.5;cursor:not-allowed}
-.auth-fehler{color:#ff8a8a;font-size:13px;margin-top:12px;min-height:16px}
-.auth-link{background:none;border:none;color:var(--text-muted);font-size:12px;margin-top:16px;cursor:pointer;text-decoration:underline;font-family:inherit}
-.qr-box{background:#fff;padding:14px;border-radius:6px;display:inline-block;margin:6px 0 14px}
-.qr-box img{display:block;width:200px;height:200px}
-.mfa-secret{font-family:monospace;font-size:13px;word-break:break-all;background:var(--gray);border:1px solid var(--border);padding:10px;border-radius:4px;margin-bottom:14px;color:var(--accent)}
-
-/* ── DASHBOARD ── */
-nav{background:var(--gray);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:50}
-.nav-links{display:flex;align-items:center;gap:14px}
-.nav-meta{font-size:11px;color:var(--text-muted)}
-.btn-aus{background:transparent;border:1px solid var(--border);color:var(--text-muted);padding:8px 16px;border-radius:4px;font-family:inherit;font-size:12px;cursor:pointer}
-.btn-aus:hover{color:var(--white);border-color:rgba(255,255,255,0.3)}
-.content{padding:20px}
-.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:3px;margin-bottom:22px}
-.stat-card{background:var(--card);padding:18px;border-left:3px solid var(--accent);cursor:pointer}
-.stat-card:hover{background:var(--mid)}
-.stat-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:7px;font-weight:600}
-.stat-value{font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--accent);letter-spacing:2px;line-height:1}
-.stat-sub{font-size:11px;color:var(--text-muted);margin-top:4px}
-.tabs{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:18px}
-.tab{padding:9px 16px;background:var(--card);border:none;color:var(--text-muted);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;cursor:pointer}
-.tab.active{background:var(--accent);color:var(--black)}
-.tab-content{display:none}
-.tab-content.active{display:block}
-.werkzeugleiste{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
-.werkzeugleiste input,.werkzeugleiste select{background:var(--gray);border:1px solid var(--border);color:var(--white);padding:9px 12px;border-radius:4px;font-family:inherit;font-size:13px;outline:none}
-.werkzeugleiste input[type=search]{flex:1;min-width:160px}
-.btn-klein{background:rgba(232,255,0,0.1);border:1px solid rgba(232,255,0,0.3);color:var(--accent);padding:8px 14px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
-.schalter{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-muted);cursor:pointer}
-.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:4px}
-table{width:100%;border-collapse:collapse}
-th{background:var(--gray);padding:11px 14px;text-align:left;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);font-weight:600;white-space:nowrap;cursor:pointer;user-select:none}
-th[data-sort]:hover{color:var(--white)}
-td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px;color:rgba(245,245,240,0.85)}
-tr:last-child td{border-bottom:none}
-.klickbar{cursor:pointer}
-.klickbar:hover td{background:var(--card)}
-.badge{display:inline-block;padding:3px 8px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap}
-.badge-paid,.badge-ang{background:rgba(74,222,128,0.15);color:#4ade80}
-.badge-unpaid,.badge-abg{background:rgba(255,80,80,0.12);color:#ff6b6b}
-.badge-active,.badge-offen{background:rgba(232,255,0,0.12);color:var(--accent)}
-.badge-grau{background:rgba(255,255,255,0.06);color:var(--text-muted)}
-.leer-text{text-align:center;padding:36px;color:var(--text-muted);font-size:14px}
-.section-hinweis{font-size:12px;color:var(--text-muted);margin:8px 2px}
-
-/* ── DETAIL / DIALOG ── */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:900}
-.panel{position:fixed;top:0;right:0;height:100%;width:100%;max-width:520px;background:var(--gray);border-left:1px solid var(--border);z-index:901;display:flex;flex-direction:column}
-.panel-kopf{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border)}
-.panel-titel{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px}
-.panel-zu{background:transparent;border:1px solid var(--border);color:var(--text-muted);width:36px;height:36px;border-radius:4px;font-size:18px;cursor:pointer}
-.panel-body{padding:20px;overflow-y:auto;flex:1}
-.panel-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px}
-.feld{margin-bottom:13px}
-.feld-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px}
-.feld-wert{font-size:14px;color:var(--white);word-break:break-word;white-space:pre-wrap}
-.feld-fehlt{color:#ff8a8a}
-.chiprow{display:flex;flex-wrap:wrap;gap:6px}
-.chip{background:var(--mid);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px}
-.btn-gross{padding:11px 16px;border-radius:4px;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;cursor:pointer;border:1px solid transparent;font-family:inherit}
-.btn-ja{background:var(--accent);color:var(--black)}
-.btn-warn{background:rgba(255,165,0,0.12);border-color:rgba(255,165,0,0.4);color:#ffaa00}
-.btn-gefahr{background:rgba(255,80,80,0.12);border-color:rgba(255,80,80,0.4);color:#ff6b6b}
-.btn-neutral{background:rgba(255,255,255,0.06);border-color:var(--border);color:var(--white)}
-.dialog-box{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:1001;background:var(--gray);border:1px solid var(--border);border-radius:6px;width:calc(100% - 40px);max-width:440px;padding:26px}
-.dialog-titel{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;margin-bottom:10px}
-.dialog-text{font-size:14px;color:rgba(245,245,240,0.85);line-height:1.6;margin-bottom:18px}
-.dialog-aktionen{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
-.dialog-box .feld{margin-bottom:12px}
-.dialog-box input{width:100%;background:var(--black);border:1px solid var(--border);color:var(--white);padding:11px 13px;border-radius:4px;font-family:inherit;font-size:14px;outline:none}
-
-/* ── MELDUNGEN ── */
-#meldungen{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2000;display:flex;flex-direction:column;gap:8px;width:calc(100% - 24px);max-width:520px;pointer-events:none}
-.meldung{pointer-events:auto;padding:12px 16px;border-radius:5px;font-size:13px;line-height:1.5;box-shadow:0 8px 28px rgba(0,0,0,0.5);display:flex;gap:10px;align-items:flex-start}
-.meldung-ok{background:#143d22;border:1px solid rgba(74,222,128,0.5);color:#d6ffe4}
-.meldung-fehler{background:#3d1414;border:1px solid rgba(255,80,80,0.5);color:#ffd9d9}
-.meldung-info{background:#1e1e1e;border:1px solid rgba(255,255,255,0.18);color:var(--white)}
-.meldung button{margin-left:auto;background:transparent;border:none;color:inherit;font-size:16px;line-height:1;cursor:pointer;opacity:.7}
-@media(min-width:768px){
-  .stats-grid{grid-template-columns:repeat(4,1fr)}
-  .content{padding:28px 36px}
-}
-
-/* ── Teil A: Tab-Mehr-Menü. Großer Bildschirm: alle Reiter in einer Zeile
-   (Wrapper verschwindet via display:contents, „Mehr" ausgeblendet). ── */
-.tab-mehr-menu{display:contents}
-.tab-mehr{display:none}
-
-/* ── Teil A: Push-Mitteilungen auf diesem Gerät ── */
-.push-box{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:16px}
-.push-kopf{font-weight:700;font-size:13px;margin-bottom:6px}
-.push-text{font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.5}
-.push-geraete{margin-top:10px;display:flex;flex-direction:column;gap:6px}
-.push-geraet{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;background:var(--gray);border:1px solid var(--border);border-radius:4px;padding:8px 10px}
-.push-geraet button{background:transparent;border:1px solid var(--border);color:#ff8a8a;border-radius:4px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:inherit}
-
-/* ── Teil A: Handy (<=600px): feste untere Leiste, Karten, wischbare Kennzahlen ── */
-@media(max-width:600px){
-  html,body{overflow-x:hidden}
-  .content{padding:16px 16px 84px}            /* Platz für die feste untere Leiste */
-  nav{padding-left:16px;padding-right:16px}
-
-  /* Kennzahlen als wischbare Kacheln */
-  .stats-grid{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;margin:0 -16px 18px;padding:0 16px}
-  .stat-card{flex:0 0 auto;min-width:150px;scroll-snap-align:start;border-radius:8px}
-
-  /* Reiter als feste Leiste unten: vier Hauptreiter + „Mehr" */
-  .tabs-unten{position:fixed;left:0;right:0;bottom:0;z-index:60;margin:0;display:flex;justify-content:space-around;gap:0;background:var(--gray);border-top:1px solid var(--border);padding:6px calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left))}
-  .tabs-unten .tab{flex:1;background:transparent;padding:10px 4px;font-size:10px;text-align:center;border-radius:6px}
-  .tabs-unten .tab.active{background:var(--accent);color:var(--black)}
-  .tab-mehr{display:block}
-  .tab-mehr-menu{display:none;position:fixed;left:12px;right:12px;bottom:66px;z-index:61;flex-direction:column;gap:4px;background:var(--gray);border:1px solid var(--border);border-radius:8px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
-  .tab-mehr-menu.offen{display:flex}
-  .tab-mehr-menu .tab{width:100%;text-align:left;padding:12px;font-size:13px;border-radius:6px}
-
-  /* Listen als Karten statt breiter Tabellen (data-label liefert die Beschriftung) */
-  .table-wrap{overflow-x:visible;border:none;border-radius:0}
-  table,tbody,tr,td{display:block;width:100%}
-  thead{display:none}
-  tbody tr{background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:10px;padding:6px 12px}
-  tbody tr td{border:none;padding:7px 0;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;text-align:right}
-  tbody tr td::before{content:attr(data-label);color:var(--text-muted);font-size:10px;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0;text-align:left}
-  tbody tr td:empty{display:none}
-
-  /* Aktionen groß und daumenfreundlich; Detail als Vollbild-Blatt */
-  .panel{max-width:100%}
-  .btn-gross{flex:1 1 44%;padding:14px 12px;font-size:12px}
-  .btn-klein{padding:11px 14px;font-size:13px}
-  .werkzeugleiste input[type=search]{min-width:100%}
-}
-
-/* ════ Feinschliff Teil 1/2: Kopf, Karten, Mehr-Blatt, Push kompakt ════ */
-/* 1a: kleiner Aktualisieren-Knopf im Kopf */
-.btn-aktualisieren{background:transparent;border:1px solid var(--border);color:var(--text-muted);width:34px;height:34px;border-radius:4px;font-size:16px;cursor:pointer;line-height:1;flex-shrink:0}
-.btn-aktualisieren:hover{color:var(--white);border-color:rgba(255,255,255,0.3)}
-.btn-aktualisieren.laeuft{animation:dreh .8s linear infinite}
-@keyframes dreh{to{transform:rotate(360deg)}}
-
-/* 1b: kompakte Karten – nur am Handy sichtbar (sonst Tabelle) */
-.karten{display:none}
-.karte{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:10px;cursor:pointer}
-.karte:active{background:var(--mid)}
-.karte-kopf{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-.karte-name{font-weight:700;font-size:16px;line-height:1.2;word-break:break-word}
-.karte-zeile{font-size:12px;color:var(--text-muted);margin-top:4px}
-.karte-voll{display:flex;align-items:center;gap:8px;margin-top:9px}
-.karte-balken{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,0.08);overflow:hidden}
-.karte-balken span{display:block;height:100%;border-radius:3px}
-.karte-voll-text{font-size:11px;color:var(--text-muted);font-weight:700;flex-shrink:0}
-.karte-aktionen{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.karte-aktionen button{flex:1 1 auto;min-width:92px;min-height:42px;padding:10px 12px;border-radius:6px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;border:1px solid transparent}
-.karte-neu{animation:neuBlitz 2.6s ease-out}
-@keyframes neuBlitz{0%{box-shadow:0 0 0 2px var(--accent) inset;background:rgba(232,255,0,0.14)}100%{box-shadow:none;background:var(--card)}}
-
-/* 1c: Mehr-Blatt (von unten) + Abdunkelung */
-.mehr-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:60}
-.mehr-griff{width:40px;height:4px;border-radius:2px;background:rgba(255,255,255,0.25);margin:2px auto 10px}
-.mehr-nur-handy{display:none}
-.mehr-aktionen{flex-direction:column;gap:4px;border-top:1px solid var(--border);margin-top:6px;padding-top:6px}
-.mehr-aktion{width:100%;text-align:left;padding:13px 12px;font-size:13px;border-radius:6px;background:transparent;border:none;color:var(--white);font-family:inherit;cursor:pointer}
-.mehr-aktion:active{background:var(--mid)}
-.mehr-aktion-aus{color:var(--text-muted)}
-
-/* 1f: Push kompakt, wenn das Gerät eingerichtet ist */
-.push-kompakt-zeile{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:13px}
-.push-verwalten-link{margin-left:auto;background:transparent;border:none;color:var(--accent);font-size:13px;cursor:pointer;text-decoration:underline;font-family:inherit}
-
-/* 1g: aktive Kennzahl-Kachel markiert */
-.stat-card.aktiv{background:var(--mid);border-left-color:var(--white)}
-
-/* 1a: „Zum Aktualisieren ziehen" (Pull-to-Refresh) */
-.ptr{position:fixed;top:0;left:0;right:0;z-index:55;text-align:center;font-size:12px;color:var(--text-muted);background:var(--gray);border-bottom:1px solid var(--border);padding:8px;transform:translateY(-100%);pointer-events:none}
-.ptr.sichtbar{transform:translateY(0)}
-
-@media(max-width:600px){
-  .logo-zusatz{display:none}
-  #btn-logout{display:none}                     /* 1d: Abmelden ins Mehr-Blatt */
-  /* 1b: Karten statt Tabelle in Übersicht/Trainer/Kunden */
-  #tab-uebersicht .table-wrap,#tab-trainer .table-wrap,#tab-kunden .table-wrap{display:none}
-  .karten{display:block}
-  /* 1c: das Mehr-Blatt geht von unten über der Leiste auf */
-  .mehr-nur-handy{display:flex}
-  .tab-mehr-menu{left:0;right:0;bottom:0;border-radius:14px 14px 0 0;max-height:72vh;overflow-y:auto;padding:12px 14px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,0.6)}
-  /* 1e: leere Zustände in den Reflow-Tabellen wirklich zentrieren */
-  tbody tr td.leer-text{display:block;text-align:center;width:100%}
-  tbody tr td.leer-text::before{content:none}
-}
-</style>
-<style>/* B3: Heute zu tun, Karte, Herkunft */
-.heute-box{margin-bottom:22px}
-.heute-karte{background:var(--card,#161616);border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:10px;padding:14px 16px;margin-bottom:12px}
-.heute-kopf{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-bottom:8px}
-.heute-zahl{background:var(--accent,#e8ff00);color:#0a0a0a;border-radius:999px;font-size:12px;font-weight:700;padding:1px 9px;min-width:20px;text-align:center}
-.heute-zahl.null{background:rgba(255,255,255,0.12);color:var(--text-muted,#9a9a9a)}
-.heute-liste{display:flex;flex-direction:column;gap:6px}
-.heute-zeile{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-size:13px;padding:6px 0;border-top:1px solid var(--border,rgba(255,255,255,0.06))}
-.heute-zeile:first-child{border-top:none}
-.heute-zeile a,.heute-zeile .heute-link{color:var(--accent,#e8ff00);text-decoration:none;font-weight:600;cursor:pointer}
-.heute-fehlt{color:#ffaa00;font-size:12px}
-.heute-leer{color:var(--text-muted,#9a9a9a);font-size:13px}
-.karte-leiste{display:flex;flex-wrap:wrap;gap:12px 16px;align-items:center;margin-bottom:12px;font-size:13px}
-.karte-leiste label{display:flex;gap:6px;align-items:center;color:var(--text-muted,#9a9a9a)}
-.karte-leiste select{background:var(--card,#161616);color:var(--white,#f5f5f0);border:1px solid var(--border,rgba(255,255,255,0.14));border-radius:6px;padding:7px 9px;font-family:inherit}
-.karte-status{color:var(--text-muted,#9a9a9a)}
-.karte-flaeche{height:60vh;min-height:320px;width:100%;border-radius:10px;border:1px solid var(--border,rgba(255,255,255,0.1));background:#0e0e0e}
-.leaflet-container{background:#0e0e0e}
-.karte-legende{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:12px;font-size:12.5px;color:var(--text-muted,#9a9a9a)}
-.karte-legende span{display:flex;align-items:center;gap:6px}
-.karte-legende .pkt{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,0.4)}
-.leaflet-popup-content{font-size:13px;line-height:1.5}
-.leaflet-popup-content a{color:#2e6fff;font-weight:600}
-.herkunft-tag{margin-bottom:10px;border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:8px;overflow:hidden}
-.herkunft-tag-kopf{display:flex;justify-content:space-between;gap:10px;padding:9px 12px;background:var(--card,#161616);font-weight:600;font-size:13px}
-.herkunft-tag-kopf .z{color:var(--text-muted,#9a9a9a);font-weight:400}
-.herkunft-tag table{width:100%;border-collapse:collapse}
-.herkunft-tag td{padding:6px 12px;font-size:12.5px;border-top:1px solid var(--border,rgba(255,255,255,0.06))}
-.herkunft-tag td:last-child{text-align:right;color:var(--text-muted,#9a9a9a)}
-.herkunft-hinweis{font-size:12px;color:var(--text-muted,#9a9a9a);margin-top:10px;line-height:1.6}
-/* B7: Vorschlagskasten Test-/Spam-Konten */
-.test-verdacht{border:1px solid rgba(251,146,60,0.3);background:rgba(251,146,60,0.07);border-radius:8px;padding:12px 14px;margin:0 0 14px}
-.test-verdacht .verdacht-kopf{font-weight:600;font-size:13px;margin-bottom:10px}
-.test-verdacht .verdacht-zeile{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border,rgba(255,255,255,0.06));font-size:13px}
-.test-verdacht .verdacht-mail{color:var(--text-muted,#9a9a9a);font-size:12px}
-.test-verdacht .verdacht-grund{color:#fb923c;font-size:12px}
-@media (max-width:640px){.karte-flaeche{height:66vh}}
-</style>
 </head>
 <body>
+<title>Vexfit Verwaltung · Vision</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: Verwaltungs-Oberfläche – Kopfleiste, Kennzahlen, Heute-Feed + Städte, Trainerliste. Dark-first in Vexfit-Farben. */
+:root{
+  --bg:#0b0b0a; --panel:#141413; --panel2:#1b1b19; --line:#2a2a26; --fg:#f2f2ec; --muted:#9a9a8f;
+  --neon:#e8ff00; --on-neon:#0a0a0a; --good:#5ee39a; --warn:#ffb547; --bad:#ff6b6b; --info:#7cc4ff;
+  --display:'Bebas Neue',Impact,'Arial Narrow',sans-serif; --body:'DM Sans',system-ui,-apple-system,Segoe UI,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#f4f4ef; --panel:#ffffff; --panel2:#f0f0ea; --line:#dcdcd2; --fg:#0f0f0d; --muted:#66665c;
+  --neon:#d4ec00; --on-neon:#0a0a0a; --good:#14904f; --warn:#b86e00; --bad:#c62f2f; --info:#1f6fb8; color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#f4f4ef; --panel:#ffffff; --panel2:#f0f0ea; --line:#dcdcd2; --fg:#0f0f0d; --muted:#66665c;
+  --neon:#d4ec00; --on-neon:#0a0a0a; --good:#14904f; --warn:#b86e00; --bad:#c62f2f; --info:#1f6fb8; color-scheme:light}
 
-<div id="meldungen"></div>
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.wrap{max-width:1320px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+.num{font-variant-numeric:tabular-nums}
+.vision{background:var(--neon);color:var(--on-neon);font-size:12px;font-weight:700;letter-spacing:.04em;text-align:center;padding:6px 16px}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:center;gap:16px;padding-block:12px;flex-wrap:wrap}
+.logo{font-family:var(--display);font-size:30px;letter-spacing:.04em;line-height:1}
+.logo span{background:var(--neon);color:var(--on-neon);padding:0 6px;margin-left:6px;font-size:18px;vertical-align:middle}
+nav.tabs{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+nav.tabs a{color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:6px;font-weight:500}
+nav.tabs a.on{color:var(--fg);background:var(--panel2)}
+.who{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--good);display:inline-block}
 
-<!-- ══ ANMELDUNG ══ -->
-<div id="ansicht-login" class="auth-wrap verborgen">
-  <div class="auth-box">
-    <a class="logo">VEX<span>FIT</span></a>
-    <div class="auth-title">Verwaltung</div>
-    <div class="auth-sub">Geschützter Bereich. Anmeldung mit zweitem Faktor erforderlich.</div>
-    <div class="feld-ein"><label for="login-email">E-Mail</label><input id="login-email" type="email" autocomplete="username" inputmode="email"></div>
-    <div class="feld-ein"><label for="login-pw">Passwort</label><input id="login-pw" type="password" autocomplete="current-password"></div>
-    <button id="btn-login" class="btn-haupt">Anmelden</button>
-    <div id="login-fehler" class="auth-fehler"></div>
-  </div>
-</div>
+h1{font-family:var(--display);font-weight:400;font-size:44px;letter-spacing:.02em;margin:28px 0 20px;line-height:1}
+.sub{color:var(--muted);margin:0 0 20px}
+h2{font-family:var(--display);font-weight:400;font-size:26px;letter-spacing:.03em;margin:0 0 12px;line-height:1}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
 
-<!-- ══ ZWEITER FAKTOR: EINRICHTEN ══ -->
-<div id="ansicht-mfa-setup" class="auth-wrap verborgen">
-  <div class="auth-box">
-    <a class="logo">VEX<span>FIT</span></a>
-    <div class="auth-title">Zweiter Faktor</div>
-    <div class="auth-sub">Scanne den Code mit einer Authenticator-App (z. B. Google Authenticator) und gib dann den 6-stelligen Code ein.</div>
-    <div class="qr-box"><img id="mfa-qr" alt="QR-Code für die Authenticator-App"></div>
-    <div class="auth-sub" style="margin-bottom:6px">Falls der Scan nicht geht, Schlüssel manuell eingeben:</div>
-    <div id="mfa-secret" class="mfa-secret"></div>
-    <div class="feld-ein"><label for="mfa-setup-code">6-stelliger Code</label><input id="mfa-setup-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>
-    <button id="btn-mfa-setup" class="btn-haupt">Einrichtung abschließen</button>
-    <div id="mfa-setup-fehler" class="auth-fehler"></div>
-    <button id="btn-mfa-setup-abbruch" class="auth-link">Abmelden</button>
-  </div>
-</div>
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.kpi .v{font-family:var(--display);font-size:40px;line-height:1;letter-spacing:.02em}
+.kpi .d{font-size:12px;color:var(--good)}
+.kpi .d.neutral{color:var(--muted)}
+.kpi.hero{background:var(--neon);color:var(--on-neon);border-color:var(--neon)}
+.kpi.hero .lbl,.kpi.hero .d{color:var(--on-neon);opacity:.75}
+.kpi svg{width:100%;height:34px;display:block}
 
-<!-- ══ ZWEITER FAKTOR: CODE ══ -->
-<div id="ansicht-mfa-code" class="auth-wrap verborgen">
-  <div class="auth-box">
-    <a class="logo">VEX<span>FIT</span></a>
-    <div class="auth-title">Zweiter Faktor</div>
-    <div class="auth-sub">Gib den 6-stelligen Code aus deiner Authenticator-App ein.</div>
-    <div class="feld-ein"><label for="mfa-code">Code</label><input id="mfa-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>
-    <button id="btn-mfa-code" class="btn-haupt">Bestätigen</button>
-    <div id="mfa-code-fehler" class="auth-fehler"></div>
-    <button id="btn-mfa-code-abbruch" class="auth-link">Abmelden</button>
-  </div>
-</div>
+.grid2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;margin-top:16px}
+@media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.feed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.feed li{display:grid;grid-template-columns:52px 14px minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--line)}
+.feed li:last-child{border-bottom:0}
+.feed time{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.feed .ic{width:8px;height:8px;border-radius:50%;align-self:center}
+.feed .amt{font-family:var(--mono);font-size:12px;white-space:nowrap}
+.feed b{font-weight:700}
 
-<!-- ══ DASHBOARD ══ -->
-<div id="ansicht-dashboard" class="verborgen">
-  <!-- Teil 1a: Hinweis für „Zum Aktualisieren ziehen" (Pull-to-Refresh am Handy) -->
-  <div class="ptr" id="ptr">↻ Zum Aktualisieren ziehen</div>
-  <nav>
-    <a class="logo">VEX<span>FIT</span> <span class="logo-zusatz" style="color:var(--text-muted);font-size:14px;letter-spacing:2px">VERWALTUNG</span></a>
-    <div class="nav-links">
-      <span id="zuletzt" class="nav-meta"></span>
-      <!-- Teil 1a: kleiner Aktualisieren-Knopf -->
-      <button id="btn-aktualisieren" class="btn-aktualisieren" type="button" aria-label="Aktualisieren" title="Aktualisieren">↻</button>
-      <!-- Teil 1d: „Abmelden" wandert am Handy ins Mehr-Blatt (hier per CSS versteckt) -->
-      <button id="btn-logout" class="btn-aus">Abmelden</button>
-    </div>
+.cities{width:100%;border-collapse:collapse}
+.cities th,.cities td{text-align:left;padding:7px 4px;border-bottom:1px solid var(--line);font-size:13px}
+.cities th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.cities td.r,.cities th.r{text-align:right}
+.bar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:var(--neon)}
+
+.chartcard{margin-top:16px}
+.chartcard svg{width:100%;height:auto;display:block}
+
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:28px 0 12px}
+.tools h2{margin:0 auto 0 0}
+input[type=search],select{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;min-width:0}
+input[type=search]{width:220px;max-width:100%}
+input:focus-visible,select:focus-visible,button:focus-visible,th button:focus-visible{outline:2px solid var(--neon);outline-offset:2px}
+.tablebox{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+table.t{width:100%;border-collapse:collapse;min-width:980px}
+table.t th,table.t td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle;font-size:13px}
+table.t th{position:sticky;top:0;background:var(--panel2);z-index:1}
+table.t th button{all:unset;cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+table.t th button[aria-sort]{color:var(--fg)}
+table.t td.r,table.t th.r{text-align:right}
+table.t tbody tr{cursor:pointer}
+table.t tbody tr:hover{background:var(--panel2)}
+.nm{font-weight:700}
+.loc{color:var(--muted);font-size:12px}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;letter-spacing:.02em;white-space:nowrap;border:1px solid transparent}
+.p-zahlend{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.p-gratis{background:color-mix(in srgb,var(--info) 16%,transparent);color:var(--info)}
+.p-pausiert{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.p-gekuendigt{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
+.p-online{border-color:var(--line);color:var(--muted)}
+.prof{display:flex;gap:2px}
+.prof i{width:7px;height:12px;border-radius:2px;background:var(--line)}
+.prof i.f{background:var(--neon)}
+.detail td{background:var(--panel2);cursor:default}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px 24px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:12px;padding:2px 8px;border-radius:6px;background:var(--panel);border:1px solid var(--line)}
+.foot{color:var(--muted);font-size:12px;margin-top:10px}
+@media (max-width:560px){h1{font-size:36px}.kpi .v{font-size:34px}nav.tabs{margin-left:0;width:100%}}
+@media (prefers-reduced-motion:no-preference){.kpi,.card{animation:in .35s ease both}@keyframes in{from{transform:translateY(4px)}to{transform:none}}}
+</style>
+
+<header class="top"><div class="wrap">
+  <div class="logo">VEXFIT<span>VERWALTUNG</span></div>
+  <nav class="tabs" aria-label="Bereiche">
+    <a class="on" href="#uebersicht">Übersicht</a><a href="#trainer">Trainer</a><a href="#staedte">Städte</a><a href="#heute">Anfragen</a>
   </nav>
-  <div class="content">
-    <!-- Kennzahlen -->
-    <div class="stats-grid" id="stats"></div>
+  <div class="who"><span class="dot"></span> Jakob · 2FA aktiv</div>
+</div></header>
 
-    <!-- Reiter. Am Handy (Teil A) feste Leiste unten: vier Hauptreiter + „Mehr".
-         Am großen Bildschirm fließen alle neun in einer Zeile (tab-mehr-menu:
-         display:contents, Mehr-Knopf ausgeblendet). -->
-    <!-- Teil 1c: Abdunkelung hinter dem Mehr-Blatt (nur am Handy sichtbar) -->
-    <div class="mehr-overlay verborgen" id="mehr-overlay" data-schliessen="mehr"></div>
-    <div class="tabs tabs-unten" id="tabs">
-      <button class="tab active" data-tab="uebersicht">Übersicht</button>
-      <button class="tab" data-tab="trainer">Trainer</button>
-      <button class="tab" data-tab="kunden">Kunden</button>
-      <button class="tab" data-tab="anfragen">Anfragen</button>
-      <div class="tab-mehr-menu" id="tab-mehr-menu">
-        <!-- Teil 1c: Griff + Titel nur im Blatt (am großen Bildschirm ausgeblendet) -->
-        <div class="mehr-griff mehr-nur-handy" aria-hidden="true"></div>
-        <button class="tab" data-tab="karte">Karte</button>
-        <button class="tab" data-tab="herkunft">Herkunft</button>
-        <button class="tab" data-tab="zahlungen">Zahlungen</button>
-        <button class="tab" data-tab="studios">Studios</button>
-        <button class="tab" data-tab="zertifikate">Zertifikate</button>
-        <button class="tab" data-tab="nachfrage">Nachfrage</button>
-        <button class="tab" data-tab="erinnerung">Profil-Erinnerung</button>
-        <button class="tab" data-tab="protokoll">Protokoll</button>
-        <!-- Teil 1d/1f: Geräte-Mitteilungen + Abmelden nur im Mehr-Blatt (Handy) -->
-        <div class="mehr-nur-handy mehr-aktionen">
-          <button class="mehr-aktion" id="mehr-push-verwalten" type="button">🔔 Mitteilungen verwalten</button>
-          <button class="mehr-aktion mehr-aktion-aus" id="mehr-logout" type="button">Abmelden</button>
-        </div>
-      </div>
-      <button class="tab tab-mehr" id="tab-mehr-knopf" type="button" aria-label="Weitere Reiter">Mehr ▾</button>
-    </div>
+<main class="wrap">
+  <h1 id="uebersicht">Guten Morgen, Jakob</h1>
 
-    <!-- Übersicht -->
-    <div class="tab-content active" id="tab-uebersicht">
-      <!-- B3.1: Heute zu tun (ganz oben, nur lesend). Gefüllt von renderHeuteZuTun(). -->
-      <div id="heute-zu-tun" class="heute-box"><div class="leer-text">Lade …</div></div>
-      <!-- Teil A: Push-Mitteilungen auf diesem Gerät (mehrere Geräte möglich). -->
-      <!-- Teil 1f: eingerichtet → nur eine kleine Zeile; sonst der große Kasten. -->
-      <div class="push-kompakt-zeile verborgen" id="push-kompakt">
-        <span>🔔 Mitteilungen aktiv</span>
-        <button class="push-verwalten-link" id="push-verwalten" type="button">verwalten</button>
-      </div>
-      <div class="push-box" id="push-box">
-        <div class="push-kopf">Mitteilungen auf diesem Gerät</div>
-        <div class="push-text" id="push-status">Wird geprüft …</div>
-        <button class="btn-klein" id="push-aktivieren" type="button">Mitteilungen auf diesem Gerät aktivieren</button>
-        <div class="push-geraete" id="push-geraete"></div>
-      </div>
-      <div class="section-hinweis">Klicke eine Kennzahl oben an, um in die gefilterte Liste zu springen.</div>
-      <!-- Teil 1b: am Handy kompakte Karten (unten), am großen Bildschirm die Tabelle. -->
-      <div class="table-wrap"><table>
-        <thead><tr><th>Neu – wartet auf Freigabe</th><th>Vollständigkeit</th><th>Registriert</th><th></th></tr></thead>
-        <tbody id="freigabe-tbody"><tr><td colspan="4" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-      <div class="karten" id="freigabe-karten"><div class="leer-text">Lade …</div></div>
-    </div>
+  <section class="kpis" id="kpis" aria-label="Kennzahlen"></section>
 
-    <!-- Trainer -->
-    <div class="tab-content" id="tab-trainer">
-      <div class="werkzeugleiste">
-        <input type="search" id="trainer-suche" placeholder="Suche Name, E-Mail, Stadt, PLZ …">
-        <select id="trainer-filter">
-          <option value="">Alle</option>
-          <option value="warten">Wartet auf Freigabe</option>
-          <option value="aktiv">Aktiv</option>
-          <option value="gesperrt">Gesperrt</option>
-          <option value="unvollstaendig">Profil unvollständig</option>
-          <option value="studio">Studio-Trainer</option>
-        </select>
-        <label class="schalter"><input type="checkbox" id="tests-aus-trainer" checked> Testkonten ausblenden</label>
-        <button class="btn-klein" id="csv-trainer">CSV-Export</button>
-      </div>
-      <!-- B7: Vorschlagskasten für mögliche Test-/Spam-Konten (nicht automatisch). -->
-      <div id="test-verdacht" class="test-verdacht" style="display:none"></div>
-      <div class="table-wrap"><table>
-        <thead><tr>
-          <th data-sort="name" data-liste="trainer">Name</th>
-          <th data-sort="email" data-liste="trainer">E-Mail</th>
-          <th>Telefon</th>
-          <th data-sort="stadt" data-liste="trainer">Stadt</th>
-          <th>Vollst.</th>
-          <th>Bezahlt</th>
-          <th>Status</th>
-          <th data-sort="created_at" data-liste="trainer">Registriert</th>
-        </tr></thead>
-        <tbody id="trainer-tbody"><tr><td colspan="8" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-      <div class="karten" id="trainer-karten"><div class="leer-text">Lade …</div></div>
-    </div>
-
-    <!-- Kunden -->
-    <div class="tab-content" id="tab-kunden">
-      <div class="werkzeugleiste">
-        <input type="search" id="kunden-suche" placeholder="Suche Name, E-Mail, Stadt, PLZ …">
-        <label class="schalter"><input type="checkbox" id="tests-aus-kunden" checked> Testkonten ausblenden</label>
-        <button class="btn-klein" id="csv-kunden">CSV-Export</button>
-      </div>
-      <div class="table-wrap"><table>
-        <thead><tr>
-          <th data-sort="name" data-liste="kunde">Name</th>
-          <th data-sort="email" data-liste="kunde">E-Mail</th>
-          <th>Telefon</th>
-          <th data-sort="stadt" data-liste="kunde">Stadt</th>
-          <th>Ziel</th>
-          <th data-sort="created_at" data-liste="kunde">Registriert</th>
-        </tr></thead>
-        <tbody id="kunden-tbody"><tr><td colspan="6" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-      <div class="karten" id="kunden-karten"><div class="leer-text">Lade …</div></div>
-    </div>
-
-    <!-- Anfragen -->
-    <div class="tab-content" id="tab-anfragen">
-      <!-- S3: Verdaechtige Anfragen „Zur Pruefung" (gehen NICHT an den Trainer). -->
-      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Zur Prüfung · verdächtige Anfragen</h3>
-      <div class="section-hinweis">Diese Anfragen wurden automatisch als verdächtig markiert (Wegwerf-Mail, unsinniger Name/Nachricht) und NICHT an den Trainer geschickt. Freigeben schickt sie an den Trainer, Verwerfen lehnt sie ab (protokolliert).</div>
-      <div class="table-wrap" style="margin-bottom:22px"><table>
-        <thead><tr><th>Datum</th><th>Trainer</th><th>Kunde</th><th>Grund</th><th>Aktion</th></tr></thead>
-        <tbody id="pruef-tbody"><tr><td colspan="5" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Alle Anfragen</h3>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Datum</th><th>Trainer</th><th>Kunde</th><th>Status</th><th>Unbeantwortet seit</th><th>Weitergeleitet</th></tr></thead>
-        <tbody id="anfragen-tbody"><tr><td colspan="6" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-    </div>
-
-    <!-- Zahlungen -->
-    <div class="tab-content" id="tab-zahlungen">
-      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Erste Anfrage angenommen – Zahlungslink offen</h3>
-      <div class="table-wrap" style="margin-bottom:22px"><table>
-        <thead><tr><th>Name</th><th>E-Mail</th><th>Stadt</th><th>Aktion</th></tr></thead>
-        <tbody id="zahlungslink-tbody"><tr><td colspan="4" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-      <!-- B5.3: Abo-Status je Trainer (aktiv / Zahlung fehlgeschlagen / gekündigt). -->
-      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Abo-Status je Trainer</h3>
-      <div class="table-wrap" style="margin-bottom:22px"><table>
-        <thead><tr><th>Trainer</th><th>Abo-Status</th><th>seit</th></tr></thead>
-        <tbody id="abo-status-tbody"><tr><td colspan="3" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Verarbeitete Zahlungsereignisse</h3>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Zeitpunkt</th><th>Typ</th><th>Ereignis-ID</th></tr></thead>
-        <tbody id="zahlungen-tbody"><tr><td colspan="3" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-    </div>
-
-    <!-- Studios -->
-    <div class="tab-content" id="tab-studios">
-      <div id="studios-inhalt"><div class="leer-text">Lade …</div></div>
-    </div>
-
-    <!-- Zertifikate -->
-    <div class="tab-content" id="tab-zertifikate">
-      <div class="table-wrap"><table>
-        <thead><tr><th>Name</th><th>Stadt</th><th>Zertifikat</th><th>Status</th><th>Aktion</th></tr></thead>
-        <tbody id="zertifikate-tbody"><tr><td colspan="5" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-    </div>
-
-    <!-- Nachfrage -->
-    <div class="tab-content" id="tab-nachfrage">
-      <!-- S6: Salzburg-Ziel (Region = PLZ 50xx). -->
-      <div id="salzburg-karte" style="border:1px solid var(--bi,rgba(255,255,255,0.12));border-radius:10px;padding:14px 16px;margin-bottom:22px">
-        <div class="feld-label" style="font-size:12px;margin-bottom:8px">🎯 Salzburg (PLZ 50xx)</div>
-        <div id="salzburg-inhalt" class="section-hinweis">Lade …</div>
-      </div>
-      <!-- Land eindeutig (07.11.2026): Datensätze mit PLZ, aber ohne Land. -->
-      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">PLZ ohne Land · bitte zuordnen</h3>
-      <div class="section-hinweis">Trainer und Kunden mit Postleitzahl, aber ohne Land (AT/DE/CH). Bei 4-stelliger PLZ ist der Ort ohne Land nicht eindeutig (z.&nbsp;B. 5020 in Salzburg und in der Schweiz). Antippen ordnet das Land zu (protokolliert).</div>
-      <div class="table-wrap" style="margin-bottom:22px"><table>
-        <thead><tr><th>Art</th><th>Name</th><th>PLZ / Stadt</th><th>Land zuordnen</th></tr></thead>
-        <tbody id="plz-ohne-land-tbody"><tr><td colspan="4" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-      <!-- K6: Stadt-/PLZ-Übersicht. Spalten klickbar zum Sortieren. -->
-      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Stadt-Übersicht · wo ist Nachfrage, wo fehlen Trainer</h3>
-      <div class="section-hinweis">Freigegebene Trainer (ohne Test/Spam), davon Profil ≥5/8, Kundensuchen 7/30 Tage, Vormerkungen, Anfragen. Spaltenüberschrift antippen zum Sortieren.</div>
-      <div class="table-wrap" style="margin-bottom:22px"><table>
-        <thead><tr>
-          <th>Ort</th>
-          <th class="stadt-sort" data-feld="trainerFrei" style="cursor:pointer">Trainer frei</th>
-          <th class="stadt-sort" data-feld="trainerReif" style="cursor:pointer">≥5/8</th>
-          <th class="stadt-sort" data-feld="suchen7" style="cursor:pointer">Suchen 7d</th>
-          <th class="stadt-sort" data-feld="suchen30" style="cursor:pointer">Suchen 30d</th>
-          <th class="stadt-sort" data-feld="vorm" style="cursor:pointer">Vormerk.</th>
-          <th class="stadt-sort" data-feld="anfragen" style="cursor:pointer">Anfragen</th>
-        </tr></thead>
-        <tbody id="stadt-uebersicht-tbody"><tr><td colspan="7" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Nachfrage je Ort</h3>
-      <div class="table-wrap" style="margin-bottom:22px"><table>
-        <thead><tr><th>Ort</th><th>Suchen</th><th>Vormerkungen</th><th>Trainer</th></tr></thead>
-        <tbody id="nachfrage-tbody"><tr><td colspan="4" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Häufig gesuchte Ziele</h3>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Ziel</th><th>Anzahl</th></tr></thead>
-        <tbody id="ziele-tbody"><tr><td colspan="2" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-    </div>
-
-    <!-- B3.2: Karte (Leaflet + OpenStreetMap, nur lesend) -->
-    <div class="tab-content" id="tab-karte">
-      <div class="karte-leiste">
-        <label>Land
-          <select id="karte-land"><option value="">alle</option><option value="AT">AT</option><option value="DE">DE</option><option value="CH">CH</option></select>
-        </label>
-        <label>Zeitraum
-          <select id="karte-zeit"><option value="7">7 Tage</option><option value="30">30 Tage</option><option value="">alle</option></select>
-        </label>
-        <span class="karte-status" id="karte-status"></span>
-      </div>
-      <div id="karte" class="karte-flaeche"></div>
-      <div class="karte-legende" id="karte-legende">
-        <span><i class="pkt" style="background:#2e6fff"></i>Trainer freigegeben</span>
-        <span><i class="pkt" style="background:#7fb3ff"></i>Trainer wartet</span>
-        <span><i class="pkt" style="background:#ff5a5a"></i>Kunde</span>
-        <span><i class="pkt" style="background:#ff9f1a"></i>Warteliste</span>
-      </div>
-    </div>
-
-    <!-- B3.3: Zahlen nach Herkunft (letzte 14 Tage, nur lesend) -->
-    <div class="tab-content" id="tab-herkunft">
-      <div class="section-hinweis">Trichter der letzten 7 Tage nach Herkunft (anonym, keine Personendaten) und Registrierungen je Tag. „direkt/unbekannt" = ohne gespeicherte Herkunft.</div>
-      <div id="herkunft-inhalt"><div class="leer-text">Lade …</div></div>
-    </div>
-
-    <!-- Protokoll -->
-    <div class="tab-content" id="tab-protokoll">
-      <div class="section-hinweis">Die letzten Admin-Aktionen (ohne Personendaten).</div>
-      <div style="margin:0 0 12px"><button class="btn-gross btn-neutral" id="btn-abendbericht-jetzt" data-aktion="abendbericht-jetzt">Abendbericht jetzt senden</button></div>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Zeitpunkt</th><th>Aktion</th><th>Ziel</th><th>Ergebnis</th></tr></thead>
-        <tbody id="protokoll-tbody"><tr><td colspan="4" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-    </div>
+  <div class="grid2">
+    <section class="card" id="heute" aria-labelledby="h-heute">
+      <h2 id="h-heute">Heute</h2>
+      <ul class="feed" id="feed"></ul>
+    </section>
+    <section class="card" id="staedte" aria-labelledby="h-st">
+      <h2 id="h-st">Städte</h2>
+      <div style="overflow-x:auto"><table class="cities" id="cities"></table></div>
+    </section>
   </div>
 
-  <!-- Detailfenster -->
-  <div id="detail-overlay" class="overlay verborgen" data-schliessen="detail"></div>
-  <div id="detail-panel" class="panel verborgen">
-    <div class="panel-kopf"><div class="panel-titel" id="detail-titel"></div><button class="panel-zu" data-schliessen="detail">✕</button></div>
-    <div class="panel-body" id="detail-body"></div>
-    <div class="panel-foot" id="detail-foot"></div>
+  <section class="card chartcard" aria-labelledby="h-mrr">
+    <h2 id="h-mrr">Monatlicher Umsatz aus Abos</h2>
+    <div id="chart"></div>
+  </section>
+
+  <div class="tools" id="trainer">
+    <h2>Trainer <span class="num" id="cnt" style="color:var(--muted)"></span></h2>
+    <label class="lbl" for="q" hidden>Suche</label>
+    <input type="search" id="q" placeholder="Name, Ort, Schwerpunkt …">
+    <select id="fStatus" aria-label="Status filtern">
+      <option value="">Alle Status</option><option value="zahlend">Zahlend</option><option value="gratis">Gratisphase</option><option value="pausiert">Pausiert</option><option value="gekuendigt">Gekündigt</option>
+    </select>
+    <select id="fLand" aria-label="Land filtern"><option value="">AT · DE · CH</option><option>AT</option><option>DE</option><option>CH</option></select>
   </div>
-
-    <!-- Profil-Erinnerung: Trainer mit unvollständigem Profil, Versand nur per Klick -->
-    <div class="tab-content" id="tab-erinnerung">
-      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Profil-Erinnerung · Service-Mail an registrierte Trainer</h3>
-      <div class="section-hinweis">
-        Alle Trainer ohne Test/Spam-Markierung, Raum Salzburg (PLZ 50/51) zuerst,
-        dann nach Vollständigkeit aufsteigend. Der Knopf „Erinnerung" zeigt zuerst
-        die fertige Mail als Vorschau – verschickt wird erst mit „Jetzt senden".
-        Höchstens eine Erinnerung je Trainer in 14 Tagen; vollständige Profile
-        (8/8) und Test/Spam werden abgelehnt. Nicht bestätigte E-Mail ist erlaubt,
-        wird aber gekennzeichnet.
-      </div>
-      <div class="table-wrap"><table>
-        <thead><tr>
-          <th>Trainer</th><th>Ort / PLZ</th><th>Land</th><th>x/8</th>
-          <th>Fehlt</th><th>Registriert</th><th>Letzte Erinnerung</th><th>Aktion</th>
-        </tr></thead>
-        <tbody id="erinnerung-tbody"><tr><td colspan="8" class="leer-text">Lade …</td></tr></tbody>
-      </table></div>
-    </div>
-
-  <!-- Vorschau der Profil-Erinnerung (Versand erst auf „Jetzt senden") -->
-  <div id="erinnerung-overlay" class="overlay verborgen" data-schliessen="erinnerung"></div>
-  <div id="erinnerung-box" class="dialog-box verborgen" style="max-width:640px">
-    <div class="dialog-titel">Vorschau · Profil-Erinnerung</div>
-    <div class="feld-label" id="erinnerung-empf" style="margin-bottom:4px"></div>
-    <div class="feld-label" id="erinnerung-betreff" style="margin-bottom:8px"></div>
-    <pre id="erinnerung-text" style="white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:13px;line-height:1.6;background:rgba(255,255,255,0.04);border:1px solid var(--bi,rgba(255,255,255,0.12));border-radius:8px;padding:12px;max-height:48vh;overflow:auto;margin:0 0 12px"></pre>
-    <div class="dialog-aktionen">
-      <button class="btn-gross btn-neutral" id="erinnerung-abbrechen" data-schliessen="erinnerung">Abbrechen</button>
-      <button class="btn-gross btn-ja" id="erinnerung-senden" data-aktion="erinnerung-senden">Jetzt senden</button>
-    </div>
+  <div class="tablebox">
+    <table class="t" id="tbl">
+      <thead><tr>
+        <th><button data-k="name">Trainer</button></th>
+        <th><button data-k="status">Status</button></th>
+        <th><button data-k="profil">Profil</button></th>
+        <th class="r"><button data-k="kunden">Kunden laufend</button></th>
+        <th class="r"><button data-k="anfragen">Anfragen 30 T</button></th>
+        <th class="r"><button data-k="quote">Annahme</button></th>
+        <th class="r"><button data-k="preis">Preis / h</button></th>
+        <th class="r"><button data-k="seit">Seit</button></th>
+        <th class="r"><button data-k="umsatz">Umsatz bisher</button></th>
+      </tr></thead>
+      <tbody id="tb"></tbody>
+    </table>
   </div>
+  <p class="foot">Zeile anklicken für Details. Preise: 49,99 € im Monat ab der ersten angenommenen Anfrage, jeder weitere Kunde einmalig 9,99 €.</p>
+  <p class="foot" style="opacity:.6">Vision · Daten fiktiv</p>
+</main>
 
-  <!-- Bestätigungsdialog -->
-  <div id="dialog-overlay" class="overlay verborgen" data-schliessen="dialog"></div>
-  <div id="dialog-box" class="dialog-box verborgen">
-    <div class="dialog-titel" id="dialog-titel"></div>
-    <div class="dialog-text" id="dialog-text"></div>
-    <div class="dialog-aktionen">
-      <button class="btn-gross btn-neutral" id="dialog-abbrechen">Abbrechen</button>
-      <button class="btn-gross btn-ja" id="dialog-ok">Bestätigen</button>
-    </div>
-  </div>
+<script>
+(function(){
+// ---------- deterministische Zufallszahlen ----------
+let s=0x5EED1138;function r(){s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}
+const pick=a=>a[Math.floor(r()*a.length)], ri=(a,b)=>a+Math.floor(r()*(b-a+1));
+function wpick(list){let tot=list.reduce((x,e)=>x+e[1],0),v=r()*tot;for(const e of list){if((v-=e[1])<0)return e[0]}return list[0][0]}
 
-  <!-- Formulardialog (Studios) -->
-  <div id="form-overlay" class="overlay verborgen" data-schliessen="form"></div>
-  <div id="form-box" class="dialog-box verborgen">
-    <div class="dialog-titel" id="form-titel"></div>
-    <div id="form-felder"></div>
-    <div class="dialog-aktionen">
-      <button class="btn-gross btn-neutral" id="form-abbrechen">Abbrechen</button>
-      <button class="btn-gross btn-ja" id="form-ok">Speichern</button>
-    </div>
-  </div>
-</div>
+const VORN=["Valentina","Maximilian","Leonie","Dragan","Aylin","Johanna","Sebastian","Nora","Florentina","Konstantin","Emilia","Tobias","Selin","Matthäus","Viktoria","Ricardo","Anouk","Benedikt","Mira","Lorenz","Theresa","Elias","Hanna-Sophie","Jonas","Amira","Fabian","Clara","Quirin","Marlene","Dominik","Ilvy","Vincent","Laetitia","Raphael","Zoe","Kilian","Sanja","Ferdinand","Yara","Leopold","Bianca","Mateo","Irina","Samuel","Josefine","Arne","Lejla","Korbinian","Anja","Niklas","Saskia","Elif","Moritz","Ronja","Gabriel","Tamara","Henrik","Larissa","Adrian","Melina","Jakob","Paulina","Luka","Annika","Noah","Elena","Patrick","Ida","Oskar","Rebecca","Darius","Carina","Julian","Nadja","Simon","Alessia","Bastian","Svenja","Emir","Magdalena"];
+const NACH=["Hofstätter","Grubinger","Wimmer-Kastner","Petrović","Demirtaş","Pfeiffenberger","Kranzinger","Lindqvist","Aigner","Oberascher","Haslauer","Ziegelwanger","Rainer","Moosleitner","Schwaighofer","Kovačević","Brandstätter","Leitgeb","Neumayr","Eisl","Gschwandtner","Rehrl","Strobl-Huber","Fankhauser","Wallner","Steinwender","Hörtnagl","Mayrhofer","Lechner","Kogler","Ramsauer","Weißenbacher","Doppler","Sendlhofer","Zehentner","Baumgartner","Novak","Ostermann","Wechselberger","Krismer","Engl","Pöllmann","Hinterberger","Bachmayer","Riedl","Vogt","Schönauer","Ebner","Gruber-Sallaberger","Lindner","Taferner","Zauner","Fuchsberger","Messner","Huemer","Wieser","Achleitner","Pichlmann","Scharler","Treml","Bürgi","Ammann","Zürcher","Gisler","Bachofner","Kälin","Schwarzenbach","Brunner","Fässler","Moser","Hagspiel","Tschurtschenthaler","Unterberger","Feichtinger","Kaltenegger","Obermüller","Sailer","Thaler","Wörndl","Nussbaumer"];
 
-<!-- B3: Leaflet (Karte) + PLZ-Auflösung (vexfit-plz.js) vor dem Modul laden. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="vexfit-plz.js"></script>
-<script type="module" src="vexfit-verwaltung.js"></script>
+const ORTE=[ // [Ort, PLZ, Land, Region, Gewicht]
+ ["Salzburg-Lehen","5020","AT","Salzburg",9],["Salzburg-Parsch","5020","AT","Salzburg",6],["Salzburg-Maxglan","5020","AT","Salzburg",5],["Salzburg-Gneis","5020","AT","Salzburg",3],["Wals-Siezenheim","5071","AT","Salzburg",3],["Elsbethen","5061","AT","Salzburg",2],["Anif","5081","AT","Salzburg",2],["Bergheim","5101","AT","Salzburg",2],["Seekirchen","5201","AT","Salzburg",2],["Hallein","5400","AT","Salzburg",2],["Fuschl am See","5330","AT","Salzburg",1],["Grödig","5082","AT","Salzburg",1],
+ ["Wien-Neubau","1070","AT","Wien",5],["Wien-Josefstadt","1080","AT","Wien",3],["Wien-Döbling","1190","AT","Wien",3],["Wien-Landstraße","1030","AT","Wien",2],
+ ["Linz","4020","AT","Linz",3],["Graz-Geidorf","8010","AT","Graz",3],["Innsbruck","6020","AT","Innsbruck",3],["Klagenfurt","9020","AT","Klagenfurt",1],["Dornbirn","6850","AT","Vorarlberg",1],
+ ["München-Schwabing","80803","DE","München",4],["München-Haidhausen","81667","DE","München",3],["Rosenheim","83022","DE","Rosenheim",2],["Freilassing","83395","DE","Rosenheim",2],["Regensburg","93047","DE","Regensburg",1],["Augsburg","86150","DE","Augsburg",1],
+ ["Zürich-Wiedikon","8003","CH","Zürich",3],["Zürich-Seefeld","8008","CH","Zürich",2],["Bern","3011","CH","Bern",1],["Basel","4051","CH","Basel",1],["Luzern","6003","CH","Luzern",1]
+];
+const FOKUS=["Muskelaufbau","Abnehmen","Rücken & Haltung","Reha nach Verletzung","Mobility","Schwangerschaft & Rückbildung","Fitness 60+","Laufen & Ausdauer","Boxen","Kettlebell","Skigymnastik","Yoga","Pilates","Athletiktraining","Firmenfitness","Ernährungsbegleitung","Triathlon","Kraftsport für Frauen","Haltungsschule für Büroarbeit","Kinder- und Jugendsport"];
+const QUALI=["Staatl. gepr. Fitnesstrainer","Sportwissenschaft (BSc)","Physiotherapeutin","Personal Trainer (BSA)","A-Lizenz Fitness","Diplomtrainer","Heilmasseur","Pilates-Instruktorin","Ernährungstrainer","Sportwissenschaft (MSc)"];
+
+const HEUTE=new Date();HEUTE.setHours(12,0,0,0);
+const tage=d=>Math.round((HEUTE-d)/864e5);
+const eur=(v,cur="€")=>v.toLocaleString("de-AT",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+cur;
+const eur0=v=>v.toLocaleString("de-AT",{maximumFractionDigits:0})+" €";
+
+// ---------- 138 Trainer ----------
+const used=new Set(),T=[];
+const statusVerteilung=[["zahlend",96],["gratis",29],["pausiert",8],["gekuendigt",5]];
+const statusPool=[];statusVerteilung.forEach(([k,n])=>{for(let i=0;i<n;i++)statusPool.push(k)});
+for(let i=statusPool.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[statusPool[i],statusPool[j]]=[statusPool[j],statusPool[i]]}
+for(let i=0;i<138;i++){
+  let n;do{n=pick(VORN)+" "+pick(NACH)}while(used.has(n));used.add(n);
+  const o=wpick(ORTE.map(e=>[e,e[4]]));
+  const status=statusPool[i];
+  const online=r()<.28;
+  const fokus=[];const nf=ri(2,4);while(fokus.length<nf){const f=pick(FOKUS);if(!fokus.includes(f))fokus.push(f)}
+  const ch=o[2]==="CH";
+  const preis=ch?ri(11,19)*10:ri(11,26)*5;
+  const seitTage=status==="gratis"?ri(2,75):ri(40,320);
+  const seit=new Date(HEUTE-seitTage*864e5);
+  let kunden=0,gesamtKunden=0,anfr=0,angen=0,abo=0;
+  if(status==="zahlend"){kunden=ri(1,9);gesamtKunden=kunden+ri(0,5);anfr=ri(3,18);angen=Math.max(1,Math.round(anfr*(.45+r()*.45)));abo=Math.max(1,Math.min(Math.floor((seitTage-ri(5,30))/30),10))}
+  else if(status==="gratis"){anfr=ri(0,3);angen=0}
+  else if(status==="pausiert"){kunden=ri(0,2);gesamtKunden=kunden+ri(1,3);anfr=ri(0,2);angen=0;abo=ri(1,5)}
+  else{gesamtKunden=ri(1,3);abo=ri(1,4);anfr=0}
+  const umsatz=abo*49.99+Math.max(0,gesamtKunden-1)*9.99;
+  const profil=status==="gratis"?ri(4,8):ri(6,8);
+  T.push({id:i,name:n,ort:o[0],plz:o[1],land:o[2],region:o[3],status,online,fokus,preis,cur:ch?"CHF":"€",seit,seitTage,kunden,gesamtKunden,anfragen:anfr,quote:anfr?Math.round(angen/anfr*100):null,profil,umsatz,quali:pick(QUALI),antwort:ri(1,30)/2});
+}
+
+// ---------- Kennzahlen ----------
+const zahlend=T.filter(t=>t.status==="zahlend");
+const mrr=zahlend.length*49.99;
+const laufend=T.reduce((a,t)=>a+t.kunden,0);
+const anfr30=T.reduce((a,t)=>a+t.anfragen,0);
+const qListe=T.filter(t=>t.quote!==null&&t.anfragen>0);
+const quote=Math.round(qListe.reduce((a,t)=>a+t.quote*t.anfragen,0)/qListe.reduce((a,t)=>a+t.anfragen,0));
+const neu30=T.filter(t=>t.seitTage<=30).length;
+// MRR-Verlauf: 12 Wochen, endet genau beim heutigen Wert
+const wochen=12,verlauf=[];let v=mrr;for(let w=0;w<wochen;w++){verlauf.unshift(v);v=Math.max(0,v-49.99*ri(3,9))}
+const spark=(arr,stroke)=>{const mx=Math.max(...arr),mn=Math.min(...arr),w=200,h=34;const pts=arr.map((y,i)=>[i/(arr.length-1)*w,h-3-((y-mn)/(mx-mn||1))*(h-6)]);return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polyline fill="none" stroke="${stroke}" stroke-width="2" points="${pts.map(p=>p.join(",")).join(" ")}"/><circle cx="${pts.at(-1)[0]-2}" cy="${pts.at(-1)[1]}" r="3" fill="${stroke}"/></svg>`};
+
+document.getElementById("kpis").innerHTML=`
+ <div class="kpi hero"><span class="lbl">Umsatz pro Monat (Abos)</span><span class="v num">${eur0(mrr)}</span><span class="d num">+${eur0(mrr-verlauf[wochen-5])} in 4 Wochen</span>${spark(verlauf,"currentColor")}</div>
+ <div class="kpi"><span class="lbl">Zahlende Trainer</span><span class="v num">${zahlend.length}</span><span class="d num">von ${T.length} registrierten</span></div>
+ <div class="kpi"><span class="lbl">Kunden in Betreuung</span><span class="v num">${laufend}</span><span class="d num">über Vexfit vermittelt</span></div>
+ <div class="kpi"><span class="lbl">Anfragen 30 Tage</span><span class="v num">${anfr30}</span><span class="d num">Annahmequote ${quote} %</span></div>
+ <div class="kpi"><span class="lbl">Neue Trainer 30 Tage</span><span class="v num">${neu30}</span><span class="d neutral num">Ø Antwortzeit ${(T.reduce((a,t)=>a+t.antwort,0)/T.length).toFixed(1).replace(".",",")} h</span></div>`;
+
+// ---------- Heute-Feed ----------
+const kf=["Kundin","Kunde"];
+const ev=[];
+const zt=()=>{const t=new Date(HEUTE);t.setHours(ri(6,7),ri(0,59));return t};
+for(let i=0;i<14;i++){
+  const t=pick(zahlend.concat(T.filter(x=>x.status==="gratis")));const k=pick(kf);const typ=wpick([["anf",5],["ann",4],["zahl",3],["neu",1],["weiter",2]]);
+  const kurz=t.name.split(" ")[0]+" "+t.name.split(" ").at(-1)[0]+".";
+  let txt,amt="",col;
+  if(typ==="anf"){txt=`<b>Neue Anfrage</b> · ${k} aus ${t.plz} → ${kurz} <span class="loc">(${pick(t.fokus)})</span>`;col="var(--info)"}
+  else if(typ==="ann"){txt=`<b>Angenommen</b> · ${kurz} übernimmt ${k.toLowerCase()} aus ${t.plz}`;col="var(--good)"}
+  else if(typ==="zahl"){txt=`<b>Abo bezahlt</b> · ${kurz}`;amt="+"+eur(49.99);col="var(--neon)"}
+  else if(typ==="weiter"){txt=`<b>Weiterer Kunde</b> · ${kurz}`;amt="+"+eur(9.99);col="var(--neon)"}
+  else{txt=`<b>Neuer Trainer</b> · ${kurz}, ${t.ort}`;col="var(--warn)"}
+  ev.push({t:zt(),txt,amt,col});
+}
+ev.sort((a,b)=>b.t-a.t);
+document.getElementById("feed").innerHTML=ev.map(e=>`<li><time>${e.t.toLocaleTimeString("de-AT",{hour:"2-digit",minute:"2-digit"})}</time><span class="ic" style="background:${e.col}"></span><span>${e.txt}</span><span class="amt num">${e.amt}</span></li>`).join("");
+
+// ---------- Städte ----------
+const reg={};T.forEach(t=>{const g=reg[t.region]||(reg[t.region]={n:0,z:0,k:0,land:t.land});g.n++;if(t.status==="zahlend")g.z++;g.k+=t.kunden});
+const rl=Object.entries(reg).sort((a,b)=>b[1].n-a[1].n).slice(0,9);const mx=rl[0][1].n;
+document.getElementById("cities").innerHTML=`<thead><tr><th>Region</th><th class="r">Trainer</th><th class="r">Zahlend</th><th class="r">Kunden</th><th></th></tr></thead><tbody>`+
+ rl.map(([n,g])=>`<tr><td>${n} <span class="loc">${g.land}</span></td><td class="r num">${g.n}</td><td class="r num">${g.z}</td><td class="r num">${g.k}</td><td style="width:30%"><div class="bar"><i style="width:${g.n/mx*100}%"></i></div></td></tr>`).join("")+"</tbody>";
+
+// ---------- MRR-Diagramm ----------
+(function(){const W=720,H=220,pl=56,pr=16,pt=14,pb=28;const max=Math.ceil(Math.max(...verlauf)/1000)*1000;const x=i=>pl+i*(W-pl-pr)/(wochen-1),y=v=>pt+(1-v/max)*(H-pt-pb);
+ let g="";for(let k=0;k<=4;k++){const val=max/4*k;g+=`<line x1="${pl}" x2="${W-pr}" y1="${y(val)}" y2="${y(val)}" stroke="var(--line)"/><text x="${pl-8}" y="${y(val)+4}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="var(--mono)">${(val/1000).toLocaleString("de-AT")} T €</text>`}
+ const pts=verlauf.map((v,i)=>`${x(i)},${y(v)}`).join(" ");
+ let lab="";verlauf.forEach((v,i)=>{if(i%2===1||i===wochen-1){const d=new Date(HEUTE-(wochen-1-i)*7*864e5);lab+=`<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--mono)">KW ${kw(d)}</text>`}});
+ document.getElementById("chart").innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Abo-Umsatz der letzten 12 Wochen, zuletzt ${eur0(mrr)}">${g}<polygon points="${x(0)},${y(0)} ${pts} ${x(wochen-1)},${y(0)}" fill="var(--neon)" opacity=".14"/><polyline points="${pts}" fill="none" stroke="var(--neon)" stroke-width="2.5"/><circle cx="${x(wochen-1)}" cy="${y(verlauf.at(-1))}" r="5" fill="var(--neon)"/><text x="${x(wochen-1)-8}" y="${y(verlauf.at(-1))-10}" text-anchor="end" font-size="13" font-weight="700" fill="var(--fg)">${eur0(mrr)}</text>${lab}</svg>`;
+ function kw(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const n=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-n);const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y0)/864e5+1)/7)}
+})();
+
+// ---------- Trainertabelle ----------
+const SL={zahlend:"Zahlend",gratis:"Gratisphase",pausiert:"Pausiert",gekuendigt:"Gekündigt"};
+let sortK="umsatz",sortD=-1,open=null;
+const tb=document.getElementById("tb"),q=document.getElementById("q"),fs=document.getElementById("fStatus"),fl=document.getElementById("fLand");
+function val(t,k){return k==="name"?t.name:k==="status"?t.status:k==="seit"?-t.seitTage:k==="quote"?(t.quote??-1):t[k]}
+function render(){
+  const s=q.value.trim().toLowerCase();
+  let rows=T.filter(t=>(!fs.value||t.status===fs.value)&&(!fl.value||t.land===fl.value)&&(!s||(t.name+" "+t.ort+" "+t.plz+" "+t.fokus.join(" ")).toLowerCase().includes(s)));
+  rows.sort((a,b)=>{const x=val(a,sortK),y=val(b,sortK);return (x>y?1:x<y?-1:0)*sortD});
+  document.getElementById("cnt").textContent="· "+rows.length;
+  tb.innerHTML=rows.map(t=>{
+    const row=`<tr data-id="${t.id}" tabindex="0" aria-expanded="${open===t.id}"><td><div class="nm">${t.name}</div><div class="loc">${t.ort} · ${t.plz} · ${t.land}${t.online?' · <span class="pill p-online">auch online</span>':''}</div></td>
+     <td><span class="pill p-${t.status}">${SL[t.status]}</span></td>
+     <td><span class="prof" title="${t.profil}/8 Angaben">${Array.from({length:8},(_,i)=>`<i class="${i<t.profil?"f":""}"></i>`).join("")}</span></td>
+     <td class="r num">${t.kunden||"–"}</td><td class="r num">${t.anfragen||"–"}</td><td class="r num">${t.quote===null?"–":t.quote+" %"}</td>
+     <td class="r num">${t.preis} ${t.cur}</td><td class="r num">${t.seit.toLocaleDateString("de-AT",{month:"short",year:"2-digit"})}</td><td class="r num">${t.umsatz?eur(t.umsatz):"–"}</td></tr>`;
+    const det=open===t.id?`<tr class="detail"><td colspan="9"><div class="dgrid">
+      <div><div class="lbl">Schwerpunkte</div><div class="tags">${t.fokus.map(f=>`<span class="tag">${f}</span>`).join("")}</div></div>
+      <div><div class="lbl">Ausbildung</div>${t.quali}</div>
+      <div><div class="lbl">Antwortet im Schnitt</div><span class="num">${String(t.antwort).replace(".",",")} h</span></div>
+      <div><div class="lbl">Kunden gesamt über Vexfit</div><span class="num">${t.gesamtKunden}</span></div>
+      <div><div class="lbl">Training</div>${t.online?"Vor Ort und online":"Vor Ort"}</div>
+      <div><div class="lbl">Registriert</div><span class="num">${t.seit.toLocaleDateString("de-AT")}</span> · vor ${t.seitTage} Tagen</div>
+    </div></td></tr>`:"";
+    return row+det}).join("");
+  document.querySelectorAll("th button").forEach(b=>{if(b.dataset.k===sortK)b.setAttribute("aria-sort",sortD>0?"ascending":"descending");else b.removeAttribute("aria-sort")});
+}
+document.querySelectorAll("th button").forEach(b=>b.addEventListener("click",()=>{if(sortK===b.dataset.k)sortD*=-1;else{sortK=b.dataset.k;sortD=b.dataset.k==="name"?1:-1}render()}));
+const toggle=e=>{const tr=e.target.closest("tr[data-id]");if(!tr)return;const id=+tr.dataset.id;open=open===id?null:id;render()};
+tb.addEventListener("click",toggle);tb.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle(e)}});
+[q,fs,fl].forEach(el=>el.addEventListener("input",render));
+render();
+})();
+</script>
+
 </body>
 </html>
