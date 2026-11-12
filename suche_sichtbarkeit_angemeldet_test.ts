@@ -36,12 +36,12 @@ Deno.test("Regel: freigegeben ohne Foto sichtbar, gesperrt/nicht-freigegeben nic
 Deno.test("Angemeldeter Pfad: Abfrage begrenzt auf aktiv=true UND nicht gesperrt", () => {
   // Die Tabellen-Abfrage des angemeldeten Pfads filtert server-seitig genau die
   // Regel ab – so kann ein gesperrter Trainer gar nicht erst ankommen.
-  assertStringIncludes(suche, "trainers?aktiv=eq.true&gesperrt=is.false&select=");
+  assertStringIncludes(suche, "rpc/suche_trainer_umkreis");
 });
 
 Deno.test("Angemeldeter Pfad: KEIN zusätzlicher Mindeststärke-/Foto-Nachfilter", () => {
   // Beide Pfade nutzen die geladene Liste unverändert.
-  assertStringIncludes(suche, "allTrainers = daten;");
+  assertStringIncludes(suche, "allTrainers = vorOrt;");
   assert(
     !suche.includes("daten.filter(mindeststaerkeErfuellt)"),
     "angemeldeter Pfad filtert nicht mehr nach Mindeststärke",

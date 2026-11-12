@@ -17,22 +17,14 @@ import { assert, assertStringIncludes } from "jsr:@std/assert@1";
 
 const lies = (p: string) => Deno.readTextFile(new URL(p, import.meta.url));
 
-Deno.test("D1: profil.html laedt nicht angemeldet aus trainers_vorschau, ohne Nachnamen", async () => {
+Deno.test("D1/12.11.: profil.html zeigt anon ein Gate (kein Netzaufruf), angemeldet via RPC", async () => {
   const p = await lies("./profil.html");
-  // Der anon-Zweig ruft ladeProfilVorschau statt trainers_oeffentlich-mit-nachname.
-  assertStringIncludes(p, ": await ladeProfilVorschau(id);");
-  assertStringIncludes(p, "async function ladeProfilVorschau(");
-  assertStringIncludes(p, "trainers_vorschau?id=eq.");
-  // Rueckfall trainers_oeffentlich ohne nachname (Sicht fehlt).
-  assertStringIncludes(p, "res.status === 404 || res.status === 400");
-  // Keine der beiden Vorschau-Spaltenlisten fragt nachname an.
-  const vs = p.match(/const VS = '([^']+)'/);
-  assert(vs, "VS-Spalten nicht gefunden");
-  assert(!vs![1].split(",").includes("nachname"), "anon-Profil fragt vollen Nachnamen an");
-  assert(vs![1].split(",").includes("nachname_initial"), "anon-Profil sollte nachname_initial laden");
-  const fb = p.match(/const FB = '([^']+)'/);
-  assert(fb, "FB-Spalten nicht gefunden");
-  assert(!fb![1].split(",").includes("nachname"), "Profil-Rueckfall fragt vollen Nachnamen an");
+  // Nicht angemeldet → Gate, keine Trainerdaten geladen.
+  assertStringIncludes(p, "function zeigeProfilGate(");
+  assertStringIncludes(p, "if(!angemeldet) { zeigeProfilGate(); return; }");
+  // Angemeldet → einzelnes Profil NUR über die RPC trainer_profil.
+  assertStringIncludes(p, "rpc/trainer_profil");
+  assertStringIncludes(p, "p_id: id");
 });
 
 Deno.test("D1: profilAnzeigeName baut 'Vorname N.' aus nachname_initial", async () => {

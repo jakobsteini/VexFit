@@ -12,13 +12,15 @@ import { assert, assertStringIncludes } from "jsr:@std/assert@1";
 
 const lies = (p: string) => Deno.readTextFile(new URL(p, import.meta.url));
 
-Deno.test("K4: Umkreissuche zeigt die nächsten statt Sackgasse", async () => {
+Deno.test("K4/12.11.: keine Treffer → ehrliche Leerseite + Vormerkung, KEIN Rückfall", async () => {
   const s = await lies("./suche.html");
-  assertStringIncludes(s, "const mitEntfernung = [];");
-  assertStringIncludes(s, "const imUmkreis = mitEntfernung.filter(t => t._distance <= radius);");
-  assertStringIncludes(s, "Die nächsten (ab ${vorOrt[0]._distance} km)");
-  // Leerzustand nur noch im echten Null-Fall: kein Trainer vor Ort UND online.
-  assertStringIncludes(s, "if(!vorOrt.length && !online.length)");
+  // Serverseitige Umkreissuche (RPC); kein client-seitiger Rückfall auf weiter
+  // entfernte Trainer mehr, kein Online-Abschnitt.
+  assertStringIncludes(s, "rpc/suche_trainer_umkreis");
+  assert(!s.includes("Die nächsten (ab ${vorOrt[0]._distance} km)"), "Rückfall auf die Nächsten noch da");
+  // Ehrliche Leerseite + Vormerkung.
+  assertStringIncludes(s, "In deiner Nähe ist gerade noch kein Trainer frei");
+  assertStringIncludes(s, "naeheHinweisAn(coords)");
 });
 
 Deno.test("K4: Nähe-Hinweisband mit Vormerkung vorhanden", async () => {

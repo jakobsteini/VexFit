@@ -31,7 +31,10 @@ Deno.test("profil.html: zeigt die Verfuegbarkeit", async () => {
   const html = await lies("./profil.html");
   assertStringIncludes(html, "pVerfSection");
   assertStringIncludes(html, "t.verfuegbarkeit");
-  assertStringIncludes(html, "verfuegbarkeit`"); // in den Lade-Spalten
+  // 12.11.: Profil wird über die RPC trainer_profil geladen; die RPC liefert
+  // verfuegbarkeit (siehe Migration 2026-11-12-01).
+  const mig = await lies("./migrations/2026-11-12-01-suche-umkreis.sql");
+  assertStringIncludes(mig, "verfuegbarkeit");
 });
 
 Deno.test("suche.html: Matching in 4 Fragen", async () => {
@@ -44,6 +47,7 @@ Deno.test("suche.html: Matching in 4 Fragen", async () => {
   assertStringIncludes(html, "matchOrt");
   assertStringIncludes(html, "matchSprache");
   assertStringIncludes(html, "matchZeit");
-  // verfuegbarkeit wird geladen (fuer die Zeit-Frage).
-  assertStringIncludes(html, "trainingsorte,verifiziert,created_at,verfuegbarkeit");
+  // 12.11.: verfuegbarkeit kommt jetzt aus der RPC (für die Zeit-Frage).
+  const mig = await lies("./migrations/2026-11-12-01-suche-umkreis.sql");
+  assertStringIncludes(mig, "verfuegbarkeit");
 });

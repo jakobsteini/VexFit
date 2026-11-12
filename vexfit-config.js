@@ -16,9 +16,12 @@
     //           (Nachname abgekürzt), Schwerpunkte, Ort (keine Adresse), Preis
     //           pro Stunde, Foto. Kontaktdaten/Nachname/Anfrage bleiben hinter
     //           der Kurz-Anmeldung.
-    // Jakob hat am 07.11.2026 das Einschalten entschieden (ersetzt den Grundsatz
-    // vom 12.10.2026 „Suche/Profile nur hinter Anmeldung").
-    OEFFENTLICHE_VORSCHAU: true,
+    // Jakob hat am 12.11.2026 entschieden: nicht angemeldete Besucher sehen
+    // GAR KEINE Trainerdaten mehr (kein Name, keine Karte, kein Ort, keine
+    // Anzahl). Die öffentliche Vorschau ist damit AUS; zusätzlich machen die
+    // Seiten für nicht angemeldete Besucher keinen Trainer-Netzaufruf mehr und
+    // die DB entzieht anon den Lesezugriff (2026-11-12-01-suche-umkreis.sql).
+    OEFFENTLICHE_VORSCHAU: false,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = global.VEXFIT_CONFIG;
 })(typeof window !== "undefined" ? window : globalThis);

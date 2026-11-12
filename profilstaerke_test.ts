@@ -51,7 +51,7 @@ Deno.test("suche.html: KEIN Mindeststaerke-Filter mehr (B1, Admin entscheidet al
   // Pfad. Freigegebene Trainer ohne Foto erscheinen jetzt in der Suche.
   assert(!html.includes("function mindeststaerkeErfuellt(t)"), "Mindeststaerke-Funktion noch da");
   assert(!html.includes("daten.filter(mindeststaerkeErfuellt)"), "Mindeststaerke-Filter noch da");
-  assertStringIncludes(html, "allTrainers = daten;");
+  assertStringIncludes(html, "allTrainers = vorOrt;");
 });
 
 Deno.test("Blitz-Registrierung: Trainerformular verlangt nur die Pflichtfelder", async () => {

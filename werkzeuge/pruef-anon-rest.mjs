@@ -56,15 +56,18 @@ try {
   merk(!leckt, `b) trainers?select=nachname -> kein nachname (Status ${res.status}${leckt ? ", LECK" : ""})`);
 } catch (e) { merk(false, `b) Netzwerkfehler: ${e.message}`); }
 
-// c) trainers_vorschau?select=vorname,nachname_initial -> Status 200,
-//    nachname_initial vorhanden (oder leere Liste, falls kein aktiver Trainer).
-try {
-  const res = await rest("trainers_vorschau?select=vorname,nachname_initial&limit=1");
-  const daten = res.ok ? await res.json() : null;
-  const ok = res.status === 200 && Array.isArray(daten) &&
-    (daten.length === 0 || Object.prototype.hasOwnProperty.call(daten[0], "nachname_initial"));
-  merk(ok, `c) trainers_vorschau?select=vorname,nachname_initial -> 200 + nachname_initial (Status ${res.status}, Zeilen ${Array.isArray(daten) ? daten.length : "?"})`);
-} catch (e) { merk(false, `c) Netzwerkfehler: ${e.message}`); }
+// c) 12.11.: anon darf GAR KEINE Trainerdaten mehr lesen. trainers_vorschau UND
+//    trainers_oeffentlich MÜSSEN für anon fehlschlagen (Lesezugriff entzogen,
+//    Migration 2026-11-12-01). VOR dem Einspielen fällt c ABSICHTLICH durch.
+for (const sicht of ["trainers_vorschau", "trainers_oeffentlich"]) {
+  try {
+    const res = await rest(`${sicht}?select=vorname&limit=1`);
+    const txt = await res.text().catch(() => "");
+    const leckt = res.status === 200 && /"vorname"\s*:/.test(txt);
+    merk(res.status !== 200 && !leckt,
+      `c) ${sicht}?select=vorname (anon) -> Fehlerstatus (ist ${res.status}${leckt ? ", LECK: vorname im Body" : ""})`);
+  } catch (e) { merk(false, `c) ${sicht} Netzwerkfehler: ${e.message}`); }
+}
 
 // d) Live-Seiten (nicht angemeldet): suche.html + eine aktive Profilseite.
 //    Kein voller Nachname in DOM, Meta, JSON-LD oder in REST-Antworten.

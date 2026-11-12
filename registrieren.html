@@ -497,7 +497,7 @@ function plzStatusZeigen(kuerzel,html,fehler){
 
 function plzGeaendert(kuerzel){
   plzLauf[kuerzel]++;
-  plzStand[kuerzel]={plz:'',stadt:null,land:null};
+  plzStand[kuerzel]={plz:'',stadt:null,land:null,lat:null,lng:null};
   plzStatusZeigen(kuerzel,'');
   if(!imVersand[kuerzel])document.getElementById(kuerzel+'-submit-btn').disabled=false;
   if(plzTimer[kuerzel])clearTimeout(plzTimer[kuerzel]);
@@ -524,7 +524,7 @@ async function plzPruefen(kuerzel){
   if(lauf!==plzLauf[kuerzel])return null; // inzwischen wurde weiter getippt
   // Eindeutiger Treffer: Stadt + Land uebernehmen.
   if(erg&&erg.stadt&&!erg.mehrdeutig){
-    plzStand[kuerzel]={plz:wert,stadt:erg.stadt,land:erg.land||null};
+    plzStand[kuerzel]={plz:wert,stadt:erg.stadt,land:erg.land||null,lat:(typeof erg.lat==='number'?erg.lat:null),lng:(typeof erg.lng==='number'?erg.lng:null)};
     plzStatusZeigen(kuerzel,erg.stadt);
     if(!imVersand[kuerzel])btn.disabled=false;
     return erg.stadt;
@@ -533,12 +533,12 @@ async function plzPruefen(kuerzel){
   // Bis zur Wahl gilt die PLZ als noch nicht aufgeloest -> Stadt/Land ungesetzt,
   // der Absende-Knopf bleibt gesperrt.
   if(erg&&erg.mehrdeutig){
-    plzStand[kuerzel]={plz:'',stadt:null,land:null};
+    plzStand[kuerzel]={plz:'',stadt:null,land:null,lat:null,lng:null};
     const statusEl=document.getElementById(kuerzel+'-plz-status');
     statusEl.style.color='var(--text-muted)';
     statusEl.style.display='block';
     vexPlz.auswahlKnoepfe(erg.optionen,statusEl,(ort)=>{
-      plzStand[kuerzel]={plz:wert,stadt:ort.stadt,land:ort.land};
+      plzStand[kuerzel]={plz:wert,stadt:ort.stadt,land:ort.land,lat:(typeof ort.lat==='number'?ort.lat:null),lng:(typeof ort.lng==='number'?ort.lng:null)};
       plzCache.set(wert,ort);
       plzStatusZeigen(kuerzel,ort.stadt);
       if(!imVersand[kuerzel])document.getElementById(kuerzel+'-submit-btn').disabled=false;
@@ -546,7 +546,7 @@ async function plzPruefen(kuerzel){
     return null;
   }
   if(!imVersand[kuerzel])btn.disabled=false;
-  plzStand[kuerzel]={plz:'',stadt:null,land:null};
+  plzStand[kuerzel]={plz:'',stadt:null,land:null,lat:null,lng:null};
   if(erg&&erg.netzfehler){
     plzStatusZeigen(kuerzel,'Der Ort konnte gerade nicht ermittelt werden. <a href="#" style="color:var(--accent)" onclick="plzPruefen(\''+kuerzel+'\');return false">Erneut versuchen</a>',true);
   }else{
@@ -649,7 +649,9 @@ async function submitTrainer(){
   // Neutrale Startwerte: PLZ/Stadt/Trainingsart bleiben leer und werden später
   // im Trainer-Bereich ergänzt. Leere Strings sind für NOT-NULL-Spalten gültig;
   // falls die DB sie trotzdem ablehnt, siehe migrations/2026-11-01-03-registrierung-kurz.sql.
-  const td={vorname:fn,nachname:ln,email,telefon:'',stadt:plzStand.t.stadt,plz:plzWert,land:ortLand,trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
+  // 12.11.: Trainer-Koordinaten (aus der PLZ) gleich mitspeichern, damit die
+  // serverseitige Umkreissuche sie sofort findet.
+  const td={vorname:fn,nachname:ln,email,telefon:'',stadt:plzStand.t.stadt,plz:plzWert,land:ortLand,lat:(typeof plzStand.t.lat==='number'?plzStand.t.lat:null),lng:(typeof plzStand.t.lng==='number'?plzStand.t.lng:null),trainingsart:'',erfahrung:'',spezialisierungen:[],bio:'',preis_stunde:null,preis_monat:null,zertifikate:'',calendly:'',stripe_bezahlt:false,aktiv:false};
   // Herkunft der Anzeige (für die sofortige Meldung an office@vexfit.app).
   // Robuste Erfassung aus VEXFIT_WERBUNG (überlebt In-App-Browser-Neuladen).
   const utm=VEXFIT_WERBUNG.utm_campaign||'';

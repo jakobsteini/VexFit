@@ -470,6 +470,9 @@ export interface Anschluesse {
    *  (service_role) – fuer die Admin-Zuordnung „PLZ ohne Land". Gibt die Zahl
    *  geaenderter Zeilen zurueck. */
   adminLandSetzen?(tabelle: "trainers" | "kunden", id: string, land: "AT" | "DE" | "CH"): Promise<number>;
+  /** 12.11.: Trainer-Koordinaten (lat/lng) nachtragen – für den Altbestand ohne
+   *  Koordinaten, damit die Umkreissuche sie findet. Gibt geänderte Zeilen zurück. */
+  adminKoordinatenSetzen?(trainerId: string, lat: number, lng: number): Promise<number>;
   /** Loescht die Zeile; verhindert ein Fremdschluessel (z. B. Anfragen) das
    *  Loeschen, werden stattdessen die personenbezogenen Felder anonymisiert
    *  (Fremddaten bleiben erhalten). */
@@ -2300,6 +2303,25 @@ async function adminAktion(
 
     // ── Land eindeutig (07.11.2026): fehlendes Land einer Person von Hand
     // zuordnen. Fuer die Admin-Liste „PLZ ohne Land". Nur 'AT'/'DE'/'CH'. ──
+    case "koordinaten_setzen": {
+      const lat = Number(body.lat);
+      const lng = Number(body.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
+          lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return antwort(400, { fehler: "lat/lng ungültig" }, herkunft);
+      }
+      if (!a.adminKoordinatenSetzen) {
+        return antwort(501, { fehler: "Koordinaten-Nachtrag ist in dieser Fassung nicht verfuegbar" }, herkunft);
+      }
+      try {
+        const n = await a.adminKoordinatenSetzen(zielId, lat, lng);
+        await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: "trainers", ziel_id: zielId, ergebnis: `lat/lng gesetzt geaendert=${n}` });
+        return antwort(200, { ok: true, geaendert: n }, herkunft);
+      } catch (fehler) {
+        if (istMigrationFehlt(fehler)) return antwort(400, { fehler: "Die Spalten lat/lng fehlen (Migration 2026-11-12-01 nicht eingespielt)." }, herkunft);
+        throw fehler;
+      }
+    }
     case "land_setzen": {
       const tabelle = artTabelle(body.art);
       if (!tabelle) return antwort(400, { fehler: "art fehlt (trainer/kunde)" }, herkunft);

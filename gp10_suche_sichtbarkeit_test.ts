@@ -18,7 +18,7 @@ const suche = await Deno.readTextFile(new URL("./suche.html", import.meta.url));
 
 Deno.test("Weder der öffentliche noch der angemeldete Pfad filtert nach Mindeststärke", () => {
   // Beide Pfade nutzen dieselbe Liste; keine zusätzliche Mindeststärke-Hürde.
-  assertStringIncludes(suche, "allTrainers = daten;");
+  assertStringIncludes(suche, "allTrainers = vorOrt;");
   // Die alte, an die Anmeldung gebundene Filterung ist weg.
   assert(
     !suche.includes("daten.filter(mindeststaerkeErfuellt)"),

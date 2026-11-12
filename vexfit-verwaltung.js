@@ -235,6 +235,20 @@ export function trainerOhneStandort(trainers, testListe = []) {
   );
 }
 
+/** 12.11.: Trainer MIT PLZ, aber OHNE Koordinaten (lat/lng) – ohne Test-/Spam.
+ *  Für die serverseitige Umkreissuche unsichtbar, bis die Koordinaten
+ *  nachgetragen sind. Reine Funktion. */
+export function trainerOhneKoordinaten(trainers, testListe = []) {
+  const arr = Array.isArray(trainers) ? trainers : [];
+  const zahl = (x) => (x === null || x === undefined || x === "" ? NaN : Number(x));
+  return arr.filter((t) =>
+    t.ist_test !== true &&
+    !istTestkonto(t.email, testListe) &&
+    (t.plz && String(t.plz).trim()) &&
+    !(Number.isFinite(zahl(t.lat)) && Number.isFinite(zahl(t.lng)))
+  );
+}
+
 /** B2: die drei Pflichtangaben VOR der Freigabe – Foto, PLZ, Preis pro Stunde.
  *  Entscheidung Jakob. Dieselbe Regel wie vexfit-pflicht.js (vexPflicht) im
  *  Trainer-Bereich; die Übereinstimmung sichert verwaltung_logik_test.ts ab.
@@ -1267,6 +1281,16 @@ function starteVerwaltung() {
           return `<div class="heute-zeile"><span class="heute-link" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">${escapeHtml(name)}</span>${ort ? `<span>${ort}</span>` : ""}<span class="heute-fehlt">${t.erfuellt}/8</span><button class="btn-klein btn-ja" data-aktion="freigeben" data-id="${escapeHtml(t.id)}">Freigeben</button></div>`;
         }).join("")
       : '<div class="heute-leer">Niemand bereit</div>';
+    // 12.11.: Trainer mit PLZ aber ohne Koordinaten – in der Umkreissuche
+    // unsichtbar; „Nachtragen" löst die PLZ auf und speichert lat/lng.
+    const ohneKoord = trainerOhneKoordinaten(daten.trainers);
+    const koordHtml = ohneKoord.length
+      ? ohneKoord.slice(0, 50).map((t) => {
+          const name = nameFormatieren(`${t.vorname || ""} ${t.nachname || ""}`.trim()) || "Trainer";
+          const ort = t.plz ? escapeHtml(t.plz) : "";
+          return `<div class="heute-zeile"><span class="heute-link" data-aktion="detail" data-art="trainer" data-id="${escapeHtml(t.id)}">${escapeHtml(name)}</span>${ort ? `<span>${ort}</span>` : ""}<button class="btn-klein" data-aktion="koord-nachtragen" data-id="${escapeHtml(t.id)}" data-plz="${escapeHtml(t.plz || "")}" data-land="${escapeHtml(t.land || "")}">Koordinaten nachtragen</button></div>`;
+        }).join("")
+      : '<div class="heute-leer">Alle haben Koordinaten</div>';
     // E2: Trainer ohne Standort (Altbestand ohne PLZ) – Jakob kann die PLZ nachtragen.
     const ohneStandort = trainerOhneStandort(daten.trainers);
     const standortHtml = ohneStandort.length
@@ -1297,6 +1321,10 @@ function starteVerwaltung() {
        <div class="heute-karte">
          <div class="heute-kopf">📍 Standort fehlt (keine PLZ) <span class="heute-zahl${ohneStandort.length ? "" : " null"}">${ohneStandort.length}</span></div>
          <div class="heute-liste">${standortHtml}</div>
+       </div>
+       <div class="heute-karte">
+         <div class="heute-kopf">🧭 Standort ohne Koordinaten <span class="heute-zahl${ohneKoord.length ? "" : " null"}">${ohneKoord.length}</span></div>
+         <div class="heute-liste">${koordHtml}</div>
        </div>
        <div class="heute-karte">
          <div class="heute-kopf">⏰ Anfragen ohne Antwort seit über 24 h <span class="heute-zahl null" id="heute-anfragen-zahl">…</span></div>
@@ -1937,6 +1965,27 @@ function starteVerwaltung() {
     }
   }
 
+  // 12.11.: Koordinaten eines Trainers nachtragen – PLZ (land-bewusst) auflösen
+  // und lat/lng über die Edge-Aktion speichern. Macht den Trainer in der
+  // Umkreissuche sichtbar.
+  async function koordinatenNachtragen(id, plz, land) {
+    const p = String(plz || "").trim();
+    if (!p) { fehler("Dieser Trainer hat keine PLZ – zuerst eine PLZ nachtragen."); return; }
+    const l = (typeof vexPlz !== "undefined" && vexPlz.landNormal) ? vexPlz.landNormal(land) : null;
+    let erg;
+    try { erg = await vexPlz.aufloesen(p, { land: l }); }
+    catch { fehler("Standortdienst nicht erreichbar."); return; }
+    if (!erg || erg.netzfehler || erg.mehrdeutig || typeof erg.lat !== "number" || typeof erg.lng !== "number") {
+      fehler("Koordinaten konnten nicht ermittelt werden (PLZ/Land prüfen)."); return;
+    }
+    const d = await adminEdge({ aktion: "koordinaten_setzen", ziel_id: id, lat: erg.lat, lng: erg.lng });
+    if (!d) return;
+    const t = daten.trainers.find((x) => String(x.id) === String(id));
+    if (t) { t.lat = erg.lat; t.lng = erg.lng; }
+    erfolg("Koordinaten gespeichert (" + (erg.stadt || p) + ").");
+    neuZeichnen();
+  }
+
   async function freigeben(id) {
     const t = daten.trainers.find((x) => String(x.id) === String(id));
     const d = await adminEdge({ aktion: "trainer_aktivieren", ziel_id: id });
@@ -2488,6 +2537,7 @@ function starteVerwaltung() {
       if (akt === "test-markieren") { testMarkieren(id, true); return; }
       if (akt === "test-aufheben") { testMarkieren(id, false); return; }
       if (akt === "kicken") { kicken(art, id); return; }
+      if (akt === "koord-nachtragen") { koordinatenNachtragen(id, a.dataset.plz, a.dataset.land); return; }
       if (akt === "zertifikat") { zertifikatOeffnen(a.dataset.pfad); return; }
       if (akt === "push-entfernen") { pushGeraetEntfernen(id); return; }
       if (akt === "abendbericht-jetzt") { abendberichtJetzt(); return; }

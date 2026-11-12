@@ -430,22 +430,42 @@ async function ladeProfilVorschau(id) {
   return res;
 }
 
+// 12.11.: Nicht angemeldet → kein Netzaufruf, nur Erklärung + Registrieren/Anmelden.
+function zeigeProfilGate() {
+  try {
+    var m = document.querySelector('meta[name="robots"]');
+    if (!m) { m = document.createElement('meta'); m.name = 'robots'; document.head.appendChild(m); }
+    m.content = 'noindex,nofollow';
+  } catch (e) {}
+  var lp = document.getElementById('loadingProfile');
+  var pc = document.getElementById('profileContent');
+  if (pc) pc.style.display = 'none';
+  if (lp) {
+    lp.innerHTML = '<div style="text-align:center;padding:48px 20px;max-width:460px;margin:0 auto">'
+      + '<div style="font-size:40px;margin-bottom:12px">🔒</div>'
+      + '<h1 style="font-family:\'Bebas Neue\',sans-serif;letter-spacing:1.5px;font-size:28px;margin-bottom:10px">Trainerprofile nur für Mitglieder</h1>'
+      + '<p style="color:var(--text-muted);line-height:1.7;margin-bottom:20px">Melde dich kostenlos an, um Personal-Trainer-Profile zu sehen und direkt anzufragen.</p>'
+      + '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">'
+      + '<a href="registrieren.html?typ=kunde" style="background:var(--accent);color:#0a0a0a;padding:13px 22px;border-radius:3px;font-weight:700;text-decoration:none">Kostenlos registrieren</a>'
+      + '<a href="login.html?typ=kunde" style="color:var(--accent);border:1px solid var(--accent);padding:13px 22px;border-radius:3px;font-weight:700;text-decoration:none">Anmelden</a>'
+      + '</div></div>';
+  }
+}
+
 async function loadProfile() {
   const urlParams = new URLSearchParams(window.location.search);
   const id = urlParams.get('id');
   if(!id) { window.location.href = 'suche.html'; return; }
+  if(!angemeldet) { zeigeProfilGate(); return; }
 
   try {
-    // Angemeldete lesen die Trainertabelle mit ihrem Token (wie bisher, inkl.
-    // Calendly). Nicht Angemeldete UND Suchmaschinen lesen NUR die strenge
-    // Vorschau-Sicht trainers_vorschau - sie liefert KEINEN vollen Nachnamen
-    // (nur die Initiale als nachname_initial), keine Kontaktdaten, keinen
-    // Monatspreis. So steht kein voller Nachname im HTML, in den Meta-Tags oder
-    // im JSON-LD. Fehlt die Sicht, faellt ladeProfilVorschau auf
-    // trainers_oeffentlich OHNE Nachnamen zurueck (nur Vorname, kein PII).
-    const res = angemeldet
-      ? await fetch(`${SUPABASE_URL}/rest/v1/trainers?id=eq.${id}&aktiv=eq.true&gesperrt=is.false&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,video_url,sprachen,trainingsorte,galerie,verifiziert,probetraining,probetraining_kostenlos,antwort_stunden,antwort_basis,verfuegbarkeit`, { headers: authKopf() })
-      : await ladeProfilVorschau(id);
+    // 12.11.: Angemeldete lesen das Profil NUR über die RPC trainer_profil
+    // (SECURITY DEFINER) – kein direkter Tabellenzugriff auf fremde Trainer mehr.
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/trainer_profil`, {
+      method: 'POST',
+      headers: { ...authKopf(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_id: id })
+    });
     if(istAbgemeldet(res)) return;
     if(!res.ok) throw new Error('Profil laden fehlgeschlagen: ' + res.status);
     const data = await res.json();

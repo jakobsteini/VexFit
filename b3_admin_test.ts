@@ -13,6 +13,7 @@ import {
   bereitZurFreigabe,
   herkunftVon,
   herkunftZusammenfassung,
+  trainerOhneKoordinaten,
   trainerOhneStandort,
   wartenAufFreigabe,
 } from "./vexfit-verwaltung.js";
@@ -158,4 +159,17 @@ Deno.test("E5: bereitZurFreigabe listet nur reife, nicht freigegebene, echte Kon
   ]);
   assertEquals(liste.map((t: { id: string }) => t.id), ["1"]);
   assertEquals(liste[0].erfuellt, 8);
+});
+
+// 12.11.: „Standort ohne Koordinaten" – PLZ da, aber lat/lng fehlen.
+Deno.test("12.11.: trainerOhneKoordinaten listet nur Trainer mit PLZ ohne lat/lng", () => {
+  const liste = trainerOhneKoordinaten([
+    { id: "1", email: "a@b.at", plz: "5020", lat: 47.8, lng: 13.0 }, // hat Koordinaten
+    { id: "2", email: "b@b.at", plz: "5020" },                       // PLZ, keine Koord
+    { id: "3", email: "c@b.at", plz: "5020", lat: null, lng: null }, // PLZ, keine Koord
+    { id: "4", email: "d@b.at", plz: "" },                           // keine PLZ (andere Liste)
+    { id: "5", email: "e+test@b.at", plz: "5020" },                  // Test-Alias
+    { id: "6", email: "f@b.at", plz: "5020", lat: 47.8, lng: 13.0, ist_test: true }, // Test
+  ]);
+  assertEquals(liste.map((t: { id: string }) => t.id), ["2", "3"]);
 });

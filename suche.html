@@ -173,7 +173,7 @@ try {
   </div>
 </nav>
 
-<div class="search-hero">
+<div class="search-hero" id="sucheBox">
   <div class="sh-label">Trainer finden</div>
   <div class="sh-title">FINDE DEINEN<br>PERFEKTEN TRAINER</div>
   <div class="search-bar">
@@ -184,13 +184,7 @@ try {
       <option value="DE">Deutschland</option>
       <option value="CH">Schweiz</option>
     </select>
-    <select class="s-input" id="radiusInput" style="max-width:130px;cursor:pointer">
-      <option value="10">10 km</option>
-      <option value="25" selected>25 km</option>
-      <option value="50">50 km</option>
-      <option value="100">100 km</option>
-      <option value="0">Alle</option>
-    </select>
+    <!-- 12.11.: fester Umkreis 25 km (UMKREIS_KM), kein Radius-Wähler mehr. -->
     <button class="s-btn" onclick="searchByPLZ()">Suchen →</button>
   </div>
   <div id="plzStatus" style="font-size:12px;color:#666;margin-bottom:8px"></div>
@@ -199,7 +193,6 @@ try {
     <div class="ftag" onclick="setFilter('Muskelaufbau', this)">Muskelaufbau</div>
     <div class="ftag" onclick="setFilter('Abnehmen', this)">Abnehmen</div>
     <div class="ftag" onclick="setFilter('Krafttraining', this)">Krafttraining</div>
-    <div class="ftag" onclick="setFilter('Online', this)">Online</div>
     <div class="ftag" onclick="setFilter('Bodybuilding', this)">Bodybuilding</div>
   </div>
   <!-- Baustein 2: Filter nach Sprache und Trainingsort -->
@@ -212,7 +205,6 @@ try {
       <option value="studio">Studio</option>
       <option value="outdoor">Outdoor</option>
       <option value="beim_kunden">Beim Kunden zuhause</option>
-      <option value="online">Online</option>
     </select>
   </div>
   <!-- Baustein 5: Matching in 4 Fragen -->
@@ -252,6 +244,18 @@ try {
   <div class="loading" id="loading">
     <div class="spinner"></div>
     <p>Trainer werden geladen...</p>
+  </div>
+
+  <!-- 12.11.: Gate für nicht angemeldete Besucher. KEIN Trainer-Netzaufruf;
+       nur Erklärung + Registrieren/Anmelden. -->
+  <div class="empty-state" id="anonGate" style="display:none">
+    <div class="empty-icon">🔒</div>
+    <div class="empty-title">Trainer findest du als Mitglied</div>
+    <p class="empty-sub">Die Trainersuche ist kostenlos – aber nur für angemeldete Kundinnen und Kunden. Melde dich an oder registriere dich kostenlos, dann siehst du passende Personal Trainer in deiner Nähe (bis 25 km) und kannst direkt anfragen.</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <a href="registrieren.html?typ=kunde" class="s-btn" style="width:auto;padding:13px 22px;text-decoration:none">Kostenlos registrieren</a>
+      <a href="login.html?typ=kunde" class="s-btn" style="width:auto;padding:13px 22px;text-decoration:none;background:transparent;color:var(--accent);border:1px solid var(--accent)">Anmelden</a>
+    </div>
   </div>
 
   <!-- EMPTY STATE -->
@@ -408,7 +412,24 @@ async function ladeOeffentlich(fetchImpl, basisUrl, apikey) {
 }
 // ==KERN-ENDE==
 
+// 12.11.: EINE Konstante für den Umkreis (Luftlinie, km). Leicht änderbar.
+const UMKREIS_KM = 25;
+// allTrainers hält ab jetzt das ERGEBNIS der letzten Umkreissuche (nicht mehr
+// alle Trainer) – die Filter-/Sortier-/Matching-Ansicht arbeitet darauf weiter.
 let allTrainers = [];
+
+// 12.11.: Nicht angemeldet → kein Trainer-Netzaufruf, nur Gate zeigen.
+function zeigeAnonGate() {
+  var gate = document.getElementById('anonGate');
+  var empty = document.getElementById('emptyState');
+  var grid = document.getElementById('trainerGrid');
+  if (empty) empty.classList.remove('show');
+  if (grid) grid.innerHTML = '';
+  // Suchleiste + Filter ausblenden (kein Nutzen ohne Anmeldung).
+  var box = document.getElementById('sucheBox');
+  if (box) box.style.display = 'none';
+  if (gate) gate.style.display = 'block';
+}
 // K1: Kunden-Trichter. Letzte gesuchte PLZ merken (für die Stufen suche/treffer/
 // profil), und „Seite geöffnet" einmal melden. Anonym, best effort.
 let letztePlz = '';
@@ -533,17 +554,7 @@ function urlStand(plz, land, radius) {
 
 async function searchByPLZ() {
   const plz = document.getElementById('plzInput').value.trim();
-  const radius = parseInt(document.getElementById('radiusInput').value);
   const status = document.getElementById('plzStatus');
-
-  if(radius === 0) {
-    try { vexfitTrichter('suche', { rolle: 'kunde', einmal: false }); } catch(e) {}
-    urlStand(plz, gewaehltesLand(), 0);
-    renderTrainers(allTrainers);
-    if(allTrainers.length) { try { vexfitTrichter('treffer', { rolle: 'kunde', einmal: false }); } catch(e) {} }
-    status.textContent = `Alle ${allTrainers.length} Trainer werden angezeigt`;
-    return;
-  }
 
   if(!plz || plz.length < 4) {
     status.textContent = '⚠️ Bitte gültige PLZ eingeben';
@@ -564,7 +575,7 @@ async function searchByPLZ() {
   // K1: Suche ausgeführt (mit grobem PLZ-Bereich). PLZ für die weiteren Stufen merken.
   letztePlz = plz;
   letztesLand = land || '';
-  urlStand(plz, land, radius);
+  urlStand(plz, land, UMKREIS_KM);
   try { vexfitTrichter('suche', { rolle: 'kunde', plz: plz, land: land, einmal: false }); } catch(e) {}
 
   status.textContent = '📍 Standort wird ermittelt...';
@@ -578,64 +589,78 @@ async function searchByPLZ() {
   // Sicherheitsnetz: nur falls doch ohne Land aufgelöst (sollte durch die
   // Land-Pflicht oben nicht vorkommen) – Nutzer wählt den Ort.
   if(ergebnis.mehrdeutig) {
-    vexPlz.auswahlKnoepfe(ergebnis.optionen, status, (ort) => umkreisSuche(ort, radius, status));
+    vexPlz.auswahlKnoepfe(ergebnis.optionen, status, (ort) => umkreisSuche(ort, status));
     return;
   }
-  umkreisSuche(ergebnis, radius, status);
+  umkreisSuche(ergebnis, status);
 }
 
-async function umkreisSuche(coords, radius, status) {
+// 12.11.: Serverseitige Umkreissuche über die RPC suche_trainer_umkreis.
+// Nur angemeldet; nur Vor-Ort-Trainer im gleichen Land ≤ UMKREIS_KM. KEIN
+// Online-Abschnitt, KEIN Rückfall auf weiter entfernte Trainer. Keine Treffer →
+// ehrliche Leerseite + Vormerkung.
+async function umkreisSuche(coords, status) {
   const sel = gewaehltesLand(); // 'AT'|'DE'|'CH'|null
-  setzeSucheSeo(coords.stadt, sel); // D6: Titel/Beschreibung passend zu Ort/Land
-  status.textContent = `📍 ${coords.stadt} · Suche in ${radius} km Umkreis...`;
-
-  // D2: Erst in Vor-Ort (nur gewaehltes Land) und Online (laenderuebergreifend)
-  // trennen – die Einteilung ist eine reine, geprüfte Funktion.
-  const { vorOrt: vorOrtKand, online } = vexAbschnitte.einteilen(allTrainers, sel);
-
-  // K4: Fuer alle Vor-Ort-Kandidaten die Entfernung berechnen (nicht nur im
-  // Radius), damit bei 0 Treffern im Umkreis die NÄCHSTEN im selben Land gezeigt
-  // werden statt einer Sackgasse.
-  const mitEntfernung = [];
-  for(const t of vorOrtKand) {
-    if(!t.plz) continue;
-    const tc = await trainerCoords(t);
-    if(!tc) continue;
-    const dist = calcDistance(coords.lat, coords.lng, tc.lat, tc.lng);
-    mitEntfernung.push({...t, _distance: Math.round(dist)});
+  setzeSucheSeo(coords.stadt, sel);
+  if(!angemeldet) { zeigeAnonGate(); return; }
+  if(coords.lat == null || coords.lng == null || !sel) {
+    status.textContent = '⚠️ Standort konnte nicht eindeutig bestimmt werden. Bitte PLZ und Land prüfen.';
+    return;
   }
-  mitEntfernung.sort((a,b) => a._distance - b._distance);
-  const imUmkreis = mitEntfernung.filter(t => t._distance <= radius);
+  status.textContent = `📍 ${coords.stadt} · Suche im Umkreis von ${UMKREIS_KM} km...`;
 
-  let vorOrt, nurNaechste = false;
-  if(imUmkreis.length) {
-    vorOrt = imUmkreis;
-    status.textContent = `📍 ${coords.stadt} · ${imUmkreis.length} vor Ort in ${radius} km`;
+  let liste = [];
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/suche_trainer_umkreis`, {
+      method: 'POST',
+      headers: { ...authKopf(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        p_lat: coords.lat, p_lng: coords.lng, p_land: sel,
+        p_schwerpunkt: aktuellerSchwerpunkt(), p_umkreis_km: UMKREIS_KM
+      })
+    });
+    if(istAbgemeldet(res)) return;
+    if(!res.ok) throw new Error('Suche fehlgeschlagen: ' + res.status);
+    const roh = await res.json();
+    liste = Array.isArray(roh) ? roh : [];
+  } catch(e) {
+    console.error(e);
+    status.textContent = '⚠️ Die Suche ist gerade nicht erreichbar. Bitte später erneut versuchen.';
+    return;
+  }
+
+  const vorOrt = liste.map(t => ({ ...t, _distance: (t.entfernung_km != null ? Math.round(t.entfernung_km) : null) }));
+  allTrainers = vorOrt; // Filter/Sortierung/Match arbeiten auf dem Umkreis-Ergebnis
+  spracheOptionenAufbauen();
+
+  if(vorOrt.length) {
+    status.textContent = `📍 ${coords.stadt} · ${vorOrt.length} Trainer in ${UMKREIS_KM} km`;
     naeheHinweisAus();
     try { vexfitTrichter('treffer', { rolle: 'kunde', plz: letztePlz, land: letztesLand, einmal: false }); } catch(e) {}
-  } else if(mitEntfernung.length) {
-    vorOrt = mitEntfernung.slice(0, 6);
-    nurNaechste = true;
-    status.textContent = `📍 Kein Trainer in ${radius} km um ${coords.stadt}. Die nächsten (ab ${vorOrt[0]._distance} km):`;
-    naeheHinweisAn(coords, radius);
+    renderTrainers(vorOrt);
   } else {
-    // Niemand vor Ort im gewählten Land. Ehrlicher Hinweis + Vormerkung; der
-    // Online-Abschnitt und die Anfrage bleiben trotzdem möglich.
-    vorOrt = [];
-    status.textContent = `📍 Noch kein Trainer vor Ort um ${coords.stadt}.`;
-    naeheHinweisAn(coords, radius);
+    status.textContent = `📍 Noch kein Trainer in ${UMKREIS_KM} km um ${coords.stadt}.`;
+    const grid = document.getElementById('trainerGrid');
+    if(grid) grid.innerHTML = '';
+    const empty = document.getElementById('emptyState');
+    if(empty) empty.classList.remove('show');
+    naeheHinweisAn(coords);
   }
-  renderErgebnis(vorOrt, online, sel, nurNaechste);
+}
+
+// Aktiver Schwerpunkt-Filter (für die RPC); 'alle' → kein Filter.
+function aktuellerSchwerpunkt() {
+  return (typeof activeFilter !== 'undefined' && activeFilter && activeFilter !== 'alle') ? activeFilter : null;
 }
 
 // K4: Hinweisband unter der Trefferliste, wenn nur die „nächsten" (außerhalb des
 // Umkreises) gezeigt werden. Bietet die Vormerkung an, ohne die Seite auf
 // „leer" zu stellen.
-function naeheHinweisAn(coords, radius) {
+function naeheHinweisAn(coords) {
   const el = document.getElementById('naeheHinweis');
   if(!el) return;
   const t = document.getElementById('naeheHinweisText');
-  if(t) t.textContent = `Noch kein Trainer in ${radius} km um ${coords && coords.stadt ? coords.stadt : 'dich'}. Lass dich benachrichtigen, sobald sich einer in deiner Region anmeldet.`;
+  if(t) t.textContent = 'In deiner Nähe ist gerade noch kein Trainer frei. Wir melden uns, sobald einer dazukommt.';
   // E-Mail-Feld der Vormerkung mit der PLZ als Kontext; Ort merken.
   el.dataset.stadt = (coords && coords.stadt) || '';
   el.style.display = 'block';
@@ -722,48 +747,12 @@ function renderErgebnis(vorOrt, online, sel, nurNaechste) {
   grid.innerHTML = html;
 }
 
+// 12.11.: Nicht angemeldet → Gate (kein Netzaufruf). Angemeldet → nichts
+// vorladen; die Suche (searchByPLZ → RPC suche_trainer_umkreis) lädt bei Bedarf
+// nur Vor-Ort-Trainer im Umkreis. Es werden nie mehr alle Trainer geladen.
 async function loadTrainers() {
-  document.getElementById('loading').classList.add('show');
-  try {
-    let daten;
-    if(angemeldet) {
-      // Fuer Angemeldete unveraendert: die Tabelle trainers mit Nutzer-Token.
-      // Wie die oeffentliche Sicht: aktiv=true UND nicht gesperrt. "Anmeldung
-      // sperren" (login_sperren) setzt gesperrt=true, ohne aktiv zu aendern;
-      // ohne diesen Filter saehe ein angemeldeter Kunde einen so gesperrten
-      // Trainer, den Nichtangemeldete (ueber die Sicht) nicht sehen.
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?aktiv=eq.true&gesperrt=is.false&select=id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv,sprachen,trainingsorte,verifiziert,verfuegbarkeit&order=created_at.desc`, {
-        headers: authKopf()
-      });
-      if(istAbgemeldet(res)) return;
-      if(!res.ok) throw new Error('Trainer laden fehlgeschlagen: ' + res.status);
-      daten = await res.json();
-      if(!Array.isArray(daten)) throw new Error('Unerwartete Antwort beim Trainer laden');
-    } else if(typeof vexVorschau !== 'undefined' && vexVorschau.vorschauAktiv(angemeldet)) {
-      // Öffentliche Vorschau AN: strenge Sicht ohne Nachnamen/Kontaktdaten.
-      daten = await ladeVorschau(fetch, SUPABASE_URL, SUPABASE_KEY);
-    } else {
-      // Ohne Sitzung (Vorschau aus): oeffentliche Sicht wie bisher.
-      daten = await ladeOeffentlich(fetch, SUPABASE_URL, SUPABASE_KEY);
-    }
-    // "Admin entscheidet allein" (Migration 2026-10-31-10): sichtbar ist, wer
-    // freigegeben (aktiv=true) und nicht gesperrt ist. Foto/Kurztext/
-    // Spezialisierung sind KEINE Bedingung. BEIDE Pfade (oeffentliche Sicht und
-    // angemeldete Tabellen-Abfrage) begrenzen schon auf genau diese Bedingung;
-    // deshalb hier NICHT zusaetzlich nach Mindeststaerke filtern - sonst saehe
-    // ein angemeldeter Kunde neue, noch unvollstaendige Trainer nicht und
-    // koennte sie nicht anfragen.
-    allTrainers = daten;
-    spracheOptionenAufbauen();
-    renderTrainers(allTrainers);
-  } catch(e) {
-    console.error(e);
-    const grid = document.getElementById('trainerGrid');
-    const empty = document.getElementById('emptyState');
-    if(empty) empty.classList.remove('show');
-    if(grid) grid.innerHTML = '<div class="empty-state show" style="display:block">⚠️<br><br>Die Trainerliste konnte gerade nicht geladen werden.<br>Bitte lade die Seite neu.</div>';
-  }
-  document.getElementById('loading').classList.remove('show');
+  if(!angemeldet) { zeigeAnonGate(); return; }
+  spracheOptionenAufbauen();
 }
 
 // Baustein 4: Kartenabzeichen - echte Verifizierung, sonst "Neu" (erste 30 Tage).
@@ -996,18 +985,18 @@ async function submitNotify() {
 // starten. Das Land aus der Adresse wird in die Auswahl übernommen, damit 5020
 // eindeutig als Salzburg (AT) aufgelöst wird und kein Schweizer Ort erscheint.
 loadTrainers().then(function() {
+  if (!angemeldet) return; // Gate steht, keine Suche für anon
   try {
     var q = new URLSearchParams(location.search);
     var vorgabe = q.get('plz');
     var landVorgabe = vexPlz.landNormal(q.get('land'));
     if (landVorgabe && landFeld()) landFeld().value = landVorgabe;
-    // D2: Umkreis aus der Adresse uebernehmen (Teilen/Neuladen/Zurueck).
-    var rad = q.get('radius');
-    var radEl = document.getElementById('radiusInput');
-    if (rad && radEl && [].some.call(radEl.options, function(o){ return o.value === rad; })) radEl.value = rad;
     if (vorgabe && /^\d{4,5}$/.test(vorgabe.trim())) {
       var feld = document.getElementById('plzInput');
       if (feld) { feld.value = vorgabe.trim(); plzLandAbgleich(); searchByPLZ(); }
+    } else {
+      var st = document.getElementById('plzStatus');
+      if (st) st.textContent = 'Gib deine PLZ ein, um Trainer in deiner Nähe (bis ' + UMKREIS_KM + ' km) zu finden.';
     }
   } catch (e) {}
 });

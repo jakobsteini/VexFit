@@ -50,8 +50,12 @@ const HANDGEMACHT = new Set(['personal-trainer-salzburg.html']);
 
 // ████ ABSCHALTUNG ████ Trainer sind nur nach Anmeldung sichtbar; oeffentliche
 // Stadtseiten wuerden Suchmaschinen etwas zeigen, was Besucher nicht sehen
-// duerfen. Solange das gilt, bleibt dieser Schalter auf true.
-const STILLGELEGT = false;
+// duerfen. Entscheidung Jakob 12.11.2026: anon sieht keine Trainerdaten mehr und
+// die DB entzieht anon den Lesezugriff (2026-11-12-01) – der Generator darf die
+// Trainer-Sicht also gar nicht mehr lesen. Daher true: keine Trainer-Stadtseiten,
+// sitemap OHNE Trainerprofile. Die handgemachte personal-trainer-salzburg.html
+// (ohne Trainerliste) bleibt erhalten (HANDGEMACHT).
+const STILLGELEGT = true;
 
 // Oeffentlicher (anon) Schluessel - steht in jeder Seite des Repos, kein Geheimnis.
 const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';

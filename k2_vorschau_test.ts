@@ -16,11 +16,11 @@ const lies = (p: string) => Deno.readTextFile(new URL(p, import.meta.url));
 // Die Module lesen/schreiben window.* – im Test globalThis.
 const g = globalThis as Record<string, unknown>;
 
-Deno.test("K2/S1: Schalter ist seit 07.11.2026 (Jakobs Entscheidung) AN", async () => {
+Deno.test("K2/12.11.: Schalter ist AUS (Jakob 12.11.: anon sieht keine Trainerdaten)", async () => {
   delete g.VEXFIT_CONFIG;
   await import("./vexfit-config.js");
   const cfg = g.VEXFIT_CONFIG as { OEFFENTLICHE_VORSCHAU: boolean };
-  assertEquals(cfg.OEFFENTLICHE_VORSCHAU, true);
+  assertEquals(cfg.OEFFENTLICHE_VORSCHAU, false);
 });
 
 Deno.test("K2: vorschauAktiv nur bei Schalter AN und nicht angemeldet", async () => {
@@ -37,7 +37,7 @@ Deno.test("K2: vorschauAktiv nur bei Schalter AN und nicht angemeldet", async ()
   cfg.OEFFENTLICHE_VORSCHAU = true;
   assertEquals(v.vorschauAktiv(false), true); // an + nicht angemeldet
   assertEquals(v.vorschauAktiv(true), false); // angemeldet: normale Sicht
-  cfg.OEFFENTLICHE_VORSCHAU = true; // auf den echten Standard (AN) zuruecksetzen
+  cfg.OEFFENTLICHE_VORSCHAU = false; // echter Standard seit 12.11.: AUS
 });
 
 Deno.test("K2: vorschauReif verlangt Foto und genug Felder, vorschauName kürzt den Nachnamen", async () => {

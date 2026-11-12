@@ -804,6 +804,19 @@ const anschluesse: Anschluesse = {
     const zeilen = await a.json().catch(() => []);
     return Array.isArray(zeilen) ? zeilen.length : 0;
   },
+  async adminKoordinatenSetzen(trainerId, lat, lng) {
+    const a = await fetch(restAdresse(`trainers?id=eq.${encodeURIComponent(trainerId)}`), {
+      method: "PATCH",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify({ lat, lng }),
+    });
+    if (!a.ok) {
+      const txt = await a.text().catch(() => "");
+      throw new Error(`adminKoordinatenSetzen fehlgeschlagen: HTTP ${a.status} ${txt}`);
+    }
+    const zeilen = await a.json().catch(() => []);
+    return Array.isArray(zeilen) ? zeilen.length : 0;
+  },
 
   // Erst loeschen; verhindert ein Fremdschluessel das Loeschen (HTTP 409,
   // PostgreSQL 23503 – z. B. verknuepfte Anfragen), dann die personenbezogenen

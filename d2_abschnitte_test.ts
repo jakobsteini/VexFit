@@ -75,16 +75,15 @@ Deno.test("D2: 5020 land-eindeutig – AT liefert Salzburg, CH liefert den Schwe
   assertEquals(ch.land, "CH");
 });
 
-Deno.test("D2: suche.html verdrahtet Abschnitte und URL-Zustand", async () => {
+Deno.test("D2/12.11.: suche.html – nur Vor-Ort über RPC, KEIN Online-Split, fester Umkreis", async () => {
   const s = await lies("./suche.html");
-  assertStringIncludes(s, 'src="vexfit-abschnitte.js"');
-  assertStringIncludes(s, "function renderErgebnis(");
-  assertStringIncludes(s, "vexAbschnitte.einteilen(allTrainers, sel)");
-  assertStringIncludes(s, "Personal Training vor Ort");
-  assertStringIncludes(s, "Online-Training");
-  assertStringIncludes(s, "vexAbschnitte.ausLand(t, sel)");
-  // URL-Zustand: plz/land/radius in die Adresse schreiben + beim Laden lesen.
+  // Serverseitige Umkreissuche; der Vor-Ort/Online-Split in suche.html entfällt.
+  assertStringIncludes(s, "rpc/suche_trainer_umkreis");
+  assert(!s.includes("vexAbschnitte.einteilen(allTrainers, sel)"), "Online-Split noch aktiv");
+  // Fester Umkreis (eine Konstante), kein Radius-Wähler/-Parameter mehr.
+  assertStringIncludes(s, "const UMKREIS_KM = 25;");
+  assert(!s.includes("q.get('radius')"), "Radius-Parameter noch gelesen");
+  assert(!s.includes('id="radiusInput"'), "Radius-Wähler noch im HTML");
+  // URL-Zustand bleibt (plz/land).
   assertStringIncludes(s, "function urlStand(");
-  assertStringIncludes(s, "history.replaceState");
-  assertStringIncludes(s, "q.get('radius')");
 });

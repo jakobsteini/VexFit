@@ -14,9 +14,9 @@ import { assert, assertStringIncludes } from "jsr:@std/assert@1";
 
 const lies = (p: string) => Deno.readTextFile(new URL(p, import.meta.url));
 
-Deno.test("S1: OEFFENTLICHE_VORSCHAU ist eingeschaltet", async () => {
+Deno.test("S1/12.11.: OEFFENTLICHE_VORSCHAU ist AUS (Jakob 12.11.)", async () => {
   const cfg = await lies("./vexfit-config.js");
-  assertStringIncludes(cfg, "OEFFENTLICHE_VORSCHAU: true");
+  assertStringIncludes(cfg, "OEFFENTLICHE_VORSCHAU: false");
 });
 
 Deno.test("S1: Sicht trainers_vorschau ohne vollen Nachnamen/Kontaktdaten/Monatspreis", async () => {
@@ -39,24 +39,12 @@ Deno.test("S1: Sicht trainers_vorschau ohne vollen Nachnamen/Kontaktdaten/Monats
   assertStringIncludes(r, "DROP VIEW IF EXISTS public.trainers_vorschau");
 });
 
-Deno.test("S1: suche.html lädt nicht angemeldet aus trainers_vorschau, ohne Nachnamen", async () => {
+Deno.test("S1/12.11.: suche.html zeigt anon ein Gate und lädt KEINE Trainerdaten", async () => {
   const s = await lies("./suche.html");
-  assertStringIncludes(s, "trainers_vorschau?select=");
-  assertStringIncludes(s, "function ladeVorschau(");
-  assertStringIncludes(s, "vexVorschau.vorschauAktiv(angemeldet)) {");
-  // Die Vorschau-Spaltenliste trägt kein Feld "nachname" (nur nachname_initial).
-  const m = s.match(/const VORSCHAU_SPALTEN = '([^']+)'/);
-  assert(m, "VORSCHAU_SPALTEN nicht gefunden");
-  const felder = m![1].split(",");
-  assert(!felder.includes("nachname"), "VORSCHAU_SPALTEN enthält den vollen Nachnamen");
-  assert(felder.includes("nachname_initial"), "VORSCHAU_SPALTEN sollte nachname_initial enthalten");
-  for (const verboten of ["email", "telefon", "user_id", "preis_monat"]) {
-    assert(!felder.includes(verboten), `VORSCHAU_SPALTEN darf ${verboten} nicht anfordern`);
-  }
-  // Rückfall (Sicht noch nicht eingespielt) lädt trainers_oeffentlich OHNE Nachnamen.
-  assertStringIncludes(s, "VORSCHAU_FALLBACK_SPALTEN");
-  const fb = s.match(/const VORSCHAU_FALLBACK_SPALTEN = '([^']+)'/);
-  assert(fb, "VORSCHAU_FALLBACK_SPALTEN nicht gefunden");
-  assert(!fb![1].split(",").includes("nachname"), "Rückfall darf keinen Nachnamen anfordern");
-  assertStringIncludes(s, "res.status === 404 || res.status === 400");
+  // Nicht angemeldet → Gate (Registrieren/Anmelden), kein Trainer-Netzaufruf.
+  assertStringIncludes(s, "function zeigeAnonGate(");
+  assertStringIncludes(s, "if(!angemeldet) { zeigeAnonGate(); return; }");
+  assertStringIncludes(s, 'id="anonGate"');
+  // Die Suche läuft angemeldet über die RPC, nicht mehr über die Vorschau-Sicht.
+  assertStringIncludes(s, "rpc/suche_trainer_umkreis");
 });

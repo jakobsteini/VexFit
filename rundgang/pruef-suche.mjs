@@ -45,8 +45,12 @@ function mock() {
     if (url.includes("api.zippopotam.us")) return json({ places: [{ latitude: "47.80", longitude: "13.04", "place name": "Salzburg" }] });
     if (url.includes(`${SB}/storage/v1/object/public/avatars/`)) return route.fulfill({ status: 200, contentType: "image/svg+xml", body: portrait() });
     if (url.includes(SB)) {
-      if (url.includes("/rest/v1/trainers_vorschau")) return json(TRAINER);
-      if (url.includes("/rest/v1/trainers_oeffentlich")) return json(TRAINER.map((t) => { const c = { ...t }; delete c.nachname; return c; }));
+      // 12.11.: Suche läuft angemeldet über die RPC (nur Vor-Ort, mit Entfernung).
+      if (url.includes("/rest/v1/rpc/suche_trainer_umkreis")) {
+        return json(TRAINER.filter((t) => t.trainingsort !== "online")
+          .map((t) => ({ ...t, entfernung_km: 3 })));
+      }
+      if (url.includes("/rest/v1/trainers_vorschau") || url.includes("/rest/v1/trainers_oeffentlich")) return json([]);
       if (method === "POST") return route.fulfill({ status: 201, contentType: "application/json", body: "[]" });
       if (url.includes("/rest/v1/")) return json([]);
       return json({});
@@ -56,60 +60,37 @@ function mock() {
   };
 }
 
-function kanal(c) { const s = c / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); }
-function lumRgb([r, g, b]) { return 0.2126 * kanal(r) + 0.7152 * kanal(g) + 0.0722 * kanal(b); }
-function parseRgb(s) { const m = s.match(/(\d+),\s*(\d+),\s*(\d+)/); return m ? [ +m[1], +m[2], +m[3] ] : [0, 0, 0]; }
-function kontrast(a, b) { const la = lumRgb(parseRgb(a)), lb = lumRgb(parseRgb(b)); return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); }
-
 const browser = await chromium.launch();
+
+// 12.11.: suche.html ist jetzt nur-angemeldet. ANON (keine Sitzung) sieht das
+// Gate (Registrieren/Anmelden), KEINE Trainerkarten, macht KEINEN Trainer-
+// Netzaufruf und zeigt keinen vollen Nachnamen. Geprüft bei 375 und 1440 px.
+// Die angemeldete Karten-/Foto-Ansicht deckt e2e/suche-nur-angemeldet.spec.ts ab.
 for (const w of [375, 1440]) {
   const ctx = await browser.newContext({ viewport: { width: w, height: 900 } });
   await ctx.addInitScript(() => { try { localStorage.setItem("vexfit_consent", "abgelehnt"); } catch { /* kein localStorage */ } });
   await ctx.route("**/*", mock());
   const page = await ctx.newPage();
+  const vorher = requests.length;
   await page.goto(`${BASIS}/suche.html?plz=5020&land=AT`, { waitUntil: "networkidle" });
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(700);
+
+  const gate = await page.evaluate(() => { const g = document.getElementById("anonGate"); return !!g && getComputedStyle(g).display !== "none"; });
+  merk(gate, `[${w}] Gate sichtbar (Registrieren/Anmelden)`);
+
+  const karten = await page.evaluate(() => document.querySelectorAll(".tc").length);
+  merk(karten === 0, `[${w}] keine Trainerkarten für anon (${karten})`);
+
+  const trainerCalls = requests.slice(vorher).filter((u) => /trainers|suche_trainer_umkreis/.test(u));
+  merk(trainerCalls.length === 0, `[${w}] kein Trainer-Netzaufruf (${trainerCalls.length})`);
 
   // Kein waagrechter Scroll.
   const scroll = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
   merk(scroll.sw <= scroll.cw, `[${w}] kein waagrechter Scroll (${scroll.sw} <= ${scroll.cw})`);
 
-  // Überschrift nicht unter der festen Kopfzeile.
-  const kopf = await page.evaluate(() => {
-    const nav = document.querySelector("nav").getBoundingClientRect();
-    const label = document.querySelector(".sh-label").getBoundingClientRect();
-    const titel = document.querySelector(".sh-title").getBoundingClientRect();
-    return { navBottom: nav.bottom, labelTop: label.top, titelTop: titel.top };
-  });
-  merk(kopf.labelTop >= kopf.navBottom - 1, `[${w}] Überschrift frei unter der Kopfzeile (label ${kopf.labelTop.toFixed(0)} >= nav ${kopf.navBottom.toFixed(0)})`);
-
-  // Knopf-Kontrast.
-  const btn = await page.evaluate(() => { const b = document.getElementById("matchBtn"); const cs = getComputedStyle(b); return { color: cs.color, bg: cs.backgroundColor }; });
-  const kBtn = kontrast(btn.color, btn.bg);
-  merk(kBtn >= 4.5, `[${w}] 4-Fragen-Knopf Kontrast ${kBtn.toFixed(2)} >= 4,5`);
-
-  // Kartenfoto: Bildmitte = Kartenmitte ± 2 px; object-fit cover + position top.
-  const foto = await page.evaluate(() => {
-    const img = document.querySelector(".tc .ci .cimg");
-    if (!img) return null;
-    const karte = img.closest(".tc").getBoundingClientRect();
-    const b = img.getBoundingClientRect();
-    const cs = getComputedStyle(img);
-    return { imgMitte: b.left + b.width / 2, karteMitte: karte.left + karte.width / 2, fit: cs.objectFit, pos: cs.objectPosition };
-  });
-  if (!foto) { merk(false, `[${w}] Kartenfoto <img> gefunden`); }
-  else {
-    merk(Math.abs(foto.imgMitte - foto.karteMitte) <= 2, `[${w}] Bildmitte = Kartenmitte ± 2 px (${Math.abs(foto.imgMitte - foto.karteMitte).toFixed(1)})`);
-    merk(foto.fit === "cover", `[${w}] object-fit cover (${foto.fit})`);
-    // „center top" wird vom Browser als „50% 0%" normalisiert – beides heißt oben.
-    merk(/top/.test(foto.pos) || /\b0%/.test(foto.pos), `[${w}] object-position oben (${foto.pos})`);
-  }
-
-  // Kein voller Nachname im DOM (nicht angemeldet).
+  // Kein voller Nachname im DOM.
   const dom = await page.content();
   merk(!dom.includes(CANARY), `[${w}] kein voller Nachname im DOM`);
-  const namen = await page.evaluate(() => Array.from(document.querySelectorAll(".cn")).map((e) => e.textContent.trim()));
-  merk(namen.length > 0 && namen.every((n) => /^[^ ]+ [A-ZÄÖÜ]\.$/.test(n) || /^[^ ]+$/.test(n)), `[${w}] Kartennamen sind „Vorname N." (${namen.join(", ")})`);
 
   await ctx.close();
 }

@@ -37,13 +37,11 @@ Deno.test("suche.html: Enter startet die Suche, Warteliste sendet die PLZ", asyn
   assertStringIncludes(s, "const stadt = document.getElementById('plzInput')?.value.trim() || '';");
 });
 
-Deno.test("suche.html: Umkreissuche erkennt Online-Trainer am trainingsort", async () => {
+Deno.test("suche.html/12.11.: KEIN Online-Abschnitt mehr – nur Vor-Ort im Umkreis", async () => {
   const s = await lies("./suche.html");
-  // Die Online-Erkennung liegt jetzt in der geprüften Einteilung (D2);
-  // suche.html nutzt sie fuer die zwei Abschnitte.
-  assertStringIncludes(s, "vexAbschnitte.einteilen(allTrainers, sel)");
-  const ab = await lies("./vexfit-abschnitte.js");
-  assertStringIncludes(ab, "ort === 'online' || ort === 'beides'");
+  // Online-Trainer werden nicht mehr angezeigt; die RPC liefert nur Vor-Ort.
+  assert(!s.includes("vexAbschnitte.einteilen(allTrainers, sel)"), "Vor-Ort/Online-Split noch aktiv");
+  assertStringIncludes(s, "rpc/suche_trainer_umkreis");
 });
 
 Deno.test("keine Preise in falscher Reihenfolge (auch dynamisch) auf oeffentlichen Seiten", async () => {

@@ -1,5 +1,14 @@
 # Entwurf: Datenschutz-Passage „Öffentliche Trainerprofile" (07./08.11.2026)
 
+> **ÜBERHOLT seit 12.11.2026.** Jakob hat die öffentliche Vorschau wieder
+> ABGESCHALTET: nicht angemeldete Besucher sehen keine Trainerdaten mehr
+> (`OEFFENTLICHE_VORSCHAU = false`, anon-Lesezugriff entzogen). Dieser Entwurf
+> einer Datenschutz-Passage für öffentliche Profile wird damit **nicht** mehr
+> gebraucht. Er bleibt nur als Historie stehen. Die Live-Erklärung in
+> `rechtliches.html` sollte (BLOCK, Jakob) bestätigen, dass Trainerprofile nur
+> angemeldeten Kundinnen/Kunden gezeigt werden – falls preview-bezogene Sätze
+> eingepflegt worden wären, sind sie zu entfernen.
+
 **Status: ENTWURF – NICHT live übernommen.** Entscheidung liegt bei Jakob.
 Grund: Mit der am 07.11.2026 eingeschalteten öffentlichen Vorschau
 (`OEFFENTLICHE_VORSCHAU = true`) sind Trainerkarten jetzt **ohne Anmeldung**
