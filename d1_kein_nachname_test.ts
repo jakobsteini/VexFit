@@ -22,9 +22,9 @@ Deno.test("D1/12.11.: profil.html zeigt anon ein Gate (kein Netzaufruf), angemel
   // Nicht angemeldet → Gate, keine Trainerdaten geladen.
   assertStringIncludes(p, "function zeigeProfilGate(");
   assertStringIncludes(p, "if(!angemeldet) { zeigeProfilGate(); return; }");
-  // Angemeldet → einzelnes Profil NUR über die RPC trainer_profil.
-  assertStringIncludes(p, "rpc/trainer_profil");
-  assertStringIncludes(p, "p_id: id");
+  // Angemeldet → einzelnes Profil NUR über den Edge-Endpunkt /trainer-profil.
+  assertStringIncludes(p, "functions/v1/vexfit-automation/trainer-profil");
+  assertStringIncludes(p, "id: id");
 });
 
 Deno.test("D1: profilAnzeigeName baut 'Vorname N.' aus nachname_initial", async () => {

@@ -8,9 +8,10 @@
 //   npm i -D @playwright/test && npx playwright install chromium
 //   npx playwright test e2e/suche-nur-angemeldet.spec.ts
 //
-// Geprüft: (a) nicht angemeldet → kein Trainername/-ort im DOM UND keine
-// REST-Antwort mit Trainerdaten; (b) angemeldet → RPC liefert nur ≤25 km; bei 0
-// Treffern ehrliche Leerseite + Vormerkung (interne Mail gestubbt). 375 + 1440 px.
+// Geprüft: (a) nicht angemeldet → kein Trainername/-ort im DOM UND kein
+// Trainer-Netzaufruf; (b) angemeldet → der Edge-Endpunkt /trainer-suche liefert
+// nur ≤25 km; bei 0 Treffern ehrliche Leerseite + Vormerkung (interne Mail
+// gestubbt). 375 + 1440 px.
 import { expect, test, type Page } from "@playwright/test";
 
 const BASIS = process.env.VEXFIT_BASIS || "http://localhost:5199";
@@ -21,15 +22,17 @@ const SITZUNG = {
   email: "kunde@example.com", role: "kunde",
 };
 
-// Jede /rest/v1/-Antwort mitschneiden; keine darf Trainerdaten (nachname/vorname/
-// stadt) für anon liefern. RPC + Geo stubben.
+// Jeden Trainer-Netzaufruf mitschneiden (REST-Tabelle/Sicht UND Edge-Endpunkt);
+// für anon darf es gar keinen geben. /trainer-suche liefert die ≤25-km-Treffer.
 async function fange(page: Page, trainer: unknown[], restCalls: string[]) {
   await page.route("**/rest/v1/**", (r) => {
     restCalls.push(r.request().method() + " " + r.request().url());
     return r.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   });
-  await page.route("**/rest/v1/rpc/suche_trainer_umkreis", (r) =>
-    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(trainer) }));
+  await page.route("**/functions/v1/vexfit-automation/trainer-suche", (r) => {
+    restCalls.push(r.request().method() + " " + r.request().url());
+    return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, ort: "Salzburg", land: "AT", umkreis_km: 25, treffer: trainer }) });
+  });
   await page.route("**/api.zippopotam.us/**", (r) =>
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ places: [{ "place name": "Salzburg", latitude: "47.80", longitude: "13.04" }] }) }));
   await page.route("**/functions/v1/vexfit-automation/neuer-kunde", (r) =>
@@ -43,8 +46,8 @@ for (const breite of [375, 1440]) {
     await page.setViewportSize({ width: breite, height: 900 });
     await page.goto(`${BASIS}/suche.html?plz=5020&land=AT`);
     await expect(page.locator("#anonGate")).toBeVisible();
-    // Kein Trainer-Netzaufruf (weder Tabelle/Sicht noch RPC).
-    expect(restCalls.filter((u) => /trainers|suche_trainer_umkreis/.test(u))).toEqual([]);
+    // Kein Trainer-Netzaufruf (weder Tabelle/Sicht noch Edge-Endpunkt).
+    expect(restCalls.filter((u) => /trainers|trainer-suche/.test(u))).toEqual([]);
     const dom = (await page.locator("body").innerText()).toLowerCase();
     expect(dom.includes("vor ort")).toBeFalsy();
   });
@@ -62,7 +65,7 @@ for (const breite of [375, 1440]) {
   });
 }
 
-test("angemeldet: ein Treffer wird gezeigt (RPC-Ergebnis)", async ({ page }) => {
+test("angemeldet: ein Treffer wird gezeigt (/trainer-suche)", async ({ page }) => {
   const restCalls: string[] = [];
   await fange(page, [{ id: "t1", vorname: "Nina", nachname: "B.", stadt: "Salzburg", plz: "5020", land: "AT", trainingsart: "EMS", trainingsort: "vor_ort", preis_stunde: 50, entfernung_km: 3 }], restCalls);
   await page.addInitScript((s) => { try { localStorage.setItem("vexfit_session", JSON.stringify(s)); } catch { /* egal */ } }, SITZUNG);

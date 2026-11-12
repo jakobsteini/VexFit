@@ -78,7 +78,7 @@ Deno.test("D2: 5020 land-eindeutig – AT liefert Salzburg, CH liefert den Schwe
 Deno.test("D2/12.11.: suche.html – nur Vor-Ort über RPC, KEIN Online-Split, fester Umkreis", async () => {
   const s = await lies("./suche.html");
   // Serverseitige Umkreissuche; der Vor-Ort/Online-Split in suche.html entfällt.
-  assertStringIncludes(s, "rpc/suche_trainer_umkreis");
+  assertStringIncludes(s, "functions/v1/vexfit-automation/trainer-suche");
   assert(!s.includes("vexAbschnitte.einteilen(allTrainers, sel)"), "Online-Split noch aktiv");
   // Fester Umkreis (eine Konstante), kein Radius-Wähler/-Parameter mehr.
   assertStringIncludes(s, "const UMKREIS_KM = 25;");

@@ -459,21 +459,23 @@ async function loadProfile() {
   if(!angemeldet) { zeigeProfilGate(); return; }
 
   try {
-    // 12.11.: Angemeldete lesen das Profil NUR über die RPC trainer_profil
-    // (SECURITY DEFINER) – kein direkter Tabellenzugriff auf fremde Trainer mehr.
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/trainer_profil`, {
+    // 12.11. (Weg B): Angemeldete Kunden lesen das Profil NUR über den
+    // Edge-Endpunkt /trainer-profil (service_role). Er gibt ein Profil nur frei,
+    // wenn der Trainer ≤ 25 km um die zuletzt gesuchte Mitte liegt ODER der Kunde
+    // schon eine Anfrage an ihn hat; sonst 404. Kein direkter Tabellenzugriff.
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/vexfit-automation/trainer-profil`, {
       method: 'POST',
-      headers: { ...authKopf(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ p_id: id })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (sess && sess.access_token || '') },
+      body: JSON.stringify({ id: id })
     });
-    if(istAbgemeldet(res)) return;
-    if(!res.ok) throw new Error('Profil laden fehlgeschlagen: ' + res.status);
-    const data = await res.json();
-    if(!Array.isArray(data)) throw new Error('Unerwartete Antwort beim Profil laden');
-    // Kein Treffer: Profil gibt es nicht oder es ist nicht freigeschaltet ->
-    // fuer Suchmaschinen noindex setzen, dann zur Suche.
-    if(data.length === 0) { seoNichtGefunden(); window.location.href = 'suche.html'; return; }
-    trainerData = data[0];
+    if(res.status === 401) { sitzungAbgelaufen(); return; }
+    if(res.status === 403) { zeigeProfilGate(); return; } // kein Kundenkonto
+    // 404: Profil gibt es nicht, ist nicht freigeschaltet oder außerhalb der
+    // zuletzt gesuchten Nähe -> noindex, zurück zur Suche.
+    if(res.status === 404) { seoNichtGefunden(); window.location.href = 'suche.html'; return; }
+    const data = await res.json().catch(() => null);
+    if(!res.ok || !data || !data.ok || !data.trainer) throw new Error('Profil laden fehlgeschlagen: ' + res.status);
+    trainerData = data.trainer;
     renderProfile(trainerData);
     setzeProfilSeo(trainerData, id);
     // D7: anonymen Profilaufruf zaehlen (genau einmal pro Seitenaufruf). Die

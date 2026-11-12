@@ -69,6 +69,58 @@ for (const sicht of ["trainers_vorschau", "trainers_oeffentlich"]) {
   } catch (e) { merk(false, `c) ${sicht} Netzwerkfehler: ${e.message}`); }
 }
 
+// ── 12.11. (Weg B): KUNDEN-Fälle. Login über Umgebungsvariablen, nichts im Code.
+//    VEXFIT_TEST_MAIL / VEXFIT_TEST_PASSWORT setzen (das Passwort tippt Jakob
+//    selbst beim Aufruf ein). Ohne diese Variablen werden die Fälle übersprungen.
+const TEST_MAIL = process.env.VEXFIT_TEST_MAIL || "";
+const TEST_PW = process.env.VEXFIT_TEST_PASSWORT || "";
+if (!TEST_MAIL || !TEST_PW) {
+  console.log("  (übersprungen) e/f/g) Kunden-Fälle – VEXFIT_TEST_MAIL/VEXFIT_TEST_PASSWORT nicht gesetzt");
+} else {
+  let token = null;
+  try {
+    const anm = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: SUPABASE_KEY },
+      body: JSON.stringify({ email: TEST_MAIL, password: TEST_PW }),
+    });
+    const ad = await anm.json().catch(() => ({}));
+    token = ad.access_token || null;
+    merk(!!token, `e) Kunden-Login (${TEST_MAIL}) -> Zugangs-Token erhalten (Status ${anm.status})`);
+  } catch (e) { merk(false, `e) Kunden-Login Netzwerkfehler: ${e.message}`); }
+
+  if (token) {
+    const kundeKopf = { apikey: SUPABASE_KEY, Authorization: "Bearer " + token };
+    // f) Kunde liest trainers direkt per REST -> KEINE fremden Zeilen (Abschnitt 3:
+    //    authenticated sieht nur die eigene Zeile; ein Kunde hat keine Trainerzeile).
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/trainers?select=id,vorname&limit=50`, { headers: kundeKopf });
+      const j = res.ok ? await res.json().catch(() => []) : [];
+      const anzahl = Array.isArray(j) ? j.length : 0;
+      merk(anzahl === 0, `f) Kunde: GET /trainers -> keine fremden Zeilen (Status ${res.status}, ${anzahl} Zeilen)`);
+    } catch (e) { merk(false, `f) Kunde /trainers Netzwerkfehler: ${e.message}`); }
+
+    // g) Der richtige Weg funktioniert: /trainer-suche liefert mit Kunden-Token
+    //    eine (ggf. leere) Trefferliste; ohne Token 401.
+    try {
+      const mit = await fetch(`${SUPABASE_URL}/functions/v1/vexfit-automation/trainer-suche`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ plz: "5020", land: "AT" }),
+      });
+      const d = await mit.json().catch(() => ({}));
+      merk(mit.ok && d && d.ok === true && Array.isArray(d.treffer),
+        `g) /trainer-suche (Kunde) -> ok mit Trefferliste (Status ${mit.status}, ${Array.isArray(d.treffer) ? d.treffer.length : "?"} Treffer, Umkreis ${d.umkreis_km} km)`);
+      const ohne = await fetch(`${SUPABASE_URL}/functions/v1/vexfit-automation/trainer-suche`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plz: "5020", land: "AT" }),
+      });
+      merk(ohne.status === 401, `g) /trainer-suche ohne Token -> 401 (ist ${ohne.status})`);
+    } catch (e) { merk(false, `g) /trainer-suche Netzwerkfehler: ${e.message}`); }
+  }
+}
+
 // d) Live-Seiten (nicht angemeldet): suche.html + eine aktive Profilseite.
 //    Kein voller Nachname in DOM, Meta, JSON-LD oder in REST-Antworten.
 if (process.env.OHNE_D === "1") {

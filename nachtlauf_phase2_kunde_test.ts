@@ -41,7 +41,7 @@ Deno.test("suche.html/12.11.: KEIN Online-Abschnitt mehr – nur Vor-Ort im Umkr
   const s = await lies("./suche.html");
   // Online-Trainer werden nicht mehr angezeigt; die RPC liefert nur Vor-Ort.
   assert(!s.includes("vexAbschnitte.einteilen(allTrainers, sel)"), "Vor-Ort/Online-Split noch aktiv");
-  assertStringIncludes(s, "rpc/suche_trainer_umkreis");
+  assertStringIncludes(s, "functions/v1/vexfit-automation/trainer-suche");
 });
 
 Deno.test("keine Preise in falscher Reihenfolge (auch dynamisch) auf oeffentlichen Seiten", async () => {

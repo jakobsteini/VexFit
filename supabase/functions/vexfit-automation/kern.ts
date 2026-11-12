@@ -235,6 +235,8 @@ export interface TrainerProfil {
   nachname?: string | null;
   email?: string | null;
   plz?: string | null;
+  /** Land 'AT'|'DE'|'CH' (für die serverseitige PLZ-Auflösung). */
+  land?: string | null;
   stadt?: string | null;
   avatar_url?: string | null;
   trainingsart?: string | null;
@@ -267,6 +269,189 @@ export interface TrainerProfil {
    *  keine Erinnerungen, nicht im Abendbericht. Fehlt die Spalte, ist das Feld
    *  undefined (altes Verhalten). */
   ist_test?: boolean | null;
+}
+
+// ============================================================================
+// Umkreis-Suche serverseitig (Weg B mit Zwischenspeicher, 12.11.2026)
+// ============================================================================
+
+/** Fester Umkreis in km. Einzige Stelle – nie vom Client beeinflussbar. */
+export const UMKREIS_KM = 25;
+/** Einfache Bremse gegen Massenabfragen: höchstens so viele Suchen je Kunde und
+ *  Stunde. (Fenster im Prozess – siehe suchRatenGrenze; bei vielen gleichzeitigen
+ *  Instanzen eine lockere Obergrenze je Instanz.) */
+export const SUCHEN_PRO_STUNDE = 30;
+
+/** Normalisiert einen Landwert auf 'AT'|'DE'|'CH' oder null. */
+export function landNormal(x: unknown): "AT" | "DE" | "CH" | null {
+  const s = String(x == null ? "" : x).trim().toUpperCase();
+  return (s === "AT" || s === "DE" || s === "CH") ? s : null;
+}
+
+/** 4- oder 5-stellige PLZ (nur Ziffern) oder null. */
+export function ziffernPlz(x: unknown): string | null {
+  const s = String(x == null ? "" : x).trim();
+  return /^\d{4,5}$/.test(s) ? s : null;
+}
+
+/** Entfernung zweier Punkte in km (Haversine, Erdradius 6371 km). */
+export function haversineKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6371, rad = (x: number) => (x * Math.PI) / 180;
+  return R * 2 * Math.asin(Math.sqrt(
+    Math.sin(rad(lat2 - lat1) / 2) ** 2 +
+      Math.cos(rad(lat1)) * Math.cos(rad(lat2)) *
+        Math.sin(rad(lng2 - lng1) / 2) ** 2,
+  ));
+}
+
+/** Ein Ort aus dem Zwischenspeicher / Standortdienst. netzfehler = Dienst nicht
+ *  erreichbar (≠ „PLZ unbekannt" = null). */
+export interface PlzOrt {
+  ort: string | null;
+  lat: number;
+  lng: number;
+}
+
+/** Trainer-Felder, die die Suche (serverseitig) braucht: die für Kunden
+ *  erlaubten Anzeigefelder PLUS lat/lng (nur serverseitig) für die Rechnung. */
+export interface TrainerKandidat {
+  id: string;
+  created_at?: string | null;
+  vorname?: string | null;
+  nachname?: string | null;
+  stadt?: string | null;
+  plz?: string | null;
+  land?: string | null;
+  trainingsart?: string | null;
+  trainingsort?: string | null;
+  erfahrung?: string | null;
+  spezialisierungen?: string[] | null;
+  sprachen?: string[] | null;
+  trainingsorte?: string[] | null;
+  bio?: string | null;
+  preis_stunde?: number | string | null;
+  preis_monat?: number | string | null;
+  zertifikate?: string | null;
+  calendly?: string | null;
+  avatar_url?: string | null;
+  verifiziert?: boolean | null;
+  verfuegbarkeit?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+}
+
+/** Für Kunden erlaubte Trainerfelder (ohne E-Mail/Telefon/user_id/lat/lng),
+ *  bei der Suche zusätzlich mit entfernung_km. */
+export interface TrainerSuchTreffer {
+  id: string;
+  created_at?: string | null;
+  vorname?: string | null;
+  nachname?: string | null;
+  stadt?: string | null;
+  plz?: string | null;
+  land?: string | null;
+  trainingsart?: string | null;
+  trainingsort?: string | null;
+  erfahrung?: string | null;
+  spezialisierungen?: string[] | null;
+  sprachen?: string[] | null;
+  trainingsorte?: string[] | null;
+  bio?: string | null;
+  preis_stunde?: number | string | null;
+  preis_monat?: number | string | null;
+  zertifikate?: string | null;
+  calendly?: string | null;
+  avatar_url?: string | null;
+  verifiziert?: boolean | null;
+  verfuegbarkeit?: string | null;
+  entfernung_km?: number;
+}
+
+/** Nur die für Kunden erlaubten Felder aus einem Kandidaten (lat/lng bleiben
+ *  serverseitig). `entfernung_km` optional angehängt. */
+export function erlaubteTrainerFelder(
+  t: TrainerKandidat,
+  entfernungKm?: number,
+): TrainerSuchTreffer {
+  const o: TrainerSuchTreffer = {
+    id: t.id,
+    created_at: t.created_at ?? null,
+    vorname: t.vorname ?? null,
+    nachname: t.nachname ?? null,
+    stadt: t.stadt ?? null,
+    plz: t.plz ?? null,
+    land: t.land ?? null,
+    trainingsart: t.trainingsart ?? null,
+    trainingsort: t.trainingsort ?? null,
+    erfahrung: t.erfahrung ?? null,
+    spezialisierungen: t.spezialisierungen ?? null,
+    sprachen: t.sprachen ?? null,
+    trainingsorte: t.trainingsorte ?? null,
+    bio: t.bio ?? null,
+    preis_stunde: t.preis_stunde ?? null,
+    preis_monat: t.preis_monat ?? null,
+    zertifikate: t.zertifikate ?? null,
+    calendly: t.calendly ?? null,
+    avatar_url: t.avatar_url ?? null,
+    verifiziert: t.verifiziert ?? null,
+    verfuegbarkeit: t.verfuegbarkeit ?? null,
+  };
+  if (typeof entfernungKm === "number") o.entfernung_km = entfernungKm;
+  return o;
+}
+
+/**
+ * Reine Suchrechnung (ohne Netz/DB): aus den Kandidaten (gleiches Land, aktiv,
+ * nicht gesperrt, nicht Test – das filtert die DB-Abfrage) die Vor-Ort-Trainer
+ * mit Koordinaten ≤ umkreisKm um die Mitte, nach Entfernung sortiert, mit
+ * entfernung_km (gerundet). Online-only wird hier zusätzlich ausgeschlossen –
+ * doppelt hält besser. Optionaler Schwerpunkt filtert über Spezialisierung /
+ * Trainingsart.
+ */
+export function trainerTrefferBerechnen(
+  kandidaten: TrainerKandidat[],
+  mitte: { lat: number; lng: number },
+  schwerpunkt: string | null,
+  umkreisKm: number = UMKREIS_KM,
+): TrainerSuchTreffer[] {
+  const sp = (schwerpunkt || "").trim().toLowerCase();
+  const treffer: Array<{ t: TrainerKandidat; d: number }> = [];
+  for (const t of kandidaten || []) {
+    const ort = String(t.trainingsort ?? "");
+    if (ort !== "vor_ort" && ort !== "beides") continue; // kein reines Online
+    if (t.lat == null || t.lng == null) continue;
+    const d = haversineKm(mitte.lat, mitte.lng, Number(t.lat), Number(t.lng));
+    if (!(d <= umkreisKm)) continue;
+    if (sp) {
+      const spez = (t.spezialisierungen || []).join(" ").toLowerCase();
+      const art = String(t.trainingsart ?? "").toLowerCase();
+      if (!spez.includes(sp) && !art.includes(sp)) continue;
+    }
+    treffer.push({ t, d });
+  }
+  treffer.sort((a, b) => a.d - b.d);
+  return treffer.map(({ t, d }) => erlaubteTrainerFelder(t, Math.round(d)));
+}
+
+/** Prozess-weites Zeitfenster je Kunde für die Suchbremse. */
+const _suchFenster = new Map<string, number[]>();
+/** true, wenn der Kunde in der letzten Stunde schon SUCHEN_PRO_STUNDE Suchen
+ *  hatte (diese eingerechnet). Fenster im Prozess (wie die Admin-Bremse). */
+export function suchRatenGrenze(
+  id: string,
+  jetzt: number = Date.now(),
+  max: number = SUCHEN_PRO_STUNDE,
+): boolean {
+  const vor1h = jetzt - 3_600_000;
+  const liste = (_suchFenster.get(id) || []).filter((t) => t > vor1h);
+  liste.push(jetzt);
+  _suchFenster.set(id, liste);
+  return liste.length > max;
 }
 
 export interface Mail {
@@ -470,9 +655,35 @@ export interface Anschluesse {
    *  (service_role) – fuer die Admin-Zuordnung „PLZ ohne Land". Gibt die Zahl
    *  geaenderter Zeilen zurueck. */
   adminLandSetzen?(tabelle: "trainers" | "kunden", id: string, land: "AT" | "DE" | "CH"): Promise<number>;
-  /** 12.11.: Trainer-Koordinaten (lat/lng) nachtragen – für den Altbestand ohne
-   *  Koordinaten, damit die Umkreissuche sie findet. Gibt geänderte Zeilen zurück. */
+  /** 12.11.: Trainer-Koordinaten (lat/lng) setzen – bei Registrierung, Profil-
+   *  Pflege und beim Admin-Nachtrag. Gibt geänderte Zeilen zurück. */
   adminKoordinatenSetzen?(trainerId: string, lat: number, lng: number): Promise<number>;
+
+  // ── Weg B (12.11.): serverseitige Umkreis-Suche mit Zwischenspeicher ──
+  /** Zwischenspeicher lesen: Ort/Koordinaten einer PLZ (service_role) oder null. */
+  plzOrtLesen?(land: string, plz: string): Promise<PlzOrt | null>;
+  /** Zwischenspeicher schreiben (service_role, mehrfach = merge). */
+  plzOrtSpeichern?(e: { land: string; plz: string; ort: string | null; lat: number; lng: number; quelle: string }): Promise<void>;
+  /** Eine PLZ beim externen Standortdienst (api.zippopotam.us) abrufen.
+   *  null = dort unbekannt; { netzfehler:true } = Dienst nicht erreichbar. */
+  plzAbrufExtern?(land: string, plz: string): Promise<PlzOrt | { netzfehler: true } | null>;
+  /** Kandidaten der Suche: Trainer im gleichen Land, aktiv, nicht gesperrt, nicht
+   *  Test, Vor-Ort/beides, mit Koordinaten – nur erlaubte Felder + lat/lng.
+   *  service_role (umgeht RLS). */
+  trainerKandidatenFuerSuche?(land: string): Promise<TrainerKandidat[]>;
+  /** Ein einzelner freigegebener (aktiv, nicht gesperrt, nicht Test) Trainer mit
+   *  den erlaubten Feldern + lat/lng, für /trainer-profil. service_role. */
+  trainerFuerProfil?(id: string): Promise<TrainerKandidat | null>;
+  /** Kurze Kundenzeile zur Sitzung (user_id bevorzugt, sonst E-Mail): id, email,
+   *  letzte Such-Mitte. null = kein Kundenkonto → /trainer-suche verweigert. */
+  kundeKurzNachAuth?(userId: string, email: string): Promise<{ id: string; email: string; letzte_such_lat: number | null; letzte_such_lng: number | null } | null>;
+  /** Letzte Such-Mitte eines Kunden speichern (service_role). */
+  kundeSuchMitteSetzen?(kundeId: string, lat: number, lng: number): Promise<void>;
+  /** true, wenn der Kunde (E-Mail) bereits eine Anfrage an diesen Trainer hat. */
+  kundeHatAnfrageAnTrainer?(kundenEmail: string, trainerId: string): Promise<boolean>;
+  /** Trainer mit PLZ aber ohne Koordinaten (für den Admin-Nachtrag „alle").
+   *  service_role. */
+  trainerOhneKoordinaten?(): Promise<Array<{ id: string; plz: string | null; land: string | null; vorname?: string | null; nachname?: string | null }>>;
   /** Loescht die Zeile; verhindert ein Fremdschluessel (z. B. Anfragen) das
    *  Loeschen, werden stattdessen die personenbezogenen Felder anonymisiert
    *  (Fremddaten bleiben erhalten). */
@@ -1552,6 +1763,173 @@ async function koerperLesen(
   }
 }
 
+// ============================================================================
+// Weg B: PLZ serverseitig auflösen (Zwischenspeicher → Standortdienst)
+// ============================================================================
+
+/**
+ * Löst eine PLZ (im gegebenen Land) zu Ort/Koordinaten auf:
+ *   1) Zwischenspeicher plz_orte,
+ *   2) sonst externer Standortdienst (api.zippopotam.us) und Ergebnis ablegen.
+ * Rückgabe: PlzOrt | null (unbekannt) | { netzfehler:true } (Dienst down).
+ * Erfindet NIE Koordinaten.
+ */
+export async function plzAufloesen(
+  a: Anschluesse,
+  land: string,
+  plz: string,
+): Promise<PlzOrt | { netzfehler: true } | null> {
+  const l = landNormal(land);
+  const p = ziffernPlz(plz);
+  if (!l || !p) return null;
+  // 1) Zwischenspeicher
+  if (a.plzOrtLesen) {
+    const c = await a.plzOrtLesen(l, p);
+    if (c && Number.isFinite(c.lat) && Number.isFinite(c.lng)) return c;
+  }
+  // 2) externer Dienst
+  if (!a.plzAbrufExtern) return null;
+  const ext = await a.plzAbrufExtern(l, p);
+  if (!ext) return null;
+  if ((ext as { netzfehler?: true }).netzfehler) return { netzfehler: true };
+  const ort = ext as PlzOrt;
+  if (!Number.isFinite(ort.lat) || !Number.isFinite(ort.lng)) return null;
+  // 3) ablegen (best effort – ein Schreibfehler darf die Suche nicht stoppen)
+  if (a.plzOrtSpeichern) {
+    try {
+      await a.plzOrtSpeichern({ land: l, plz: p, ort: ort.ort, lat: ort.lat, lng: ort.lng, quelle: "zippopotam" });
+    } catch { /* egal */ }
+  }
+  return ort;
+}
+
+/** Status eines Koordinaten-Nachtrags für einen Trainer. */
+export type KoordStatus =
+  | "erledigt"
+  | "keine_plz"
+  | "plz_unbekannt"
+  | "dienst_fehler"
+  | "kein_anschluss";
+
+/**
+ * Trainer-Koordinaten aus PLZ+Land serverseitig setzen (Registrierung, Profil-
+ * Pflege, Admin-Nachtrag). Ohne Land ist eine 4-stellige PLZ nicht eindeutig →
+ * "keine_plz" (der Admin trägt dann erst das Land nach). Best effort.
+ */
+export async function trainerKoordinatenNachtragen(
+  a: Anschluesse,
+  t: { id: string; plz?: string | null; land?: string | null },
+): Promise<{ status: KoordStatus; ort?: string | null }> {
+  const plz = ziffernPlz(t.plz);
+  const land = landNormal(t.land);
+  if (!plz || !land) return { status: "keine_plz" };
+  const o = await plzAufloesen(a, land, plz);
+  if (!o) return { status: "plz_unbekannt" };
+  if ((o as { netzfehler?: true }).netzfehler) return { status: "dienst_fehler" };
+  if (!a.adminKoordinatenSetzen) return { status: "kein_anschluss" };
+  const ort = o as PlzOrt;
+  await a.adminKoordinatenSetzen(t.id, ort.lat, ort.lng);
+  return { status: "erledigt", ort: ort.ort };
+}
+
+/**
+ * POST /trainer-suche — nur gültige Kunden-Sitzung. Eingabe { plz, land,
+ * schwerpunkt? }. Mittelpunkt serverseitig über plzAufloesen; fester 25-km-
+ * Umkreis (UMKREIS_KM, nie vom Client); gleiches Land; nur freigegebene, nicht
+ * gesperrte, nicht-Test, Vor-Ort-Trainer mit Koordinaten; nur erlaubte Felder,
+ * nach Entfernung sortiert (entfernung_km). umkreis/lat/lng im Body werden
+ * ignoriert. Einfache Bremse: SUCHEN_PRO_STUNDE je Kunde.
+ */
+async function trainerSuche(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const token = bearerToken(r);
+  const nutzer = token ? await a.benutzerAusToken(token) : null;
+  if (!nutzer) return antwort(401, { fehler: "Anmeldung erforderlich" }, herkunft);
+  const kunde = a.kundeKurzNachAuth
+    ? await a.kundeKurzNachAuth(nutzer.id, nutzer.email)
+    : null;
+  if (!kunde) return antwort(403, { fehler: "Nur für angemeldete Kunden." }, herkunft);
+  if (suchRatenGrenze(nutzer.id)) {
+    return antwort(429, { fehler: "Zu viele Suchen in kurzer Zeit. Bitte kurz warten." }, herkunft);
+  }
+  const body = await koerperLesen(r);
+  if (!body) return antwort(400, { fehler: "Die Anfrage war nicht lesbar." }, herkunft);
+  const land = landNormal(body.land);
+  const plz = ziffernPlz(body.plz);
+  if (!land) return antwort(400, { fehler: "Bitte Land wählen (AT, DE oder CH)." }, herkunft);
+  if (!plz) return antwort(400, { fehler: "Bitte gültige PLZ eingeben." }, herkunft);
+  const schwerpunkt = text(body.schwerpunkt) || null;
+
+  const mitte = await plzAufloesen(a, land, plz);
+  if (!mitte) return antwort(404, { fehler: "PLZ nicht gefunden. Bitte prüfen." }, herkunft);
+  if ((mitte as { netzfehler?: true }).netzfehler) {
+    return antwort(503, { fehler: "Standortdienst nicht erreichbar. Bitte später erneut versuchen." }, herkunft);
+  }
+  const m = mitte as PlzOrt;
+  // Such-Mitte für die Profil-Sichtprüfung merken (best effort).
+  if (a.kundeSuchMitteSetzen) {
+    try { await a.kundeSuchMitteSetzen(kunde.id, m.lat, m.lng); } catch { /* egal */ }
+  }
+  const kandidaten = a.trainerKandidatenFuerSuche
+    ? await a.trainerKandidatenFuerSuche(land)
+    : [];
+  const treffer = trainerTrefferBerechnen(kandidaten, m, schwerpunkt, UMKREIS_KM);
+  return antwort(200, {
+    ok: true,
+    ort: m.ort,
+    land,
+    umkreis_km: UMKREIS_KM,
+    treffer,
+  }, herkunft);
+}
+
+/**
+ * POST /trainer-profil — nur gültige Kunden-Sitzung. Eingabe { id }. Liefert ein
+ * Profil (nur erlaubte Felder) NUR, wenn der Trainer ≤ UMKREIS_KM um die zuletzt
+ * gesuchte Mitte des Kunden liegt ODER der Kunde bereits eine Anfrage an ihn hat;
+ * sonst 404 (nicht unterscheidbar von „gibt es nicht").
+ */
+async function trainerProfilEndpunkt(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const token = bearerToken(r);
+  const nutzer = token ? await a.benutzerAusToken(token) : null;
+  if (!nutzer) return antwort(401, { fehler: "Anmeldung erforderlich" }, herkunft);
+  const kunde = a.kundeKurzNachAuth
+    ? await a.kundeKurzNachAuth(nutzer.id, nutzer.email)
+    : null;
+  if (!kunde) return antwort(403, { fehler: "Nur für angemeldete Kunden." }, herkunft);
+  const body = await koerperLesen(r);
+  if (!body) return antwort(400, { fehler: "Die Anfrage war nicht lesbar." }, herkunft);
+  const id = text(body.id);
+  if (!id || id.length > 100) return antwort(400, { fehler: "id fehlt" }, herkunft);
+
+  const t = a.trainerFuerProfil ? await a.trainerFuerProfil(id) : null;
+  if (!t) return antwort(404, { fehler: "nicht gefunden" }, herkunft);
+
+  let erlaubt = false;
+  let entfernung: number | undefined;
+  if (kunde.letzte_such_lat != null && kunde.letzte_such_lng != null &&
+      t.lat != null && t.lng != null) {
+    const d = haversineKm(
+      Number(kunde.letzte_such_lat), Number(kunde.letzte_such_lng),
+      Number(t.lat), Number(t.lng),
+    );
+    if (d <= UMKREIS_KM) { erlaubt = true; entfernung = Math.round(d); }
+  }
+  if (!erlaubt && a.kundeHatAnfrageAnTrainer &&
+      await a.kundeHatAnfrageAnTrainer(kunde.email, id)) {
+    erlaubt = true;
+  }
+  if (!erlaubt) return antwort(404, { fehler: "nicht gefunden" }, herkunft);
+  return antwort(200, { ok: true, trainer: erlaubteTrainerFelder(t, entfernung) }, herkunft);
+}
+
 /**
  * Ein Aufruf. Vier Pfade, genau die vier Ausloeser des Workflows:
  *   /neuer-trainer  Webhook 1  → Mail an Jakob
@@ -1608,6 +1986,10 @@ export async function bearbeiten(
         return await neuerKunde(anfrageObjekt, a, herkunft);
       case "neue-anfrage":
         return await neueAnfrage(anfrageObjekt, a, herkunft);
+      case "trainer-suche":
+        return await trainerSuche(anfrageObjekt, a, herkunft);
+      case "trainer-profil":
+        return await trainerProfilEndpunkt(anfrageObjekt, a, herkunft);
       case "admin-aktion":
         return await adminAktion(anfrageObjekt, a, herkunft);
       case "freigabe-pruefen":
@@ -1665,6 +2047,21 @@ async function neuerTrainer(
       : null;
   } catch (fehler) {
     a.melden?.("neuer-trainer: Profil-Nachschlag fehlgeschlagen", String(fehler));
+  }
+  // 12.11.: Koordinaten aus PLZ+Land serverseitig setzen (best effort), damit der
+  // Trainer in der Umkreissuche auftaucht, sobald er freigegeben ist. Scheitert
+  // es (keine PLZ/kein Land/Dienst weg), bleibt lat/lng leer – der Admin trägt
+  // sie später über „Koordinaten nachtragen" nach.
+  if (profil && profil.id) {
+    try {
+      await trainerKoordinatenNachtragen(a, {
+        id: String(profil.id),
+        plz: (profil.plz ?? null) as string | null,
+        land: (profil.land ?? null) as string | null,
+      });
+    } catch (fehler) {
+      a.melden?.("neuer-trainer: Koordinaten setzen fehlgeschlagen", String(fehler));
+    }
   }
   const gesendet = await sendeWennAdresseTaugt(a, mailNeuerTrainer(body, profil));
   // Teil A: Push-Mitteilung an alle Admin-Geräte (best effort, nach der Mail –
@@ -2049,6 +2446,31 @@ async function adminAktion(
     }
   }
 
+  // 12.11.: „Koordinaten nachtragen (alle)" – alle Bestandstrainer mit PLZ, aber
+  // ohne Koordinaten in einem Klick. Kein ziel_id – vor der ziel_id-Pflicht.
+  // Ergebnisliste je Trainer: erledigt / plz_unbekannt / keine_plz / dienst_fehler.
+  if (aktion === "koordinaten_nachtragen" && body.alle === true) {
+    if (!a.trainerOhneKoordinaten || !a.adminKoordinatenSetzen) {
+      return antwort(501, { fehler: "Koordinaten-Nachtrag ist in dieser Fassung nicht verfuegbar" }, herkunft);
+    }
+    let ziele: Array<{ id: string; plz: string | null; land: string | null; vorname?: string | null; nachname?: string | null }>;
+    try {
+      ziele = await a.trainerOhneKoordinaten();
+    } catch (fehler) {
+      if (istMigrationFehlt(fehler)) return antwort(400, { fehler: "Die Spalten lat/lng fehlen (Migration 2026-11-12-01 nicht eingespielt)." }, herkunft);
+      throw fehler;
+    }
+    const ergebnis: Array<{ id: string; name: string; status: KoordStatus; ort?: string | null }> = [];
+    let erledigt = 0;
+    for (const t of ziele) {
+      const r = await trainerKoordinatenNachtragen(a, { id: t.id, plz: t.plz, land: t.land });
+      if (r.status === "erledigt") erledigt++;
+      ergebnis.push({ id: t.id, name: `${t.vorname || ""} ${t.nachname || ""}`.trim(), status: r.status, ort: r.ort ?? null });
+    }
+    await a.protokoll?.({ admin_id: nutzer.id, aktion: "koordinaten_nachtragen_alle", ergebnis: `gesamt=${ziele.length} erledigt=${erledigt}` });
+    return antwort(200, { ok: true, gesamt: ziele.length, erledigt, ergebnis }, herkunft);
+  }
+
   const zielId = String(body.ziel_id ?? "");
   if (!zielId) return antwort(400, { fehler: "ziel_id fehlt" }, herkunft);
   // Eingaben begrenzen (Typ/Laenge): Kennungen sind UUIDs/kurze Strings.
@@ -2301,27 +2723,28 @@ async function adminAktion(
       return antwort(200, { ok: true, geaendert: n }, herkunft);
     }
 
-    // ── Land eindeutig (07.11.2026): fehlendes Land einer Person von Hand
-    // zuordnen. Fuer die Admin-Liste „PLZ ohne Land". Nur 'AT'/'DE'/'CH'. ──
-    case "koordinaten_setzen": {
-      const lat = Number(body.lat);
-      const lng = Number(body.lng);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) ||
-          lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        return antwort(400, { fehler: "lat/lng ungültig" }, herkunft);
-      }
+    // ── 12.11.: Koordinaten EINES Trainers (ziel_id) serverseitig nachtragen.
+    //    PLZ+Land kommen aus der Trainerzeile, aufgelöst über plzAufloesen
+    //    (Zwischenspeicher → Standortdienst). Der Client schickt KEINE lat/lng
+    //    mehr. Die „alle auf einen Klick"-Variante (body.alle) läuft vor der
+    //    ziel_id-Pflicht (siehe oben, koordinatenNachtragenAlle). ──
+    case "koordinaten_nachtragen": {
       if (!a.adminKoordinatenSetzen) {
         return antwort(501, { fehler: "Koordinaten-Nachtrag ist in dieser Fassung nicht verfuegbar" }, herkunft);
       }
+      const plz = a.trainerPlzNachId ? await a.trainerPlzNachId(zielId) : null;
+      const land = a.trainerLandNachId ? await a.trainerLandNachId(zielId) : null;
       try {
-        const n = await a.adminKoordinatenSetzen(zielId, lat, lng);
-        await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: "trainers", ziel_id: zielId, ergebnis: `lat/lng gesetzt geaendert=${n}` });
-        return antwort(200, { ok: true, geaendert: n }, herkunft);
+        const erg = await trainerKoordinatenNachtragen(a, { id: zielId, plz, land });
+        await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: "trainers", ziel_id: zielId, ergebnis: `koordinaten ${erg.status}` });
+        return antwort(200, { ok: true, status: erg.status, ort: erg.ort ?? null }, herkunft);
       } catch (fehler) {
         if (istMigrationFehlt(fehler)) return antwort(400, { fehler: "Die Spalten lat/lng fehlen (Migration 2026-11-12-01 nicht eingespielt)." }, herkunft);
         throw fehler;
       }
     }
+    // ── Land eindeutig (07.11.2026): fehlendes Land einer Person von Hand
+    // zuordnen. Fuer die Admin-Liste „PLZ ohne Land". Nur 'AT'/'DE'/'CH'. ──
     case "land_setzen": {
       const tabelle = artTabelle(body.art);
       if (!tabelle) return antwort(400, { fehler: "art fehlt (trainer/kunde)" }, herkunft);
@@ -2380,6 +2803,18 @@ async function freigabePruefen(
   }
   const t = nutzer.email ? await a.trainerProfilNachEmail(nutzer.email) : null;
   if (!t) return antwort(200, { ok: true, gesendet: false, grund: "kein Trainer" }, herkunft);
+  // 12.11.: Beim Speichern (auch PLZ-Änderung) die Koordinaten serverseitig
+  // nachführen – best effort, blockiert die Freigabe-Prüfung nicht. So bleibt
+  // trainers.lat/lng zur PLZ aktuell, ohne dass der Client Koordinaten schickt.
+  try {
+    await trainerKoordinatenNachtragen(a, {
+      id: t.id,
+      plz: (t.plz ?? null) as string | null,
+      land: (t.land ?? null) as string | null,
+    });
+  } catch (fehler) {
+    a.melden?.("freigabe-pruefen: Koordinaten setzen fehlgeschlagen", String(fehler));
+  }
   if (t.aktiv === true) return antwort(200, { ok: true, gesendet: false, grund: "schon aktiv" }, herkunft);
   if (t.freigabe_mail_gesendet === true) {
     return antwort(200, { ok: true, gesendet: false, grund: "schon gemeldet" }, herkunft);

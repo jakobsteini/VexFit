@@ -17,7 +17,7 @@ Deno.test("D6: suche.html – canonical, noindex, dynamischer Titel nach Ort/Lan
   assertStringIncludes(s, '<link rel="canonical" href="https://vexfit.app/suche.html">');
   assertStringIncludes(s, '<meta name="robots" content="noindex">');
   assertStringIncludes(s, "function setzeSucheSeo(stadt, land)");
-  assertStringIncludes(s, "setzeSucheSeo(coords.stadt, sel)");
+  assertStringIncludes(s, "setzeSucheSeo(ort, land)");
   assertStringIncludes(s, "Personal Trainer in ${ort} finden | Vexfit");
   // Keine personenbezogenen Daten in den Titel/Beschreibung-Bausteinen.
   const fn = s.slice(s.indexOf("function setzeSucheSeo"), s.indexOf("function urlStand"));

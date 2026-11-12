@@ -556,6 +556,8 @@ async function searchByPLZ() {
   const plz = document.getElementById('plzInput').value.trim();
   const status = document.getElementById('plzStatus');
 
+  // 12.11.: Ohne Anmeldung keine Suche (und kein Netzaufruf) – nur das Gate.
+  if(!angemeldet) { zeigeAnonGate(); return; }
   if(!plz || plz.length < 4) {
     status.textContent = '⚠️ Bitte gültige PLZ eingeben';
     return;
@@ -577,74 +579,64 @@ async function searchByPLZ() {
   letztesLand = land || '';
   urlStand(plz, land, UMKREIS_KM);
   try { vexfitTrichter('suche', { rolle: 'kunde', plz: plz, land: land, einmal: false }); } catch(e) {}
-
-  status.textContent = '📍 Standort wird ermittelt...';
-  const ergebnis = await vexPlz.aufloesen(plz, { cache: plzCache, land: land });
-  if(!ergebnis || ergebnis.netzfehler) {
-    status.textContent = (ergebnis && ergebnis.netzfehler)
-      ? '⚠️ Standortdienst nicht erreichbar. Bitte später erneut versuchen.'
-      : '⚠️ PLZ nicht gefunden. Bitte prüfen.';
-    return;
-  }
-  // Sicherheitsnetz: nur falls doch ohne Land aufgelöst (sollte durch die
-  // Land-Pflicht oben nicht vorkommen) – Nutzer wählt den Ort.
-  if(ergebnis.mehrdeutig) {
-    vexPlz.auswahlKnoepfe(ergebnis.optionen, status, (ort) => umkreisSuche(ort, status));
-    return;
-  }
-  umkreisSuche(ergebnis, status);
+  await umkreisSuche(plz, land, status);
 }
 
-// 12.11.: Serverseitige Umkreissuche über die RPC suche_trainer_umkreis.
-// Nur angemeldet; nur Vor-Ort-Trainer im gleichen Land ≤ UMKREIS_KM. KEIN
-// Online-Abschnitt, KEIN Rückfall auf weiter entfernte Trainer. Keine Treffer →
-// ehrliche Leerseite + Vormerkung.
-async function umkreisSuche(coords, status) {
-  const sel = gewaehltesLand(); // 'AT'|'DE'|'CH'|null
-  setzeSucheSeo(coords.stadt, sel);
+// 12.11. (Weg B): Serverseitige Umkreissuche über den Edge-Endpunkt
+// /vexfit-automation/trainer-suche. Der Browser schickt nur { plz, land,
+// schwerpunkt } und sein Zugangs-Token; Mittelpunkt, Umkreis (fest 25 km) und
+// alle Filter laufen serverseitig. KEINE Koordinaten mehr im Browser, KEIN
+// direkter Zugriff auf die Trainertabelle. Nur Vor-Ort-Trainer im gleichen Land
+// ≤ UMKREIS_KM; kein Online, kein Rückfall. Keine Treffer → ehrliche Leerseite
+// + Vormerkung.
+async function umkreisSuche(plz, land, status) {
   if(!angemeldet) { zeigeAnonGate(); return; }
-  if(coords.lat == null || coords.lng == null || !sel) {
-    status.textContent = '⚠️ Standort konnte nicht eindeutig bestimmt werden. Bitte PLZ und Land prüfen.';
+  if(!land) {
+    status.textContent = '⚠️ Bitte wähle das Land (Österreich, Deutschland oder Schweiz).';
+    const el = landFeld(); if(el) el.focus();
     return;
   }
-  status.textContent = `📍 ${coords.stadt} · Suche im Umkreis von ${UMKREIS_KM} km...`;
+  status.textContent = `📍 Suche im Umkreis von ${UMKREIS_KM} km...`;
 
-  let liste = [];
+  let daten = null;
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/suche_trainer_umkreis`, {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/vexfit-automation/trainer-suche`, {
       method: 'POST',
-      headers: { ...authKopf(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        p_lat: coords.lat, p_lng: coords.lng, p_land: sel,
-        p_schwerpunkt: aktuellerSchwerpunkt(), p_umkreis_km: UMKREIS_KM
-      })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (sess && sess.access_token || '') },
+      body: JSON.stringify({ plz: plz, land: land, schwerpunkt: aktuellerSchwerpunkt() })
     });
-    if(istAbgemeldet(res)) return;
-    if(!res.ok) throw new Error('Suche fehlgeschlagen: ' + res.status);
-    const roh = await res.json();
-    liste = Array.isArray(roh) ? roh : [];
+    if(res.status === 401) { sitzungAbgelaufen(); return; }
+    if(res.status === 403) { zeigeAnonGate(); return; } // kein Kundenkonto
+    if(res.status === 429) { status.textContent = '⚠️ Zu viele Suchen in kurzer Zeit. Bitte kurz warten.'; return; }
+    if(res.status === 404) { status.textContent = '⚠️ PLZ nicht gefunden. Bitte prüfen.'; return; }
+    if(res.status === 503) { status.textContent = '⚠️ Standortdienst nicht erreichbar. Bitte später erneut versuchen.'; return; }
+    daten = await res.json().catch(() => null);
+    if(!res.ok || !daten || !daten.ok) throw new Error('Suche fehlgeschlagen: ' + res.status);
   } catch(e) {
     console.error(e);
     status.textContent = '⚠️ Die Suche ist gerade nicht erreichbar. Bitte später erneut versuchen.';
     return;
   }
 
+  const ort = daten.ort || '';
+  setzeSucheSeo(ort, land);
+  const liste = Array.isArray(daten.treffer) ? daten.treffer : [];
   const vorOrt = liste.map(t => ({ ...t, _distance: (t.entfernung_km != null ? Math.round(t.entfernung_km) : null) }));
   allTrainers = vorOrt; // Filter/Sortierung/Match arbeiten auf dem Umkreis-Ergebnis
   spracheOptionenAufbauen();
 
   if(vorOrt.length) {
-    status.textContent = `📍 ${coords.stadt} · ${vorOrt.length} Trainer in ${UMKREIS_KM} km`;
+    status.textContent = `📍 ${ort} · ${vorOrt.length} Trainer in ${UMKREIS_KM} km`;
     naeheHinweisAus();
     try { vexfitTrichter('treffer', { rolle: 'kunde', plz: letztePlz, land: letztesLand, einmal: false }); } catch(e) {}
     renderTrainers(vorOrt);
   } else {
-    status.textContent = `📍 Noch kein Trainer in ${UMKREIS_KM} km um ${coords.stadt}.`;
+    status.textContent = `📍 Noch kein Trainer in ${UMKREIS_KM} km${ort ? ' um ' + ort : ''}.`;
     const grid = document.getElementById('trainerGrid');
     if(grid) grid.innerHTML = '';
     const empty = document.getElementById('emptyState');
     if(empty) empty.classList.remove('show');
-    naeheHinweisAn(coords);
+    naeheHinweisAn({ stadt: ort });
   }
 }
 

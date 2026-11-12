@@ -36,7 +36,7 @@ Deno.test("Regel: freigegeben ohne Foto sichtbar, gesperrt/nicht-freigegeben nic
 Deno.test("Angemeldeter Pfad: Abfrage begrenzt auf aktiv=true UND nicht gesperrt", () => {
   // Die Tabellen-Abfrage des angemeldeten Pfads filtert server-seitig genau die
   // Regel ab – so kann ein gesperrter Trainer gar nicht erst ankommen.
-  assertStringIncludes(suche, "rpc/suche_trainer_umkreis");
+  assertStringIncludes(suche, "functions/v1/vexfit-automation/trainer-suche");
 });
 
 Deno.test("Angemeldeter Pfad: KEIN zusätzlicher Mindeststärke-/Foto-Nachfilter", () => {

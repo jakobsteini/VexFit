@@ -46,5 +46,5 @@ Deno.test("S1/12.11.: suche.html zeigt anon ein Gate und lädt KEINE Trainerdate
   assertStringIncludes(s, "if(!angemeldet) { zeigeAnonGate(); return; }");
   assertStringIncludes(s, 'id="anonGate"');
   // Die Suche läuft angemeldet über die RPC, nicht mehr über die Vorschau-Sicht.
-  assertStringIncludes(s, "rpc/suche_trainer_umkreis");
+  assertStringIncludes(s, "functions/v1/vexfit-automation/trainer-suche");
 });

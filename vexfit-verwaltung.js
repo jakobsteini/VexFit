@@ -1323,8 +1323,8 @@ function starteVerwaltung() {
          <div class="heute-liste">${standortHtml}</div>
        </div>
        <div class="heute-karte">
-         <div class="heute-kopf">🧭 Standort ohne Koordinaten <span class="heute-zahl${ohneKoord.length ? "" : " null"}">${ohneKoord.length}</span></div>
-         <div class="heute-liste">${koordHtml}</div>
+         <div class="heute-kopf">🧭 Standort ohne Koordinaten <span class="heute-zahl${ohneKoord.length ? "" : " null"}">${ohneKoord.length}</span>${ohneKoord.length ? ` <button class="btn-klein" data-aktion="koord-alle">Koordinaten nachtragen (alle)</button>` : ""}</div>
+         <div class="heute-liste" id="koord-liste">${koordHtml}</div>
        </div>
        <div class="heute-karte">
          <div class="heute-kopf">⏰ Anfragen ohne Antwort seit über 24 h <span class="heute-zahl null" id="heute-anfragen-zahl">…</span></div>
@@ -1965,25 +1965,48 @@ function starteVerwaltung() {
     }
   }
 
-  // 12.11.: Koordinaten eines Trainers nachtragen – PLZ (land-bewusst) auflösen
-  // und lat/lng über die Edge-Aktion speichern. Macht den Trainer in der
-  // Umkreissuche sichtbar.
-  async function koordinatenNachtragen(id, plz, land) {
-    const p = String(plz || "").trim();
-    if (!p) { fehler("Dieser Trainer hat keine PLZ – zuerst eine PLZ nachtragen."); return; }
-    const l = (typeof vexPlz !== "undefined" && vexPlz.landNormal) ? vexPlz.landNormal(land) : null;
-    let erg;
-    try { erg = await vexPlz.aufloesen(p, { land: l }); }
-    catch { fehler("Standortdienst nicht erreichbar."); return; }
-    if (!erg || erg.netzfehler || erg.mehrdeutig || typeof erg.lat !== "number" || typeof erg.lng !== "number") {
-      fehler("Koordinaten konnten nicht ermittelt werden (PLZ/Land prüfen)."); return;
+  // 12.11. (Weg B): Koordinaten-Nachtrag läuft SERVERSEITIG. Die Edge-Aktion löst
+  // die PLZ (aus der Trainerzeile) über den Zwischenspeicher/Standortdienst auf
+  // und setzt lat/lng – der Browser schickt KEINE Koordinaten mehr.
+  function koordStatusText(status) {
+    switch (status) {
+      case "erledigt": return "erledigt";
+      case "plz_unbekannt": return "PLZ unbekannt";
+      case "keine_plz": return "keine/ungültige PLZ oder Land fehlt";
+      case "dienst_fehler": return "Standortdienst nicht erreichbar";
+      default: return "nicht möglich";
     }
-    const d = await adminEdge({ aktion: "koordinaten_setzen", ziel_id: id, lat: erg.lat, lng: erg.lng });
+  }
+  // Einzelnen Trainer nachtragen.
+  async function koordinatenNachtragen(id) {
+    const d = await adminEdge({ aktion: "koordinaten_nachtragen", ziel_id: id });
     if (!d) return;
-    const t = daten.trainers.find((x) => String(x.id) === String(id));
-    if (t) { t.lat = erg.lat; t.lng = erg.lng; }
-    erfolg("Koordinaten gespeichert (" + (erg.stadt || p) + ").");
-    neuZeichnen();
+    if (d.status === "erledigt") {
+      erfolg("Koordinaten gespeichert" + (d.ort ? " (" + nameFormatieren(d.ort) + ")" : "") + ".");
+      await ladeDaten(); // frische lat/lng → Trainer fällt aus der Liste
+    } else {
+      fehler("Nicht möglich: " + koordStatusText(d.status) + ".");
+    }
+  }
+  // Alle Bestandstrainer ohne Koordinaten in einem Klick. Zeigt die Ergebnisliste
+  // (erledigt / PLZ unbekannt …) in der Karte.
+  async function koordinatenAlleNachtragen() {
+    const d = await adminEdge({ aktion: "koordinaten_nachtragen", alle: true });
+    if (!d) return;
+    erfolg(`Koordinaten nachgetragen: ${d.erledigt} von ${d.gesamt} erledigt.`);
+    const liste = $("koord-liste");
+    if (liste) {
+      const eintraege = Array.isArray(d.ergebnis) ? d.ergebnis : [];
+      liste.innerHTML = eintraege.length
+        ? eintraege.map((e) => {
+            const name = nameFormatieren(e.name) || "Trainer";
+            const extra = e.ort ? " – " + escapeHtml(nameFormatieren(e.ort)) : "";
+            return `<div class="heute-zeile"><span>${escapeHtml(name)}</span><span class="heute-fehlt">${escapeHtml(koordStatusText(e.status))}${extra}</span></div>`;
+          }).join("")
+        : '<div class="heute-leer">Nichts nachzutragen</div>';
+    }
+    // Daten im Hintergrund frisch holen (Zähler/Karten), aber die Ergebnisliste
+    // oben stehen lassen, bis der Admin die Übersicht erneut öffnet.
   }
 
   async function freigeben(id) {
@@ -2537,7 +2560,8 @@ function starteVerwaltung() {
       if (akt === "test-markieren") { testMarkieren(id, true); return; }
       if (akt === "test-aufheben") { testMarkieren(id, false); return; }
       if (akt === "kicken") { kicken(art, id); return; }
-      if (akt === "koord-nachtragen") { koordinatenNachtragen(id, a.dataset.plz, a.dataset.land); return; }
+      if (akt === "koord-nachtragen") { koordinatenNachtragen(id); return; }
+      if (akt === "koord-alle") { koordinatenAlleNachtragen(); return; }
       if (akt === "zertifikat") { zertifikatOeffnen(a.dataset.pfad); return; }
       if (akt === "push-entfernen") { pushGeraetEntfernen(id); return; }
       if (akt === "abendbericht-jetzt") { abendberichtJetzt(); return; }

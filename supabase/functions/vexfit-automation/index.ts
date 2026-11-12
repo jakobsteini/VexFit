@@ -818,6 +818,145 @@ const anschluesse: Anschluesse = {
     return Array.isArray(zeilen) ? zeilen.length : 0;
   },
 
+  // ── Weg B (12.11.): serverseitige Umkreis-Suche mit Zwischenspeicher ──
+
+  // Zwischenspeicher lesen. Fehlt die Tabelle (Migration 2026-11-12-01 nicht
+  // eingespielt) → null, dann fragt plzAufloesen den externen Dienst.
+  async plzOrtLesen(land: string, plz: string) {
+    try {
+      const r = await fetch(
+        restAdresse(`plz_orte?land=eq.${encodeURIComponent(land)}&plz=eq.${encodeURIComponent(plz)}&select=ort,lat,lng&limit=1`),
+        { headers: restKopf() },
+      );
+      if (!r.ok) return null;
+      const zeilen = await r.json().catch(() => []);
+      const z = Array.isArray(zeilen) ? zeilen[0] : null;
+      if (!z || z.lat == null || z.lng == null) return null;
+      return { ort: z.ort ?? null, lat: Number(z.lat), lng: Number(z.lng) };
+    } catch {
+      return null;
+    }
+  },
+
+  // Zwischenspeicher schreiben (Upsert auf PK (land,plz)).
+  async plzOrtSpeichern(e) {
+    const a = await fetch(restAdresse("plz_orte"), {
+      method: "POST",
+      headers: { ...restKopf(), Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({
+        land: e.land, plz: e.plz, ort: e.ort, lat: e.lat, lng: e.lng,
+        quelle: e.quelle, abgerufen_am: new Date().toISOString(),
+      }),
+    });
+    if (!a.ok) {
+      const txt = await a.text().catch(() => "");
+      throw new Error(`plzOrtSpeichern fehlgeschlagen: HTTP ${a.status} ${txt}`);
+    }
+  },
+
+  // Externer Standortdienst. Supabase Edge Functions (Deno Deploy) erlauben
+  // ausgehende HTTPS-Aufrufe (443) – dieselbe Art Aufruf wie die Meta-CAPI; nur
+  // ausgehendes SMTP (25/587) ist gesperrt. Zeitlimit 5 s. null = PLZ dort
+  // unbekannt; { netzfehler:true } = Dienst nicht erreichbar/Zeitüberschreitung.
+  async plzAbrufExtern(land: string, plz: string) {
+    const lk = String(land).toLowerCase();
+    try {
+      const r = await fetch(`https://api.zippopotam.us/${lk}/${encodeURIComponent(plz)}`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (r.status === 404) return null; // PLZ dort unbekannt
+      if (!r.ok) return { netzfehler: true as const };
+      const d = await r.json().catch(() => null);
+      const p = d && Array.isArray(d.places) ? d.places[0] : null;
+      if (!p) return null;
+      const lat = parseFloat(p.latitude);
+      const lng = parseFloat(p.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return { ort: p["place name"] ?? null, lat, lng };
+    } catch {
+      return { netzfehler: true as const };
+    }
+  },
+
+  // Suchkandidaten: gleiches Land, aktiv, nicht gesperrt, nicht Test, Vor-Ort/
+  // beides, mit Koordinaten. Nur erlaubte Felder + lat/lng. land case-insensitiv.
+  async trainerKandidatenFuerSuche(land: string) {
+    const cols = "id,created_at,vorname,nachname,stadt,plz,land,trainingsart,trainingsort,erfahrung,spezialisierungen,sprachen,trainingsorte,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,verifiziert,verfuegbarkeit,lat,lng";
+    return await lesen<import("./kern.ts").TrainerKandidat>(
+      `trainers?select=${cols}` +
+        `&aktiv=eq.true&gesperrt=not.is.true&ist_test=not.is.true` +
+        `&trainingsort=in.(vor_ort,beides)` +
+        `&land=ilike.${encodeURIComponent(land)}` +
+        `&lat=not.is.null&lng=not.is.null&limit=2000`,
+    );
+  },
+
+  // Ein einzelner freigegebener Trainer (für /trainer-profil): erlaubte Felder +
+  // lat/lng, nur aktiv, nicht gesperrt, nicht Test.
+  async trainerFuerProfil(id: string) {
+    const cols = "id,created_at,vorname,nachname,stadt,plz,land,trainingsart,trainingsort,erfahrung,spezialisierungen,sprachen,trainingsorte,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,verifiziert,verfuegbarkeit,lat,lng";
+    const zeilen = await lesen<import("./kern.ts").TrainerKandidat>(
+      `trainers?id=eq.${encodeURIComponent(id)}&select=${cols}` +
+        `&aktiv=eq.true&gesperrt=not.is.true&ist_test=not.is.true&limit=1`,
+    );
+    return zeilen[0] ?? null;
+  },
+
+  // Kurze Kundenzeile zur Sitzung: zuerst über user_id, sonst E-Mail. Fehlen die
+  // letzte_such_*-Spalten (Migration nicht eingespielt), ohne sie laden.
+  async kundeKurzNachAuth(userId: string, email: string) {
+    const voll = "id,email,letzte_such_lat,letzte_such_lng";
+    const knapp = "id,email";
+    for (const spalten of [voll, knapp]) {
+      for (const filter of [
+        userId ? `user_id=eq.${encodeURIComponent(userId)}` : "",
+        email ? `email=ilike.${encodeURIComponent(email)}` : "",
+      ]) {
+        if (!filter) continue;
+        const r = await fetch(
+          restAdresse(`kunden?${filter}&select=${spalten}&limit=1`),
+          { headers: restKopf() },
+        );
+        if (!r.ok) break; // Spaltenfehler → nächste (knappe) Spaltenliste
+        const zeilen = await r.json().catch(() => []);
+        const z = Array.isArray(zeilen) ? zeilen[0] : null;
+        if (z) {
+          return {
+            id: String(z.id),
+            email: String(z.email ?? email ?? ""),
+            letzte_such_lat: z.letzte_such_lat != null ? Number(z.letzte_such_lat) : null,
+            letzte_such_lng: z.letzte_such_lng != null ? Number(z.letzte_such_lng) : null,
+          };
+        }
+      }
+    }
+    return null;
+  },
+
+  // Letzte Such-Mitte des Kunden speichern (für die Profil-Sichtprüfung).
+  async kundeSuchMitteSetzen(kundeId: string, lat: number, lng: number) {
+    await schreiben(`kunden?id=eq.${encodeURIComponent(kundeId)}`, {
+      letzte_such_lat: lat, letzte_such_lng: lng, letzte_such_am: new Date().toISOString(),
+    });
+  },
+
+  // Hat der Kunde (E-Mail) bereits eine Anfrage an diesen Trainer?
+  async kundeHatAnfrageAnTrainer(kundenEmail: string, trainerId: string) {
+    const zeilen = await lesen<{ id: string }>(
+      `anfragen?kunden_email=ilike.${encodeURIComponent(kundenEmail)}` +
+        `&trainer_id=eq.${encodeURIComponent(trainerId)}&select=id&limit=1`,
+    );
+    return zeilen.length >= 1;
+  },
+
+  // Trainer mit PLZ, aber ohne Koordinaten (für den Admin-Nachtrag „alle").
+  async trainerOhneKoordinaten() {
+    return await lesen<{ id: string; plz: string | null; land: string | null; vorname?: string | null; nachname?: string | null }>(
+      `trainers?select=id,plz,land,vorname,nachname` +
+        `&or=(lat.is.null,lng.is.null)&plz=not.is.null&ist_test=not.is.true&limit=2000`,
+    );
+  },
+
   // Erst loeschen; verhindert ein Fremdschluessel das Loeschen (HTTP 409,
   // PostgreSQL 23503 – z. B. verknuepfte Anfragen), dann die personenbezogenen
   // Felder anonymisieren, statt die Fremddaten (Anfragen des Kunden) zu loeschen.

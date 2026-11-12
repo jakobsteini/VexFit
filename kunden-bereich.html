@@ -561,52 +561,36 @@ function calcDist(lat1,lng1,lat2,lng2) {
   return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
 }
 
-async function loadTrainer() {
-  // Spaltenliste bewusst explizit (keine E-Mail/Telefon/user_id an den Browser).
-  const spalten = 'id,created_at,vorname,nachname,stadt,plz,land,trainingsart,erfahrung,spezialisierungen,bio,preis_stunde,preis_monat,zertifikate,calendly,avatar_url,aktiv';
-  try {
-    // Zuerst MIT trainingsort. Fehlt die Spalte noch (Migration nicht eingespielt),
-    // antwortet Supabase mit 400 - dann ohne sie laden, dann wird nur nicht nach
-    // Ort gefiltert und die Seite zeigt keinen Fehler.
-    let r = await fetch(`${SB}/rest/v1/trainers?aktiv=eq.true&select=${spalten},trainingsort&order=created_at.desc`, {
-      headers: authKopf()
-    });
-    if(istAbgemeldet(r)) return;
-    if(!r.ok && r.status === 400) {
-      r = await fetch(`${SB}/rest/v1/trainers?aktiv=eq.true&select=${spalten}&order=created_at.desc`, {
-        headers: authKopf()
-      });
-      if(istAbgemeldet(r)) return;
-    }
-    if(!r.ok) throw new Error('Trainer laden fehlgeschlagen: ' + r.status);
-    const daten = await r.json();
-    if(!Array.isArray(daten)) throw new Error('Unerwartete Antwort beim Trainer laden');
-    allT = daten;
-  } catch(e) {
-    console.error(e);
-    const g = document.getElementById('trainerList');
-    if(g) g.innerHTML = '<div class="empty-state" style="padding:48px 20px 20px">⚠️<br><br>Die Trainerliste konnte nicht geladen werden.<br>Bitte lade die Seite neu.</div>';
-  }
+// 12.11. (Weg B): Kunden lesen die Trainertabelle NICHT mehr direkt. Die Suche
+// läuft über den Edge-Endpunkt /trainer-suche (service_role). Diese Funktion
+// bleibt als harmloser Platzhalter, damit die vorhandenen Aufrufer (geführte
+// Suche, „Skip", Einstieg) unverändert aufrufen können.
+async function loadTrainer() { /* bewusst leer – siehe searchByPLZ (/trainer-suche) */ }
+
+// Fester Umkreis (km) – serverseitig verbindlich, hier nur fürs Anzeigen/Merken.
+const UMKREIS_KM = 25;
+// Schwerpunkt für die Suche: die im Einstieg gewählte Spezialisierung oder der
+// aktive Filterknopf; 'alle' → kein Schwerpunkt.
+function aktuellerSchwerpunkt() {
+  if(einstiegSpez && einstiegSpez.length) return einstiegSpez[0];
+  return (activeFilter && activeFilter !== 'alle') ? activeFilter : null;
 }
 
-// Ermittelt die Treffer. Online (ortsunabhaengig) braucht keine PLZ; sonst wird
-// zu jedem Trainer mit PLZ die Entfernung bestimmt (_dist in km, sonst null).
-// Die Aufteilung in Umkreis/Online und die Zaehlung uebernimmt vexEinstieg.
+// 12.11. (Weg B): Treffer kommen aus dem Edge-Endpunkt /trainer-suche – nur
+// Vor-Ort-Trainer im gleichen Land ≤ UMKREIS_KM, serverseitig berechnet und
+// sortiert (entfernung_km). Kein Online-Modell mehr: die frühere „online"-Wahl
+// des Einstiegs liefert nichts (ehrlich statt leere Versprechen).
 async function searchByPLZ() {
   const plz = document.getElementById('plzInput').value.trim();
-  const radius = parseInt(document.getElementById('radiusInput').value);
   const status = document.getElementById('plzStatus');
   const ort = einstiegOrt || 'beides';
-  if(!allT.length) await loadTrainer();
 
-  // 5-stellig -> automatisch DE; Land aus der Auswahl (sonst gespeichertes
-  // kunden.land). Immer sichtbar und aenderbar.
   plzLandAbgleich('plzInput','landInput');
   const land = gewaehltesLand() || (K && vexPlz.landNormal(K.land)) || null;
 
-  // Online: keine PLZ noetig, Entfernung spielt keine Rolle.
+  // Online-Wahl: es gibt in diesem Modell keine Online-Trainer → leer.
   if(ort === 'online') {
-    letzteTreffer = allT.map(t => ({ ...t, _dist: null }));
+    letzteTreffer = [];
     lastSearch = { plz: plz || (K && K.plz) || '', land: land, city: '', radius: 0, ort: 'online' };
     renderErgebnis();
     return;
@@ -622,22 +606,30 @@ async function searchByPLZ() {
   try { if(land) localStorage.setItem('vexfit_land', land); } catch(e) {}
   // kunden.land nachtragen, wenn noch leer (einmalig, best effort).
   if(land && K && K.id && !vexPlz.landNormal(K.land)) landSpeichern(land);
-  status.textContent = '📍 Standort wird ermittelt...';
-  const coords = await ermittleNutzerCoords(plz, status, land);
-  if(coords && coords.netzfehler) { status.textContent = '⚠️ Standort konnte nicht ermittelt werden. Bitte später erneut versuchen.'; return; }
-  if(!coords) { status.textContent = '⚠️ PLZ nicht gefunden'; return; }
-  status.textContent = `📍 ${coords.city} · Suche läuft...`;
-  const mitDist = [];
-  for(const t of allT) {
-    let dist = null;
-    if(t.plz) {
-      const tc = await trainerCoords(t.plz, t.land);
-      if(tc) dist = Math.round(calcDist(coords.lat, coords.lng, tc.lat, tc.lng));
-    }
-    mitDist.push({ ...t, _dist: dist });
+
+  status.textContent = `📍 Suche im Umkreis von ${UMKREIS_KM} km...`;
+  let daten = null;
+  try {
+    const res = await fetch(`${SB}/functions/v1/vexfit-automation/trainer-suche`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (sess && sess.access_token || '') },
+      body: JSON.stringify({ plz: plz, land: land, schwerpunkt: aktuellerSchwerpunkt() })
+    });
+    if(res.status === 401) { sitzungAbgelaufen(); return; }
+    if(res.status === 403) { status.textContent = '⚠️ Nur für angemeldete Kunden.'; return; }
+    if(res.status === 429) { status.textContent = '⚠️ Zu viele Suchen in kurzer Zeit. Bitte kurz warten.'; return; }
+    if(res.status === 404) { status.textContent = '⚠️ PLZ nicht gefunden'; return; }
+    if(res.status === 503) { status.textContent = '⚠️ Standort konnte nicht ermittelt werden. Bitte später erneut versuchen.'; return; }
+    daten = await res.json().catch(() => null);
+    if(!res.ok || !daten || !daten.ok) throw new Error('Suche fehlgeschlagen: ' + res.status);
+  } catch(e) {
+    console.error(e);
+    status.textContent = '⚠️ Die Suche ist gerade nicht erreichbar. Bitte später erneut versuchen.';
+    return;
   }
-  letzteTreffer = mitDist;
-  lastSearch = { plz, land: land, city: coords.city, radius: Number.isFinite(radius) ? radius : 0, ort };
+  const treffer = Array.isArray(daten.treffer) ? daten.treffer : [];
+  letzteTreffer = treffer.map(t => ({ ...t, _dist: (t.entfernung_km != null ? Math.round(t.entfernung_km) : null) }));
+  lastSearch = { plz, land: land, city: daten.ort || '', radius: UMKREIS_KM, ort };
   renderErgebnis();
 }
 

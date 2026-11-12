@@ -16,11 +16,11 @@ Deno.test("K4/12.11.: keine Treffer → ehrliche Leerseite + Vormerkung, KEIN R�
   const s = await lies("./suche.html");
   // Serverseitige Umkreissuche (RPC); kein client-seitiger Rückfall auf weiter
   // entfernte Trainer mehr, kein Online-Abschnitt.
-  assertStringIncludes(s, "rpc/suche_trainer_umkreis");
+  assertStringIncludes(s, "functions/v1/vexfit-automation/trainer-suche");
   assert(!s.includes("Die nächsten (ab ${vorOrt[0]._distance} km)"), "Rückfall auf die Nächsten noch da");
   // Ehrliche Leerseite + Vormerkung.
   assertStringIncludes(s, "In deiner Nähe ist gerade noch kein Trainer frei");
-  assertStringIncludes(s, "naeheHinweisAn(coords)");
+  assertStringIncludes(s, "naeheHinweisAn({ stadt: ort })");
 });
 
 Deno.test("K4: Nähe-Hinweisband mit Vormerkung vorhanden", async () => {
