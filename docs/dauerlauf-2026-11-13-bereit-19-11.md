@@ -304,3 +304,50 @@ Migration. Commit siehe Tabelle.
   SW cacht; `wunsch.html` registriert ebenfalls keinen SW.
 
 Commit siehe Tabelle (Screenshots + vergleich.html + Protokoll).
+
+---
+
+## G8 – PLAN UND OFFEN-LISTE
+
+- **`docs/wochenplan-2026-11-16.md`:** Plan bis 30.11. (Wunsch-Formular scharf
+  schalten, Trainer-Koordinaten, 3–5 Trainer über die Einladung, Artikel-Banner
+  ab 19.11., erste angenommene Anfrage bis 30.11.). Unbekanntes als BLOCK.
+- **`docs/offen-2026-11-13.md`:** erledigt / Jakobs Aufgaben / BLOCK.
+- **`docs/recht/entwurf-wunsch-2026-11-13.md`:** Datenschutz-Ergänzung fürs
+  Wunsch-Formular als ENTWURF (Rechtstexte nicht selbst geändert).
+
+---
+
+## ABSCHLUSS
+
+### 1. Bausteine G0–G8
+| Baustein | Status | Commit |
+|---|---|---|
+| G0 Bestand | erledigt | 2657e5f |
+| G1 Wunsch abgeben | erledigt | 454b1c9 |
+| G2 Verwaltung Wünsche + Vermittlung | erledigt | 720d80d |
+| G3 Einstiege aufs Formular | erledigt | bdc25f4 |
+| G4 Artikel-Banner | erledigt | b48afe1 |
+| G5 Einladungslink Trainer | erledigt | 4d3cc3e |
+| G6 Raum Salzburg nach km | erledigt | 2822cdb |
+| G7 Gesamttest + Screenshots | erledigt | 41b8477 |
+| G8 Plan + Offen-Liste | erledigt | (dieser Commit) |
+
+### 2. Ablauf Kunde → Wunsch → Vermittlung (6 Zeilen)
+1. Leser landet (Startseite/Salzburg-Seite/Suche-Mauer/Artikel) auf `/wunsch.html`.
+2. Er füllt ohne Konto das Formular aus und sendet (Edge `/wunsch`).
+3. Mail an office@ (Deep-Link in die Verwaltung) + Bestätigung an den Kunden („48 Stunden").
+4. Jakob öffnet Verwaltung → „Wünsche", sieht passende Trainer ≤25 km (auch nicht freigegebene).
+5. „An Trainer senden" legt eine Anfrage an und schickt die Trainer-Mail (erste/weitere/Studio).
+6. Trainer nimmt an → Stripe-Zahlung → bestehende Logik liefert die Kundendaten; Jakob setzt „vermittelt".
+
+### 3. Migrationen (vollständige Pfade, Reihenfolge)
+- `migrations/2026-11-13-01-wuensche.sql` (+ Rücknahme
+  `migrations/ruecknahmen/2026-11-13-01-wuensche-ruecknahme.sql`) – legt `wuensche`
+  an (service_role). Reihenfolge: falls `migrations/2026-11-12-01-suche-umkreis.sql`
+  noch nicht eingespielt → zuerst diese, dann 2026-11-13-01.
+- **Edge zu deployen:** `vexfit-automation` (neuer Pfad `/wunsch`, Wünsche-Aktionen,
+  G6-Zentrum, Einladungs-Zeile).
+
+### 4. Ergebnis
+`deno test` 865 passed / 0 failed · `deno check` grün · `deno lint` 30 (Baseline).
