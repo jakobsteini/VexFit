@@ -4139,6 +4139,10 @@ export interface TrichterQuelle {
 export interface AbendberichtZahlen {
   neueTrainer: number;
   neueTrainerHerkunft: { quelle: string; anzahl: number }[];
+  /** G5 (13.11.): neue Trainer in 24 h über die persönliche Einladung
+   *  (utm_source=persoenlich, Kampagne einladung-jakob). Aus der vorhandenen
+   *  Herkunfts-Erfassung (herkunft_quelle) abgeleitet, keine neue Spalte. */
+  einladungTrainer24h: number;
   neueKunden: number;
   wartenNamen: string[];
   /** E5: bereit zur Freigabe (≥5/8, nicht freigegeben, kein Test/Spam). */
@@ -4239,7 +4243,7 @@ export function istFehlerErgebnis(ergebnis: string | null | undefined): boolean 
 /** B7: leere Zahlen (Grundwert bzw. Rückfall, wenn nichts geladen werden kann). */
 export function leereAbendberichtZahlen(): AbendberichtZahlen {
   return {
-    neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [], bereitFreigabe: [],
+    neueTrainer: 0, neueTrainerHerkunft: [], einladungTrainer24h: 0, neueKunden: 0, wartenNamen: [], bereitFreigabe: [],
     anfragenOffen: 0, anfragenNeu24h: 0, anfragenZurPruefung: 0,
     anfragenAngenommen24h: 0, anfragenAbgelehnt24h: 0, ersatzVersendet: 0,
     warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
@@ -4280,6 +4284,8 @@ function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert
   };
   const basis = [
     zeile("Neue Trainer (24 h)", `${z.neueTrainer}${z.neueTrainer ? ` (${herk})` : ""}`),
+    // G5: Registrierungen über die persönliche Einladung (Kampagne einladung-jakob).
+    zeile("Trainer über persönliche Einladung (24 h)", String(z.einladungTrainer24h)),
     zeile("Neue Kunden (24 h)", String(z.neueKunden)),
     zeile("Warten auf Freigabe", z.wartenNamen.length ? `${z.wartenNamen.length} (${z.wartenNamen.join(", ")})` : "0"),
     // E5: bereit zur Freigabe (≥5/8) – Freigabe in der Verwaltung (Reiter „Heute zu tun").
@@ -4429,6 +4435,8 @@ export async function abendberichtZahlenHolen(
       proQuelle[label] = (proQuelle[label] || 0) + 1;
     }
     z.neueTrainerHerkunft = Object.keys(proQuelle).sort().map((q) => ({ quelle: q, anzahl: proQuelle[q] }));
+    // G5: Registrierungen über die persönliche Einladung (utm_source=persoenlich).
+    z.einladungTrainer24h = z.neueTrainerHerkunft.find((h) => h.quelle === "persoenlich")?.anzahl ?? 0;
   } catch (e) { merkeFehler("Neue Trainer (24 h)", e); }
 
   // Neue Kunden (24 h).

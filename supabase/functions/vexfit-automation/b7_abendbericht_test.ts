@@ -26,6 +26,7 @@ import {
 const VOLL: AbendberichtZahlen = {
   neueTrainer: 2,
   neueTrainerHerkunft: [{ quelle: "meta – t1", anzahl: 1 }, { quelle: "direkt/unbekannt", anzahl: 1 }],
+  einladungTrainer24h: 0,
   neueKunden: 3,
   wartenNamen: ["Max Muster", "Lea Berg"],
   bereitFreigabe: [{ name: "Lea Berg", erfuellt: 6 }],
@@ -44,7 +45,7 @@ const VOLL: AbendberichtZahlen = {
   cronHinweise: [],
 };
 const LEER: AbendberichtZahlen = {
-  neueTrainer: 0, neueTrainerHerkunft: [], neueKunden: 0, wartenNamen: [], bereitFreigabe: [],
+  neueTrainer: 0, neueTrainerHerkunft: [], einladungTrainer24h: 0, neueKunden: 0, wartenNamen: [], bereitFreigabe: [],
   anfragenOffen: 0, anfragenNeu24h: 0, anfragenZurPruefung: 0, anfragenAngenommen24h: 0, anfragenAbgelehnt24h: 0, ersatzVersendet: 0, warteliste: 0, bezahlt: 0, zahlungFehlgeschlagen: 0, gekuendigt: 0,
   trichter24h: [], profileUnter5: 0, profilErinnerungen24h: 0, profilErinnerungenGesamt: 0, kundenTrichter24h: { seite: 0, suche: 0, treffer: 0, profil: 0, anfrage_start: 0, anfrage: 0 }, salzburg: null, fehler: [], cronHinweise: [],
 };

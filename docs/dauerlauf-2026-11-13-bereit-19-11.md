@@ -215,3 +215,29 @@ Ergebnis: `deno lint` 30 (keine neuen), **Tests 852 grün** (848 + 4). Commit si
 
 Ergebnis: `deno lint` 30 (keine neuen), **Tests 857 grün** (852 + 5). Keine
 Migration. Commit siehe Tabelle.
+
+---
+
+## G5 – EINLADUNGSLINK FÜR TRAINER
+
+**Angekündigt:** Einladungstext-Doku + Abendbericht-Zeile, keine Migration, Commit geplant.
+
+- **Link:** `https://vexfit.app/trainer.html?utm_source=persoenlich&utm_campaign=einladung-jakob`.
+  trainer.html erfasst die Herkunft bereits (UTM-Weitergabe an die Registrierung
+  + anonymer Trichter-Beacon mit Kampagne) – **vorhandene Erfassung genutzt, kein
+  Umbau**.
+- **`docs/texte/einladung-trainer-2026-11-13.md`:** fertiger WhatsApp-Text (Du-Form,
+  kurz, ehrlich). Preise **wortgleich wie im Repo**: kostenlos bis zur ersten
+  angenommenen Kundenanfrage, danach 49,99 €/Monat (monatlich kündbar), jeder
+  weitere Kunde einmalig 9,99 €. Keine erfundenen Kundenzahlen.
+- **Abendbericht (kern.ts):** neue Zeile „Trainer über persönliche Einladung
+  (24 h)" = neue Trainer mit `herkunft_quelle=persoenlich` (aus der bestehenden
+  Herkunfts-Erfassung abgeleitet, **keine neue Spalte**). Zusätzlich sind die
+  Registrierungen weiter in der Herkunfts-Aufschlüsselung (`persoenlich`) sichtbar.
+- **Guards nachgezogen:** b7_abendbericht, s6_salzburg (neues Pflichtfeld in den
+  `AbendberichtZahlen`-Testobjekten). Neu `g5_einladung_test.ts` (4): Abendbericht
+  zählt die Einladung funktional (gestubbt), Zeile vorhanden, trainer.html reicht
+  UTM durch, Einladungstext mit exakten Preisen ohne erfundene Zahlen.
+
+Ergebnis: `deno check` grün, `deno lint` 30, **Tests 861 grün** (857 + 4). Keine
+Migration. Commit siehe Tabelle.
