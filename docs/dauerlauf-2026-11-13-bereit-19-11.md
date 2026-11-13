@@ -193,3 +193,25 @@ Migration, Commit geplant.
 - **Playwright 375/1440:** in G7 (eingebauter Browser).
 
 Ergebnis: `deno lint` 30 (keine neuen), **Tests 852 grün** (848 + 4). Commit siehe Tabelle.
+
+---
+
+## G4 – ARTIKEL-BANNER (vorbereitet, versteckt)
+
+**Angekündigt:** Konstante + Banner-Skript + Doku, keine Migration, Commit geplant.
+
+- **`vexfit-config.js`**: neue Konstante `ARTIKEL_URL: ""` (Standard leer).
+- **`vexfit-artikel.js`** (neu): `sichereArtikelUrl()` lässt nur `https` zu;
+  `vexArtikelBanner(url, zielId)` / `vexArtikelAuto(zielId)` rendern einen
+  dezenten Hinweis „★ Bekannt aus der Flachgauer Woche / SN.at – zum Artikel →"
+  (Text über textContent, Adresse über geprüfte href, **keine fremden Logos**).
+  Leer → Container `display:none`.
+- **index.html + wunsch.html**: binden `vexfit-config.js` + `vexfit-artikel.js`
+  ein, Container `#artikelBanner`, Selbststart aus der Konfiguration.
+- **`docs/artikel-19-11.md`**: genau eine Zeile (`ARTIKEL_URL: ""` → volle
+  https-Adresse) + der vollständige Push-Befehl.
+- **Test `g4_artikel_test.ts`** (5): Konstante leer, nur https, Einbindung +
+  Container auf beiden Seiten, keine Bilder/Logos, Doku vorhanden.
+
+Ergebnis: `deno lint` 30 (keine neuen), **Tests 857 grün** (852 + 5). Keine
+Migration. Commit siehe Tabelle.

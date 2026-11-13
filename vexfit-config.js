@@ -22,6 +22,13 @@
     // Seiten für nicht angemeldete Besucher keinen Trainer-Netzaufruf mehr und
     // die DB entzieht anon den Lesezugriff (2026-11-12-01-suche-umkreis.sql).
     OEFFENTLICHE_VORSCHAU: false,
+
+    // G4 (13.11.2026): Artikel-Banner. Standard LEER = kein Banner sichtbar.
+    //   Sobald am 19.11. ein Artikel erscheint, trägt Jakob hier die volle
+    //   https-Adresse ein (siehe docs/artikel-19-11.md). Dann zeigen Startseite
+    //   und /wunsch.html einen dezenten Hinweis „Bekannt aus der Flachgauer Woche
+    //   / SN.at – zum Artikel" mit Link. Leer → nichts sichtbar. Keine fremden Logos.
+    ARTIKEL_URL: "",
   };
   if (typeof module !== "undefined" && module.exports) module.exports = global.VEXFIT_CONFIG;
 })(typeof window !== "undefined" ? window : globalThis);

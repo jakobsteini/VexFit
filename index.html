@@ -189,6 +189,9 @@ try {
 <style>/* Platz fuer WhatsApp-Knopf (Fix 3) */
 @media (max-width:640px){body{padding-bottom:84px}}</style>
 <script type="module" src="vexfit-sitzung.js"></script>
+<!-- G4: Artikel-Banner (standardmäßig leer, siehe vexfit-config.js). -->
+<script src="vexfit-config.js"></script>
+<script src="vexfit-artikel.js"></script>
 </head>
 <body>
 <div class="nav-overlay" id="navOverlay" onclick="closeMenu()"></div>
@@ -212,6 +215,9 @@ try {
     <button class="nav-hamburger" onclick="openMenu()" aria-label="Menü öffnen"><span></span><span></span><span></span></button>
   </div>
 </nav>
+<!-- G4: Artikel-Hinweis – nur sichtbar, wenn ARTIKEL_URL gesetzt ist. -->
+<div id="artikelBanner" style="margin-top:62px"></div>
+<script>try { if (typeof vexArtikelAuto === "function") vexArtikelAuto("artikelBanner"); } catch (e) {}</script>
 <section class="hero">
   <div class="hero-grid"></div>
   <div class="hero-glow"></div>
