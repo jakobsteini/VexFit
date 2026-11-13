@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vexfit – Vorher/Nachher 13.11.2026 (Wunsch-Formular & Einstiege)</title>
+<style>
+  :root{--bg:#0a0a0a;--fg:#f5f5f0;--accent:#e8ff00;--muted:#8a8a8a;--card:#141414;--border:rgba(255,255,255,0.12)}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"DM Sans",sans-serif;line-height:1.6}
+  header{padding:28px 20px;border-bottom:1px solid var(--border)}
+  h1{font-size:22px;margin:0 0 6px}
+  header p{margin:0;color:var(--muted);font-size:14px;max-width:760px}
+  .wrap{max-width:1200px;margin:0 auto;padding:24px 20px 80px}
+  section{margin:34px 0;border:1px solid var(--border);border-radius:12px;padding:18px 18px 22px;background:var(--card)}
+  h2{font-size:18px;margin:0 0 4px;color:var(--accent)}
+  .aenderung{color:var(--muted);font-size:14px;margin:0 0 16px}
+  .paar{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.paar{grid-template-columns:1fr}}
+  .spalte{min-width:0}
+  .spalte .label{font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+  .spalte .label.neu{color:var(--accent)}
+  .rahmen{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#000;max-height:620px;overflow-y:auto}
+  img{display:block;width:100%;height:auto}
+  .mobilbreit{max-width:390px;margin:0 auto}
+  footer{color:var(--muted);font-size:13px;padding:0 20px 40px;max-width:1200px;margin:0 auto}
+</style>
+</head>
+<body>
+<header>
+  <h1>Vexfit · Vorher/Nachher · 13.11.2026</h1>
+  <p>Umbau der öffentlichen Kunden-Einstiege auf das neue Wunsch-Formular
+  (/wunsch.html, kein Konto nötig). Screenshots mit Playwright/Chromium bei 375 px
+  (Handy) und 1440 px (Desktop). „Vorher" = Stand <code>dc5f884</code>, „Nachher" =
+  dieser Lauf. Hinweis: die Startseite blendet Abschnitte erst beim Scrollen ein –
+  im Vollseiten-Screenshot bleibt darunter schwarz, das ist kein Fehler.</p>
+</header>
+<div class="wrap">
+
+  <section>
+    <h2>Startseite (index.html) · Handy 375 px</h2>
+    <p class="aenderung">Hero-Text ehrlich (kein „lokal oder online"), Kunden-CTA „Trainer finden lassen" → /wunsch.html, 3 Schritte neu (Wunsch abgeben → Wir vermitteln → Loslegen).</p>
+    <div class="paar">
+      <div class="spalte"><div class="label">Vorher</div><div class="rahmen mobilbreit"><img src="vorher-index-375.png" alt="Startseite vorher (Handy)"></div></div>
+      <div class="spalte"><div class="label">Nachher</div><div class="rahmen mobilbreit"><img src="nachher-index-375.png" alt="Startseite nachher (Handy)"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Startseite (index.html) · Desktop 1440 px</h2>
+    <p class="aenderung">Gleiche Änderungen, Desktop-Ansicht.</p>
+    <div class="paar">
+      <div class="spalte"><div class="label">Vorher</div><div class="rahmen"><img src="vorher-index-1440.png" alt="Startseite vorher (Desktop)"></div></div>
+      <div class="spalte"><div class="label">Nachher</div><div class="rahmen"><img src="nachher-index-1440.png" alt="Startseite nachher (Desktop)"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Suche (suche.html) – Mauer für nicht Angemeldete · Handy 375 px</h2>
+    <p class="aenderung">Das Anon-Gate bietet jetzt den Haupt-Knopf „Personal Trainer finden lassen" → /wunsch.html (statt nur Registrieren/Anmelden).</p>
+    <div class="paar">
+      <div class="spalte"><div class="label">Vorher</div><div class="rahmen mobilbreit"><img src="vorher-suche-375.png" alt="Suche-Mauer vorher (Handy)"></div></div>
+      <div class="spalte"><div class="label">Nachher</div><div class="rahmen mobilbreit"><img src="nachher-suche-375.png" alt="Suche-Mauer nachher (Handy)"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Salzburg-Seite (personal-trainer-salzburg.html) · Handy 375 px</h2>
+    <p class="aenderung">Beide CTAs → /wunsch.html (mit PLZ/Land), Lead/Schritte ohne „oder online".</p>
+    <div class="paar">
+      <div class="spalte"><div class="label">Vorher</div><div class="rahmen mobilbreit"><img src="vorher-salzburg-375.png" alt="Salzburg-Seite vorher (Handy)"></div></div>
+      <div class="spalte"><div class="label">Nachher</div><div class="rahmen mobilbreit"><img src="nachher-salzburg-375.png" alt="Salzburg-Seite nachher (Handy)"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Wunsch-Formular (wunsch.html) · NEU</h2>
+    <p class="aenderung">Die neue Landingpage: Interessent gibt ohne Konto seinen Wunsch ab. Es gab vorher keine solche Seite.</p>
+    <div class="paar">
+      <div class="spalte"><div class="label neu">Neu · Handy 375 px</div><div class="rahmen mobilbreit"><img src="nachher-wunsch-375.png" alt="Wunsch-Formular (Handy)"></div></div>
+      <div class="spalte"><div class="label neu">Neu · Desktop 1440 px</div><div class="rahmen"><img src="nachher-wunsch-1440.png" alt="Wunsch-Formular (Desktop)"></div></div>
+    </div>
+  </section>
+
+</div>
+<footer>Vexfit · Dauerlauf „Bereit für 19.11." · Screenshots in docs/screenshots/2026-11-13/</footer>
+</body>
+</html>

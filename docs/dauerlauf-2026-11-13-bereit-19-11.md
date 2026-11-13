@@ -278,3 +278,29 @@ Migration, Commit geplant.
 
 Ergebnis: `deno check` grün, `deno lint` 30, **Tests 865 grün** (861 + 4). Keine
 Migration. Commit siehe Tabelle.
+
+---
+
+## G7 – GESAMTTEST
+
+- **Alle Tests:** `deno test --allow-read --allow-run --allow-env` → **865 passed,
+  0 failed**. `deno check` grün. `deno lint` **30** (Baseline, keine neuen).
+- **Link-Prüfung:** `g3_einstiege_test.ts` prüft über ALLE öffentlichen Seiten,
+  dass kein interner `*.html`-Link ins Leere zeigt → grün.
+- **Browser-Rundgang + Screenshots (vorher/nachher, 375 & 1440):** mit
+  Playwright/Chromium (im Projekt vorhanden) gegen lokale Kopien erzeugt, in
+  `docs/screenshots/2026-11-13/`. „Vorher" aus einem git-Worktree auf `dc5f884`,
+  „Nachher" aus diesem Lauf. Geprüfte/gezeigte Seiten: index.html (375/1440),
+  suche.html-Mauer (375/1440), personal-trainer-salzburg.html (375), wunsch.html
+  (375/1440, NEU). Vergleichsseite **`docs/screenshots/2026-11-13/vergleich.html`**.
+  Eingebauter Browser bestätigt: Wunsch-Formular rendert vollständig (alle Felder,
+  Pflicht-Einwilligung, CTA), Startseite zeigt den neuen Hero + „Trainer finden
+  lassen". (Startseite blendet untere Abschnitte erst beim Scrollen ein → im
+  Vollseiten-Screenshot darunter schwarz, kein Fehler.)
+- **Service-Worker:** **NICHT hochgezählt – nicht nötig.** Begründung: keine
+  öffentliche Seite registriert einen Service Worker (abgesichert durch
+  `d8_cache_test.ts`); der einzige SW (`sw-verwaltung.js`) cacht ausschließlich die
+  Verwaltungs-Hülle, keine öffentliche Seite/Datei. G1–G6 ändern nichts, was ein
+  SW cacht; `wunsch.html` registriert ebenfalls keinen SW.
+
+Commit siehe Tabelle (Screenshots + vergleich.html + Protokoll).
