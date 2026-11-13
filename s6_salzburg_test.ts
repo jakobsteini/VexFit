@@ -49,7 +49,7 @@ Deno.test("S6/E4: Abendbericht – Zeile Raum Salzburg 50/51 plus Trainerliste",
   };
   const m = mailAbendbericht(zahlen);
   const txt = m.text + m.html;
-  assertStringIncludes(txt, "Raum Salzburg (50/51/52)");
+  assertStringIncludes(txt, "Raum Salzburg (≤25 km um 5020)");
   assertStringIncludes(txt, "3/8");          // trainerReif / Ziel
   assertStringIncludes(txt, "5 freigegeben");
   assertStringIncludes(txt, "4 Anfragen");

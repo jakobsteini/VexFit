@@ -241,3 +241,40 @@ Migration. Commit siehe Tabelle.
 
 Ergebnis: `deno check` grün, `deno lint` 30, **Tests 861 grün** (857 + 4). Keine
 Migration. Commit siehe Tabelle.
+
+---
+
+## G6 – RAUM SALZBURG NACH KILOMETERN
+
+**Angekündigt:** km-basierte Trainer-Auswahl in Abendbericht + Verwaltung, keine
+Migration, Commit geplant.
+
+- **kern.ts:** `trainerImRaumSalzburg(t, zentrum, km=25)` (Haversine) +
+  Konstanten `SALZBURG_ZENTRUM_PLZ="5020"`, `SALZBURG_ZENTRUM_LAND="AT"`,
+  `SALZBURG_UMKREIS_KM=25`, Rückfall-Koordinaten `SALZBURG_ZENTRUM_KOORD`.
+- **Abendbericht:** `abendberichtZahlenHolen` nimmt jetzt ein `salzburgZentrum`;
+  ist es da, werden die Salzburger Trainer nach **≤ 25 km** gewählt (AT-Trainer
+  mit lat/lng). index.ts löst das Zentrum aus `plz_orte` (5020 AT) auf. Label:
+  „Raum Salzburg (≤25 km um 5020)". **Seekirchen (≈15 km) zählt, Braunau (≈50 km)
+  und Mattighofen (≈34 km) nicht** – anders als der frühere 52xx-Präfix.
+- **Verwaltung (renderSalzburgKarte):** Trainer-Auswahl nach km über
+  `vexPlz.aufloesen("5020", {land:"AT"})` + Haversine; die Admin-Trainerliste
+  trägt lat/lng (select=*).
+- **Verbliebene PLZ-Präfix-Stellen** (bewusst, „wo nötig"):
+  1. kern.ts `salzburgPlzFilter()` für `such_eingaben` (Kundensuchen) und
+     `warteliste` (Vormerkungen) im Abendbericht – diese sind PLZ-gebunden (keine
+     Koordinaten).
+  2. kern.ts Abendbericht-**Rückfall**, wenn kein Zentrum aus `plz_orte` kommt.
+  3. kern.ts `istSalzburgPlz(t.plz)` für den „salzburg"-Sortier-/Markierungs-Flag
+     in der Profil-Erinnerungsliste.
+  4. vexfit-verwaltung.js Präfix als Koordinaten-Rückfall + für Kundensuchen/
+     Vormerkungen.
+  `SALZBURG_PLZ_PRAEFIXE` + `SALZBURG_ZIEL` bleiben erhalten (noch genutzt).
+- **Hinweis/Abhängigkeit:** die km-Zählung braucht Trainer-Koordinaten (lat/lng).
+  Solange Jakob den Bestand nicht nachträgt, zählen nur Trainer mit Koordinaten;
+  ohne auflösbares Zentrum greift automatisch der Präfix-Rückfall.
+- **Guards nachgezogen:** k8/s8/s6 (Label). Neu `g6_raum_salzburg_test.ts` (4):
+  Seekirchen/Braunau/Mattighofen, Abendbericht-km, Präfix-Rückfall, Verwaltung km.
+
+Ergebnis: `deno check` grün, `deno lint` 30, **Tests 865 grün** (861 + 4). Keine
+Migration. Commit siehe Tabelle.

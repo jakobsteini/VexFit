@@ -38,7 +38,7 @@ Deno.test("K8: Abendbericht enthält die Stadt-Übersicht Salzburg", async () =>
   assertEquals(z.salzburg.vorm, 1);
   assertEquals(z.salzburg.trainer.length, 2); // E4: beide Nicht-Test-Trainer gelistet
   const text = mailAbendbericht(z).text;
-  assertStringIncludes(text, "Raum Salzburg (50/51/52)");
+  assertStringIncludes(text, "Raum Salzburg (≤25 km um 5020)");
   assertStringIncludes(text, "0/8"); // S6: ≥5/8 von Ziel 8
   assertStringIncludes(text, "2 freigegeben");
 });

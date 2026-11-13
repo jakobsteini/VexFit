@@ -1671,19 +1671,46 @@ function starteVerwaltung() {
     try { await renderSalzburgKarte(); } catch { /* still */ }
   }
 
-  // S6: Salzburg-Ziel (Region über PLZ-Präfix 50, keine Koordinaten in der DB).
-  // Ziel 8 starke Trainer; dazu Suchen/Vormerkungen/Anfragen/Annahmen (7 Tage).
-  // E4 (10.11.): Raum Salzburg einheitlich über die PLZ-Präfixe 50/51 (eine
-  // Quelle, deckungsgleich mit kern.ts SALZBURG_PLZ_PRAEFIXE).
+  // G6 (13.11.): Raum Salzburg nach Kilometern (≤ 25 km um die Stadt Salzburg,
+  // 5020 AT, über vexPlz.aufloesen). Die PLZ-Präfixe bleiben nur noch (a) als
+  // Rückfall, wenn das Zentrum nicht auflösbar ist oder ein Trainer keine
+  // Koordinaten hat, und (b) für die PLZ-gebundenen Kundensuchen/Vormerkungen.
   const SALZBURG_PLZ_PRAEFIXE = ["50", "51", "52"];
   const SALZBURG_ZIEL = 8;
+  const SALZBURG_UMKREIS_KM = 25;
+  let _salzZentrum; // { lat, lng } | null, einmal aufgelöst
+  const _salzCache = new Map();
+  function salzKmDist(a, b, c, d) {
+    const R = 6371, rad = (x) => x * Math.PI / 180;
+    const dLat = rad(c - a), dLng = rad(d - b);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a)) * Math.cos(rad(c)) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  }
+  async function salzburgZentrum() {
+    if (_salzZentrum !== undefined) return _salzZentrum;
+    _salzZentrum = null;
+    try {
+      const o = await vexPlz.aufloesen("5020", { land: "AT", cache: _salzCache });
+      if (o && !o.netzfehler && !o.mehrdeutig && Number.isFinite(o.lat) && Number.isFinite(o.lng)) {
+        _salzZentrum = { lat: o.lat, lng: o.lng };
+      }
+    } catch { /* Rückfall: Präfix */ }
+    return _salzZentrum;
+  }
   async function renderSalzburgKarte() {
     const el = $("salzburg-inhalt");
     if (!el) return;
     const inRegion = (plz) => SALZBURG_PLZ_PRAEFIXE.some((p) => String(plz || "").startsWith(p));
+    const z = await salzburgZentrum();
+    const imRaum = (t) => {
+      if (z && Number.isFinite(Number(t.lat)) && Number.isFinite(Number(t.lng))) {
+        return salzKmDist(z.lat, z.lng, Number(t.lat), Number(t.lng)) <= SALZBURG_UMKREIS_KM;
+      }
+      return inRegion(t.plz); // Rückfall ohne Koordinaten
+    };
     const jetzt = Date.now(), seit7ms = jetzt - 7 * 86400000;
     const trainer50 = sichtbar(daten.trainers || [], zustand.testsAusTrainer)
-      .filter((t) => inRegion(t.plz) && t.aktiv && !t.gesperrt);
+      .filter((t) => imRaum(t) && t.aktiv && !t.gesperrt);
     const trainerFrei = trainer50.length;
     const trainerReif = trainer50.filter((t) => (8 - fehlendeProfilfelder(t).length) >= 5).length;
     const suchen7 = (stadtZustand.suchen || []).filter((s) => inRegion(s.plz) && s.erstellt_am && new Date(s.erstellt_am).getTime() >= seit7ms).length;

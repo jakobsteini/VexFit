@@ -26,7 +26,7 @@ Deno.test("S8: Abendbericht zeigt Anfragen-Fluss, Prüfung und Ersatzvorschläge
   assertStringIncludes(txt, "angenommen 2, abgelehnt 1");
   assertStringIncludes(txt, "Anfragen zur Prüfung (offen): 3");
   assertStringIncludes(txt, "Ersatzvorschläge versendet (gesamt): 4");
-  assertStringIncludes(txt, "Raum Salzburg (50/51/52)");
+  assertStringIncludes(txt, "Raum Salzburg (≤25 km um 5020)");
 });
 
 Deno.test("S8: ohne Aktivität bleibt der Bericht kurz (leer)", () => {

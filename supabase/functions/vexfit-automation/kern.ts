@@ -3596,6 +3596,30 @@ export function istSalzburgPlz(plz: unknown): boolean {
 export function salzburgPlzFilter(): string {
   return `or=(${SALZBURG_PLZ_PRAEFIXE.map((p) => `plz.like.${p}*`).join(",")})`;
 }
+
+// G6 (13.11.): „Raum Salzburg" nach Kilometern statt PLZ-Präfix. Mittelpunkt ist
+// die Stadt Salzburg (PLZ 5020 AT), aufgelöst über plzAufloesen/plz_orte. Ein
+// Trainer zählt zum Raum Salzburg, wenn er ≤ SALZBURG_UMKREIS_KM Luftlinie von
+// diesem Mittelpunkt liegt (gleiches Land). Das schließt Seekirchen (≈15 km) ein
+// und Braunau/Mattighofen (≈33–50 km) aus – anders als der grobe 52xx-Präfix.
+export const SALZBURG_ZENTRUM_PLZ = "5020";
+export const SALZBURG_ZENTRUM_LAND = "AT";
+export const SALZBURG_UMKREIS_KM = 25;
+/** Rückfall-Koordinaten der Stadt Salzburg (öffentlich bekannter Ortsmittelpunkt),
+ *  falls plz_orte den Eintrag noch nicht hat. KEINE personenbezogene Angabe. */
+export const SALZBURG_ZENTRUM_KOORD = { lat: 47.8095, lng: 13.0550 };
+
+/** G6: liegt ein Trainer (mit lat/lng) ≤ km um das Salzburg-Zentrum? Ohne
+ *  Koordinaten: false (der Trainer kann nicht verortet werden). */
+export function trainerImRaumSalzburg(
+  t: { lat?: number | string | null; lng?: number | string | null },
+  zentrum: { lat: number; lng: number },
+  km: number = SALZBURG_UMKREIS_KM,
+): boolean {
+  const lat = Number(t.lat), lng = Number(t.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  return haversineKm(zentrum.lat, zentrum.lng, lat, lng) <= km;
+}
 /** E4: „Vorname N." – Nachname auf die Initiale kürzen (Abendbericht-Liste). */
 export function kurzName(vorname: unknown, nachname: unknown): string {
   const v = nameFormatieren(String(vorname ?? "")).trim();
@@ -4322,7 +4346,7 @@ function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert
   // K8/S6: Stadt-Übersicht Salzburg (Ziel: SALZBURG_ZIEL starke Trainer).
   if (z.salzburg) {
     basis.push({
-      beschriftung: `Raum Salzburg (${SALZBURG_PLZ_PRAEFIXE.join("/")})`,
+      beschriftung: `Raum Salzburg (≤${SALZBURG_UMKREIS_KM} km um ${SALZBURG_ZENTRUM_PLZ})`,
       wert: `${z.salzburg.trainerReif}/${SALZBURG_ZIEL} Trainer ≥5/8 (${z.salzburg.trainerFrei} freigegeben) · ` +
         `${z.salzburg.suchen7} Suchen · ${z.salzburg.vorm} Vormerkungen · ` +
         `${z.salzburg.anfragen7} Anfragen · ${z.salzburg.annahmen7} Annahmen (7 T)`,
@@ -4403,6 +4427,10 @@ export async function abendberichtZahlenHolen(
   zaehlenFn: (pfad: string) => Promise<number>,
   jetztMs: number = Date.now(),
   protokollFehlerFn?: (seitISO: string) => Promise<{ aktion: string; ergebnis: string }[]>,
+  // G6: Mittelpunkt des Raums Salzburg (aus plz_orte, 5020 AT). Ist er gesetzt,
+  // werden die Salzburger Trainer nach Kilometern (≤ 25 km) ausgewählt; sonst
+  // Rückfall auf die PLZ-Präfixe (50/51/52).
+  salzburgZentrum?: { lat: number; lng: number } | null,
 ): Promise<AbendberichtZahlen> {
   const seit = new Date(jetztMs - 24 * 60 * 60 * 1000).toISOString();
   const z = leereAbendberichtZahlen();
@@ -4569,14 +4597,27 @@ export async function abendberichtZahlenHolen(
   // eine Tabelle/Spalte, bleibt salzburg einfach null (keine Zeile, kein Fehler).
   try {
     const seit7 = new Date(jetztMs - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const filter = salzburgPlzFilter(); // E4: PLZ-Präfixe 50/51, eine Quelle
-    // E4: ALLE Salzburger Trainer laden (auch noch nicht freigegebene), um
+    // Präfix-Filter bleibt für die PLZ-gebundenen Kundensuchen/Vormerkungen; die
+    // TRAINER-Auswahl läuft seit G6 nach Kilometern (salzburgZentrum).
+    const filter = salzburgPlzFilter();
+    // ALLE Salzburger Trainer laden (auch noch nicht freigegebene), um
     // „freigegeben ja/nein" je Trainer zeigen zu können. aktiv/gesperrt als Felder.
-    const felder = "id,vorname,nachname,stadt,plz,aktiv,gesperrt,ist_test," +
-      "avatar_url,trainingsart,trainingsort,preis_stunde,bio,erfahrung,spezialisierungen,telefon";
-    type ST = TrainerProfil & { id: string; vorname?: string | null; nachname?: string | null; stadt?: string | null; plz?: string | null; aktiv?: boolean | null; gesperrt?: boolean | null };
-    const alle = await lesenFn<ST>(`trainers?${filter}&select=${felder}`)
-      .catch(() => lesenFn<ST>(`trainers?${filter}&select=id,vorname,nachname,stadt,plz,aktiv,ist_test,avatar_url,trainingsart,trainingsort,preis_stunde,bio,erfahrung,spezialisierungen,telefon`));
+    type ST = TrainerProfil & { id: string; vorname?: string | null; nachname?: string | null; stadt?: string | null; plz?: string | null; aktiv?: boolean | null; gesperrt?: boolean | null; lat?: number | string | null; lng?: number | string | null };
+    let alle: ST[];
+    if (salzburgZentrum) {
+      // G6: nach Kilometern – alle AT-Trainer mit Koordinaten laden, dann ≤ 25 km
+      // um das Salzburg-Zentrum. Seekirchen (≈15 km) dabei, Braunau/Mattighofen nicht.
+      const feldK = "id,vorname,nachname,stadt,plz,aktiv,gesperrt,ist_test,lat,lng," +
+        "avatar_url,trainingsart,trainingsort,preis_stunde,bio,erfahrung,spezialisierungen,telefon";
+      const roh = await lesenFn<ST>(`trainers?land=ilike.AT&lat=not.is.null&lng=not.is.null&select=${feldK}`);
+      alle = roh.filter((t) => trainerImRaumSalzburg(t, salzburgZentrum));
+    } else {
+      // Rückfall (kein Zentrum aus plz_orte): wie bisher über die PLZ-Präfixe.
+      const felder = "id,vorname,nachname,stadt,plz,aktiv,gesperrt,ist_test," +
+        "avatar_url,trainingsart,trainingsort,preis_stunde,bio,erfahrung,spezialisierungen,telefon";
+      alle = await lesenFn<ST>(`trainers?${filter}&select=${felder}`)
+        .catch(() => lesenFn<ST>(`trainers?${filter}&select=id,vorname,nachname,stadt,plz,aktiv,ist_test,avatar_url,trainingsart,trainingsort,preis_stunde,bio,erfahrung,spezialisierungen,telefon`));
+    }
     const sichtbar = alle.filter((t) => t.ist_test !== true);
     const istFrei = (t: ST) => t.aktiv === true && t.gesperrt !== true;
     const frei = sichtbar.filter(istFrei);
