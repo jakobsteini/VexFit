@@ -71,6 +71,22 @@ export const KOERPER_GRENZE = 20000;
  *  bei "Passt nicht?" - zeitgesteuert statt per Klick. */
 export const ALTERNATIVEN_NACH_STUNDEN = 48;
 
+/** G1 (13.11.2026): In so vielen Stunden meldet sich Jakob nach einem Wunsch
+ *  (steht wortgleich in der Bestätigungsmail an den Interessenten). Eine einzige
+ *  Konstante, damit Mailtext und Doku nie auseinanderlaufen. */
+export const WUNSCH_FRIST_STUNDEN = 48;
+
+/** G1: erlaubte Status-Werte eines Wunsches (Lebenslauf, siehe Migration). */
+export const WUNSCH_STATUS = [
+  "neu",
+  "in_bearbeitung",
+  "an_trainer_gesendet",
+  "vermittelt",
+  "kein_trainer",
+  "abgeschlossen",
+] as const;
+export type WunschStatus = (typeof WUNSCH_STATUS)[number];
+
 /**
  * Fix 7b (Spam-Schutz): verstecktes Koederfeld des anonymen suche.html-Formulars.
  * Steht dieser Feldname im Koerper, ist der Aufruf das anonyme
@@ -693,6 +709,18 @@ export interface Anschluesse {
    *  damit auch nicht-Admin-Läufe (z. B. der Abendbericht vom Zeitplan) einen
    *  Eintrag ohne Admin/Ziel schreiben können (DB-Spalten sind nullable). */
   protokoll?(eintrag: { admin_id?: string; aktion: string; ziel_tabelle?: string; ziel_id?: string; ergebnis?: string }): Promise<void>;
+
+  // ── G1 (13.11.): „Wunsch abgeben" (Kunde ohne Konto) ──
+  /** Legt einen Wunsch an (service_role, Tabelle wuensche) und gibt die neue
+   *  Kennung zurück. Fehlt die Verdrahtung/Migration, ist der Pfad zu (501). */
+  wunschAnlegen?(felder: Record<string, unknown>): Promise<string | null>;
+  /** G2: alle Wünsche für die Verwaltung (service_role, neueste zuerst). */
+  wuenscheListe?(): Promise<WunschZeile[]>;
+  /** G2: einen Wunsch per Kennung (service_role). */
+  wunschNachId?(id: string): Promise<WunschZeile | null>;
+  /** G2: Status/Felder eines Wunsches setzen (service_role). Gibt geänderte
+   *  Zeilen zurück. */
+  wunschSetzen?(id: string, felder: Record<string, unknown>): Promise<number>;
 
   // ── Admin-Dashboard neu, Teil 3: Kicken (endgueltig loeschen, vollstaendig) ──
   /** Die Speicher-Dateien einer Person: avatars/galerie (public) und zertifikate
@@ -1930,6 +1958,209 @@ async function trainerProfilEndpunkt(
   return antwort(200, { ok: true, trainer: erlaubteTrainerFelder(t, entfernung) }, herkunft);
 }
 
+// ============================================================================
+// G1 (13.11.): „Wunsch abgeben" (Kunde ohne Konto)
+// ============================================================================
+
+/** Eine Wunsch-Zeile aus der Tabelle wuensche (nur die gelesenen Felder). */
+export interface WunschZeile {
+  id: string;
+  status: string;
+  vorname?: string | null;
+  email?: string | null;
+  telefon?: string | null;
+  nachricht?: string | null;
+  land?: string | null;
+  plz?: string | null;
+  stadt?: string | null;
+  ziel?: string | null;
+  haeufigkeit?: string | null;
+  zeiten?: string | null;
+  budget?: string | null;
+  trainer_id?: string | null;
+  anfrage_id?: string | null;
+  quelle?: string | null;
+  kampagne?: string | null;
+  inhalt?: string | null;
+  referrer?: string | null;
+  verdacht?: string | null;
+  erstellt_am?: string | null;
+}
+
+export interface WunschPruefung {
+  ok: boolean;
+  grund?: string;
+  felder?: Record<string, unknown>;
+}
+
+/**
+ * Prüft die Eingaben des Wunsch-Formulars und baut die zu speichernden Felder.
+ * Pflicht: Vorname, gültige E-Mail, Land (AT/DE/CH), PLZ (4-/5-stellig), Ziel
+ * und die Datenschutz-Einwilligung. Alles andere ist optional. Es wird NICHTS
+ * erfunden – fehlende optionale Felder bleiben null. Längen werden begrenzt.
+ */
+export function wunschGeprueft(body: Record<string, unknown>): WunschPruefung {
+  const vorname = text(body.vorname);
+  const email = text(body.email).toLowerCase();
+  const land = landNormal(body.land);
+  const plz = ziffernPlz(body.plz);
+  const ziel = text(body.ziel);
+  if (!vorname) return { ok: false, grund: "Bitte deinen Vornamen angeben." };
+  if (!adresseGueltig(email)) return { ok: false, grund: "Bitte eine gültige E-Mail-Adresse angeben." };
+  if (!land) return { ok: false, grund: "Bitte das Land wählen (Österreich, Deutschland oder Schweiz)." };
+  if (!plz) return { ok: false, grund: "Bitte eine gültige PLZ angeben." };
+  if (!ziel) return { ok: false, grund: "Bitte sag uns, was du erreichen möchtest." };
+  const einw = body.einwilligung;
+  const einwOk = einw === true || text(einw) === "true" || text(einw) === "ja";
+  if (!einwOk) return { ok: false, grund: "Bitte der Datenschutzerklärung zustimmen." };
+  const kurz = (v: unknown, n: number) => { const s = text(v); return s ? s.slice(0, n) : null; };
+  const felder: Record<string, unknown> = {
+    status: "neu",
+    vorname: vorname.slice(0, 200),
+    email: email.slice(0, 320),
+    telefon: kurz(body.telefon, 60),
+    nachricht: kurz(body.nachricht, 2000),
+    land,
+    plz,
+    stadt: kurz(body.stadt, 200),
+    ziel: ziel.slice(0, 500),
+    haeufigkeit: kurz(body.haeufigkeit, 60),
+    zeiten: kurz(body.zeiten, 200),
+    budget: kurz(body.budget, 60),
+    quelle: kurz(body.utm_source ?? body.quelle, 120),
+    kampagne: kurz(body.utm_campaign ?? body.kampagne, 120),
+    inhalt: kurz(body.utm_content ?? body.inhalt, 120),
+    referrer: kurz(body.referrer, 200),
+  };
+  return { ok: true, felder };
+}
+
+/** Herkunft eines Wunsches als ein kurzer Text für die interne Mail. */
+function herkunftWunschText(w_: Record<string, unknown>): string {
+  const q = w(w_.quelle) || w(w_.utm_source);
+  const k = w(w_.kampagne) || w(w_.utm_campaign);
+  const teile = [q, k].filter((x) => x);
+  if (teile.length) return teile.join(" – ");
+  return w(w_.referrer) || "direkt";
+}
+
+/** G1: interne Benachrichtigung an den Betreiber (office@) über einen neuen
+ *  Wunsch. Deep-Link in die Verwaltung (#wunsch-<id>, sonst #wuensche). Bei
+ *  Verdacht (Wegwerf-Mail/unsinnig) steht eine Hinweiszeile dabei. */
+export function mailWunschIntern(w_: Record<string, unknown>, id?: string | null): Mail {
+  const vorname = nameFormatieren(w(w_.vorname)) || "Interessent";
+  const ort = [w(w_.stadt), w(w_.plz)].filter((x) => x).join(" · ");
+  const anker = w(id) ? `wunsch-${w(id)}` : "wuensche";
+  const verdacht = w(w_.verdacht);
+  return baueMail(BETREIBER, `🟢 Neuer Wunsch: ${vorname}${ort ? ` (${ort})` : ""}`, {
+    ueberschrift: "Neuer Trainer-Wunsch",
+    datenZeilen: [
+      { beschriftung: "Vorname", wert: vorname },
+      { beschriftung: "Ort / PLZ", wert: ort },
+      { beschriftung: "Land", wert: w(w_.land) },
+      { beschriftung: "Ziel / Schwerpunkt", wert: w(w_.ziel) },
+      { beschriftung: "Wie oft pro Woche", wert: w(w_.haeufigkeit) },
+      { beschriftung: "Bevorzugte Zeiten", wert: w(w_.zeiten) },
+      { beschriftung: "Budget pro Stunde", wert: w(w_.budget) },
+      { beschriftung: "E-Mail", wert: w(w_.email) },
+      { beschriftung: "Telefon", wert: w(w_.telefon) },
+      { beschriftung: "Nachricht", wert: w(w_.nachricht) },
+      { beschriftung: "Herkunft", wert: herkunftWunschText(w_) },
+      ...(verdacht ? [{ beschriftung: "⚠️ Verdacht", wert: pruefGrundText(verdacht) }] : []),
+    ],
+    knopfText: "In der Verwaltung öffnen",
+    knopfLink: verwaltungLink(anker),
+    grundZeile: verdacht
+      ? "Interne Benachrichtigung. Verdacht auf Spam – bitte prüfen, keine Bestätigung an den Kontakt gesendet."
+      : "Interne Benachrichtigung.",
+  });
+}
+
+/** G1: Bestätigung an den Interessenten. Wortlaut wie vorgegeben, 48 Stunden als
+ *  Konstante (WUNSCH_FRIST_STUNDEN). KEINE weiteren Versprechen, keine Trainerdaten. */
+export function mailWunschBestaetigung(w_: Record<string, unknown>): Mail {
+  const vorname = nameFormatieren(w(w_.vorname));
+  const anrede = vorname ? `Hallo ${vorname}, ` : "Hallo, ";
+  return baueMail(w(w_.email), "Danke für deinen Wunsch – Vexfit", {
+    ueberschrift: "Danke! Wir melden uns.",
+    absatz: `${anrede}danke für deinen Wunsch. Jakob von Vexfit meldet sich ` +
+      `innerhalb von ${WUNSCH_FRIST_STUNDEN} Stunden mit einem passenden Trainer.`,
+    datenZeilen: [],
+    fusszeile: "Vexfit.app · Salzburg · Österreich",
+    impressumLink: `${VEXFIT_BASIS}/rechtliches.html`,
+    impressumText: "Impressum",
+  });
+}
+
+/** G1: Push-Mitteilung „Neuer Wunsch" (ohne E-Mail/Telefon). */
+export function pushWunsch(w_: Record<string, unknown>, id?: string | null): PushNachricht {
+  const vorname = nameFormatieren(w(w_.vorname)) || "Interessent";
+  const ort = nameFormatieren(w(w_.stadt)) || w(w_.plz);
+  const anker = w(id) ? `wunsch-${w(id)}` : "wuensche";
+  return {
+    titel: "🟢 Neuer Wunsch",
+    text: `${vorname}${ort ? `, ${ort}` : ""}${w(w_.ziel) ? ` · ${w(w_.ziel)}` : ""}`,
+    url: verwaltungLink(anker),
+  };
+}
+
+/**
+ * POST /wunsch — Interessent OHNE Konto gibt einen Trainer-Wunsch ab. Anonymes
+ * Formular mit verstecktem Köderfeld + Ratengrenze (wie /neuer-kunde, über
+ * torwacheMailEndpunkt). Speichert in wuensche (service_role), schickt die interne
+ * Mail an office@ und – wenn kein Spam-Verdacht – eine Bestätigung an den
+ * Interessenten. KEINE Trainerdaten in der Antwort.
+ */
+async function wunschEndpunkt(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const body = await koerperLesen(r);
+  if (!body) return antwort(400, { fehler: "Die Anfrage war nicht lesbar." }, herkunft);
+  // Honeypot + Spam-Bremse (das Formular sendet immer das Köderfeld KOEDER_FELD mit).
+  const tor = await torwacheMailEndpunkt(r, a, body, herkunft);
+  if (tor) return tor;
+  const geprueft = wunschGeprueft(body);
+  if (!geprueft.ok || !geprueft.felder) {
+    return antwort(400, { fehler: geprueft.grund ?? "Eingabe unvollständig." }, herkunft);
+  }
+  if (!a.wunschAnlegen) {
+    return antwort(501, { fehler: "Wunsch-Formular ist in dieser Fassung nicht verfügbar." }, herkunft);
+  }
+  const felder = { ...geprueft.felder };
+  // Spam-Verdacht wie bei Anfragen: Wegwerf-Mail/unsinniger Name oder Text. Der
+  // Wunsch wird trotzdem gespeichert (Jakob sieht ihn), aber markiert und ohne
+  // Bestätigungsmail an den (vermutlich falschen) Kontakt.
+  const verdacht = anfrageVerdacht({
+    email: felder.email,
+    name: felder.vorname,
+    nachricht: felder.nachricht,
+    domains: a.wegwerfDomains ? a.wegwerfDomains() : new Set<string>(),
+  });
+  felder.verdacht = verdacht.verdaechtig ? verdacht.grund : null;
+
+  let id: string | null = null;
+  try {
+    id = await a.wunschAnlegen(felder);
+  } catch (fehler) {
+    a.melden?.("wunsch anlegen fehlgeschlagen", String(fehler));
+    return antwort(500, { fehler: "Wunsch konnte nicht gespeichert werden." }, herkunft);
+  }
+  const mitId = { ...felder, id };
+  const intern = await sendeWennAdresseTaugt(a, mailWunschIntern(mitId, id));
+  const bestaetigung = verdacht.verdaechtig
+    ? false
+    : await sendeWennAdresseTaugt(a, mailWunschBestaetigung(mitId));
+  await pushBenachrichtigung(a, pushWunsch(mitId, id));
+  return antwort(200, {
+    ok: true,
+    id,
+    mails: (intern ? 1 : 0) + (bestaetigung ? 1 : 0),
+    ...(verdacht.verdaechtig ? { zur_pruefung: true } : {}),
+  }, herkunft);
+}
+
 /**
  * Ein Aufruf. Vier Pfade, genau die vier Ausloeser des Workflows:
  *   /neuer-trainer  Webhook 1  → Mail an Jakob
@@ -1986,6 +2217,8 @@ export async function bearbeiten(
         return await neuerKunde(anfrageObjekt, a, herkunft);
       case "neue-anfrage":
         return await neueAnfrage(anfrageObjekt, a, herkunft);
+      case "wunsch":
+        return await wunschEndpunkt(anfrageObjekt, a, herkunft);
       case "trainer-suche":
         return await trainerSuche(anfrageObjekt, a, herkunft);
       case "trainer-profil":

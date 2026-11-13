@@ -1242,6 +1242,22 @@ const anschluesse: Anschluesse = {
     return webPushEinzelSenden(abo, nachricht);
   },
 
+  // ── G1 (13.11.): „Wunsch abgeben" ──
+  // Legt einen Wunsch an (service_role) und gibt die neue Kennung zurueck.
+  async wunschAnlegen(felder) {
+    const a = await fetch(restAdresse("wuensche"), {
+      method: "POST",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify(felder),
+    });
+    if (!a.ok) {
+      const t = await a.text().catch(() => "");
+      throw new Error(`wunschAnlegen fehlgeschlagen: HTTP ${a.status} ${t}`);
+    }
+    const z = await a.json().catch(() => []);
+    return Array.isArray(z) && z[0] ? String(z[0].id) : null;
+  },
+
   melden(text, mehr) {
     console.error(`vexfit-automation: ${text}`, mehr ?? "");
   },

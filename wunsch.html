@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" type="image/png" sizes="32x32" href="marke/favicon-32.png">
+<link rel="apple-touch-icon" href="marke/favicon-180.png">
+<link rel="manifest" href="manifest.json">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="canonical" href="https://vexfit.app/wunsch.html">
+<title>Personal Trainer in Salzburg finden lassen – kostenlos | Vexfit</title>
+<meta name="description" content="Sag uns, was du suchst – wir finden deinen Personal Trainer in Salzburg. Für dich kostenlos und unverbindlich.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Personal Trainer in Salzburg finden lassen – kostenlos | Vexfit">
+<meta property="og:description" content="Sag uns, was du suchst – wir finden deinen Personal Trainer in Salzburg. Für dich kostenlos.">
+<meta property="og:image" content="https://vexfit.app/marke/vexfit-vorschau-1200x630.png">
+<meta property="og:url" content="https://vexfit.app/wunsch.html">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Personal Trainer in Salzburg finden lassen – kostenlos | Vexfit">
+<meta name="twitter:description" content="Sag uns, was du suchst – wir finden deinen Personal Trainer in Salzburg.">
+<meta name="twitter:image" content="https://vexfit.app/marke/vexfit-vorschau-1200x630.png">
+<link rel="stylesheet" href="fonts/vexfit-fonts.css">
+<style>
+:root{--black:#0a0a0a;--white:#f5f5f0;--accent:#e8ff00;--gray:#141414;--mid:#1e1e1e;--card:#161616;--text-muted:#8a8a8a;--border:rgba(255,255,255,0.07);--border-input:rgba(255,255,255,0.12)}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{scroll-padding-top:76px}
+body{background:var(--black);color:var(--white);font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:4px;color:var(--white);text-decoration:none}
+.logo span{color:var(--accent)}
+nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:calc(14px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) 14px calc(20px + env(safe-area-inset-left));background:rgba(10,10,10,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border)}
+.nav-r{display:flex;gap:12px;align-items:center}
+.nav-link{color:var(--text-muted);text-decoration:none;font-size:13px}
+.nav-link:hover{color:var(--white)}
+.nav-cta{background:var(--accent);color:var(--black);padding:9px 16px;border-radius:3px;font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;text-decoration:none}
+.hero{padding:calc(92px + env(safe-area-inset-top)) 20px 8px;background:var(--gray);border-bottom:1px solid var(--border)}
+.hl{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px}
+.ht{font-family:'Bebas Neue',sans-serif;font-size:clamp(30px,6.5vw,50px);line-height:1.02;letter-spacing:1.5px;margin-bottom:12px;max-width:760px}
+.hs{font-size:15px;color:var(--text-muted);line-height:1.6;max-width:600px;margin-bottom:28px}
+.wrap{max-width:620px;margin:0 auto;padding:26px 20px 100px}
+.fieldrow{display:flex;flex-direction:column;gap:7px;margin-bottom:18px}
+.fieldrow label{font-size:12px;font-weight:600;letter-spacing:0.5px;color:var(--white)}
+.hint{font-size:12px;color:var(--text-muted);font-weight:300}
+.req{color:var(--accent)}
+input[type=text],input[type=email],input[type=tel],select,textarea{background:var(--card);border:1px solid var(--border-input);color:var(--white);padding:13px 15px;font-family:'DM Sans',sans-serif;font-size:15px;border-radius:3px;outline:none;width:100%;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:rgba(232,255,0,0.4)}
+input::placeholder,textarea::placeholder{color:rgba(138,138,138,0.7)}
+select{cursor:pointer}
+textarea{resize:vertical;min-height:80px}
+.two{display:flex;gap:10px}
+.two>div{flex:1}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;pointer-events:none}
+.chip label{display:inline-flex;align-items:center;padding:9px 14px;border:1px solid var(--border-input);border-radius:100px;font-size:13px;color:var(--text-muted);cursor:pointer;transition:all .2s}
+.chip input:checked+label{border-color:var(--accent);color:var(--accent);background:rgba(232,255,0,0.08)}
+.consent{display:flex;gap:10px;align-items:flex-start;margin:6px 0 22px}
+.consent input{width:18px;height:18px;margin-top:2px;accent-color:var(--accent);flex:none}
+.consent label{font-size:13px;color:var(--text-muted);line-height:1.5}
+.consent a{color:var(--accent)}
+.sub{width:100%;background:var(--accent);color:var(--black);padding:16px;border:none;border-radius:3px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:14px;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.sub:disabled{opacity:.6;cursor:default}
+.msg{margin-top:14px;font-size:14px;line-height:1.6}
+.msg.err{color:#ff8a8a}
+.trust{font-size:12px;color:var(--text-muted);margin-top:16px;line-height:1.6}
+.done{display:none;text-align:center;padding:40px 10px}
+.done .ok{font-size:46px;margin-bottom:14px}
+.done h2{font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:1.5px;margin-bottom:10px}
+.done h2 span{color:var(--accent)}
+.done p{font-size:15px;color:var(--text-muted);line-height:1.7;max-width:420px;margin:0 auto}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none}
+footer{border-top:1px solid var(--border);padding:32px 20px 88px;text-align:center;margin-top:10px}
+.footer-links{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-bottom:12px}
+.footer-links a{font-size:12px;color:var(--text-muted);text-decoration:none}
+footer p{font-size:12px;color:var(--text-muted)}
+@media(min-width:768px){nav{padding:18px 52px}.hero{padding:120px 52px 10px}.wrap{padding:30px 52px 110px}}
+</style>
+<!-- Artikel-Banner (G4): wird von vexfit-config.js gesteuert, standardmäßig leer. -->
+<script src="vexfit-escape.js"></script>
+<script src="vexfit-namen.js"></script>
+<script src="vexfit-plz.js"></script>
+<script src="vexfit-ziele.js"></script>
+<script src="vexfit-config.js"></script>
+<script src="vexfit-trichter.js"></script>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo" aria-label="Vexfit – zur Startseite"><svg viewBox="168 166 1265 1270" aria-hidden="true" style="height:0.7em;width:auto;vertical-align:0;margin-right:4px"><g transform="translate(800 800) translate(-1024.5 -1082.5)"><path fill="#E8FF00" fill-rule="evenodd" d="M914.3,1716.3C908.8,1701.1 867.1,1595.6 814.0,1462.5C803.5,1436.1 781.3,1380.5 764.8,1339.0C711.7,1205.5 681.3,1129.2 631.2,1003.5C604.3,935.9 566.9,842.0 548.2,795.0C511.9,703.7 445.4,538.0 437.4,519.0C429.8,500.7 417.2,481.4 402.3,465.0C394.6,456.6 392.1,452.5 393.8,450.8C394.6,450.0 399.9,449.3 408.3,448.9C426.0,448.0 685.1,448.0 705.9,448.9C721.8,449.6 722.4,449.7 723.9,452.0C727.9,458.2 770.3,508.1 807.0,550.0C814.4,558.5 826.2,572.0 833.0,580.0C839.9,588.0 851.8,601.7 859.5,610.4C877.5,630.9 886.5,641.2 901.0,658.5C907.4,666.2 922.9,684.2 935.4,698.5C947.9,712.8 970.0,738.3 984.6,755.2C1011.2,786.1 1018.5,793.6 1024.9,796.6C1031.0,799.5 1033.4,797.4 1059.5,766.6C1065.6,759.5 1080.0,742.8 1091.5,729.5C1103.0,716.2 1122.8,693.5 1135.5,678.9C1148.1,664.4 1162.0,648.4 1166.5,643.5C1170.9,638.5 1180.6,627.2 1188.1,618.5C1214.0,588.0 1252.4,543.4 1266.5,527.5C1274.2,518.7 1284.6,506.8 1289.5,501.0C1302.3,486.0 1312.4,474.6 1320.1,466.5C1323.7,462.6 1328.4,456.9 1330.4,453.7L1334.1,448.0L1495.6,448.0L1657.2,448.0L1656.5,452.2C1655.3,460.0 1653.8,463.1 1648.4,469.2C1641.6,476.8 1635.1,486.5 1630.0,496.6C1626.2,504.3 1596.4,577.4 1552.7,686.0C1540.9,715.4 1513.4,783.4 1491.7,837.0C1470.0,890.6 1437.6,970.7 1419.7,1015.0C1401.9,1059.3 1372.7,1131.7 1354.7,1176.0C1326.2,1246.6 1307.6,1292.5 1246.8,1443.0C1239.2,1462.0 1224.1,1499.3 1213.3,1526.0C1202.5,1552.7 1180.8,1606.7 1165.1,1646.0L1136.5,1717.5L1025.7,1717.8C920.9,1718.0 914.9,1717.9 914.3,1716.3ZM1034.7,1470.6C1037.4,1467.3 1056.2,1418.9 1122.5,1245.0C1142.5,1192.3 1161.3,1143.3 1191.0,1066.0C1225.3,976.5 1230.1,963.2 1228.7,959.6C1227.3,956.1 1224.1,958.2 1214.3,968.8C1201.7,982.3 1167.1,1021.6 1133.0,1061.0C1118.5,1077.8 1099.6,1099.4 1091.0,1109.0C1082.5,1118.7 1069.9,1133.1 1063.0,1141.0C1045.4,1161.5 1031.1,1176.0 1028.5,1176.0C1022.9,1176.0 1008.4,1162.3 986.5,1136.5C980.5,1129.3 969.2,1116.4 961.5,1107.6C953.8,1098.9 941.3,1084.5 933.6,1075.6C894.8,1030.6 852.0,982.7 848.5,980.4C845.3,978.3 844.0,979.3 844.0,983.8C844.0,989.7 845.7,994.6 866.8,1050.0C877.7,1078.9 896.9,1129.5 909.4,1162.5C921.9,1195.5 939.5,1241.8 948.5,1265.5C973.6,1331.6 983.2,1356.8 996.0,1391.0C1019.3,1452.7 1025.3,1467.3 1029.1,1471.1C1031.6,1473.6 1032.5,1473.5 1034.7,1470.6Z"/></g></svg><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap">V</span>EX<span>FIT</span></a>
+  <div class="nav-r">
+    <a href="login.html" class="nav-link">Anmelden</a>
+    <a href="trainer.html" class="nav-cta">Für Trainer</a>
+  </div>
+</nav>
+
+<div id="artikelBanner"></div>
+
+<div class="hero">
+  <div class="hl">Kostenlos &amp; unverbindlich</div>
+  <h1 class="ht">Sag uns, was du suchst – wir finden deinen Personal Trainer in Salzburg. Kostenlos für dich.</h1>
+  <p class="hs">Du musst dich nicht registrieren. Fülle kurz das Formular aus – Jakob von Vexfit meldet sich innerhalb von 48 Stunden mit einem passenden Trainer.</p>
+</div>
+
+<div class="wrap">
+  <form id="wunschForm" novalidate>
+    <div class="two">
+      <div class="fieldrow">
+        <label for="fLand">Land <span class="req">*</span></label>
+        <select id="fLand" required>
+          <option value="AT">Österreich</option>
+          <option value="DE">Deutschland</option>
+          <option value="CH">Schweiz</option>
+        </select>
+      </div>
+      <div class="fieldrow">
+        <label for="fPlz">PLZ <span class="req">*</span></label>
+        <input type="text" id="fPlz" inputmode="numeric" autocomplete="postal-code" maxlength="5" placeholder="z. B. 5020" required>
+      </div>
+    </div>
+
+    <div class="fieldrow">
+      <label for="fZiel">Dein Ziel / Schwerpunkt <span class="req">*</span></label>
+      <select id="fZiel" required><option value="">Bitte wählen …</option></select>
+    </div>
+
+    <div class="two">
+      <div class="fieldrow">
+        <label for="fHaeufig">Wie oft pro Woche?</label>
+        <select id="fHaeufig">
+          <option value="">Keine Angabe</option>
+          <option>1× pro Woche</option>
+          <option>2× pro Woche</option>
+          <option>3× pro Woche</option>
+          <option>Mehr als 3×</option>
+          <option>Noch unklar</option>
+        </select>
+      </div>
+      <div class="fieldrow">
+        <label for="fPreis">Preis pro Stunde (optional)</label>
+        <select id="fPreis">
+          <option value="">Keine Angabe</option>
+          <option>bis 40 €</option>
+          <option>40–60 €</option>
+          <option>60–80 €</option>
+          <option>80 € und mehr</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="fieldrow">
+      <label>Bevorzugte Zeiten</label>
+      <div class="chips" id="zeiten">
+        <span class="chip"><input type="checkbox" id="z1" value="Morgens"><label for="z1">Morgens</label></span>
+        <span class="chip"><input type="checkbox" id="z2" value="Mittags"><label for="z2">Mittags</label></span>
+        <span class="chip"><input type="checkbox" id="z3" value="Abends"><label for="z3">Abends</label></span>
+        <span class="chip"><input type="checkbox" id="z4" value="Wochenende"><label for="z4">Wochenende</label></span>
+      </div>
+    </div>
+
+    <div class="two">
+      <div class="fieldrow">
+        <label for="fVorname">Vorname <span class="req">*</span></label>
+        <input type="text" id="fVorname" autocomplete="given-name" maxlength="80" placeholder="Wie dürfen wir dich nennen?" required>
+      </div>
+      <div class="fieldrow">
+        <label for="fTelefon">Telefon (optional)</label>
+        <input type="tel" id="fTelefon" autocomplete="tel" maxlength="40" placeholder="Für eine schnelle Rückmeldung">
+      </div>
+    </div>
+
+    <div class="fieldrow">
+      <label for="fEmail">E-Mail <span class="req">*</span></label>
+      <input type="email" id="fEmail" autocomplete="email" maxlength="120" placeholder="deine@email.com" required>
+    </div>
+
+    <div class="fieldrow">
+      <label for="fNachricht">Nachricht (optional)</label>
+      <textarea id="fNachricht" maxlength="800" placeholder="Gibt es etwas, das wir wissen sollten?"></textarea>
+    </div>
+
+    <!-- Honeypot: Menschen sehen das Feld nicht. Füllt es ein Bot, wird der Wunsch still verworfen. -->
+    <input type="text" id="fWebseite" name="webseite" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+    <div class="consent">
+      <input type="checkbox" id="fEinwilligung" required>
+      <label for="fEinwilligung">Ich bin einverstanden, dass Vexfit meine Angaben verwendet, um mich mit einem passenden Personal Trainer in Kontakt zu bringen. Es gilt die <a href="rechtliches.html#datenschutz" target="_blank" rel="noopener">Datenschutzerklärung</a>. <span class="req">*</span></label>
+    </div>
+
+    <button class="sub" id="fSubmit" type="submit">Personal Trainer finden lassen →</button>
+    <div class="msg" id="fMsg" role="status" aria-live="polite"></div>
+    <p class="trust">🔒 Deine Angaben gehen nur an Jakob von Vexfit – nicht an Dritte. Für dich ist die Vermittlung kostenlos.</p>
+  </form>
+
+  <div class="done" id="done">
+    <div class="ok">✅</div>
+    <h2>Danke<span>!</span></h2>
+    <p>Dein Wunsch ist bei uns. Jakob von Vexfit meldet sich innerhalb von 48 Stunden mit einem passenden Trainer. Schau auch in deinen Spam-Ordner, falls die Bestätigung nicht ankommt.</p>
+  </div>
+</div>
+
+<footer>
+  <p>© 2026 Vexfit</p>
+  <div class="footer-links">
+    <a href="rechtliches.html">Impressum</a>
+    <a href="rechtliches.html#datenschutz">Datenschutz</a>
+    <a href="rechtliches.html#agb">AGB</a>
+  </div>
+</footer>
+
+<script>
+const SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
+const WUNSCH_ENDPUNKT = SUPABASE_URL + '/functions/v1/vexfit-automation/wunsch';
+
+// G4: dezenter Artikel-Hinweis nur, wenn ARTIKEL_URL gesetzt ist (sonst nichts).
+try {
+  var au = (window.VEXFIT_CONFIG && window.VEXFIT_CONFIG.ARTIKEL_URL || '').trim();
+  if (au && typeof window.vexArtikelBanner === 'function') window.vexArtikelBanner(au, 'artikelBanner');
+} catch (e) {}
+
+// Ziel-Liste aus der gemeinsamen Quelle (vexfit-ziele.js) befüllen.
+(function(){
+  try {
+    var sel = document.getElementById('fZiel');
+    (window.SPEZ_EINSTIEG || []).forEach(function(z){
+      var o = document.createElement('option'); o.value = z; o.textContent = z; sel.appendChild(o);
+    });
+  } catch(e) {}
+})();
+
+// Land-Vorgabe ohne Raten (expliziter ?land=, sonst letzte Wahl, sonst Sprachraum;
+// Vorgabe bleibt AT, weil die Seite auf Salzburg ausgerichtet ist).
+try {
+  var lv = window.vexPlz && vexPlz.standardLand({
+    ausUrl: new URLSearchParams(location.search).get('land'),
+    gespeichert: (function(){ try { return localStorage.getItem('vexfit_land'); } catch(e){ return null; } })(),
+    sprache: (navigator.languages && navigator.languages[0]) || navigator.language || '',
+  });
+  if (lv) document.getElementById('fLand').value = lv;
+} catch(e) {}
+
+// PLZ aus der Adresse übernehmen (z. B. Verweis von suche.html).
+try {
+  var pq = new URLSearchParams(location.search).get('plz');
+  if (pq && /^\d{4,5}$/.test(pq)) document.getElementById('fPlz').value = pq;
+} catch(e) {}
+
+// Trichter-Beacon (anonym) + Herkunft in sessionStorage spiegeln (E3).
+try { if (typeof vexfitTrichter === 'function') vexfitTrichter('wunsch_seite', { rolle: 'kunde' }); } catch(e) {}
+
+// Herkunft (utm/Referrer) aus Adresse + sessionStorage zusammentragen.
+function werbungLesen(){
+  var p = new URLSearchParams(location.search);
+  var w = { utm_source: p.get('utm_source') || '', utm_campaign: p.get('utm_campaign') || '', utm_content: p.get('utm_content') || '', referrer: '' };
+  try {
+    var alt = JSON.parse(sessionStorage.getItem('vexfit_werbung') || 'null');
+    if (alt) { w.utm_source = w.utm_source || alt.quelle || ''; w.utm_campaign = w.utm_campaign || alt.kampagne || ''; w.utm_content = w.utm_content || alt.inhalt || ''; w.referrer = alt.referrer || ''; }
+  } catch(e) {}
+  try { if (!w.referrer && window.vexHerkunft) w.referrer = vexHerkunft.referrerDomain(document.referrer, location.hostname) || ''; } catch(e) {}
+  return w;
+}
+
+function zeitenWert(){
+  return Array.prototype.slice.call(document.querySelectorAll('#zeiten input:checked'))
+    .map(function(i){ return i.value; }).join(', ');
+}
+
+var form = document.getElementById('wunschForm');
+var msg = document.getElementById('fMsg');
+var btn = document.getElementById('fSubmit');
+
+form.addEventListener('submit', async function(ev){
+  ev.preventDefault();
+  msg.className = 'msg'; msg.textContent = '';
+  var vorname = document.getElementById('fVorname').value.trim();
+  var email = document.getElementById('fEmail').value.trim();
+  var land = document.getElementById('fLand').value;
+  var plz = document.getElementById('fPlz').value.trim();
+  var ziel = document.getElementById('fZiel').value;
+  var einwilligung = document.getElementById('fEinwilligung').checked;
+
+  if (!vorname) return fehler('Bitte deinen Vornamen angeben.');
+  if (!email || email.indexOf('@') < 1) return fehler('Bitte eine gültige E-Mail-Adresse angeben.');
+  if (!land) return fehler('Bitte das Land wählen.');
+  if (!/^\d{4,5}$/.test(plz)) return fehler('Bitte eine gültige PLZ angeben.');
+  if (!ziel) return fehler('Bitte dein Ziel wählen.');
+  if (!einwilligung) return fehler('Bitte der Datenschutzerklärung zustimmen.');
+
+  try { if (land) localStorage.setItem('vexfit_land', land); } catch(e) {}
+
+  var herkunft = werbungLesen();
+  var daten = {
+    vorname: vorname, email: email, land: land, plz: plz, ziel: ziel,
+    telefon: document.getElementById('fTelefon').value.trim(),
+    haeufigkeit: document.getElementById('fHaeufig').value,
+    zeiten: zeitenWert(),
+    budget: document.getElementById('fPreis').value,
+    nachricht: document.getElementById('fNachricht').value.trim(),
+    einwilligung: true,
+    webseite: document.getElementById('fWebseite').value, // Honeypot (leer lassen)
+    utm_source: herkunft.utm_source, utm_campaign: herkunft.utm_campaign,
+    utm_content: herkunft.utm_content, referrer: herkunft.referrer,
+  };
+
+  btn.disabled = true; btn.textContent = 'Wird gesendet …';
+  try {
+    var res = await fetch(WUNSCH_ENDPUNKT, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(daten),
+    });
+    if (res.status === 429) { btn.disabled = false; btn.textContent = 'Personal Trainer finden lassen →'; return fehler('Du hast gerade schon einen Wunsch gesendet. Bitte versuche es später noch einmal.'); }
+    var d = await res.json().catch(function(){ return null; });
+    if (!res.ok || !d || !d.ok) { btn.disabled = false; btn.textContent = 'Personal Trainer finden lassen →'; return fehler((d && d.fehler) || 'Das hat gerade nicht geklappt. Bitte versuche es später noch einmal.'); }
+    try { if (typeof vexfitTrichter === 'function') vexfitTrichter('wunsch_gesendet', { rolle: 'kunde', plz: plz, land: land, einmal: false }); } catch(e) {}
+    form.style.display = 'none';
+    document.getElementById('done').style.display = 'block';
+    document.getElementById('done').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch(e) {
+    btn.disabled = false; btn.textContent = 'Personal Trainer finden lassen →';
+    fehler('Das hat gerade nicht geklappt. Bitte versuche es später noch einmal.');
+  }
+});
+
+function fehler(t){ msg.className = 'msg err'; msg.textContent = '⚠️ ' + t; return false; }
+</script>
+</body>
+</html>

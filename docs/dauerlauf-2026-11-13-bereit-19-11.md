@@ -79,3 +79,41 @@ nie mehr etwas zeigen. → in G3 bereinigen/umleiten.
 Es gibt heute **keinen Weg**, bei dem ein Besucher OHNE Konto einen Wunsch
 hinterlassen kann. Genau diese Lücke schließt G1 (`/wunsch.html`). G3 lenkt alle
 öffentlichen Einstiege darauf.
+
+---
+
+## G1 – „WUNSCH ABGEBEN" (Kunde ohne Konto)
+
+**Angekündigt:** neue Seite `/wunsch.html`, Edge-Pfad `/wunsch`, Migration
+(ja: `2026-11-13-01-wuensche.sql`), Commit geplant.
+
+- **`/wunsch.html`** (neu, indexierbar, Salzburg-Landingpage): Überschrift „Sag
+  uns, was du suchst – wir finden deinen Personal Trainer in Salzburg. Kostenlos
+  für dich." Felder: Land (AT/DE/CH, Vorgabe AT), PLZ, Ziel/Schwerpunkt (Liste aus
+  `vexfit-ziele.js`), Wie oft pro Woche, Bevorzugte Zeiten (Mehrfachauswahl),
+  Preis pro Stunde (Bereiche, optional), Vorname, E-Mail, Telefon (optional),
+  Nachricht (optional), **Einwilligung Datenschutz (Pflicht)**. Herkunft (utm +
+  Referrer über `vexfit-trichter.js`/E3) wird mitgesendet. Honeypot `webseite`.
+  Lädt KEINE Trainerdaten. Kein Pixel/CAPI.
+- **Migration `migrations/2026-11-13-01-wuensche.sql`** (+ Rücknahme): Tabelle
+  `public.wuensche` (Status neu/in_bearbeitung/an_trainer_gesendet/vermittelt/
+  kein_trainer/abgeschlossen, trainer_id/anfrage_id optional, Zeitstempel,
+  Herkunft, verdacht). **RLS an, KEINE Policy, REVOKE von anon/authenticated →
+  nur service_role.** Einfügen nur über die Edge-Aktion. NUR Datei, nicht eingespielt.
+- **Edge `vexfit-automation`, Pfad `/wunsch`** (kern.ts `wunschEndpunkt` +
+  index.ts `wunschAnlegen`): Honeypot + Ratengrenze (wie `/neuer-kunde`,
+  `torwacheMailEndpunkt`), `wunschGeprueft` prüft Pflichtfelder, speichert in
+  `wuensche`, schickt **interne Mail an office@** (PLZ, Ziel, Zeiten, Preis,
+  Kontakt, Herkunft, Deep-Link `#wunsch-<id>`) und **Bestätigung an den Kunden**
+  („Danke! Jakob von Vexfit meldet sich innerhalb von 48 Stunden …", 48 =
+  `WUNSCH_FRIST_STUNDEN`). Wegwerf-Mail/unsinnig → gespeichert mit `verdacht`,
+  KEINE Bestätigung an den Kontakt (nur interne Mail mit Hinweis).
+- **Tests `g1_wunsch_test.ts`** (10): Speichern ohne Konto + beide Mails,
+  Pflichtfelder→400, Honeypot→still verworfen, Spam-Grenze→429, Wegwerf→Verdacht
+  ohne Bestätigung, 501 ohne Verdrahtung, 48-Konstante, Normalisierung, DOM-Check
+  (keine Trainerdaten/Post-Ziel), Migration+Rücknahme vorhanden.
+- **Playwright 375/1440:** in G7 über den eingebauten Browser (lokaler Server mit
+  gestubbtem Endpunkt), da der echte Edge-Pfad erst nach Deploy + Migration lebt.
+
+Ergebnis: `deno check` grün, `deno lint` 30 (keine neuen), **Tests 841 grün**
+(831 Baseline + 10). Commit-Hash siehe Abschlusstabelle.
