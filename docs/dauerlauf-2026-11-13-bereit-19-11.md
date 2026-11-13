@@ -160,3 +160,36 @@ keine Migration (nutzt `wuensche` aus G1 und `anfragen`), Commit geplant.
 
 Ergebnis: `deno check` grün, `deno lint` 30 (keine neuen), **Tests 848 grün**
 (841 + 7). Commit-Hash siehe Abschlusstabelle.
+
+---
+
+## G3 – ALLE EINSTIEGE AUFS FORMULAR
+
+**Angekündigt:** Umbau der öffentlichen Kunden-Einstiege auf /wunsch.html, keine
+Migration, Commit geplant.
+
+- **index.html:** alle Kunden-CTAs („Trainer finden lassen", Hero, Band,
+  Schluss, Menü, Nav-„Starten") → `wunsch.html?utm_source=startseite`.
+  Trainer-CTAs bleiben `registrieren.html?typ=trainer`. Hero-Text + 3-Schritte
+  (Wunsch abgeben → Wir vermitteln → Loslegen) + „Online & Offline Kunden"/
+  „Online oder vor Ort" ehrlich angepasst (kein öffentliches Online-Versprechen).
+- **personal-trainer-salzburg.html:** beide CTAs → `wunsch.html?plz=5020&land=AT`;
+  UTM-Weitergabe-Selektor auf `a[href^="wunsch.html"]` umgestellt; Lead/Schritte/
+  Meta ohne „oder online".
+- **suche.html:** Mauer (Anon-Gate) und Leerzustand (Nähe-Hinweis) bieten einen
+  Haupt-Knopf „Personal Trainer finden lassen" → `wunsch.html?utm_source=suche`
+  (angemeldete Kunden behalten die Umkreissuche). **Toter „Online"-Einstieg**
+  (Matching-Kachel `data-val="online"`) entfernt.
+- **Stadtseiten:** seit 12.11. STILLGELEGT – es gibt keine generierten
+  Trainer-Stadtseiten mehr; personal-trainer-salzburg.html ist die Salzburg-Seite.
+- **Rechtstexte:** NICHT angefasst (BLOCK – rechtliches.html bleibt unverändert).
+- **Offen gelassen (bewusst):** der dekorative Lauftext-Ticker auf index.html
+  nennt noch „ONLINE COACHING" – reine Markenwörter, kein Einstieg/kein konkretes
+  Angebot; nicht geändert, um Marketing-Text nicht zu verfälschen.
+- **Guards nachgezogen** (encodierten das alte Routing): e6_salzburg_kundenweg,
+  k5_stadtseite, land_eindeutig, nachtlauf_phase2_kunde. Neu `g3_einstiege_test.ts`
+  (4): Kunden-CTAs → wunsch, Salzburg/Suche → wunsch, Online-Einstieg weg,
+  **Link-Prüfung über alle öffentlichen Seiten (keine toten internen Links)**.
+- **Playwright 375/1440:** in G7 (eingebauter Browser).
+
+Ergebnis: `deno lint` 30 (keine neuen), **Tests 852 grün** (848 + 4). Commit siehe Tabelle.

@@ -18,14 +18,14 @@ Deno.test("K5: Kunden-Nutzen, 3 Schritte, CTA in die Suche (Salzburg vorausgefü
   const s = await lies("./personal-trainer-salzburg.html");
   assertStringIncludes(s, "Für Kunden kostenlos");
   assert((s.match(/class="schritt"/g) || []).length === 3, "nicht genau drei Schritte");
-  // Land eindeutig (07.11.2026): der Link trägt jetzt das Land mit (5020 = AT),
-  // damit die Suche nicht als Schweizer Ort auflöst.
-  assertStringIncludes(s, 'href="suche.html?plz=5020&land=AT"');
+  // G3 (13.11.): der Haupt-Knopf führt jetzt aufs Wunsch-Formular (kein Konto),
+  // trägt aber weiter das Land mit (5020 = AT), damit die PLZ eindeutig ist.
+  assertStringIncludes(s, 'href="wunsch.html?plz=5020&land=AT"');
 });
 
 Deno.test("K5: UTM-Weitergabe + Kunden-Trichter-Beacon", async () => {
   const s = await lies("./personal-trainer-salzburg.html");
-  assertStringIncludes(s, 'a[href^="suche.html?plz="]');
+  assertStringIncludes(s, 'a[href^="wunsch.html"]');
   assertStringIncludes(s, "vexfitTrichter('seite', { rolle: 'kunde'");
   // UTM laufen über sessionStorage durch.
   const js = await lies("./vexfit-trichter.js");

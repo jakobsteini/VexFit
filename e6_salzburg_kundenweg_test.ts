@@ -7,27 +7,31 @@ import { assert, assertStringIncludes } from "jsr:@std/assert@1";
 
 const lies = (p: string) => Deno.readTextFile(new URL(p, import.meta.url));
 
-Deno.test("E6: personal-trainer-salzburg.html – ehrlich, kostenlos, vor Ort + online, UTM-Weitergabe", async () => {
+Deno.test("E6/G3: personal-trainer-salzburg.html – ehrlich, kostenlos, Einstieg auf /wunsch.html, UTM-Weitergabe", async () => {
   const s = await lies("./personal-trainer-salzburg.html");
   assertStringIncludes(s, "Für Kunden kostenlos");
-  assertStringIncludes(s, "Vor Ort oder online");
-  assertStringIncludes(s, "suche.html?plz=5020&land=AT");
-  // UTM (z. B. utm_source=persoenlich) laufen in die Suche durch.
-  assertStringIncludes(s, 'a[href^="suche.html?plz="]');
+  // G3 (13.11.): der Haupt-Knopf führt auf das Wunsch-Formular (kein Konto nötig),
+  // nicht mehr in die (seit dc5f884 gated) öffentliche Suche.
+  assertStringIncludes(s, "wunsch.html?plz=5020&land=AT");
+  assert(!/suche\.html\?plz=/.test(s), "führt noch in die öffentliche Suche statt aufs Wunsch-Formular");
+  // UTM (z. B. utm_source=persoenlich) laufen aufs Wunsch-Formular durch.
+  assertStringIncludes(s, 'a[href^="wunsch.html"]');
+  // Kein öffentliches „oder online"-Versprechen mehr.
+  assert(!/vor Ort oder online/i.test(s), "verspricht noch öffentliche Online-Trainer");
   // Keine erfundene Trainerzahl / Bewertung.
   assert(!/\d+\s*Trainer\b/i.test(s), "keine erfundene Trainerzahl auf der Seite");
 });
 
-Deno.test("E6: suche.html – Leerzustand, Nähe-Vormerkung (interne Mail) und Online-Abschnitt", async () => {
+Deno.test("E6/G3: suche.html – Mauer und Leerzustand führen aufs Wunsch-Formular, Nähe-Vormerkung bleibt", async () => {
   const s = await lies("./suche.html");
-  // 0 Treffer: Leerzustand bzw. Nähe-Hinweis mit Vormerkung.
-  assertStringIncludes(s, 'id="emptyState"');
+  // 0 Treffer: Nähe-Hinweis mit Vormerkung (interne Mail über /neuer-kunde, E1).
   assertStringIncludes(s, 'id="naeheHinweis"');
   assertStringIncludes(s, "function naeheVormerken(");
-  // Vormerkung geht über /neuer-kunde -> interne Meldung an office@ (E1).
   assertStringIncludes(s, "vexfit-automation/neuer-kunde");
-  // Online-Trainer als Alternative (eigener Abschnitt).
-  assert(/Online/.test(s), "Online-Abschnitt fehlt");
+  // G3: Mauer (Anon-Gate) und Leerzustand bieten das Wunsch-Formular an.
+  assertStringIncludes(s, "wunsch.html");
+  // Kein „Online"-Einstieg mehr in der Matching-Auswahl (toter Pfad entfernt).
+  assert(!/data-val="online"/.test(s), "toter Online-Einstieg noch vorhanden");
 });
 
 Deno.test("E6: teilbarer Link + Beitragstext dokumentiert (utm_source=persoenlich)", async () => {

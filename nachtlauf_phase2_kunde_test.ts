@@ -57,8 +57,11 @@ Deno.test("keine Preise in falscher Reihenfolge (auch dynamisch) auf oeffentlich
   }
 });
 
-Deno.test("index.html: Suche nach PLZ (nicht nach Stadt)", async () => {
+Deno.test("index.html: Wunsch-Flow statt Stadt-Suche", async () => {
   const s = await lies("./index.html");
-  assertStringIncludes(s, "Durchsuche Trainer nach PLZ und Ziel.");
+  // G3 (13.11.): die Startseite führt über das Wunsch-Formular (kein öffentliches
+  // „Durchsuchen" mehr). Wichtig bleibt: NICHT mit einer Stadt-Suche werben.
+  assertStringIncludes(s, "Wunsch abgeben");
   assert(!s.includes("nach Stadt und Ziel"), "index.html wirbt noch mit Stadt-Suche");
+  assert(!/Durchsuche Trainer/.test(s), "index.html wirbt noch mit öffentlichem Durchsuchen");
 });

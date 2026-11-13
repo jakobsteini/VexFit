@@ -219,7 +219,6 @@ try {
       <div class="ftag" data-val="studio" onclick="matchPick(this,'ort')">Studio</div>
       <div class="ftag" data-val="outdoor" onclick="matchPick(this,'ort')">Outdoor</div>
       <div class="ftag" data-val="beim_kunden" onclick="matchPick(this,'ort')">Beim Kunden</div>
-      <div class="ftag" data-val="online" onclick="matchPick(this,'ort')">Online</div>
     </div>
     <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">3. Sprache</div>
     <select class="s-input" id="matchSprache" style="max-width:220px;margin-bottom:12px"><option value="">Egal</option></select>
@@ -249,11 +248,11 @@ try {
   <!-- 12.11.: Gate für nicht angemeldete Besucher. KEIN Trainer-Netzaufruf;
        nur Erklärung + Registrieren/Anmelden. -->
   <div class="empty-state" id="anonGate" style="display:none">
-    <div class="empty-icon">🔒</div>
-    <div class="empty-title">Trainer findest du als Mitglied</div>
-    <p class="empty-sub">Die Trainersuche ist kostenlos – aber nur für angemeldete Kundinnen und Kunden. Melde dich an oder registriere dich kostenlos, dann siehst du passende Personal Trainer in deiner Nähe (bis 25 km) und kannst direkt anfragen.</p>
+    <div class="empty-icon">💬</div>
+    <div class="empty-title">Personal Trainer finden – ganz einfach</div>
+    <p class="empty-sub">Sag uns ohne Konto, was du suchst – wir finden einen passenden Personal Trainer in deiner Nähe und melden uns innerhalb von 48 Stunden. Kostenlos für dich. Du hast schon ein Konto? Dann melde dich an und such direkt im Umkreis (bis 25 km).</p>
     <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-      <a href="registrieren.html?typ=kunde" class="s-btn" style="width:auto;padding:13px 22px;text-decoration:none">Kostenlos registrieren</a>
+      <a href="wunsch.html?utm_source=suche" class="s-btn" style="width:auto;padding:13px 22px;text-decoration:none">Personal Trainer finden lassen →</a>
       <a href="login.html?typ=kunde" class="s-btn" style="width:auto;padding:13px 22px;text-decoration:none;background:transparent;color:var(--accent);border:1px solid var(--accent)">Anmelden</a>
     </div>
   </div>
@@ -285,6 +284,7 @@ try {
   <!-- K4: Hinweis + Vormerkung, wenn nur die nächsten (außerhalb des Umkreises) gezeigt werden -->
   <div id="naeheHinweis" style="display:none;max-width:460px;margin:0 auto 20px;background:var(--card,#161616);border:1px solid var(--border-input,rgba(255,255,255,0.12));border-radius:6px;padding:16px 18px">
     <div id="naeheHinweisText" style="font-size:13px;color:var(--text-muted,#999);line-height:1.6;margin-bottom:10px"></div>
+    <a href="wunsch.html?utm_source=suche" class="s-btn" style="display:inline-block;width:auto;padding:11px 18px;text-decoration:none;margin-bottom:12px">Personal Trainer finden lassen →</a>
     <div id="naeheVormerkForm" style="display:flex;gap:8px;flex-wrap:wrap">
       <input type="email" id="naehe-email" placeholder="deine@email.com" autocomplete="email" inputmode="email" style="flex:1;min-width:180px;background:var(--gray,#111);border:1px solid var(--border-input,rgba(255,255,255,0.12));color:var(--white,#f5f5f0);padding:11px 13px;border-radius:3px;font-size:14px;outline:none">
       <input type="text" id="naehe-webseite" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">

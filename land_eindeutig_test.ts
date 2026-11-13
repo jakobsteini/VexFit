@@ -149,7 +149,8 @@ Deno.test("vexfit-trichter: landNormal und land im Beacon-Koerper", async () => 
 // ── Stadtseite: Link traegt das Land ──
 Deno.test("personal-trainer-salzburg.html: Suche-Link und Beacon mit Land AT", async () => {
   const s = await lies("./personal-trainer-salzburg.html");
-  assert((s.match(/suche\.html\?plz=5020&land=AT/g) || []).length >= 2, "beide CTA-Links mit &land=AT");
+  // G3 (13.11.): beide CTA-Links führen aufs Wunsch-Formular, weiterhin mit &land=AT.
+  assert((s.match(/wunsch\.html\?plz=5020&land=AT/g) || []).length >= 2, "beide CTA-Links mit &land=AT");
   assertStringIncludes(s, "{ rolle: 'kunde', plz: '5020', land: 'AT' }");
 });
 
