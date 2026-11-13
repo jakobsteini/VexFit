@@ -2225,6 +2225,7 @@ function starteVerwaltung() {
     else if (name === "herkunft") renderHerkunft();
     else if (name === "zahlungen") renderAboStatus();
     else if (name === "erinnerung") ladeProfilErinnerung();
+    else if (name === "wuensche") ladeWuensche();
   }
 
   // ── Profil-Erinnerung (Service-Mail an registrierte Trainer, Versand per Klick) ──
@@ -2299,6 +2300,135 @@ function starteVerwaltung() {
     else fehler("Erinnerung wurde nicht gesendet.");
   }
 
+  // ── G2: Wünsche (Interessenten ohne Konto) + Vermittlung ──
+  let _wuensche = [];
+  const WUNSCH_STATUS_LABEL = {
+    neu: "Neu", in_bearbeitung: "In Bearbeitung", an_trainer_gesendet: "An Trainer gesendet",
+    vermittelt: "Vermittelt", kein_trainer: "Kein Trainer", abgeschlossen: "Abgeschlossen",
+  };
+  function wunschAlter(iso) {
+    if (!iso) return "";
+    const ms = Date.now() - new Date(iso).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return "";
+    const std = Math.floor(ms / 3600000);
+    if (std < 1) return "gerade eben";
+    if (std < 24) return `vor ${std} h`;
+    const tage = Math.floor(std / 24);
+    return `vor ${tage} ${tage === 1 ? "Tag" : "Tagen"}`;
+  }
+  async function ladeWuensche() {
+    const ziel = $("wuensche-liste");
+    if (!ziel) return;
+    ziel.innerHTML = '<div class="leer-text">Lade …</div>';
+    const d = await adminEdge({ aktion: "wuensche_liste" });
+    if (!d) { ziel.innerHTML = '<div class="leer-text">Konnte nicht geladen werden.</div>'; return; }
+    _wuensche = Array.isArray(d.wuensche) ? d.wuensche : [];
+    renderWuensche();
+  }
+  function renderWuensche() {
+    const ziel = $("wuensche-liste");
+    if (!ziel) return;
+    const filter = ($("wuensche-filter") && $("wuensche-filter").value) || "offen";
+    const sichtbar = _wuensche.filter((w) => {
+      if (filter === "alle") return true;
+      if (filter === "offen") return w.status === "neu" || w.status === "in_bearbeitung";
+      return w.status === filter;
+    });
+    if (!sichtbar.length) { ziel.innerHTML = '<div class="leer-text">Keine Wünsche in dieser Ansicht.</div>'; return; }
+    ziel.innerHTML = sichtbar.map(wunschKarte).join("");
+  }
+  function wunschKarte(w) {
+    const id = escapeHtml(w.id);
+    const name = escapeHtml(nameFormatieren(w.vorname || "")) || "Interessent";
+    const ortPlz = escapeHtml([w.stadt, w.plz, w.land].filter(Boolean).join(" · "));
+    const statusLabel = escapeHtml(WUNSCH_STATUS_LABEL[w.status] || w.status || "–");
+    const verdacht = w.verdacht
+      ? ' <span style="background:rgba(251,146,60,0.18);color:#fb923c;padding:1px 7px;border-radius:100px;font-size:10px">⚠️ Verdacht</span>' : "";
+    const zeile = (label, wert) => wert ? `<div style="font-size:13px;margin:2px 0"><span style="color:var(--text-muted)">${label}:</span> ${escapeHtml(wert)}</div>` : "";
+    const herkunft = [w.quelle, w.kampagne].filter(Boolean).join(" – ") || w.referrer || "";
+    // Aktions-Knöpfe je Status.
+    let knoepfe = "";
+    if (w.status === "neu" || w.status === "in_bearbeitung") {
+      knoepfe = `<button class="btn-klein" data-aktion="wunsch-trainer" data-id="${id}">Passende Trainer</button>
+        <button class="btn-klein" data-aktion="wunsch-kein-trainer" data-id="${id}">Kein Trainer verfügbar</button>`;
+    } else if (w.status === "an_trainer_gesendet") {
+      knoepfe = `<button class="btn-klein" data-aktion="wunsch-status" data-id="${id}" data-status="vermittelt">Als vermittelt markieren</button>
+        <button class="btn-klein" data-aktion="wunsch-status" data-id="${id}" data-status="abgeschlossen">Abschließen</button>`;
+    } else if (w.status === "vermittelt" || w.status === "kein_trainer") {
+      knoepfe = `<button class="btn-klein" data-aktion="wunsch-status" data-id="${id}" data-status="abgeschlossen">Abschließen</button>`;
+    }
+    return `<div id="wunsch-${id}" style="border:1px solid var(--bi,rgba(255,255,255,0.12));border-radius:10px;padding:14px 16px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;margin-bottom:8px">
+        <strong style="font-size:15px">${name}${verdacht}</strong>
+        <span style="font-size:11px;color:var(--text-muted)">${escapeHtml(statusLabel)} · ${escapeHtml(wunschAlter(w.erstellt_am))}</span>
+      </div>
+      ${zeile("Ort", ortPlz)}
+      ${zeile("Ziel", w.ziel)}
+      ${zeile("Häufigkeit", w.haeufigkeit)}
+      ${zeile("Zeiten", w.zeiten)}
+      ${zeile("Preis/Std", w.budget)}
+      ${zeile("E-Mail", w.email)}
+      ${zeile("Telefon", w.telefon)}
+      ${zeile("Nachricht", w.nachricht)}
+      ${zeile("Herkunft", herkunft)}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${knoepfe}</div>
+      <div id="wunsch-trainer-${id}" style="margin-top:10px"></div>
+    </div>`;
+  }
+  async function wunschTrainerZeigen(id) {
+    const box = $("wunsch-trainer-" + id);
+    if (box) box.innerHTML = '<div class="leer-text">Suche passende Trainer …</div>';
+    const d = await adminEdge({ aktion: "wunsch_trainer", ziel_id: id });
+    if (!d || !box) { if (box) box.innerHTML = '<div class="leer-text">Konnte nicht geladen werden.</div>'; return; }
+    const vs = Array.isArray(d.vorschlaege) ? d.vorschlaege : [];
+    const kopf = `<div style="font-size:12px;color:var(--text-muted);margin:4px 0 6px">${vs.length} Trainer ≤ ${escapeHtml(d.umkreis_km || 25)} km${d.ort ? " um " + escapeHtml(nameFormatieren(d.ort)) : ""}${d.hinweis ? " · " + escapeHtml(d.hinweis) : ""}</div>`;
+    if (!vs.length) { box.innerHTML = kopf + '<div class="leer-text">Kein Trainer im Umkreis. „Kein Trainer verfügbar" wählen.</div>'; return; }
+    box.innerHTML = kopf + vs.map((t) => {
+      const frei = t.aktiv
+        ? '<span style="color:var(--accent,#e8ff00);font-size:10px">freigegeben</span>'
+        : '<span style="color:#fb923c;font-size:10px">noch nicht freigegeben</span>';
+      const verif = t.verifiziert ? ' · ✔ verifiziert' : "";
+      const preis = t.preis_stunde ? ` · ${escapeHtml(t.preis_stunde)} €/Std` : "";
+      return `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--border,rgba(255,255,255,0.07));padding:8px 0">
+        <div style="font-size:13px">
+          <strong>${escapeHtml(t.name)}</strong> · ${escapeHtml(t.entfernung_km)} km · Profil ${escapeHtml(t.erfuellt)}/${escapeHtml(t.gesamt)}${preis}<br>
+          <span style="color:var(--text-muted);font-size:11px">${escapeHtml([t.stadt, t.plz].filter(Boolean).join(" · "))} · ${frei}${verif}</span>
+        </div>
+        <button class="btn-klein" data-aktion="wunsch-senden" data-id="${escapeHtml(id)}" data-trainer="${escapeHtml(t.id)}" data-name="${escapeHtml(t.name)}">An Trainer senden</button>
+      </div>`;
+    }).join("");
+  }
+  async function wunschAnTrainer(wunschId, trainerId, name) {
+    const ja = await bestaetige({
+      titel: "Wunsch an Trainer senden?",
+      text: `Es wird eine Anfrage an „${name}" angelegt und die Trainer-Mail verschickt. Nimmt der Trainer an, greift die bestehende Zahlungslogik.`,
+      okText: "Senden", okArt: "btn-ja",
+    });
+    if (!ja) return;
+    const d = await adminEdge({ aktion: "wunsch_an_trainer", ziel_id: wunschId, trainer_id: trainerId });
+    if (!d) return;
+    erfolg(`An Trainer gesendet (${d.mails} Mail${d.mails === 1 ? "" : "s"}).`);
+    ladeWuensche();
+  }
+  async function wunschKeinTrainer(id) {
+    const ja = await bestaetige({
+      titel: "Kein Trainer verfügbar?",
+      text: "Der Interessent bekommt eine freundliche Mail und wird vorgemerkt. Der Wunsch wird auf „Kein Trainer“ gesetzt.",
+      okText: "Mail senden", okArt: "btn-ja",
+    });
+    if (!ja) return;
+    const d = await adminEdge({ aktion: "wunsch_kein_trainer", ziel_id: id });
+    if (!d) return;
+    erfolg(`Mail gesendet${d.vorgemerkt ? ", vorgemerkt" : ""}.`);
+    ladeWuensche();
+  }
+  async function wunschStatus(id, status) {
+    const d = await adminEdge({ aktion: "wunsch_status", ziel_id: id, status });
+    if (!d) return;
+    erfolg("Status aktualisiert.");
+    ladeWuensche();
+  }
+
   // Teil M: Deep-Link aus der Mail anspringen. #trainer-<id> / #kunde-<id>
   // öffnen den passenden Reiter und die Detailansicht des Datensatzes;
   // #anfrage-<id> bzw. #anfragen öffnen den Anfragen-Reiter.
@@ -2311,6 +2441,7 @@ function starteVerwaltung() {
     if (art === "trainer" && id) { zeigeTab("trainer"); trainerDetail(id); }
     else if ((art === "kunde" || art === "kunden") && id) { zeigeTab("kunden"); kundeDetail(id); }
     else if (art === "anfrage" || art === "anfragen") { zeigeTab("anfragen"); }
+    else if (art === "wunsch" || art === "wuensche") { zeigeTab("wuensche"); }
   }
 
   // ── Teil 1c: Mehr-Blatt (von unten) mit Abdunkelung ──
@@ -2575,7 +2706,15 @@ function starteVerwaltung() {
       if (akt === "anfrage-verwerfen") { anfrageVerwerfen(id); return; }
       if (akt === "profil-erinnerung") { profilErinnerungVorschau(id); return; }
       if (akt === "erinnerung-senden") { profilErinnerungSenden(); return; }
+      if (akt === "wuensche-neu-laden") { ladeWuensche(); return; }
+      if (akt === "wunsch-trainer") { wunschTrainerZeigen(id); return; }
+      if (akt === "wunsch-senden") { wunschAnTrainer(id, a.dataset.trainer, a.dataset.name || "Trainer"); return; }
+      if (akt === "wunsch-kein-trainer") { wunschKeinTrainer(id); return; }
+      if (akt === "wunsch-status") { wunschStatus(id, a.dataset.status); return; }
     });
+    // G2: Wünsche-Filter neu zeichnen.
+    const wf = $("wuensche-filter");
+    if (wf) wf.addEventListener("change", renderWuensche);
     // Checkbox der Studio-Freigabe (change statt click)
     document.addEventListener("change", (e) => {
       const el = e.target.closest('[data-aktion="studio-freigabe"]');

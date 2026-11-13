@@ -356,6 +356,7 @@ tr:last-child td{border-bottom:none}
       <div class="tab-mehr-menu" id="tab-mehr-menu">
         <!-- Teil 1c: Griff + Titel nur im Blatt (am großen Bildschirm ausgeblendet) -->
         <div class="mehr-griff mehr-nur-handy" aria-hidden="true"></div>
+        <button class="tab" data-tab="wuensche">Wünsche</button>
         <button class="tab" data-tab="karte">Karte</button>
         <button class="tab" data-tab="herkunft">Herkunft</button>
         <button class="tab" data-tab="zahlungen">Zahlungen</button>
@@ -540,6 +541,25 @@ tr:last-child td{border-bottom:none}
         <thead><tr><th>Ziel</th><th>Anzahl</th></tr></thead>
         <tbody id="ziele-tbody"><tr><td colspan="2" class="leer-text">Lade …</td></tr></tbody>
       </table></div>
+    </div>
+
+    <!-- G2: Wünsche (Interessenten ohne Konto) + Vermittlung an einen Trainer -->
+    <div class="tab-content" id="tab-wuensche">
+      <h3 class="feld-label" style="font-size:12px;margin-bottom:8px">Wünsche · Interessenten ohne Konto vermitteln</h3>
+      <div class="section-hinweis">Wünsche aus dem Formular /wunsch.html. „Passende Trainer" zeigt alle Trainer ≤&nbsp;25&nbsp;km im gleichen Land (auch noch nicht freigegebene, markiert). „An Trainer senden" legt eine Anfrage an und schickt die Trainer-Mail; nimmt der Trainer an, greift die bestehende Zahlungslogik.</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0 16px">
+        <select id="wuensche-filter" style="background:var(--kf,#161616);border:1px solid var(--bi,rgba(255,255,255,0.12));color:inherit;padding:9px 12px;border-radius:6px;font-family:inherit;font-size:13px;cursor:pointer">
+          <option value="offen">Offen (neu + in Bearbeitung)</option>
+          <option value="alle">Alle</option>
+          <option value="neu">Neu</option>
+          <option value="an_trainer_gesendet">An Trainer gesendet</option>
+          <option value="vermittelt">Vermittelt</option>
+          <option value="kein_trainer">Kein Trainer</option>
+          <option value="abgeschlossen">Abgeschlossen</option>
+        </select>
+        <button class="btn-klein" data-aktion="wuensche-neu-laden" type="button">Aktualisieren</button>
+      </div>
+      <div id="wuensche-liste"><div class="leer-text">Lade …</div></div>
     </div>
 
     <!-- B3.2: Karte (Leaflet + OpenStreetMap, nur lesend) -->

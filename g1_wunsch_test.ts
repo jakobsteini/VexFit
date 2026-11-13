@@ -86,7 +86,7 @@ const GUT = {
   haeufigkeit: "2× pro Woche",
   zeiten: "Morgens, Abends",
   budget: "40–60 €",
-  telefon: "+43 660 0000000",
+  telefon: "Rueckruf erwuenscht",
   nachricht: "Bitte vormittags.",
   einwilligung: true,
   webseite: "", // Honeypot leer = Mensch

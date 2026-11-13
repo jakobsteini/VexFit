@@ -1258,6 +1258,94 @@ const anschluesse: Anschluesse = {
     return Array.isArray(z) && z[0] ? String(z[0].id) : null;
   },
 
+  // ── G2 (13.11.): Verwaltung „Wünsche" + Vermittlung ──
+  // Alle Wünsche, neueste zuerst (service_role).
+  async wuenscheListe() {
+    const cols =
+      "id,status,vorname,email,telefon,nachricht,land,plz,stadt,ziel,haeufigkeit,zeiten,budget,trainer_id,anfrage_id,quelle,kampagne,referrer,verdacht,erstellt_am";
+    return await lesen<import("./kern.ts").WunschZeile>(
+      `wuensche?select=${cols}&order=erstellt_am.desc&limit=1000`,
+    );
+  },
+  // Ein Wunsch per Kennung.
+  async wunschNachId(id: string) {
+    const cols =
+      "id,status,vorname,email,telefon,nachricht,land,plz,stadt,ziel,haeufigkeit,zeiten,budget,trainer_id,anfrage_id,erstellt_am";
+    const zeilen = await lesen<import("./kern.ts").WunschZeile>(
+      `wuensche?id=eq.${encodeURIComponent(id)}&select=${cols}&limit=1`,
+    );
+    return zeilen[0] ?? null;
+  },
+  // Status/Felder eines Wunsches setzen; gibt die Zahl geänderter Zeilen zurück.
+  async wunschSetzen(id: string, felder: Record<string, unknown>) {
+    const r = await fetch(restAdresse(`wuensche?id=eq.${encodeURIComponent(id)}`), {
+      method: "PATCH",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify(felder),
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      throw new Error(`wunschSetzen fehlgeschlagen: HTTP ${r.status} ${t}`);
+    }
+    const z = await r.json().catch(() => []);
+    return Array.isArray(z) ? z.length : 0;
+  },
+  // Eine Anfrage anlegen (für die Vermittlung eines Wunsches) und id zurückgeben.
+  async anfrageAnlegen(felder: Record<string, unknown>) {
+    const a = await fetch(restAdresse("anfragen"), {
+      method: "POST",
+      headers: { ...restKopf(), Prefer: "return=representation" },
+      body: JSON.stringify(felder),
+    });
+    if (!a.ok) {
+      const t = await a.text().catch(() => "");
+      throw new Error(`anfrageAnlegen fehlgeschlagen: HTTP ${a.status} ${t}`);
+    }
+    const z = await a.json().catch(() => []);
+    return Array.isArray(z) && z[0] ? String(z[0].id) : null;
+  },
+  // Trainer-Kandidaten für die Vermittlung: gleiches Land, mit lat/lng, Vor Ort/
+  // beides, nicht Test/gesperrt – AUCH noch nicht freigegebene (kein aktiv-Filter).
+  async trainerAlleFuerVermittlung(land: string) {
+    const cols =
+      "id,vorname,nachname,stadt,plz,land,trainingsart,trainingsort,erfahrung,spezialisierungen,bio,preis_stunde,telefon,avatar_url,verifiziert,aktiv,lat,lng";
+    return await lesen<Record<string, unknown>>(
+      `trainers?select=${cols}` +
+        `&gesperrt=not.is.true&ist_test=not.is.true` +
+        `&trainingsort=in.(vor_ort,beides)` +
+        `&land=ilike.${encodeURIComponent(land)}` +
+        `&lat=not.is.null&lng=not.is.null&limit=2000`,
+    );
+  },
+  // Vormerkung in die Warteliste (trainer_alerts). Mit land, Rückfall ohne land,
+  // falls die Spalte fehlt (Migration 2026-11-07-02 nicht eingespielt).
+  async wartelisteVormerken(felder) {
+    const basis: Record<string, unknown> = {
+      kunden_email: felder.kunden_email,
+      kunden_name: felder.kunden_name ?? null,
+      plz: felder.plz ?? null,
+      stadt: felder.stadt ?? null,
+      aktiv: true,
+    };
+    const mitLand = { ...basis, land: felder.land ?? null };
+    let r = await fetch(restAdresse("trainer_alerts"), {
+      method: "POST",
+      headers: { ...restKopf(), Prefer: "return=minimal" },
+      body: JSON.stringify(mitLand),
+    });
+    if (!r.ok && r.status === 400) {
+      r = await fetch(restAdresse("trainer_alerts"), {
+        method: "POST",
+        headers: { ...restKopf(), Prefer: "return=minimal" },
+        body: JSON.stringify(basis),
+      });
+    }
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      throw new Error(`wartelisteVormerken fehlgeschlagen: HTTP ${r.status} ${t}`);
+    }
+  },
+
   melden(text, mehr) {
     console.error(`vexfit-automation: ${text}`, mehr ?? "");
   },

@@ -117,3 +117,46 @@ hinterlassen kann. Genau diese Lücke schließt G1 (`/wunsch.html`). G3 lenkt al
 
 Ergebnis: `deno check` grün, `deno lint` 30 (keine neuen), **Tests 841 grün**
 (831 Baseline + 10). Commit-Hash siehe Abschlusstabelle.
+
+---
+
+## G2 – VERWALTUNG „WÜNSCHE" + VERMITTLUNG
+
+**Angekündigt:** neuer Reiter „Wünsche" in der Verwaltung + Edge-Aktionen,
+keine Migration (nutzt `wuensche` aus G1 und `anfragen`), Commit geplant.
+
+- **Reiter „Wünsche"** (verwaltung-…html + vexfit-verwaltung.js): Liste mit
+  Status-Badge, Alter, Filter (offen/alle/je Status). Je Wunsch Kontakt + Ziel +
+  Zeiten + Preis + Herkunft (+ Verdacht-Markierung). „Passende Trainer" zeigt
+  Trainer ≤ 25 km (gleiches Land, über `plzAufloesen`), **inkl. noch nicht
+  freigegebener (markiert „noch nicht freigegeben")**, mit Entfernung in km und
+  Profil x/8. „An Trainer senden" (mit Bestätigungsdialog), „Kein Trainer
+  verfügbar", Status-Knöpfe (vermittelt/abschließen). Deep-Link `#wunsch-<id>`.
+- **Edge-Aktionen (kern.ts adminAktion, aal2):**
+  - `wuensche_liste` – lesend, alle Wünsche.
+  - `wunsch_trainer` – `wunschTrainerVorschlaege` (rein) über `plzAufloesen` +
+    `trainerAlleFuerVermittlung` (gleiches Land, lat/lng, Vor Ort/beides, nicht
+    Test/gesperrt, **ohne aktiv-Filter**).
+  - `wunsch_an_trainer` – legt über den **bestehenden Anfrage-Ablauf** eine
+    Anfrage an (Kontakt aus dem Wunsch = Gast-Kunde, `anfrageAnlegen`), schickt
+    Trainer-Mail (erste/weitere/Studio) + interne Mail, Status →
+    `an_trainer_gesendet`, `trainer_id`/`anfrage_id` gesetzt. Studio-Trainer:
+    `weitergeleitet=true` (sofort sichtbar). Normale Trainer: `weitergeleitet=false`
+    → **Annahme = Stripe-Zahlung greift unverändert** (bestehende
+    `aeltesteOffeneAnfrage`/`mailKundenDaten`-Logik liefert dann die Kontaktdaten).
+  - `wunsch_kein_trainer` – freundliche Mail an den Kunden (`mailWunschKeinTrainer`,
+    Text im Abschluss) + Vormerkung in `trainer_alerts` (`wartelisteVormerken`),
+    Status → `kein_trainer`.
+  - `wunsch_status` – Status von Hand setzen (vermittelt/abgeschlossen/…).
+- **index.ts** neue Anschlüsse: `wuenscheListe`, `wunschNachId`, `wunschSetzen`,
+  `anfrageAnlegen`, `trainerAlleFuerVermittlung`, `wartelisteVormerken`.
+- **KEINE Migration** (nutzt `wuensche` aus G1 und `anfragen`). Edge muss deployt
+  werden (Jakobs Aufgabe, siehe Abschluss).
+- **Tests `g2_wuensche_test.ts`** (7): Matching rein, Zugriff (Admin+aal2),
+  wunsch_trainer, **Integration Wunsch→Anfrage→Annahme(Stripe gestubbt)→
+  Kundendaten an Trainer**, wunsch_kein_trainer (Mail+Vormerkung+Status),
+  wunsch_status, UI/index.ts verdrahtet. (G1-Test: Telefon-Testwert entschärft,
+  weil der Geheimnis-Wächter jedes +NN-Muster meldet.)
+
+Ergebnis: `deno check` grün, `deno lint` 30 (keine neuen), **Tests 848 grün**
+(841 + 7). Commit-Hash siehe Abschlusstabelle.

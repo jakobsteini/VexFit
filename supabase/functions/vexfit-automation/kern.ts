@@ -721,6 +721,17 @@ export interface Anschluesse {
   /** G2: Status/Felder eines Wunsches setzen (service_role). Gibt geänderte
    *  Zeilen zurück. */
   wunschSetzen?(id: string, felder: Record<string, unknown>): Promise<number>;
+  /** G2: legt eine Anfrage an (service_role, Tabelle anfragen) und gibt die neue
+   *  Kennung zurück – damit ein Wunsch über den bestehenden Anfrage-Ablauf an
+   *  einen Trainer vermittelt werden kann. */
+  anfrageAnlegen?(felder: Record<string, unknown>): Promise<string | null>;
+  /** G2: Trainer-Kandidaten für die Vermittlung eines Wunsches: gleiches Land,
+   *  mit lat/lng, Vor Ort/beides, nicht Test/gesperrt – AUCH noch nicht
+   *  freigegebene (aktiv=false), damit Jakob sie sieht. service_role. */
+  trainerAlleFuerVermittlung?(land: string): Promise<Record<string, unknown>[]>;
+  /** G2: einen Interessenten in die Warteliste (trainer_alerts) vormerken, wenn
+   *  gerade kein Trainer frei ist. service_role. */
+  wartelisteVormerken?(felder: { kunden_email: string; kunden_name?: string; plz?: string; stadt?: string; land?: string }): Promise<void>;
 
   // ── Admin-Dashboard neu, Teil 3: Kicken (endgueltig loeschen, vollstaendig) ──
   /** Die Speicher-Dateien einer Person: avatars/galerie (public) und zertifikate
@@ -2161,6 +2172,83 @@ async function wunschEndpunkt(
   }, herkunft);
 }
 
+// ============================================================================
+// G2 (13.11.): Verwaltung „Wünsche" + Vermittlung
+// ============================================================================
+
+/** Ein Trainer-Vorschlag für einen Wunsch (Verwaltung). Enthält – anders als die
+ *  öffentliche Suche – AUCH noch nicht freigegebene Trainer, deutlich markiert
+ *  (aktiv=false), mit Entfernung und Profil-Vollständigkeit x/8. */
+export interface WunschTrainerVorschlag {
+  id: string;
+  name: string;
+  stadt?: string | null;
+  plz?: string | null;
+  land?: string | null;
+  entfernung_km: number;
+  aktiv: boolean;
+  verifiziert: boolean;
+  erfuellt: number;
+  gesamt: number;
+  preis_stunde?: number | string | null;
+  trainingsort?: string | null;
+}
+
+/**
+ * Passende Trainer für einen Wunsch: alle Kandidaten ≤ umkreisKm um die Mitte,
+ * nach Entfernung sortiert, mit x/8 und aktiv-Markierung. Rein (keine DB/Netz) –
+ * die Kandidaten (gleiches Land, mit lat/lng, vor Ort/beides, nicht Test/gesperrt)
+ * kommen vom Anschluss trainerAlleFuerVermittlung.
+ */
+export function wunschTrainerVorschlaege(
+  mitte: { lat: number; lng: number },
+  kandidaten: Array<Record<string, unknown>>,
+  umkreisKm: number = UMKREIS_KM,
+): WunschTrainerVorschlag[] {
+  const out: WunschTrainerVorschlag[] = [];
+  for (const t of kandidaten) {
+    const lat = Number(t.lat), lng = Number(t.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const d = haversineKm(mitte.lat, mitte.lng, lat, lng);
+    if (d > umkreisKm) continue;
+    const voll = profilVollstaendigkeitAcht(t);
+    out.push({
+      id: String(t.id),
+      name: nameFormatieren(`${w(t.vorname)} ${w(t.nachname)}`.trim()) || "Trainer",
+      stadt: (t.stadt as string) ?? null,
+      plz: (t.plz as string) ?? null,
+      land: (t.land as string) ?? null,
+      entfernung_km: Math.round(d),
+      aktiv: t.aktiv === true,
+      verifiziert: t.verifiziert === true,
+      erfuellt: voll.erfuellt,
+      gesamt: voll.gesamt,
+      preis_stunde: (t.preis_stunde as number | string) ?? null,
+      trainingsort: (t.trainingsort as string) ?? null,
+    });
+  }
+  out.sort((x, y) => x.entfernung_km - y.entfernung_km);
+  return out;
+}
+
+/** G2: „Noch kein Trainer frei" an den Interessenten. Freundlich, ehrlich, keine
+ *  Trainerdaten, keine erfundenen Versprechen. Wird im Abschluss ausgegeben. */
+export function mailWunschKeinTrainer(wunsch: WunschZeile): Mail {
+  const vorname = nameFormatieren(w(wunsch.vorname));
+  const anrede = vorname ? `Hallo ${vorname}, ` : "Hallo, ";
+  const ort = w(wunsch.stadt) || w(wunsch.plz);
+  return baueMail(w(wunsch.email), "Dein Wunsch bei Vexfit – kurzer Zwischenstand", {
+    ueberschrift: "Kurzer Zwischenstand",
+    absatz: `${anrede}danke für deine Geduld. Aktuell haben wir ` +
+      `${ort ? `in ${ort}` : "in deiner Nähe"} noch keinen passenden Personal Trainer frei. ` +
+      "Wir haben dich vorgemerkt und melden uns, sobald ein Trainer dazukommt. Für dich bleibt es kostenlos.",
+    datenZeilen: [],
+    fusszeile: "Vexfit.app · Salzburg · Österreich",
+    impressumLink: `${VEXFIT_BASIS}/rechtliches.html`,
+    impressumText: "Impressum",
+  });
+}
+
 /**
  * Ein Aufruf. Vier Pfade, genau die vier Ausloeser des Workflows:
  *   /neuer-trainer  Webhook 1  → Mail an Jakob
@@ -2704,6 +2792,23 @@ async function adminAktion(
     return antwort(200, { ok: true, gesamt: ziele.length, erledigt, ergebnis }, herkunft);
   }
 
+  // G2: Liste aller Wünsche für die Verwaltung (lesend, kein ziel_id). Nur
+  // service_role (Admin + aal2 oben geprüft).
+  if (aktion === "wuensche_liste") {
+    if (!a.wuenscheListe) {
+      return antwort(200, { ok: true, wuensche: [], uebersprungen: "nicht verdrahtet" }, herkunft);
+    }
+    try {
+      const wuensche = await a.wuenscheListe();
+      return antwort(200, { ok: true, wuensche }, herkunft);
+    } catch (fehler) {
+      if (istMigrationFehlt(fehler)) {
+        return antwort(200, { ok: true, wuensche: [], uebersprungen: "migration fehlt" }, herkunft);
+      }
+      throw fehler;
+    }
+  }
+
   const zielId = String(body.ziel_id ?? "");
   if (!zielId) return antwort(400, { fehler: "ziel_id fehlt" }, herkunft);
   // Eingaben begrenzen (Typ/Laenge): Kennungen sind UUIDs/kurze Strings.
@@ -2996,6 +3101,132 @@ async function adminAktion(
         if (istMigrationFehlt(fehler)) return antwort(400, { fehler: MIGRATION_HINWEIS }, herkunft);
         throw fehler;
       }
+    }
+
+    // ── G2: passende Trainer für einen Wunsch (≤ 25 km, inkl. noch nicht
+    // freigegebener, markiert). zielId = Wunsch-Kennung. ──
+    case "wunsch_trainer": {
+      if (!a.wunschNachId || !a.trainerAlleFuerVermittlung) {
+        return antwort(501, { fehler: "Wunsch-Vermittlung in dieser Fassung nicht verfuegbar" }, herkunft);
+      }
+      const wunsch = await a.wunschNachId(zielId);
+      if (!wunsch) return antwort(404, { fehler: "Wunsch nicht gefunden" }, herkunft);
+      const land = landNormal(wunsch.land);
+      const plz = ziffernPlz(wunsch.plz);
+      if (!land || !plz) {
+        return antwort(200, { ok: true, ort: null, umkreis_km: UMKREIS_KM, vorschlaege: [], hinweis: "PLZ oder Land fehlt im Wunsch." }, herkunft);
+      }
+      const mitte = await plzAufloesen(a, land, plz);
+      if (!mitte) return antwort(200, { ok: true, ort: null, umkreis_km: UMKREIS_KM, vorschlaege: [], hinweis: "PLZ nicht gefunden." }, herkunft);
+      if ((mitte as { netzfehler?: true }).netzfehler) {
+        return antwort(503, { fehler: "Standortdienst nicht erreichbar. Bitte später erneut." }, herkunft);
+      }
+      const m = mitte as PlzOrt;
+      const kandidaten = await a.trainerAlleFuerVermittlung(land);
+      const vorschlaege = wunschTrainerVorschlaege({ lat: m.lat, lng: m.lng }, kandidaten, UMKREIS_KM);
+      return antwort(200, { ok: true, ort: m.ort, umkreis_km: UMKREIS_KM, vorschlaege }, herkunft);
+    }
+
+    // ── G2: Wunsch an einen Trainer senden – legt über den bestehenden Anfrage-
+    // Ablauf eine Anfrage an (Kontakt aus dem Wunsch), schickt Trainer- und
+    // interne Mail und setzt den Wunsch auf an_trainer_gesendet. zielId = Wunsch. ──
+    case "wunsch_an_trainer": {
+      if (!a.wunschNachId || !a.wunschSetzen || !a.anfrageAnlegen) {
+        return antwort(501, { fehler: "Wunsch-Vermittlung in dieser Fassung nicht verfuegbar" }, herkunft);
+      }
+      const trainerId = String(body.trainer_id ?? "");
+      if (!trainerId) return antwort(400, { fehler: "trainer_id fehlt" }, herkunft);
+      const wunsch = await a.wunschNachId(zielId);
+      if (!wunsch) return antwort(404, { fehler: "Wunsch nicht gefunden" }, herkunft);
+      const trainer = await a.trainerNachId(trainerId);
+      if (!trainer) return antwort(404, { fehler: "Trainer nicht gefunden" }, herkunft);
+      const trainerName = nameFormatieren(`${w(trainer.vorname)} ${w(trainer.nachname)}`.trim());
+      const studio = !!trainer.studio_standort_id;
+      // Anfrage als Gast-Kunde (Kontakt aus dem Wunsch) über den bestehenden
+      // Anfrage-Ablauf. Studio-Trainer sehen die Anfrage ohne Zahlung
+      // (weitergeleitet=true), wie in neueAnfrage.
+      const anfrageFelder: Record<string, unknown> = {
+        trainer_id: trainerId,
+        trainer_name: trainerName,
+        kunden_name: w(wunsch.vorname),
+        kunden_email: w(wunsch.email),
+        ziel: w(wunsch.ziel),
+        nachricht: w(wunsch.nachricht),
+        weitergeleitet: studio,
+      };
+      let anfrageId: string | null = null;
+      try {
+        anfrageId = await a.anfrageAnlegen(anfrageFelder);
+      } catch (fehler) {
+        a.melden?.("wunsch_an_trainer: Anfrage anlegen fehlgeschlagen", String(fehler));
+        return antwort(500, { fehler: "Anfrage konnte nicht angelegt werden." }, herkunft);
+      }
+      const mailBody: Record<string, unknown> = {
+        ...anfrageFelder,
+        kunde_name: anfrageFelder.kunden_name,
+        kunde_email: anfrageFelder.kunden_email,
+        kunde_nachricht: anfrageFelder.nachricht,
+        anfrage_id: anfrageId,
+      };
+      const trainerMail = studio
+        ? mailStudioAnfrage(trainer, mailBody)
+        : (trainer.stripe_bezahlt === true ? mailWeitereAnfrage(trainer, mailBody) : mailErsteAnfrage(trainer, mailBody));
+      let mails = 0;
+      if (await sendeWennAdresseTaugt(a, trainerMail)) mails++;
+      if (await sendeWennAdresseTaugt(a, mailNeueAnfrageIntern(mailBody, anfrageId))) mails++;
+      await pushBenachrichtigung(a, pushNeueAnfrage(mailBody, anfrageId));
+      await a.wunschSetzen(zielId, {
+        status: "an_trainer_gesendet",
+        trainer_id: trainerId,
+        anfrage_id: anfrageId,
+        aktualisiert_am: new Date().toISOString(),
+      });
+      await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: "wuensche", ziel_id: zielId, ergebnis: `an Trainer ${trainerId} anfrage=${anfrageId ?? "?"} mails=${mails}` });
+      return antwort(200, { ok: true, anfrage_id: anfrageId, mails, studio }, herkunft);
+    }
+
+    // ── G2: kein passender Trainer – freundliche Mail an den Kunden + Vormerkung
+    // (Warteliste). zielId = Wunsch. ──
+    case "wunsch_kein_trainer": {
+      if (!a.wunschNachId || !a.wunschSetzen) {
+        return antwort(501, { fehler: "Wunsch-Vermittlung in dieser Fassung nicht verfuegbar" }, herkunft);
+      }
+      const wunsch = await a.wunschNachId(zielId);
+      if (!wunsch) return antwort(404, { fehler: "Wunsch nicht gefunden" }, herkunft);
+      const mails = (await sendeWennAdresseTaugt(a, mailWunschKeinTrainer(wunsch))) ? 1 : 0;
+      let vorgemerkt = false;
+      if (a.wartelisteVormerken) {
+        try {
+          await a.wartelisteVormerken({
+            kunden_email: w(wunsch.email),
+            kunden_name: w(wunsch.vorname),
+            plz: w(wunsch.plz),
+            stadt: w(wunsch.stadt),
+            land: w(wunsch.land),
+          });
+          vorgemerkt = true;
+        } catch (fehler) {
+          a.melden?.("wunsch_kein_trainer: Vormerkung fehlgeschlagen", String(fehler));
+        }
+      }
+      await a.wunschSetzen(zielId, { status: "kein_trainer", aktualisiert_am: new Date().toISOString() });
+      await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: "wuensche", ziel_id: zielId, ergebnis: `kein_trainer mails=${mails} vorgemerkt=${vorgemerkt}` });
+      return antwort(200, { ok: true, mails, vorgemerkt }, herkunft);
+    }
+
+    // ── G2: Status eines Wunsches von Hand setzen (vermittelt/abgeschlossen/…).
+    // zielId = Wunsch. ──
+    case "wunsch_status": {
+      if (!a.wunschSetzen) {
+        return antwort(501, { fehler: "Wunsch-Vermittlung in dieser Fassung nicht verfuegbar" }, herkunft);
+      }
+      const status = String(body.status ?? "");
+      if (!(WUNSCH_STATUS as readonly string[]).includes(status)) {
+        return antwort(400, { fehler: "unbekannter Status" }, herkunft);
+      }
+      const n = await a.wunschSetzen(zielId, { status, aktualisiert_am: new Date().toISOString() });
+      await a.protokoll?.({ admin_id: nutzer.id, aktion, ziel_tabelle: "wuensche", ziel_id: zielId, ergebnis: `status=${status} geaendert=${n}` });
+      return antwort(200, { ok: true, status, geaendert: n }, herkunft);
     }
 
     default:
