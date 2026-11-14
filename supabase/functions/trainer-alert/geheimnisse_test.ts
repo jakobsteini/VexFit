@@ -57,6 +57,16 @@ const HARMLOS: { datei: string; hash: string; grund: string }[] = [
     grund: "Vexfit-Geschaeftsnummer (tel:-Link) im Ueber-mich-Abschnitt der Startseite, dieselbe oeffentliche Nummer wie im Impressum",
   },
   {
+    datei: "ueber_mich_test.ts",
+    hash: "52986df1c94522cb3b1b76511878ff54809516a43704a0375c8f5f47ac7eb345",
+    grund: "Vexfit-Geschaeftsnummer (Anzeige) als erwarteter Text in der Pruefung des Ueber-mich-Abschnitts, dieselbe oeffentliche Nummer wie im Impressum",
+  },
+  {
+    datei: "ueber_mich_test.ts",
+    hash: "1689d7ba627aed917285c46c809691ab8ffcc3c5d6bd7d019a167b637a683cbf",
+    grund: "Vexfit-Geschaeftsnummer (tel:-Link) als erwarteter Text in der Pruefung des Ueber-mich-Abschnitts, dieselbe oeffentliche Nummer wie im Impressum",
+  },
+  {
     datei: "supabase/functions/vexfit-automation/profil_erinnerung_test.ts",
     hash: "9d5473adfc3ff1af8b566073e082e6390b14b82b1e63c4e44feedb241b7e338a",
     grund: "Platzhalter-Testnummer (alle Nullen) in der Fixture, keine echte Nummer",

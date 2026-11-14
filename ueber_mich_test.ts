@@ -3,7 +3,8 @@
 // Baustein 14.11.2026 – Abschnitt „Wer steckt hinter Vexfit?" mit Foto.
 // Geprüft (reine Datei-/Textprüfung, ohne Netz/DB):
 //   * index.html: Abschnitt #ueber-mich mit EXAKT dem vorgegebenen Text
-//     (Überschrift, Absatz, Kontaktzeile) + Bildnachweis „Foto: Tatjana Weber",
+//     (Überschrift, Absatz, Kontaktzeile),
+//   * „Tatjana Weber" kommt auf keiner öffentlichen Seite vor,
 //   * Kontaktzeile zusätzlich als mailto-/tel-Link,
 //   * Knopf „Personal Trainer finden lassen" → wunsch.html mit Herkunfts-Parameter,
 //   * responsive Bilder (400/800 WebP + JPG), alt-Text, feste Maße, loading=lazy,
@@ -46,8 +47,17 @@ Deno.test("Ueber: Abschnitt mit exakt vorgegebenem Text (Überschrift, Absatz, K
   assertEquals(nurText(kontakt[1]), "Fragen? office@vexfit.app · +43 660 3675175");
   assertStringIncludes(kontakt[1], 'href="mailto:office@vexfit.app"');
   assertStringIncludes(kontakt[1], 'href="tel:+436603675175"');
+});
 
-  assertStringIncludes(sec, '<figcaption class="ueber-credit">Foto: Tatjana Weber</figcaption>');
+Deno.test("Ueber: kein Bildnachweis Tatjana Weber auf öffentlichen Seiten", async () => {
+  const basis = new URL("./", import.meta.url);
+  const treffer: string[] = [];
+  for await (const e of Deno.readDir(basis)) {
+    if (!e.isFile || !e.name.endsWith(".html")) continue;
+    const s = await Deno.readTextFile(new URL(e.name, basis));
+    if (s.includes("Tatjana")) treffer.push(e.name);
+  }
+  assertEquals(treffer, [], "Bildnachweis noch vorhanden in: " + treffer.join(", "));
 });
 
 Deno.test("Ueber: Knopf führt mit Herkunfts-Parameter auf das Wunsch-Formular", async () => {
