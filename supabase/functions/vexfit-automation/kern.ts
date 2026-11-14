@@ -3138,6 +3138,18 @@ async function adminAktion(
       if (!trainerId) return antwort(400, { fehler: "trainer_id fehlt" }, herkunft);
       const wunsch = await a.wunschNachId(zielId);
       if (!wunsch) return antwort(404, { fehler: "Wunsch nicht gefunden" }, herkunft);
+      // Doppelklick-Schutz: ein Wunsch wird genau EINMAL an einen Trainer
+      // vermittelt (die UI schaltet danach auf „Als vermittelt markieren"/
+      // „Abschließen" um). Liegt bereits eine Anfrage vor (Status
+      // an_trainer_gesendet oder anfrage_id gesetzt), nicht erneut anlegen –
+      // sonst entstünden bei einem zweiten Klick doppelte Anfragen und Mails.
+      if (w(wunsch.status) === "an_trainer_gesendet" || w(wunsch.anfrage_id)) {
+        return antwort(409, {
+          fehler: "Dieser Wunsch wurde bereits an einen Trainer gesendet.",
+          bereits_gesendet: true,
+          anfrage_id: w(wunsch.anfrage_id) || null,
+        }, herkunft);
+      }
       const trainer = await a.trainerNachId(trainerId);
       if (!trainer) return antwort(404, { fehler: "Trainer nicht gefunden" }, herkunft);
       const trainerName = nameFormatieren(`${w(trainer.vorname)} ${w(trainer.nachname)}`.trim());

@@ -256,3 +256,23 @@ Deno.test("G2: Verwaltung-UI + index.ts verdrahtet", async () => {
   assertStringIncludes(idx, "trainerAlleFuerVermittlung");
   assertStringIncludes(idx, "anfrageAnlegen");
 });
+
+// ── Doppelklick-Schutz (Nachtlauf 15.11.2026) ─────────────────────────────────
+// Prompt-Vorgabe P2: „doppelte Klicks erzeugen keine doppelten Anfragen". Ein
+// Wunsch wird genau einmal an einen Trainer vermittelt (die UI schaltet danach
+// auf „Als vermittelt markieren"/„Abschließen" um). Ein zweiter Aufruf von
+// wunsch_an_trainer darf keine zweite Anfrage und keine zweite Mail erzeugen.
+Deno.test("G2: wunsch_an_trainer zweimal → keine zweite Anfrage/Mail (Doppelklick)", async () => {
+  const { a, s } = bau();
+  const r1 = await bearbeiten(admin({ aktion: "wunsch_an_trainer", ziel_id: "w-1", trainer_id: "t-1" }), a);
+  assertEquals(r1.status, 200);
+  assertEquals(s.anfragen.length, 1);
+  const mailsNach1 = s.mails.length;
+  // Zweiter Klick auf denselben, bereits vermittelten Wunsch.
+  const r2 = await bearbeiten(admin({ aktion: "wunsch_an_trainer", ziel_id: "w-1", trainer_id: "t-1" }), a);
+  assertEquals(r2.status, 409, "zweiter Klick muss abgewiesen werden");
+  const d2 = await r2.json();
+  assertEquals(d2.bereits_gesendet, true);
+  assertEquals(s.anfragen.length, 1, "Doppelklick legte eine zweite Anfrage an");
+  assertEquals(s.mails.length, mailsNach1, "Doppelklick verschickte erneut Mails");
+});
