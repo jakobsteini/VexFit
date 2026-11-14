@@ -144,6 +144,26 @@ footer p{font-size:12px;color:var(--text-muted)}
 @keyframes glowPulse{0%,100%{opacity:1}50%{opacity:0.6}}
 @keyframes tickerLeft{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+/* Wer steckt hinter Vexfit? (Ueber-mich-Abschnitt, 14.11.2026) */
+.ueber{background:var(--gray);border-top:1px solid var(--border)}
+.ueber-inner{display:flex;flex-direction:column;gap:26px;max-width:1040px;margin:0 auto;opacity:1;animation:ueberIn 0.7s ease both}
+@keyframes ueberIn{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.ueber-inner{animation:none}}
+.ueber-foto{margin:0;min-width:0}
+.ueber-foto img{display:block;width:100%;height:auto;aspect-ratio:4/3;object-fit:cover;object-position:center top;border-radius:16px;background:var(--card)}
+.ueber-credit{font-size:11px;color:var(--text-muted);letter-spacing:0.5px;margin-top:8px}
+.ueber-titel{font-family:'Bebas Neue',sans-serif;font-size:clamp(34px,8vw,50px);line-height:0.98;letter-spacing:2px;margin:8px 0 16px;color:var(--white)}
+.ueber-abs{font-size:15px;color:var(--text-muted);line-height:1.75;margin-bottom:18px;max-width:54ch}
+.ueber-kontakt{font-size:14px;color:var(--white);line-height:1.7;margin-bottom:24px}
+.ueber-kontakt a{color:var(--accent);text-decoration:none}
+.ueber-kontakt a:hover{text-decoration:underline}
+.ueber-btn{width:100%}
+@media(min-width:768px){
+  .ueber-inner{flex-direction:row;align-items:center;gap:52px}
+  .ueber-foto{flex:0 0 42%;max-width:440px}
+  .ueber-text{flex:1;min-width:0}
+  .ueber-btn{width:auto;display:inline-block}
+}
 </style>
 <!-- Meta Pixel Code -->
 <!-- Laedt NICHT beim Seitenaufruf. Nur wenn eine Zustimmung fuer Marketing vorliegt. -->
@@ -246,6 +266,25 @@ try {
     <div class="step reveal reveal-delay-1"><div class="step-num">01</div><span class="step-icon">🎯</span><h3>Wunsch abgeben</h3><p>Sag uns Ziel, Ort und Wunschzeiten – ganz ohne Konto.</p></div>
     <div class="step reveal reveal-delay-2"><div class="step-num">02</div><span class="step-icon">⚡</span><h3>Wir vermitteln</h3><p>Wir finden einen passenden Personal Trainer in deiner Nähe.</p></div>
     <div class="step reveal reveal-delay-3"><div class="step-num">03</div><span class="step-icon">🚀</span><h3>Loslegen</h3><p>Dein Trainer meldet sich bei dir – und ihr startet durch.</p></div>
+  </div>
+</section>
+<!-- Wer steckt hinter Vexfit? (Ueber-mich-Abschnitt, Baustein 14.11.2026) -->
+<section class="section ueber" id="ueber-mich">
+  <div class="ueber-inner">
+    <figure class="ueber-foto">
+      <picture>
+        <source type="image/webp" srcset="bilder/jakob-400.webp 400w, bilder/jakob-800.webp 800w" sizes="(min-width:768px) 440px, 100vw">
+        <img src="bilder/jakob-800.jpg" srcset="bilder/jakob-400.jpg 400w, bilder/jakob-800.jpg 800w" sizes="(min-width:768px) 440px, 100vw" width="800" height="600" loading="lazy" decoding="async" alt="Jakob Steinbacher, Gründer von Vexfit">
+      </picture>
+      <figcaption class="ueber-credit">Foto: Tatjana Weber</figcaption>
+    </figure>
+    <div class="ueber-text">
+      <div class="section-label">Hinter Vexfit</div>
+      <h2 class="ueber-titel">Wer steckt hinter Vexfit?</h2>
+      <p class="ueber-abs">Ich bin Jakob Steinbacher aus Salzburg. Mit Vexfit finde ich für dich den passenden Personal Trainer in deiner Nähe. Du sagst mir, was du suchst – ich kümmere mich um den Rest. Für dich ist das kostenlos.</p>
+      <p class="ueber-kontakt">Fragen? <a href="mailto:office@vexfit.app">office@vexfit.app</a> · <a href="tel:+436603675175">+43 660 3675175</a></p>
+      <a href="wunsch.html?utm_source=startseite" class="btn-accent ueber-btn">Personal Trainer finden lassen →</a>
+    </div>
   </div>
 </section>
 <section id="fuer-trainer">
