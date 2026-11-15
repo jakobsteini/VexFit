@@ -4399,6 +4399,11 @@ function abendberichtZeilen(z: AbendberichtZahlen): { beschriftung: string; wert
   // B8: Trichter der letzten 24 h nach Herkunft (anonym). Eine Zeile je
   // Herkunft mit den fünf Stufen; fehlt die Tabelle, steht „nicht verfügbar".
   const trichterFehler = z.fehler.find((x) => x.feld === "Trichter (24 h)");
+  // Einwilligung (15.11.2026): Reichweiten-/Herkunftszahlen entstehen nur noch
+  // von Besuchern mit Statistik-Einwilligung – als Hinweis über den Trichter.
+  if (!trichterFehler && (z.trichter24h.length || kundenTrichterSumme(z.kundenTrichter24h) > 0)) {
+    basis.push({ beschriftung: "Hinweis Reichweite", wert: "Zahlen nur von Besuchern mit Statistik-Einwilligung" });
+  }
   if (trichterFehler) {
     basis.push({ beschriftung: "Trichter (24 h)", wert: `nicht verfügbar (Fehler: ${trichterFehler.grund})` });
   } else if (z.trichter24h.length) {

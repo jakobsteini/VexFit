@@ -261,6 +261,11 @@ try { if (typeof vexfitTrichter === 'function') vexfitTrichter('wunsch_seite', {
 function werbungLesen(){
   var p = new URLSearchParams(location.search);
   var w = { utm_source: p.get('utm_source') || '', utm_campaign: p.get('utm_campaign') || '', utm_content: p.get('utm_content') || '', referrer: '' };
+  // Einwilligung (15.11.2026): Ohne Zustimmung „Statistik" NUR utm aus der
+  // aktuellen URL – kein Referrer, nichts vom Gerät lesen.
+  var statistik = false;
+  try { statistik = (localStorage.getItem('vexfit_statistik') === 'ja'); } catch(e) {}
+  if (!statistik) return w;
   try {
     var alt = JSON.parse(sessionStorage.getItem('vexfit_werbung') || 'null');
     if (alt) { w.utm_source = w.utm_source || alt.quelle || ''; w.utm_campaign = w.utm_campaign || alt.kampagne || ''; w.utm_content = w.utm_content || alt.inhalt || ''; w.referrer = alt.referrer || ''; }

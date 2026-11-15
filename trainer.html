@@ -93,7 +93,9 @@ h1 em{font-style:normal;color:var(--accent)}
   // Variablen, nicht als Inline-Literal.
   var SUPABASE_URL = 'https://hbapzwxdehfgnputrfjf.supabase.co';
   var SUPABASE_KEY = 'sb_publishable_DqQ2QLBEd_mRzWIRH5npXA_e99yfAzY';
-  try{
+  // Einwilligung (15.11.2026): Trichter nur mit Zustimmung „Statistik".
+  var statistikOk=false; try{ statistikOk=(localStorage.getItem('vexfit_statistik')==='ja'); }catch(e){}
+  if(statistikOk) try{
     var p = new URLSearchParams(qs);
     var ua = (navigator.userAgent||'').toLowerCase();
     var browser = ua.indexOf('instagram')>=0 ? 'instagram'

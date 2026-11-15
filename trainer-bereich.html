@@ -735,6 +735,8 @@ function achtAngaben(p) {
 // aus dem eigenen Datensatz T). Best effort; fehlt die Tabelle, passiert nichts.
 let profil5Gemeldet = false;
 function trichterProfil5() {
+  // Einwilligung (15.11.2026): ohne Zustimmung „Statistik" kein Trichter-Ereignis.
+  try { if (localStorage.getItem('vexfit_statistik') !== 'ja') return; } catch (e) { return; }
   if (profil5Gemeldet) return;
   const a = achtAngaben(aktuellesProfil());
   if (a.erfuellt < 5) return;
@@ -1906,6 +1908,7 @@ function logout() {
 </script>
 <div class="cookie-widerruf"><a href="rechtliches.html">Impressum</a><a href="rechtliches.html#datenschutz">Datenschutz</a><a href="#" onclick="return vexfitEinstellungenOeffnen()">Cookie-Einstellungen</a></div>
 <!-- Zustimmung fuer Marketing. Gleicher Aufbau und gleiche Gestaltung auf allen Seiten. -->
+<script src="vexfit-consent.js"></script>
 <style>
 .cookie-widerruf{text-align:center;padding:20px;font-size:13px}
 .cookie-widerruf a{color:#666;text-decoration:none;margin:0 8px}

@@ -302,6 +302,11 @@ const VEXFIT_WERBUNG=(function(){
   const schluessel=['utm_source','utm_campaign','utm_content','utm_medium','utm_term'];
   const w={};
   for(const k of schluessel){ const v=(p.get(k)||'').trim(); if(v) w[k]=v; }
+  // Einwilligung (15.11.2026): Ohne Zustimmung „Statistik" NUR utm aus der
+  // aktuellen URL – kein Referrer, nichts auf dem Gerät speichern/lesen.
+  let statistik=false;
+  try{ statistik=(localStorage.getItem('vexfit_statistik')==='ja'); }catch(e){}
+  if(!statistik) return w;
   // E3 (10.11.): Referrer-DOMAIN (ohne Pfad/Parameter) beim ersten Aufruf merken.
   try{ const rd=(window.vexHerkunft&&window.vexHerkunft.referrerDomain)?window.vexHerkunft.referrerDomain(document.referrer, location.hostname):''; if(rd) w.referrer=rd; }catch(e){}
   try{
@@ -331,6 +336,8 @@ function vexfitBrowserTyp(){
 // schlägt der Aufruf still fehl und die Registrierung läuft unberührt weiter.
 const trichterGemeldet={};
 function trichterBeacon(stufe, rolle){
+  // Einwilligung (15.11.2026): ohne Zustimmung „Statistik" kein Trichter-Ereignis.
+  try { if(localStorage.getItem('vexfit_statistik')!=='ja') return; } catch(e){ return; }
   const schluessel=stufe+'|'+(rolle||'');
   if(trichterGemeldet[schluessel]) return;
   trichterGemeldet[schluessel]=true;
@@ -781,6 +788,7 @@ zielChipsAufbauen();
 </script>
 <div class="cookie-widerruf"><a href="rechtliches.html">Impressum</a><a href="rechtliches.html#datenschutz">Datenschutz</a><a href="#" onclick="return vexfitEinstellungenOeffnen()">Cookie-Einstellungen</a></div>
 <!-- Zustimmung fuer Marketing. Gleicher Aufbau und gleiche Gestaltung auf allen Seiten. -->
+<script src="vexfit-consent.js"></script>
 <style>
 .cookie-widerruf{text-align:center;padding:20px;font-size:13px}
 .cookie-widerruf a{color:#666;text-decoration:none;margin:0 8px}

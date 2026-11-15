@@ -23,14 +23,27 @@
   // Profil → Anfrage). Beim ersten Aufruf mit UTM werden sie best effort in
   // sessionStorage gespiegelt; auf Folgeseiten ohne Query kommen sie von dort.
   var SCHLUESSEL = "vexfit_werbung";
+  // Einwilligung (15.11.2026, Variante A): Herkunft/Trichter nur mit Zustimmung
+  // „Statistik". Schlüssel vexfit_statistik ('ja'|'nein'); fehlt er, gilt AUS.
+  // Von vexfit-consent.js gesetzt. Hier direkt gelesen, damit die Datei ohne
+  // Abhängigkeit (und im Test) funktioniert.
+  function statistikErlaubt() {
+    try { return !!(global.localStorage && global.localStorage.getItem("vexfit_statistik") === "ja"); }
+    catch (_e) { return false; }
+  }
   function werbung() {
     var p = new URLSearchParams(global.location ? global.location.search : "");
     var w = {
       quelle: (p.get("utm_source") || "").trim() || null,
       kampagne: (p.get("utm_campaign") || "").trim() || null,
       inhalt: (p.get("utm_content") || "").trim() || null,
+      referrer: null,
     };
-    // E3: Referrer-Domain beim ERSTEN Aufruf merken (ohne Pfad/Parameter).
+    // Ohne Statistik-Einwilligung: NUR utm aus der AKTUELLEN URL. Kein Referrer,
+    // nichts auf dem Gerät speichern oder lesen.
+    if (!statistikErlaubt()) return w;
+    // Mit Einwilligung wie bisher: Referrer-Domain beim ERSTEN Aufruf merken
+    // (ohne Pfad/Parameter) und utm/Referrer in sessionStorage durchreichen.
     w.referrer = referrerDomain(
       global.document && global.document.referrer,
       global.location && global.location.hostname,
@@ -104,6 +117,11 @@
   var gemeldet = {};
   function vexfitTrichter(stufe, opt) {
     opt = opt || {};
+    // Einwilligung (15.11.2026): Ohne Zustimmung „Statistik" KEIN Trichter-
+    // Ereignis – weder mit Kennung noch als Zähler, und nichts auf dem Gerät.
+    // (Ein reiner anonymer Seitenzähler wäre nach Punkt 5 erlaubt, wird aber
+    //  bewusst nicht gesendet, um die Trennung einfach und eindeutig zu halten.)
+    if (!statistikErlaubt()) return;
     var rolle = opt.rolle || null;
     if (opt.einmal !== false) {
       var k = stufe + "|" + (rolle || "");
@@ -149,6 +167,7 @@
     module.exports = {
       plzBereich: plzBereich, browserTyp: browserTyp, landNormal: landNormal,
       referrerDomain: referrerDomain, herkunftEinordnen: herkunftEinordnen,
+      statistikErlaubt: statistikErlaubt,
     };
   }
 })(typeof window !== "undefined" ? window : globalThis);
