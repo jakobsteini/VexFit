@@ -33,16 +33,23 @@ Deno.test("B6a: AGB-Entwurf §6 setzt den USt-Status auf Kleinunternehmer (Platz
   assertStringIncludes(md, "einmalig 9,99 €");
 });
 
-Deno.test("B6b: Meta-Pixel-Datenschutztext bewusst NICHT eingefügt (kein fertiger Text in der Quelle)", async () => {
-  const quelle = await lies("./docs/recht/aenderungen-datenschutz-impressum.md");
-  // Die Quelle beschreibt nur Anforderungen ("Erforderlich: ... als Empfänger"),
-  // sie liefert KEINEN fertig formulierten Datenschutz-Absatz zum wörtlichen
-  // Übernehmen. Darum wurde nach der Regel BLOCK-STATT-RATEN nichts eingefügt.
-  assertStringIncludes(quelle, "Erforderlich:");
+Deno.test("B6b: Meta-Pixel-Datenschutztext eingefügt (15.11., belegt aus entwurf-meta-capi)", async () => {
+  // Stand 03.11. gab es nur eine Anforderungs-Notiz, keinen fertigen Absatz –
+  // darum galt BLOCK. Am 15.11. (Baustein R1) wurde der Abschnitt aus dem nun
+  // vorhandenen, fertig formulierten Entwurf docs/recht/entwurf-meta-capi-2026-11-06.md
+  // in die Datenschutzerklärung übernommen (nur das live laufende Browser-Pixel;
+  // die serverseitige Conversions API bleibt abgeschaltet und wird daher nicht
+  // als laufende Verarbeitung beschrieben).
+  const entwurf = await lies("./docs/recht/entwurf-meta-capi-2026-11-06.md");
+  assertStringIncludes(entwurf, "Meta Platforms Ireland Ltd.");
   const recht = await lies("./rechtliches.html");
-  // Es wurde kein erfundener Meta-Absatz in die Datenschutzerklärung geschrieben.
-  assert(!recht.includes("Meta Platforms"), "ein nicht belegter Meta-Absatz wurde eingefügt");
-  assert(!recht.includes("Conversions API"), "ein nicht belegter CAPI-Absatz wurde eingefügt");
+  // Der belegte Meta-Pixel-Abschnitt steht jetzt in der Datenschutzerklärung.
+  assertStringIncludes(recht, "META-PIXEL");
+  assertStringIncludes(recht, "Meta Platforms Ireland Ltd.");
+  assertStringIncludes(recht, "Art. 6 Abs. 1 lit. a DSGVO");
+  // Es wird keine laufende serverseitige Conversions-API-Übermittlung behauptet
+  // (der Schalter META_CAPI_AKTIV ist nicht gesetzt).
+  assert(!recht.includes("Conversions API"), "serverseitige CAPI fälschlich als laufend beschrieben");
 });
 
 Deno.test("B6c: Kunden-Pfad reicht event_id, Zustimmung und Quell-URL an /neuer-kunde", async () => {
