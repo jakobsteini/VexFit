@@ -1,7 +1,7 @@
 // /Users/js/Projekte/Vexfit/app/vexfit/teil3_test.ts
 //
 // Teil 3 - Schweizer PLZ. Prueft die gemeinsame PLZ-Aufloesung vexPlz.aufloesen
-// mit nachgestelltem zippopotam (KEINE echten Netzabfragen):
+// mit nachgestelltem Edge-Endpunkt /plz-aufloesen (KEINE echten Netzabfragen):
 //   6300 -> zwei Treffer (AT/CH) -> mehrdeutig; Wahl CH gibt Zug/CH.
 //   10115 -> DE ohne Rueckfrage, nur eine Abfrage.
 //   5020 -> nur AT-Treffer -> AT ohne Rueckfrage.
@@ -18,30 +18,36 @@ async function ladeVexPlz() {
   return (g.vexPlz as any);
 }
 
-// Baut ein nachgestelltes fetch, das zippopotam-Antworten liefert und mitzaehlt,
-// welche Laender/PLZ abgefragt wurden.
+// Baut ein nachgestelltes fetch für den eigenen Edge-Endpunkt /plz-aufloesen
+// (POST { plz, land }) und mitzaehlt, welche Laender/PLZ abgefragt wurden
+// (als "/land/plz", ein Aufruf je Land – wie bisher).
 function macheFetch(
   daten: Record<string, { stadt: string; lat: string; lng: string } | null>,
 ) {
   const aufrufe: string[] = [];
-  const f = (url: string) => {
-    aufrufe.push(String(url));
-    const m = String(url).match(/zippopotam\.us\/([a-z]{2})\/(\d+)/);
-    const key = m ? `${m[1]}/${m[2]}` : "";
-    const treffer = daten[key];
+  const f = (_url: string, opts?: { body?: string }) => {
+    let plz = "", land = "";
+    try {
+      const b = JSON.parse(opts?.body ?? "{}");
+      plz = String(b.plz ?? "");
+      land = String(b.land ?? "").toLowerCase();
+    } catch { /* egal */ }
+    aufrufe.push(`/${land}/${plz}`);
+    const treffer = daten[`${land}/${plz}`];
     if (treffer) {
       return Promise.resolve({
         ok: true,
+        status: 200,
         json: () => Promise.resolve({
-          places: [{
-            "place name": treffer.stadt,
-            latitude: treffer.lat,
-            longitude: treffer.lng,
-          }],
+          ok: true,
+          stadt: treffer.stadt,
+          land: land.toUpperCase(),
+          lat: treffer.lat,
+          lng: treffer.lng,
         }),
       });
     }
-    return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+    return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({ unbekannt: true }) });
   };
   return { fetch: f as unknown as typeof fetch, aufrufe };
 }

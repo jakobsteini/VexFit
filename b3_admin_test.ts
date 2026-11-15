@@ -7,7 +7,7 @@
 //   - die Migration für die Herkunft-Spalte.
 //
 // Aufruf:  deno test --allow-read b3_admin_test.ts
-import { assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
+import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
 import {
   anfragenOhneAntwort,
   bereitZurFreigabe,
@@ -90,7 +90,11 @@ Deno.test("Admin-HTML: neue Reiter, Heute-zu-tun, Karte, Herkunft vorhanden", as
   assertStringIncludes(html, "leaflet/1.9.4/leaflet.min.js");
   assertStringIncludes(html, "cdnjs.cloudflare.com");
   assertStringIncludes(html, "https://*.tile.openstreetmap.org");
-  assertStringIncludes(html, "api.zippopotam.us");
+  // R4 (15.11.2026): Die PLZ-Auflösung läuft serverseitig über die eigene Edge-
+  // Function – der Browser ruft keinen externen Standortdienst mehr auf, daher
+  // ist api.zippopotam.us nicht mehr in der CSP (nur noch Supabase als Ziel).
+  assert(!html.includes("api.zippopotam.us"), "kein externer Standortdienst mehr in der CSP");
+  assertStringIncludes(html, "connect-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co");
   // Legende mit allen vier Punktfarben.
   for (const farbe of ["#2e6fff", "#7fb3ff", "#ff5a5a", "#ff9f1a"]) assertStringIncludes(html, farbe);
   // Filter Land + Zeitraum.

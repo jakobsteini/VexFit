@@ -525,29 +525,18 @@ async function ermittleNutzerCoords(plz, statusEl, land) {
   return { lat: e.lat, lng: e.lng, city: e.stadt };
 }
 
-// Trainer-Koordinaten. Ist t.land gesetzt, wird nur dieses Land abgefragt
-// (direkt bei zippopotam.us, Schluessel im Zwischenspeicher inkl. Land), sonst
-// wie die Nutzer-PLZ ueber vexPlz.aufloesen. Bei Mehrdeutigkeit ohne gesetztes
-// Land wird der erste Treffer genommen (keine Nutzerwahl noetig).
+// Trainer-Koordinaten. Ist t.land gesetzt, wird nur dieses Land abgefragt (ueber
+// vexPlz.aufloesen -> serverseitige Auflösung, land-bewusster Zwischenspeicher),
+// sonst ohne Land. Bei Mehrdeutigkeit ohne gesetztes Land wird der erste Treffer
+// genommen (keine Nutzerwahl noetig).
 // Rueckgabe: { lat, lng, city } | null.
 async function trainerCoords(plz, land) {
   if(!plz) return null;
   if(land) {
-    const lk = String(land).toLowerCase();
-    const key = lk + ':' + plz;
-    if(plzCache.has(key)) return plzCache.get(key);
-    try {
-      const r = await fetch(`https://api.zippopotam.us/${lk}/${plz}`);
-      if(r.ok) {
-        const d = await r.json();
-        if(d.places?.length) {
-          const c = { lat: parseFloat(d.places[0].latitude), lng: parseFloat(d.places[0].longitude), city: d.places[0]['place name'] };
-          plzCache.set(key, c);
-          return c;
-        }
-      }
-    } catch(e) {}
-    return null;
+    // Mit gesetztem Land ist die Aufloesung eindeutig (nie mehrdeutig).
+    const e = await vexPlz.aufloesen(plz, { cache: plzCache, land });
+    if(!e || e.netzfehler) return null;
+    return { lat: e.lat, lng: e.lng, city: e.stadt };
   }
   const e = await vexPlz.aufloesen(plz, { cache: plzCache });
   if(!e || e.netzfehler) return null;

@@ -20,21 +20,28 @@ async function ladeVexPlz() {
   return (g as any).vexPlz;
 }
 
-// Nachgestelltes fetch: liefert zippopotam-Antworten und zaehlt die Aufrufe.
+// Nachgestelltes fetch: der Browser ruft jetzt den eigenen Edge-Endpunkt
+// /plz-aufloesen auf (POST { plz, land }). Dieser Stub liefert die Edge-Antwort
+// und zaehlt die Aufrufe als "/land/plz" (ein Aufruf je Land, wie bisher).
 function macheFetch(daten: Record<string, { stadt: string; lat: string; lng: string }>) {
   const aufrufe: string[] = [];
-  const f = (url: string) => {
-    aufrufe.push(String(url));
-    const m = String(url).match(/zippopotam\.us\/([a-z]{2})\/(\d+)/);
-    const key = m ? `${m[1]}/${m[2]}` : "";
-    const t = daten[key];
+  const f = (_url: string, opts?: { body?: string }) => {
+    let plz = "", land = "";
+    try {
+      const b = JSON.parse(opts?.body ?? "{}");
+      plz = String(b.plz ?? "");
+      land = String(b.land ?? "").toLowerCase();
+    } catch { /* egal */ }
+    aufrufe.push(`/${land}/${plz}`);
+    const t = daten[`${land}/${plz}`];
     if (t) {
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ places: [{ "place name": t.stadt, latitude: t.lat, longitude: t.lng }] }),
+        status: 200,
+        json: () => Promise.resolve({ ok: true, stadt: t.stadt, land: land.toUpperCase(), lat: t.lat, lng: t.lng }),
       });
     }
-    return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+    return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({ unbekannt: true }) });
   };
   return { fetch: f as unknown as typeof fetch, aufrufe };
 }

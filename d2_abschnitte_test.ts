@@ -57,15 +57,19 @@ Deno.test("D2: ein DE-Online-Trainer erscheint bei AT-Suche NIE im Vor-Ort-Absch
 });
 
 Deno.test("D2: 5020 land-eindeutig – AT liefert Salzburg, CH liefert den Schweizer Ort", async () => {
-  // Gefälschtes fetch: je Landpfad ein anderer Ort fuer dieselbe PLZ 5020.
-  const fakeFetch = (url: string) => {
+  // Gefälschtes fetch für den eigenen Edge-Endpunkt /plz-aufloesen (POST
+  // { plz, land }): je Land ein anderer Ort fuer dieselbe PLZ 5020.
+  const fakeFetch = (_url: string, opts?: { body?: string }) => {
+    const b = JSON.parse(opts?.body ?? "{}");
+    const land = String(b.land ?? "").toUpperCase();
     const ok = (ort: string) => Promise.resolve({
       ok: true,
-      json: () => Promise.resolve({ places: [{ "place name": ort, latitude: "47", longitude: "13" }] }),
+      status: 200,
+      json: () => Promise.resolve({ ok: true, stadt: ort, land, lat: "47", lng: "13" }),
     });
-    if (url.includes("/at/5020")) return ok("Salzburg");
-    if (url.includes("/ch/5020")) return ok("Wettingen");
-    return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) });
+    if (b.plz === "5020" && land === "AT") return ok("Salzburg");
+    if (b.plz === "5020" && land === "CH") return ok("Wettingen");
+    return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({ unbekannt: true }) });
   };
   const at = await vexPlz.aufloesen("5020", { land: "AT", fetch: fakeFetch });
   const ch = await vexPlz.aufloesen("5020", { land: "CH", fetch: fakeFetch });

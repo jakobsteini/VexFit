@@ -11,9 +11,13 @@
 //                 der Nutzer waehlt ueber zwei Knoepfe.
 // Ergebnis je Ort: { stadt, land ('AT'|'DE'|'CH'), lat, lng }.
 //
-// Dienst: api.zippopotam.us (Laendercode klein in der Adresse). Damit dieselbe
-// PLZ nicht mehrfach abgefragt wird, nimmt aufloesen() einen optionalen
-// Zwischenspeicher (Map) entgegen.
+// Auflösung SERVERSEITIG (15.11.2026, R4): Der Browser ruft den externen
+// Standortdienst NICHT mehr direkt auf. Stattdessen fragt er den eigenen Edge-
+// Endpunkt /functions/v1/vexfit-automation/plz-aufloesen (Land je Abfrage), der
+// serverseitig auflöst und nur Ort + Koordinaten zurückgibt. So erreicht die
+// IP-Adresse des Besuchers den US-Dienst nicht mehr. Damit dieselbe PLZ nicht
+// mehrfach abgefragt wird, nimmt aufloesen() einen optionalen Zwischenspeicher
+// (Map) entgegen.
 //
 // Land eindeutig fuehren (07.11.2026): Viele 4-stellige PLZ gibt es in AT UND
 // CH (z. B. 5020 Salzburg vs. 5020 Wettingen/CH). Wird aufloesen() ein Land
@@ -50,22 +54,40 @@
     return null;
   }
 
-  async function einLand(landKlein, plz, fetchImpl) {
+  // Adresse des eigenen Edge-Endpunkts. In der Seite kann window.SUPABASE_URL
+  // gesetzt sein; sonst das bekannte Projekt. Zur Aufrufzeit gelesen, damit eine
+  // später gesetzte SUPABASE_URL noch greift. Tests übergeben opts.endpunkt/fetch.
+  function edgeAdresse() {
+    const basis = (global.SUPABASE_URL || 'https://hbapzwxdehfgnputrfjf.supabase.co');
+    return basis + '/functions/v1/vexfit-automation/plz-aufloesen';
+  }
+
+  // Fragt den eigenen Server nach EINEM Land. Rückgabe unverändert:
+  //   { stadt, land, lat, lng } - Treffer
+  //   null                      - Dienst erreichbar, aber PLZ dort unbekannt
+  //   { netzfehler: true }      - Server/Dienst nicht erreichbar oder gebremst
+  async function einLand(landKlein, plz, fetchImpl, endpunkt) {
     try {
-      const r = await fetchImpl('https://api.zippopotam.us/' + landKlein + '/' + plz);
-      if (r && r.ok) {
-        const d = await r.json();
-        if (d && d.places && d.places.length > 0) {
-          const p = d.places[0];
-          return {
-            stadt: p['place name'],
-            land: landKlein.toUpperCase(),
-            lat: parseFloat(p.latitude),
-            lng: parseFloat(p.longitude),
-          };
-        }
+      const r = await fetchImpl(endpunkt || edgeAdresse(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plz: plz, land: landKlein.toUpperCase() }),
+      });
+      if (!r) return { netzfehler: true };
+      const d = await Promise.resolve(r.json ? r.json() : null).catch(function () { return null; });
+      if (d && d.netzfehler) return { netzfehler: true }; // Standortdienst down
+      if (r.status === 429) return { netzfehler: true };  // gebremst -> später erneut
+      const lat = d ? parseFloat(d.lat) : NaN;
+      const lng = d ? parseFloat(d.lng) : NaN;
+      if (r.ok && d && isFinite(lat) && isFinite(lng)) {
+        return {
+          stadt: d.stadt,
+          land: d.land || landKlein.toUpperCase(),
+          lat: lat,
+          lng: lng,
+        };
       }
-      return null; // Dienst erreichbar, aber PLZ dort unbekannt.
+      return null; // erreichbar, aber PLZ dort unbekannt / ungültig
     } catch (_e) {
       return { netzfehler: true };
     }
@@ -80,6 +102,7 @@
     opts = opts || {};
     const fetchImpl = opts.fetch || (typeof fetch !== 'undefined' ? fetch : null);
     const cache = opts.cache || null;
+    const endpunkt = opts.endpunkt || null;
     const land = landNormal(opts.land); // 'AT'|'DE'|'CH' oder null
     plz = String(plz == null ? '' : plz).trim();
 
@@ -93,19 +116,19 @@
     if (/^\d{5}$/.test(plz)) {
       // 5 Ziffern sind eindeutig Deutschland; ein gewaehltes Land spielt keine
       // Rolle (DE wird ohnehin abgefragt).
-      const de = await einLand('de', plz, fetchImpl);
+      const de = await einLand('de', plz, fetchImpl, endpunkt);
       ergebnis = de && de.netzfehler ? { netzfehler: true } : (de || null);
     } else if (/^\d{4}$/.test(plz)) {
       if (land) {
         // Gezielt nur das gewaehlte Land -> eindeutig, keine Rueckfrage.
-        const r = await einLand(land.toLowerCase(), plz, fetchImpl);
+        const r = await einLand(land.toLowerCase(), plz, fetchImpl, endpunkt);
         ergebnis = r && r.netzfehler ? { netzfehler: true } : (r || null);
       } else {
         // Kein Land gewaehlt: AT und CH parallel. Zwei Treffer -> mehrdeutig
         // (Rueckfrage ueber auswahlKnoepfe), statt still zu raten.
         const beide = await Promise.all([
-          einLand('at', plz, fetchImpl),
-          einLand('ch', plz, fetchImpl),
+          einLand('at', plz, fetchImpl, endpunkt),
+          einLand('ch', plz, fetchImpl, endpunkt),
         ]);
         const netz = beide.some((x) => x && x.netzfehler);
         const treffer = beide.filter((x) => x && !x.netzfehler);

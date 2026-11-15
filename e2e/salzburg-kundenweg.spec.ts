@@ -32,8 +32,9 @@ async function fange(page: Page, anzahl: number, calls: string[]) {
     await page.route(`**/rest/v1/${sicht}*`, (r) =>
       r.fulfill({ status: 200, contentType: "application/json", body }));
   }
-  await page.route("**/api.zippopotam.us/**", (r) =>
-    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ places: [{ "place name": "Salzburg", latitude: "47.80", longitude: "13.04" }] }) }));
+  // R4 (15.11.): PLZ-Auflösung serverseitig über die eigene Edge-Function.
+  await page.route("**/functions/v1/vexfit-automation/plz-aufloesen", (r) =>
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, stadt: "Salzburg", land: "AT", lat: 47.80, lng: 13.04 }) }));
   await page.route("**/functions/v1/vexfit-automation/neuer-kunde", (r) => {
     calls.push("mail-kunde");
     return r.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' });

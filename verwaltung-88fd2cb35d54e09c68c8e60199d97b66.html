@@ -12,10 +12,11 @@
      Storage und data: (MFA-QR-Code). Verbindungen nur zu Supabase. -->
 <!-- Teil A: manifest-src und worker-src ergänzt (PWA + Service Worker, beides 'self'). -->
 <!-- B3: Karte (Leaflet). Zusätzlich erlaubt, NUR für die Karten-Ansicht (lesend):
-     Leaflet von cdnjs (script/style), OpenStreetMap-Kacheln als Bilder und die
-     PLZ-Auflösung (api.zippopotam.us, via vexfit-plz.js). Schreibende
-     Admin-Aktionen laufen unverändert nur über die Edge-Function /admin-aktion. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co data: https://*.tile.openstreetmap.org; font-src 'self'; connect-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co https://api.zippopotam.us; manifest-src 'self'; worker-src 'self'">
+     Leaflet von cdnjs (script/style) und OpenStreetMap-Kacheln als Bilder. Die
+     PLZ-Auflösung läuft seit 15.11.2026 (R4) serverseitig über die eigene Edge-
+     Function (Supabase) – der Browser ruft keinen externen Standortdienst mehr
+     auf. Schreibende Admin-Aktionen laufen unverändert nur über /admin-aktion. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co data: https://*.tile.openstreetmap.org; font-src 'self'; connect-src 'self' https://hbapzwxdehfgnputrfjf.supabase.co; manifest-src 'self'; worker-src 'self'">
 <title>Vexfit – Verwaltung</title>
 <link rel="icon" type="image/png" sizes="32x32" href="marke/favicon-32.png">
 <!-- Teil A: Homescreen-App nur für die Verwaltung. Manifest + Icons sind nur von

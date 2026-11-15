@@ -470,6 +470,28 @@ export function suchRatenGrenze(
   return liste.length > max;
 }
 
+/** R4 (15.11.2026): Bremse für die ÖFFENTLICHE PLZ-Auflösung (/plz-aufloesen).
+ *  Höchstens so viele Abfragen je IP-Adresse und Stunde. */
+export const PLZ_ABFRAGEN_PRO_STUNDE = 60;
+/** Prozess-weites Zeitfenster je IP für die PLZ-Bremse. */
+const _plzFenster = new Map<string, number[]>();
+/** true, wenn diese IP in der letzten Stunde schon PLZ_ABFRAGEN_PRO_STUNDE
+ *  Abfragen hatte (diese eingerechnet). Fenster im Prozess (wie die Suchbremse);
+ *  bei vielen gleichzeitigen Instanzen eine lockere Obergrenze je Instanz.
+ *  Verhindert, dass der offene Endpunkt als Weiterleitung zum Standortdienst
+ *  missbraucht wird. */
+export function plzRatenGrenze(
+  ip: string,
+  jetzt: number = Date.now(),
+  max: number = PLZ_ABFRAGEN_PRO_STUNDE,
+): boolean {
+  const vor1h = jetzt - 3_600_000;
+  const liste = (_plzFenster.get(ip) || []).filter((t) => t > vor1h);
+  liste.push(jetzt);
+  _plzFenster.set(ip, liste);
+  return liste.length > max;
+}
+
 export interface Mail {
   an: string;
   betreff: string;
@@ -1926,6 +1948,41 @@ async function trainerSuche(
 }
 
 /**
+ * POST /plz-aufloesen — ÖFFENTLICH (keine Anmeldung). Eingabe { plz, land }
+ * (land Pflicht: AT/DE/CH; eine 5-stellige PLZ behandelt der Browser ohnehin als
+ * DE). Löst die PLZ SERVERSEITIG auf (Zwischenspeicher plz_orte → externer
+ * Standortdienst) und gibt NUR Ort + Koordinaten zurück. Dadurch erreicht die
+ * IP-Adresse des Besuchers den US-Standortdienst nicht mehr – nur dieser Server
+ * ruft ihn auf. Einfache Bremse je IP (PLZ_ABFRAGEN_PRO_STUNDE), damit der offene
+ * Endpunkt nicht als Weiterleitung missbraucht wird.
+ * Antworten: 200 { ok, stadt, land, lat, lng } | 404 { unbekannt:true } |
+ *   503 { netzfehler:true } | 400 { fehler } | 429 { fehler }.
+ */
+async function plzAufloesenEndpunkt(
+  r: Request,
+  a: Anschluesse,
+  herkunft: string | null,
+): Promise<Response> {
+  const ip = klientIp(r);
+  if (ip && plzRatenGrenze(ip)) {
+    return antwort(429, { fehler: "Zu viele PLZ-Abfragen in kurzer Zeit. Bitte kurz warten." }, herkunft);
+  }
+  const body = await koerperLesen(r);
+  if (!body) return antwort(400, { fehler: "Die Anfrage war nicht lesbar." }, herkunft);
+  const land = landNormal(body.land);
+  const plz = ziffernPlz(body.plz);
+  if (!land) return antwort(400, { fehler: "Bitte Land wählen (AT, DE oder CH)." }, herkunft);
+  if (!plz) return antwort(400, { fehler: "Bitte gültige PLZ eingeben." }, herkunft);
+  const o = await plzAufloesen(a, land, plz);
+  if (!o) return antwort(404, { unbekannt: true }, herkunft);
+  if ((o as { netzfehler?: true }).netzfehler) {
+    return antwort(503, { netzfehler: true }, herkunft);
+  }
+  const m = o as PlzOrt;
+  return antwort(200, { ok: true, stadt: m.ort, land, lat: m.lat, lng: m.lng }, herkunft);
+}
+
+/**
  * POST /trainer-profil — nur gültige Kunden-Sitzung. Eingabe { id }. Liefert ein
  * Profil (nur erlaubte Felder) NUR, wenn der Trainer ≤ UMKREIS_KM um die zuletzt
  * gesuchte Mitte des Kunden liegt ODER der Kunde bereits eine Anfrage an ihn hat;
@@ -2311,6 +2368,8 @@ export async function bearbeiten(
         return await trainerSuche(anfrageObjekt, a, herkunft);
       case "trainer-profil":
         return await trainerProfilEndpunkt(anfrageObjekt, a, herkunft);
+      case "plz-aufloesen":
+        return await plzAufloesenEndpunkt(anfrageObjekt, a, herkunft);
       case "admin-aktion":
         return await adminAktion(anfrageObjekt, a, herkunft);
       case "freigabe-pruefen":

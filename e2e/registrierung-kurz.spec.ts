@@ -23,8 +23,10 @@ async function fangeSupabaseAb(page: import("@playwright/test").Page, calls: str
   await page.route("**/functions/v1/vexfit-automation/neuer-trainer", (r) => { calls.push("mail-trainer:" + r.request().postData()); return r.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' }); });
   await page.route("**/functions/v1/vexfit-automation/neuer-kunde", (r) => { calls.push("mail-kunde"); return r.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' }); });
   // E2 (10.11.): Trainer-Registrierung ermittelt den Ort aus der PLZ (vexfit-plz.js).
-  await page.route("**/api.zippopotam.us/**", (r) =>
-    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ places: [{ "place name": "Salzburg", latitude: "47.80", longitude: "13.04" }] }) }));
+  // R4 (15.11.): Die Auflösung läuft serverseitig über die eigene Edge-Function;
+  // der Browser ruft keinen externen Standortdienst mehr auf.
+  await page.route("**/functions/v1/vexfit-automation/plz-aufloesen", (r) =>
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, stadt: "Salzburg", land: "AT", lat: 47.80, lng: 13.04 }) }));
 }
 
 test("Trainer-Erstformular: nur Pflichtfelder, Mail sofort mit utm_campaign, dann geführter Ablauf", async ({ page }) => {
