@@ -69,6 +69,33 @@ for (const sicht of ["trainers_vorschau", "trainers_oeffentlich"]) {
   } catch (e) { merk(false, `c) ${sicht} Netzwerkfehler: ${e.message}`); }
 }
 
+// h) 15.11. (P1-Härtung, Migration 2026-11-15-01): anon darf KEINE interne
+//    Tabelle/Sicht lesen. SELECT als anon MUSS einen Fehlerstatus (nicht 200)
+//    liefern und darf keine Zeile zurückgeben. VOR dem Einspielen fallen
+//    admin_protokoll und trichter_ereignisse ABSICHTLICH durch (heute 200/0),
+//    die übrigen sind bereits abgeschottet (401).
+const INTERN = [
+  "admin_protokoll", "trichter_ereignisse", "such_eingaben", "warteliste",
+  "trainer_alerts", "profilaufrufe", "profil_erinnerungen", "push_abos",
+  "spam_schutz", "wuensche", "studios", "studio_standorte", "kunden",
+  "trainers", "anfragen", "nachrichten", "favoriten", "bewertungen",
+  "anfragen_sichtbar",
+];
+for (const tab of INTERN) {
+  try {
+    const res = await rest(`${tab}?select=*&limit=1`);
+    let zeilen = 0;
+    if (res.status === 200) {
+      const j = await res.json().catch(() => []);
+      zeilen = Array.isArray(j) ? j.length : 0;
+    } else {
+      await res.text().catch(() => "");
+    }
+    merk(res.status !== 200 && zeilen === 0,
+      `h) ${tab} (anon SELECT) -> Fehlerstatus (ist ${res.status}${res.status === 200 ? `, 200 mit ${zeilen} Zeile(n)` : ""})`);
+  } catch (e) { merk(false, `h) ${tab} Netzwerkfehler: ${e.message}`); }
+}
+
 // ── 12.11. (Weg B): KUNDEN-Fälle. Login über Umgebungsvariablen, nichts im Code.
 //    VEXFIT_TEST_MAIL / VEXFIT_TEST_PASSWORT setzen (das Passwort tippt Jakob
 //    selbst beim Aufruf ein). Ohne diese Variablen werden die Fälle übersprungen.

@@ -42,6 +42,11 @@ const HARMLOS: { datei: string; hash: string; grund: string }[] = [
     grund: "Vexfit-Geschaeftsnummer (tel:-Link) im Impressum und Kontakt",
   },
   {
+    datei: "docs/pruefbericht-2026-11-15.md",
+    hash: "52986df1c94522cb3b1b76511878ff54809516a43704a0375c8f5f47ac7eb345",
+    grund: "oeffentliche Vexfit-Geschaeftsnummer im zitierten Kunden-Mailtext",
+  },
+  {
     datei: "supabase/functions/vexfit-automation/kern.ts",
     hash: "52986df1c94522cb3b1b76511878ff54809516a43704a0375c8f5f47ac7eb345",
     grund: "Vexfit-Geschaeftsnummer (oeffentlich) in der Signatur der Freischalt-Mail (mailFreischaltung)",
